@@ -8,7 +8,7 @@ import { readTombstonedUploadDocumentIds } from "./customer-source-lifecycle";
 import { admitsDerivedCustomerData } from "./derived-data-admission";
 import type { AgentPrincipal } from "./developer-auth";
 import { COLLECTION_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "./immutable-keys";
-import { libraryOrganizeMode } from "./library-shadow";
+import { libraryOrganizeMode, readLibraryDocuments } from "./library-shadow";
 import { processingCohortRefusal } from "./processing-workspace-grant";
 import { COMPILE_PLAN_MAX_BODY_BYTES } from "./proposal-compile-plan";
 import { listImmutableWorkspaceObjects } from "./r2-objects";
@@ -27,12 +27,14 @@ import { getFoundationActiveWorld, listFoundationActiveWorlds } from "./world-st
   (agentCodeOf); a code the table does not name is UNAVAILABLE, and a handler that throws is UNAVAILABLE too, so
   no exception text, store message or internal code ever reaches the agent's model.
 
-  Existence is not disclosed. For every tool that takes an id, a failure before or at the step that decides
-  whether the id names something this person can read is NOT_FOUND, whatever the id: readable-but-absent,
-  unreadable, another tenant's, random -- and an outage of a reader that makes that decision folds into the same
-  NOT_FOUND (§17 (a)), because "the reader is down" must not tell "absent" from "exists but unreadable". The
-  security suite fuzzes every id-taking tool across every id class and every reader outage and requires
-  byte-identical answers.
+  Existence is not disclosed. For every tool that takes an id, the reads that decide whether the id names
+  something this person can read run through `deciding`: any failure of them -- refused, unavailable, thrown --
+  is NOT_FOUND, whatever the id (readable-but-absent, unreadable, another tenant's, random), because "the reader
+  is down" must not tell "absent" from "exists but unreadable" (§3, §17 (a)). A failure after that decision is
+  what it is (UNAVAILABLE, or the reused function's own refusal). The propose tools make the same decision here,
+  with the same readers, before the executor runs, so an executor's later outage is never mistaken for it.
+  Codes leave through the one table only. The security suite fuzzes both sides of that line for every
+  id-taking tool, and every id class under every reader outage for byte identity.
 */
 
 // -------------------------------------------------------------------------------------------------------------
@@ -115,12 +117,17 @@ const actorOf = (principal: AgentPrincipal): ProposalActor => ({
   grantId: principal.grantId, keyId: principal.keyId,
 });
 
+/** A read that decides whether an id names something this person can read: a throw is a failure like any other (null). */
+async function deciding<T>(read: () => Promise<T>): Promise<T | null> {
+  try { return await read(); } catch { return null; }
+}
+
 type Access = "readable" | "denied" | "unavailable";
-/** One access call for a set of documents, as the grant's person. */
+/** One access call for a set of documents, as the grant's person. A checker that throws cannot answer. */
 async function access(principal: AgentPrincipal, documentIds: readonly string[]): Promise<Access> {
   if (documentIds.length === 0) return "denied";
-  const checked = await checkConnectorSourceAccessForViewer(principal.workspaceKey, [...documentIds], principal.userId);
-  return checked.ok ? "readable" : checked.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? "denied" : "unavailable";
+  const checked = await deciding(() => checkConnectorSourceAccessForViewer(principal.workspaceKey, [...documentIds], principal.userId));
+  return checked?.ok ? "readable" : checked?.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? "denied" : "unavailable";
 }
 
 /** Access per document set, one call per distinct sorted set. */
@@ -184,9 +191,10 @@ async function getWorkflowStatus({ principal }: AgentToolContext, args: unknown)
 async function getProposalTool({ principal }: AgentToolContext, args: unknown): Promise<AgentToolResult> {
   const input = exact(args, ["proposalId"]);
   if (!input || !text(input.proposalId, UUID)) return INPUT_INVALID;
-  const found = await getProposal(principal.workspaceKey, input.proposalId);
+  const { proposalId } = input;
+  const found = await deciding(() => getProposal(principal.workspaceKey, proposalId));
   // Absent, another tenant's, another grant's and a store that cannot answer are one answer.
-  if (!found.ok || found.row.agent_grant_id !== principal.grantId || found.row.workspace_key !== principal.workspaceKey) return NOT_FOUND;
+  if (!found?.ok || found.row.agent_grant_id !== principal.grantId || found.row.workspace_key !== principal.workspaceKey) return NOT_FOUND;
   const documents = agentProposalDocuments(found.row);
   if (!documents) return NOT_FOUND;
   const readable = await access(principal, documents);
@@ -202,11 +210,12 @@ async function getProposalTool({ principal }: AgentToolContext, args: unknown): 
 async function getCompileJobTool({ principal }: AgentToolContext, args: unknown): Promise<AgentToolResult> {
   const input = exact(args, ["jobId"]);
   if (!input || !text(input.jobId, JOB_ID)) return INPUT_INVALID;
-  const read = await readCompileJob(principal.workspaceKey, input.jobId);
-  if (!read.ok) return read.code === "COMPILE_JOB_NOT_FOUND" ? NOT_FOUND : UNAVAILABLE;
+  // The job read and the access check decide the job's existence: any failure of either is the same not-found.
+  const { jobId } = input;
+  const read = await deciding(() => readCompileJob(principal.workspaceKey, jobId));
+  if (!read?.ok) return NOT_FOUND;
   const job = read.value;
   if (job.workspaceKey !== principal.workspaceKey) return NOT_FOUND;
-  // Unreadable and an access check that cannot answer are the same not-found: the job's existence is the question.
   if (await access(principal, job.documentIds) !== "readable") return NOT_FOUND;
   return {
     ok: true,
@@ -237,23 +246,21 @@ function asCandidates(body: unknown): Candidate[] | null {
 }
 
 /**
- * The collection's candidates this person can read, newest first, before any page is cut. A collection with
- * none (absent, another tenant's, unreadable) is NOT_FOUND; so is an access check that cannot answer. Nothing
+ * The collection's candidates this person can read, newest first, before any page is cut: the read that decides
+ * whether a collection id (and a digest in it) names something readable. A collection with none (absent,
+ * another tenant's, unreadable) is NOT_FOUND; so is a listing or an access check that fails in any way. Nothing
  * else is read here: a caller reads the active pointer only after it has decided its own id exists.
  */
 async function readableCandidates(principal: AgentPrincipal, collectionId: string): Promise<{ ok: true; candidates: Candidate[] } | Refusal> {
-  const config = readSupabaseAdminConfig();
-  if (!config) return UNAVAILABLE;
-  let listed: Candidate[] | null;
-  try {
+  const listed = await deciding(async () => {
+    const config = readSupabaseAdminConfig();
+    if (!config) return null;
     const response = await supabaseAdminRequest(config, "/rest/v1/rpc/list_collection_candidates", {
       method: "POST", body: JSON.stringify({ p_workspace_key: principal.workspaceKey, p_collection_id: collectionId, p_limit: CANDIDATE_SCAN }),
     });
-    listed = response.ok ? asCandidates(await response.json().catch(() => null)) : null;
-  } catch {
-    listed = null;
-  }
-  if (!listed) return UNAVAILABLE;
+    return response.ok ? asCandidates(await response.json()) : null;
+  });
+  if (!listed) return NOT_FOUND;
   const check = accessCache(principal);
   const verdicts = await Promise.all(listed.map((candidate) => check(candidate.documentIds)));
   if (verdicts.includes("unavailable")) return NOT_FOUND;
@@ -434,8 +441,8 @@ async function listDocumentsTool({ principal }: AgentToolContext, args: unknown)
 const clientKey = (value: unknown): value is string => text(value, AGENT_CLIENT_KEY);
 
 /** The single-row answer of a propose tool. */
-function proposed(created: Awaited<ReturnType<typeof createProposal>>, fold: (code: string) => AgentErrorCode): AgentToolResult {
-  if (!created.ok) return refuse(fold(created.code));
+function proposed(created: Awaited<ReturnType<typeof createProposal>>): AgentToolResult {
+  if (!created.ok) return refuse(agentCodeOf(created.code));
   const shown = view(created.row, true);
   return shown ? { ok: true, output: shown } : UNAVAILABLE;
 }
@@ -449,8 +456,8 @@ async function proposeCompile({ principal }: AgentToolContext, args: unknown): P
     actionType: "compile_plan", raw: { documentIds: input.documentIds }, evidenceIds: undefined, clientKey: input.idempotencyKey,
     toolName: "propose_compile", index: 0,
   });
-  // §17 (a): the inventory read decides whether a readable id exists, so its outage is the same not-found.
-  return proposed(created, (code) => (code === "PROPOSAL_PRECONDITION_UNAVAILABLE" ? "NOT_FOUND" : agentCodeOf(code)));
+  // The dry-run folds a failure of its own existence-deciding reads into not-found (§17 (a)); nothing is folded here.
+  return proposed(created);
 }
 
 /** The Library answers only under `on` for a workspace inside an explicitly set processing cohort (library-shadow.ts). */
@@ -471,13 +478,18 @@ async function proposeLibraryLabels({ principal }: AgentToolContext, args: unkno
   // Checked before any per-document check: with the Library off nothing is read.
   if (!libraryOrganizeEnabled(principal.workspaceKey)) return refuse("LIBRARY_ORGANIZE_NOT_ENABLED");
   const { collectionId, expectedManifestDigest, idempotencyKey } = input;
+  // The existence decision: every item names a document this person can read that the Library has a labelled
+  // version of. The executor repeats it; deciding it here first keeps an outage of these reads a not-found.
+  const documentIds = [...new Set((items as Record<string, unknown>[]).map((item) => item.documentId as string))];
+  if (await access(principal, documentIds) !== "readable") return NOT_FOUND;
+  const library = await deciding(() => readLibraryDocuments(principal.workspaceKey, documentIds, principal.userId));
+  if (!library?.ok || documentIds.some((id) => !Object.hasOwn(library.sourceVersions, id))) return NOT_FOUND;
   const created = await createProposalBatch(actorOf(principal), (items as Record<string, unknown>[]).map((item) => ({
     actionType: "library_label",
     raw: { collectionId, expectedManifestDigest, input: { documentId: item.documentId, labelKind: item.labelKind, labelKey: item.labelKey, decision: item.decision } },
     evidenceIds: undefined, clientKey: idempotencyKey, toolName: "propose_library_labels",
   })));
-  // The Library's own read decides whether a readable document has a labelled version; its outage is the same not-found.
-  if (!created.ok) return refuse(/^LIBRARY_ORGANIZE_(?!NOT_ENABLED$)/.test(created.code) ? "NOT_FOUND" : agentCodeOf(created.code));
+  if (!created.ok) return refuse(agentCodeOf(created.code));
   const views = created.created.map(({ row }) => view(row, true));
   return views.every((row) => row !== null) ? { ok: true, output: views } : UNAVAILABLE;
 }
@@ -487,10 +499,14 @@ async function proposeLabelCorrection({ principal }: AgentToolContext, args: unk
   if (!input || !text(input.collectionId, COLLECTION_ID_PATTERN) || !text(input.baseManifestDigest, SHA256) || !text(input.objectId, OBJECT_ID)
     || !label(input.before) || !label(input.after) || !text(input.evidenceId, OBJECT_ID) || !clientKey(input.idempotencyKey)) return INPUT_INVALID;
   const { idempotencyKey, ...raw } = input;
+  // The existence decision, as R5 makes it: the base is a candidate of the collection this person can read.
+  const found = await readableCandidates(principal, input.collectionId);
+  if (!found.ok) return found;
+  if (!found.candidates.some((candidate) => candidate.manifestDigest === input.baseManifestDigest)) return NOT_FOUND;
   const created = await createProposal(actorOf(principal), {
     actionType: "ontology_label_patch", raw, evidenceIds: undefined, clientKey: idempotencyKey as string, toolName: "propose_label_correction", index: 0,
   });
-  return proposed(created, agentCodeOf);
+  return proposed(created);
 }
 
 // -------------------------------------------------------------------------------------------------------------

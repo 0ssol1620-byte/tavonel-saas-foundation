@@ -201,11 +201,40 @@ describe("prepare: the creation dry-run", () => {
     expect(store).toEqual([]);
   });
 
+  /*
+    §17 (a), the class and not one input: every way the two reads that decide existence (access, inventory) can
+    fail -- refused, unavailable, thrown as an Error, a TypeError or a non-Error -- is, for an agent, the same
+    not-found as an unreadable id, with nothing quoted. For a person the inventory outage stays a 503.
+  */
+  const deciding: Array<[string, () => void]> = [
+    ["access unavailable", () => checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" })],
+    ["no signer", () => readSigner.mockReturnValue(null)],
+    ["a listing that fails", () => listObjects.mockResolvedValue({ ok: false, code: "LIST_FAILED" })],
+    ...[new Error("boom"), new TypeError("x is not a function"), "a string"].flatMap((value): Array<[string, () => void]> => [
+      [`access throwing ${String(value)}`, () => checkAccess.mockImplementation(async () => { throw value; })],
+      [`the signer throwing ${String(value)}`, () => readSigner.mockImplementation(() => { throw value; })],
+      [`the listing throwing ${String(value)}`, () => listObjects.mockImplementation(async () => { throw value; })],
+    ]),
+  ];
+  it.each(deciding)("agent: %s is the same not-found as an unreadable id, and nothing is quoted", async (_name, arrange) => {
+    arrange();
+    expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404 });
+    expect(store).toEqual([]);
+  });
+
   it.each([
     ["no signer", () => readSigner.mockReturnValue(null)],
     ["a listing that fails", () => listObjects.mockResolvedValue({ ok: false, code: "LIST_FAILED" })],
-  ])("an inventory with %s fails closed with 503", async (_name, arrange) => {
+  ])("person: an inventory with %s fails closed with 503", async (_name, arrange) => {
     arrange();
+    expect(await prepare([DOC_A], { kind: "session", workspaceKey: WS, userId: PERSON, authorizationRevision: 3 }))
+      .toEqual({ ok: false, code: "PROPOSAL_PRECONDITION_UNAVAILABLE", status: 503 });
+  });
+
+  it("agent: a failure after the existence decision is not folded -- the quote down on a readable, present document is 503", async () => {
+    quote = "down";
+    expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_PRECONDITION_UNAVAILABLE", status: 503 });
+    storeThrows = new Error("connect ECONNREFUSED");
     expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_PRECONDITION_UNAVAILABLE", status: 503 });
   });
 
@@ -436,6 +465,23 @@ describe("decision path with the real executor", () => {
     expect(decideCalls()).toBe(0);
     expect(rows.get(row.proposal_id)?.state).toBe("proposed");
     expect(postCompile).not.toHaveBeenCalled();
+  });
+
+  it("§17 (b): a confirmation takes one quote -- the one refused over the balance on is the one bound (mutant: binding re-quotes)", async () => {
+    const row = await proposed();
+    const quotes = () => store.filter((call) => call.path.endsWith("/quote_foundation_compile_recharge")).length;
+    const before = quotes();
+    const answer = await proposals.decideProposal(confirmRequest(), principal, row, { decision: "confirm", previewDigest: digestOf(row) });
+    expect(quotes() - before).toBe(1);
+    expect(answer.ok && answer.proposal.state).toBe("executed");
+  });
+
+  it("a rejection is never refused for the balance", async () => {
+    const row = await proposed();
+    quote = quoteOf({ balanceRechargeCredits: 101, balanceCredits: 100 });
+    const answer = await proposals.decideProposal(confirmRequest(), principal, row, { decision: "reject" });
+    expect(answer.ok).toBe(true);
+    expect(decideCalls()).toBe(1);
   });
 
   it("the quote RPC down at confirmation: 503, nothing decided", async () => {

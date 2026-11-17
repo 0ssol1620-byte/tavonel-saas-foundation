@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
 import { PROMPT_INJECTION_FIXTURES } from "./prompt-injection.fixtures";
 
@@ -56,6 +56,9 @@ const ARTIFACT = compileCollectionCandidate([
   ocr(DOC_B, "b".repeat(64), "ACME Corporaton requires written approval before changing payment terms."),
 ]);
 const CANDIDATE = ARTIFACT.manifestDigest;
+/** What a Core-compiled candidate carries outside its digest; the real read model only serves a reviewable artifact. */
+const CORE_EXECUTION = { status: "completed", runtime: "tavonel-python-core-v2", worldStateId: "world-state-1",
+  receipt: { requestId: "core-request-1", outputSha256: `sha256:${"c".repeat(64)}`, candidatePromotion: false } };
 const EDITABLE = ARTIFACT.ontology.nodes.find((node) => node.kind === "Entity" || node.kind === "Topic" || node.kind === "Claim")!;
 const EVIDENCE = { id: "ev-1", sourceId: DOC_A, sourceVersionId: "a".repeat(64), page: 1, bbox: [80, 120, 920, 320] };
 
@@ -63,10 +66,17 @@ const EVIDENCE = { id: "ev-1", sourceId: DOC_A, sourceVersionId: "a".repeat(64),
 // The fake workspace(s)
 // ---------------------------------------------------------------------------------------------------------------
 
+/** A reader is up (false), down -- it answers its own failure (true) -- or it throws ("throw"). */
+type Mode = boolean | "throw";
 type Outages = {
-  access: boolean; inventory: boolean; library: boolean; candidates: boolean; quote: boolean; active: boolean; jobs: boolean;
-  proposals: boolean; review: boolean; model: boolean; quarantine: boolean; tombstones: boolean; storeThrows: boolean;
+  access: Mode; inventory: Mode; library: Mode; candidates: Mode; quote: Mode; active: Mode; jobs: Mode;
+  proposals: Mode; review: Mode; model: Mode; quarantine: Mode; tombstones: Mode; storeThrows: boolean;
 };
+/** The failure a down reader answers, or, for "throw", an exception whose text must never reach the agent. */
+function broken<T>(mode: Mode, failure: T): T {
+  if (mode === "throw") throw new TypeError("reader exploded: connect ECONNREFUSED 10.0.0.7:5432 password=hunter2");
+  return failure;
+}
 const NO_OUTAGE: Outages = { access: false, inventory: false, library: false, candidates: false, quote: false, active: false, jobs: false,
   proposals: false, review: false, model: false, quarantine: false, tombstones: false, storeThrows: false };
 
@@ -117,20 +127,24 @@ function reset(outages: Partial<Outages> = {}) {
 }
 
 const checkAccess = async (ws: string, ids: string[]) => {
-  if (down.access) return { ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" };
+  if (down.access) return broken(down.access, { ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
   // Another tenant's documents are not this workspace's: the checker knows nothing of them and does not block them.
   return ids.some((id) => ws === WS && unreadable.has(id)) ? { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" } : { ok: true };
 };
 const authorize = vi.fn();
+/** Answers the next session/foundation checks take, in order; with none queued the real check runs. */
+const queuedAuth: unknown[] = [];
 const postCompile = vi.fn(async () => { writes.push("POST /api/compile-jobs"); return new Response(null, { status: 500 }); });
 
 /* Every R2 helper is recorded; those the tools may read are answered, any other one is refused (and recorded). */
 const R2_ANSWERS: Record<string, (...args: never[]) => unknown> = {
   readR2SignerEnv: () => ({ bucket: "b" }),
-  listImmutableWorkspaceObjects: async (_signer: unknown, ws: string) => down.inventory ? { ok: false, code: "LIST_FAILED" }
+  listImmutableWorkspaceObjects: async (_signer: unknown, ws: string) => down.inventory ? broken(down.inventory, { ok: false, code: "LIST_FAILED" })
     : { ok: true, objects: [...inventories.get(ws) ?? new Map()].map(([id, version]) => ({
       key: `immutable/${ws}/${ws}/${id}/${version}/sanitized.pdf`, size: 10, lastModified: "2026-11-16T10:00:00.000Z" })) },
-  listFoundationQuarantineRejects: async () => down.quarantine ? { ok: false, code: "LIST_FAILED" }
+  getWorkspaceCollectionCandidate: async () => down.model ? broken(down.model, { ok: false, code: "R2_READ_FAILED" })
+    : { ok: true, json: { ...structuredClone(ARTIFACT), coreExecution: CORE_EXECUTION } },
+  listFoundationQuarantineRejects: async () => down.quarantine ? broken(down.quarantine, { ok: false, code: "LIST_FAILED" })
     : { ok: true, documentIds: [], storedDocumentIds: [], truncated: false },
 };
 function recorded(module: Record<string, unknown>) {
@@ -149,47 +163,63 @@ vi.mock("@/lib/collection-storage", () => ({
 vi.mock("@/lib/developer-auth", async (original) => {
   const real = await original<typeof import("./developer-auth")>();
   authorize.mockImplementation(real.authorizeAgentRequest);
-  return { ...real, authorizeAgentRequest: authorize };
+  return {
+    ...real, authorizeAgentRequest: authorize,
+    requireFoundationSession: (...args: Parameters<typeof real.requireFoundationSession>) =>
+      queuedAuth.length > 0 ? Promise.resolve(queuedAuth.shift()) : real.requireFoundationSession(...args),
+    authorizeFoundationRequest: (...args: Parameters<typeof real.authorizeFoundationRequest>) =>
+      queuedAuth.length > 0 ? Promise.resolve(queuedAuth.shift()) : real.authorizeFoundationRequest(...args),
+  };
 });
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccessForViewer: checkAccess, checkConnectorSourceAccess: checkAccess }));
 vi.mock("@/app/api/compile-jobs/route", () => ({ POST: postCompile }));
 /* The customer-data gate's own suites cover it; its one store read (current_foundation_processing_terms_acceptance) is on the read list. */
-vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: async () => true }));
+/* The customer-data gates admit, except where a test runs them real (realGate): the last describe does, over the transport. */
+let realGate = false;
+vi.mock("@/lib/customer-data-admission", async (original) => {
+  const real = await original<typeof import("./customer-data-admission")>();
+  return { ...real, canAdmitCustomerSource: (...args: Parameters<typeof real.canAdmitCustomerSource>) =>
+    realGate ? real.canAdmitCustomerSource(...args) : Promise.resolve(true) };
+});
 vi.mock("@/lib/customer-source-scope", () => ({ readCustomerSourceScope: async () => ({ ok: true, scope: "direct_upload" }) }));
-vi.mock("@/lib/derived-data-admission", () => ({ admitsDerivedCustomerData: async () => true }));
+vi.mock("@/lib/derived-data-admission", async (original) => {
+  const real = await original<typeof import("./derived-data-admission")>();
+  return { ...real, admitsDerivedCustomerData: (...args: Parameters<typeof real.admitsDerivedCustomerData>) =>
+    realGate ? real.admitsDerivedCustomerData(...args) : Promise.resolve(true) };
+});
 vi.mock("@/lib/world-store", async (original) => ({
   ...await original<typeof import("./world-store")>(),
-  listFoundationActiveWorlds: async (ws: string) => down.active ? { ok: false, code: "WORLD_STORE_READ_FAILED" } : { ok: true, nextCursor: null,
+  listFoundationActiveWorlds: async (ws: string) => down.active ? broken(down.active, { ok: false, code: "WORLD_STORE_READ_FAILED" }) : { ok: true, nextCursor: null,
     worlds: [...actives].filter(([key]) => key.startsWith(`${ws}|`)).map(([key, world]) => ({ collectionId: key.split("|")[1], ...world, updatedAt: "2026-11-17T00:00:00Z" })) },
   getFoundationActiveWorld: async (ws: string, collectionId: string) => {
-    if (down.active) return { ok: false, code: "WORLD_STORE_READ_FAILED" };
+    if (down.active) return broken(down.active, { ok: false, code: "WORLD_STORE_READ_FAILED" });
     const world = actives.get(`${ws}|${collectionId}`);
     return world ? { ok: true, world: { collectionId, ...world } } : { ok: false, code: "ACTIVE_WORLD_NOT_FOUND" };
   },
 }));
 vi.mock("@/lib/compile-job-store", async (original) => ({
   ...await original<typeof import("./compile-job-store")>(),
-  listWorkspaceCompileJobs: async (ws: string) => down.jobs ? { ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" }
+  listWorkspaceCompileJobs: async (ws: string) => down.jobs ? broken(down.jobs, { ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" })
     : { ok: true, value: jobs.filter((item) => item.workspaceKey === ws) },
   readCompileJob: async (ws: string, jobId: string) => {
-    if (down.jobs) return { ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" };
+    if (down.jobs) return broken(down.jobs, { ok: false, code: "COMPILE_JOB_STORE_READ_FAILED" });
     const found = jobs.find((item) => item.jobId === jobId && item.workspaceKey === ws);
     return found ? { ok: true, value: found } : { ok: false, code: "COMPILE_JOB_NOT_FOUND" };
   },
 }));
 vi.mock("@/lib/world-read-model", () => ({
-  loadWorldReadModel: async (_ws: string, _collection: string, digest: string) => down.model ? { ok: false, code: "SIGNER_NOT_CONFIGURED", status: 503 }
+  loadWorldReadModel: async (_ws: string, _collection: string, digest: string) => down.model ? broken(down.model, { ok: false, code: "SIGNER_NOT_CONFIGURED", status: 503 })
     : { ok: true, model: { world: { manifestDigest: digest }, evidence: [EVIDENCE],
       objects: [{ id: EDITABLE.id, type: EDITABLE.kind, label: EDITABLE.label, evidenceRefs: ["ev-1"] }] } },
 }));
 vi.mock("@/lib/customer-source-lifecycle", async (original) => ({
   ...await original<typeof import("./customer-source-lifecycle")>(),
-  readTombstonedUploadDocumentIds: async () => down.tombstones ? { ok: false, code: "CUSTOMER_SOURCE_DELETE_STORE_FAILED" } : { ok: true, ids: new Set() },
+  readTombstonedUploadDocumentIds: async () => down.tombstones ? broken(down.tombstones, { ok: false, code: "CUSTOMER_SOURCE_DELETE_STORE_FAILED" }) : { ok: true, ids: new Set() },
 }));
 vi.mock("@/lib/library-shadow", async (original) => ({
   ...await original<typeof import("./library-shadow")>(),
   readLibraryDocuments: async (ws: string, ids: string[]) => {
-    if (down.library) return { ok: false, code: "LIBRARY_ORGANIZE_STORE_FAILED" };
+    if (down.library) return broken(down.library, { ok: false, code: "LIBRARY_ORGANIZE_STORE_FAILED" });
     const versions = library.get(ws) ?? {};
     return { ok: true, documents: [], sourceVersions: Object.fromEntries(ids.filter((id) => versions[id] && !unreadable.has(id)).map((id) => [id, versions[id]!])) };
   },
@@ -201,9 +231,14 @@ vi.mock("@/lib/supabase-admin", () => ({
     calls.push({ method: init.method ?? "GET", path, body });
     if (down.storeThrows) throw new Error("connect ECONNREFUSED 10.0.0.7:5432 password=hunter2");
     const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
-    const failed = () => json({ code: "57014", message: "canceling statement due to statement timeout" }, 500);
+    const failed = (mode: Mode) => broken(mode, json({ code: "57014", message: "canceling statement due to statement timeout" }, 500));
+    if (realStore) {
+      const answer = realReaderAnswer(path, body, json, failed);
+      if (answer) return answer;
+    }
+    if (name0(path) === "revoke_foundation_api_key_authorized") return json(null);
     if (path.startsWith("/rest/v1/foundation_review_decisions?")) {
-      if (down.review) return failed();
+      if (down.review) return failed(down.review);
       const query = new URLSearchParams(path.split("?")[1]);
       const base = query.get("manifest_digest")?.replace(/^eq\./, "");
       const result = query.get("resulting_manifest_digest")?.replace(/^eq\./, "");
@@ -212,23 +247,23 @@ vi.mock("@/lib/supabase-admin", () => ({
     }
     const name = path.replace("/rest/v1/rpc/", "");
     if (name === "list_collection_candidates") {
-      return down.candidates ? failed() : json(candidates.get(`${body!.p_workspace_key}|${body!.p_collection_id}`) ?? []);
+      return down.candidates ? failed(down.candidates) : json(candidates.get(`${body!.p_workspace_key}|${body!.p_collection_id}`) ?? []);
     }
     if (name === "quote_foundation_compile_recharge") {
-      return down.quote ? failed() : json({ reservations: [], totalRechargeCredits: 0, balanceRechargeCredits: 0, overageCredits: 0, balanceCredits: 100 });
+      return down.quote ? failed(down.quote) : json({ reservations: [], totalRechargeCredits: 0, balanceRechargeCredits: 0, overageCredits: 0, balanceCredits: 100 });
     }
     if (name === "get_world_change_proposal") {
-      if (down.proposals) return failed();
+      if (down.proposals) return failed(down.proposals);
       const row = proposals.get(body!.p_proposal_id as string);
       return row && row.workspace_key === body!.p_workspace_key ? json(row) : json({ message: "proposal_not_found" }, 400);
     }
     if (name === "list_world_change_proposals_page") {
-      if (down.proposals) return failed();
+      if (down.proposals) return failed(down.proposals);
       return json([...proposals.values()].filter((row) => row.workspace_key === body!.p_workspace_key
         && (body!.p_agent_grant_id === null || row.agent_grant_id === body!.p_agent_grant_id)).reverse().slice(0, body!.p_limit as number));
     }
     if (name === "create_world_change_proposal") {
-      if (down.proposals) return failed();
+      if (down.proposals) return failed(down.proposals);
       const existing = [...proposals.values()].find((row) => row.idempotency_key === body!.p_idempotency_key);
       if (existing) return json({ proposal: existing, replayed: true });
       nextId += 1;
@@ -246,6 +281,66 @@ vi.mock("@/lib/supabase-admin", () => ({
     return json({ message: `unexpected ${path}` }, 500);
   },
 }));
+
+/*
+  The rows the real reader modules read (the last describe of this file runs them over this transport). Each
+  answers from the same fake workspace as the fakes above, shaped as PostgREST and the migrations answer.
+*/
+let realStore = false;
+const name0 = (path: string) => path.replace("/rest/v1/rpc/", "").split("?")[0]!;
+function realReaderAnswer(path: string, body: Record<string, unknown> | null, json: (value: unknown, status?: number) => Response,
+  failed: (mode: Mode) => Response): Response | null {
+  const [table, search] = path.replace("/rest/v1/", "").split("?") as [string, string | undefined];
+  const query = new URLSearchParams(search ?? "");
+  const eq = (key: string) => query.get(key)?.replace(/^eq\./, "") ?? null;
+  const ws = eq("workspace_key");
+  const counted = (rows: unknown[]) => new Response(JSON.stringify(rows), { status: 200, headers: { "content-range": `0-${rows.length}/${rows.length}` } });
+  switch (table) {
+    case "rpc/connector_documents_blocked": {
+      if (down.access) return failed(down.access);
+      return json(body!.p_workspace_key === WS && (body!.p_document_ids as string[]).some((id) => unreadable.has(id)));
+    }
+    case "rpc/read_library_organize": {
+      if (down.library) return failed(down.library);
+      const versions = library.get(body!.p_workspace_key as string) ?? {};
+      return json({ schemaVersion: "tavonel.library_organize_read.v1", relations: [], labels: (body!.p_document_ids as string[])
+        .filter((id) => versions[id]).map((id) => ({ documentId: id, sourceVersionId: versions[id], labelKind: "topic", labelKey: "pricing",
+          labelSetVersion: "v1", method: "m", methodVersion: "1", inputsSha256: `sha256:${"1".repeat(64)}`, disposition: "proposed",
+          abstainReason: null, internalScore: null, evidenceIds: [], createdAt: "2026-11-16T00:00:00Z" })) });
+    }
+    case "rpc/current_foundation_processing_terms_acceptance": return json(null);
+    case "source_deletion_tombstones": return down.tombstones ? failed(down.tombstones) : json([]);
+    case "connector_document_bindings": return counted([]);
+    case "foundation_intake_admissions": {
+      const ids = /document_id=in\.\(([^)]*)\)/.exec(search ?? "")?.[1]?.split(",") ?? [];
+      return counted(ids.filter((id) => inventories.get(ws ?? "")?.has(id)).map((id) => ({ workspace_key: ws, document_id: id })));
+    }
+    case "foundation_compile_jobs": {
+      if (down.jobs) return failed(down.jobs);
+      return json(jobs.filter((row) => row.workspaceKey === ws && (eq("job_id") === null || row.jobId === eq("job_id"))).map((row) => ({
+        job_id: row.jobId, workspace_key: row.workspaceKey, created_by_user_id: row.createdByUserId, authorization_revision: row.authorizationRevision,
+        document_ids: row.documentIds, state: row.state, collection_id: row.collectionId, error_code: row.errorCode, blocked: row.blocked,
+        blocked_resolution: row.blockedResolution, documents_total: row.documentsTotal, documents_ready: row.documentsReady, corpus_id: null,
+        batch_index: null, batch_count: null, created_at: row.createdAt, updated_at: row.updatedAt, settled_at: row.settledAt })));
+    }
+    case "foundation_active_worlds": {
+      if (down.active) return failed(down.active);
+      return json([...actives].filter(([key]) => key.startsWith(`${ws}|`) && (eq("collection_id") === null || key === `${ws}|${eq("collection_id")}`))
+        .map(([key, world]) => ({ workspace_key: ws, collection_id: key.split("|")[1], manifest_digest: world.manifestDigest, revision: world.revision,
+          updated_at: "2026-11-17T00:00:00Z" })));
+    }
+    case "foundation_world_versions": {
+      if (down.active) return failed(down.active);
+      return json([...actives].filter(([key, world]) => key === `${ws}|${eq("collection_id")}` && (eq("manifest_digest") === null || world.manifestDigest === eq("manifest_digest")))
+        .map(([key, world]) => ({ workspace_key: ws, collection_id: key.split("|")[1], manifest_digest: world.manifestDigest, revision: world.revision,
+          lifecycle_status: "active", world_state_id: "ws-1", core_output_sha256: `sha256:${"7".repeat(64)}`, created_at: "2026-11-16T00:00:00Z",
+          first_promoted_at: "2026-11-16T00:00:00Z", last_activated_at: "2026-11-16T00:00:00Z", activation_count: 1,
+          candidate_object_key: `immutable/${ws}/${ws}/collections/${key.split("|")[1]}/${world.manifestDigest.slice(7)}/candidate-world.json`,
+          updated_at: "2026-11-17T00:00:00Z" })));
+    }
+    default: return null;
+  }
+}
 
 const { POST, GET } = await import("@/app/api/agent-mcp/route");
 // Imported once at collection: the read-only MCP route loads its whole bridge.
@@ -296,13 +391,15 @@ const READ_RPCS = ["connector_documents_blocked_for_viewer", "connector_document
   "quote_foundation_compile_recharge", "get_world_change_proposal", "list_world_change_proposals_page", "list_world_change_proposals",
   "current_foundation_processing_terms_acceptance"];
 const WRITE_RPCS = ["create_world_change_proposal", "consume_foundation_api_rate_limit"];
-const R2_READS = /^(readR2SignerEnv|list[A-Z]\w*|get[A-Z]\w*|load[A-Z]\w*|read[A-Z]\w*)$/;
+/** The R2 helpers the tools may call, by exact name: a new helper (a presign-for-put named get*, say) fails I-1 until it is listed. */
+const R2_READS = ["readR2SignerEnv", "listImmutableWorkspaceObjects", "listFoundationQuarantineRejects", "getWorkspaceCollectionCandidate",
+  "loadPreferredCollectionCandidate"];
 
 function expectOnlyReadsAndTheProposalRow() {
   const rpcs = calls.filter((call) => call.path.startsWith("/rest/v1/rpc/")).map((call) => call.path.slice("/rest/v1/rpc/".length));
   expect(rpcs.filter((name) => !READ_RPCS.includes(name) && !WRITE_RPCS.includes(name)), "an RPC outside the read and write lists").toEqual([]);
   expect(calls.filter((call) => !call.path.startsWith("/rest/v1/rpc/") && call.method !== "GET").map((call) => `${call.method} ${call.path}`)).toEqual([]);
-  expect(r2Calls.filter((name) => !R2_READS.test(name)), "an R2 helper that is not a read").toEqual([]);
+  expect(r2Calls.filter((name) => !R2_READS.includes(name)), "an R2 helper that is not a read").toEqual([]);
   expect(writes).toEqual([]);
 }
 
@@ -476,6 +573,37 @@ describe("I-19: flag off", () => {
     expect(await once()).toEqual(on);
     expect(on[0]!.status).toBe(200);
   });
+
+  it("/api/compile-jobs POST and the developer key revoke answer the same status, headers and body with the flag set and unset", async () => {
+    // The real compile route (the agent route's executor mock is not what a person's compile runs).
+    const { POST: compileJobs } = await vi.importActual<typeof import("@/app/api/compile-jobs/route")>("@/app/api/compile-jobs/route");
+    const { DELETE: revokeKey } = await import("@/app/api/developer/keys/[id]/route");
+    const person = { ok: true, principal: { kind: "session", workspaceKey: WS, userId: PERSON, authorizationRevision: 3, workspaceRole: "owner",
+      accessSource: "pilot" } };
+    const keyId = uuid(0x801);
+    const once = async () => {
+      const answers = [];
+      // No credential, an agent credential, and a signed-in person (who reaches each route's own logic).
+      for (const [signedIn, authorization] of [[false, null], [false, `Bearer ${TOKEN}`], [true, "Bearer person-session"]] as const) {
+        const headers: Record<string, string> = { "content-type": "application/json", ...(authorization ? { authorization } : {}) };
+        if (signedIn) queuedAuth.push(person);
+        answers.push(await snapshot(await compileJobs(new Request("https://tavonel.test/api/compile-jobs", {
+          method: "POST", headers, body: JSON.stringify({ documentIds: [DOC_A] }) }))));
+        if (signedIn) queuedAuth.push(person);
+        answers.push(await snapshot(await revokeKey(new Request(`https://tavonel.test/api/developer/keys/${keyId}`, { method: "DELETE", headers }),
+          { params: Promise.resolve({ id: keyId }) })));
+      }
+      return answers;
+    };
+    const on = await once();
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "");
+    expect(await once()).toEqual(on);
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "false");
+    expect(await once()).toEqual(on);
+    expect(queuedAuth).toEqual([]);
+    // The person's revoke reached the store and succeeded; the agent credential was refused at both (I-2).
+    expect(on.map((answer) => answer.status)).toEqual([401, 401, 401, 401, expect.any(Number), 204]);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -530,7 +658,8 @@ function probes(next: () => number): Record<string, Classes> {
 
 describe("I-17: absent, unreadable, another tenant's and random ids answer byte-identically, under every reader outage", () => {
   const outages = Object.keys(NO_OUTAGE).filter((name) => name !== "storeThrows") as (keyof Outages)[];
-  const scenarios: [string, Partial<Outages>][] = [["no outage", {}], ...outages.map((name) => [`${name} down`, { [name]: true }] as [string, Partial<Outages>]),
+  const scenarios: [string, Partial<Outages>][] = [["no outage", {}],
+    ...outages.flatMap((name) => [[`${name} down`, { [name]: true }], [`${name} throws`, { [name]: "throw" }]] as [string, Partial<Outages>][]),
     ["the store throws", { storeThrows: true }]];
   const TOOLS = ["get_proposal", "get_compile_job", "list_candidates", "get_candidate_objects", "propose_compile", "propose_library_labels", "propose_label_correction"];
 
@@ -545,8 +674,64 @@ describe("I-17: absent, unreadable, another tenant's and random ids answer byte-
         for (const [index, other] of rest.entries()) {
           expect(other, `${tool}, ${scenario}, seed ${seed}: ${Object.keys(answers)[index + 1]} differs from ${Object.keys(answers)[0]}`).toEqual(first);
         }
-        // Nothing is created for an id the person cannot use, whatever the outage.
+        // Nothing is created for an id the person cannot use, whatever the outage, and a refusal writes nothing (I-1).
         expect(calls.filter((call) => call.path.endsWith("/create_world_change_proposal")), `${tool}, ${scenario}`).toEqual([]);
+        expectOnlyReadsAndTheProposalRow();
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// The line (§3): a failure of a read that decides whether an id names something this person can read is NOT_FOUND;
+// a failure after that decision is what it is (UNAVAILABLE). Both sides, every id-taking tool, every reader down and
+// throwing. Mutants: fold every UNAVAILABLE of a tool into NOT_FOUND (the "after" side fails); answer UNAVAILABLE
+// for a reader outage before the decision (the "decides" side fails).
+// ---------------------------------------------------------------------------------------------------------------
+
+/** One of this grant's proposals, over a readable document: what R2 can read. */
+function ownProposal(): string {
+  const id = uuid(0x703);
+  proposals.set(id, {
+    proposal_id: id, workspace_key: WS, agent_grant_id: GRANT, collection_id: null, action_type: "compile_plan",
+    input: { documentIds: [DOC_A], quote: { rechargeCredits: 0, balanceRechargeCredits: 0, overageCredits: 0 } }, input_sha256: `sha256:${"9".repeat(64)}`,
+    evidence_ids: [], state: "proposed", expires_at: "2099-01-01T00:00:00Z", created_at: "2026-11-17T00:00:00Z", decided_at: null,
+    binding_kind: "source_inventory", principal_kind: "agent", principal_id: PERSON, decided_by: null, expected_manifest_digest: `sha256:${"8".repeat(64)}`,
+    idempotency_key: `agt_${id}`, receipt: null, agent_client_label: "Claude", agent_grantor_email: null,
+  });
+  return id;
+}
+
+/** Per tool: arguments naming something readable and present, the readers that decide that, and the readers after. */
+const LINE: Record<string, { readable: () => unknown; decides: (keyof Outages)[]; after: (keyof Outages)[] }> = {
+  get_proposal: { readable: () => ({ proposalId: ownProposal() }), decides: ["proposals"], after: ["access"] },
+  get_compile_job: { readable: () => ({ jobId: JOB }), decides: ["jobs", "access"], after: [] },
+  list_candidates: { readable: () => ({ collectionId: COLLECTION }), decides: ["candidates", "access"], after: ["review", "active"] },
+  get_candidate_objects: { readable: () => ({ collectionId: COLLECTION, manifestDigest: CANDIDATE }), decides: ["candidates", "access"], after: ["model", "active"] },
+  propose_compile: { readable: () => ({ documentIds: [DOC_A], idempotencyKey: "client-key-1" }), decides: ["access", "inventory"], after: ["quote", "proposals"] },
+  propose_library_labels: { readable: () => p3Args(), decides: ["access", "library"], after: ["active", "proposals"] },
+  propose_label_correction: { readable: () => p4Args(), decides: ["candidates", "access"], after: ["review", "model", "proposals"] },
+};
+
+describe("the line: a failed existence-deciding read is NOT_FOUND, a failure after the decision is UNAVAILABLE", () => {
+  it.each(Object.keys(LINE))("%s", async (tool) => {
+    const { readable, decides, after } = LINE[tool]!;
+    reset();
+    expect((await answerOf(await toolCall(tool, readable()))).ok, `${tool}, nothing down`).toBe(true);
+    for (const mode of [true, "throw"] as const) {
+      for (const reader of decides) {
+        // A readable, present id and an absent one answer byte-identically: NOT_FOUND.
+        reset({ [reader]: mode });
+        const absent = await snapshot(await toolCall(tool, probes(seeded(1))[tool]!.absent, 7));
+        reset({ [reader]: mode });
+        const present = await snapshot(await toolCall(tool, readable(), 7));
+        expect(present, `${tool}: ${reader} ${String(mode)}`).toEqual(absent);
+        expect(JSON.parse(present.body).result, `${tool}: ${reader} ${String(mode)}`).toEqual({ content: [{ type: "text", text: "NOT_FOUND" }], isError: true });
+        expect(calls.filter((call) => call.path.endsWith("/create_world_change_proposal"))).toEqual([]);
+      }
+      for (const reader of after) {
+        reset({ [reader]: mode });
+        expect(await answerOf(await toolCall(tool, readable())), `${tool}: ${reader} ${String(mode)}`).toEqual({ ok: false, code: "UNAVAILABLE" });
       }
     }
   });
@@ -674,5 +859,118 @@ describe("the founder flow runs on one agent credential with no /api/mcp call", 
     expect(fetched).not.toHaveBeenCalled();
     expect(calls.some((call) => call.path.includes("/api/mcp"))).toBe(false);
     expect((status.proposals as unknown[]).length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// I-1 over the real readers: every reader module real, only the transport faked
+// ---------------------------------------------------------------------------------------------------------------
+
+/*
+  The suite above replaces the reader modules with fakes, so it sees what the tools ask of the readers, not what the
+  readers then ask of the store. Here they are the real modules, and only supabaseAdminRequest, the R2 primitives,
+  fetch and the compile POST are faked (authorization stays the stub: its own suite is lib/developer-auth.test.ts).
+  The customer-data gates are the exception in the success pass: they verify signed gate receipts, so there they
+  admit; the second test runs them real, over the transport, where with no accepted terms they refuse.
+  Every tool is driven to success and to each refusal it can reach from this state, and after every call the store
+  calls must be reads named on the exact read list plus the proposal row. Mutant: a real reader that also calls a
+  writing RPC (record_library_organize from readLibraryDocuments, say) fails here.
+*/
+const REAL_READERS = ["@/lib/connector-source-access", "@/lib/library-shadow", "@/lib/world-store", "@/lib/compile-job-store", "@/lib/world-read-model",
+  "@/lib/customer-source-lifecycle", "@/lib/customer-source-scope", "@/lib/collection-storage"];
+
+describe("I-1 over the real readers: only the transport is faked", () => {
+  let realPost: typeof POST;
+  const fetched: string[] = [];
+  const REAL = ARTIFACT.collectionId;
+  beforeAll(async () => {
+    for (const path of REAL_READERS) vi.doUnmock(path);
+    vi.resetModules();
+    ({ POST: realPost } = await import("@/app/api/agent-mcp/route"));
+  });
+  afterAll(() => { realStore = false; realGate = false; });
+  beforeEach(() => {
+    realStore = true;
+    realGate = false;
+    fetched.length = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => { fetched.push(String(url)); return new Response(null, { status: 503 }); });
+    // The candidate the real storage reads is ARTIFACT, so the collection is its own id.
+    candidates.set(`${WS}|${REAL}`, candidates.get(`${WS}|${COLLECTION}`)!);
+    actives.set(`${WS}|${REAL}`, actives.get(`${WS}|${COLLECTION}`)!);
+    jobs[0]!.collectionId = REAL;
+  });
+
+  const call = async (name: string, args: unknown) => answerOf(await realPost(new Request("https://tavonel.test/api/agent-mcp", {
+    method: "POST", headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) })));
+  const p3 = (fields: Row = {}) => p3Args({ collectionId: REAL, ...fields });
+  // An evidence id as the agent reads it: from the real read model, through R5 (set by the test before P4 runs).
+  let evidenceId = "";
+  const p4 = (fields: Row = {}) => p4Args({ collectionId: REAL, evidenceId, ...fields });
+
+  /** [tool, arguments, expected answer: "ok" or the refusal code]. */
+  const CASES: [string, () => unknown, string][] = [
+    ["get_workflow_status", () => ({}), "ok"],
+    ["list_documents", () => ({}), "ok"],
+    ["get_compile_job", () => ({ jobId: JOB }), "ok"],
+    ["get_compile_job", () => ({ jobId: JOB_HIDDEN }), "NOT_FOUND"],
+    ["get_compile_job", () => ({ jobId: `cjob-${"9".repeat(32)}` }), "NOT_FOUND"],
+    ["list_candidates", () => ({ collectionId: REAL }), "ok"],
+    ["list_candidates", () => ({ collectionId: COLLECTION_HIDDEN }), "NOT_FOUND"],
+    ["get_candidate_objects", () => ({ collectionId: REAL, manifestDigest: CANDIDATE }), "ok"],
+    ["get_candidate_objects", () => ({ collectionId: REAL, manifestDigest: `sha256:${"0".repeat(64)}` }), "NOT_FOUND"],
+    ["propose_compile", () => ({ documentIds: [DOC_A, DOC_B], idempotencyKey: "client-key-1" }), "ok"],
+    ["propose_compile", () => ({ documentIds: [DOC_HIDDEN], idempotencyKey: "client-key-2" }), "NOT_FOUND"],
+    ["propose_compile", () => ({ documentIds: [uuid(0x7fe)], idempotencyKey: "client-key-3" }), "NOT_FOUND"],
+    ["propose_library_labels", () => p3(), "ok"],
+    ["propose_library_labels", () => p3({ expectedManifestDigest: `sha256:${"e".repeat(64)}`, idempotencyKey: "client-key-4" }), "PROPOSAL_BASE_NOT_HEAD"],
+    ["propose_library_labels", () => p3({ idempotencyKey: "client-key-5", items: [{ documentId: DOC_HIDDEN, labelKind: "topic", labelKey: "pricing",
+      decision: "confirmed" }] }), "NOT_FOUND"],
+    ["propose_label_correction", () => p4(), "ok"],
+    ["propose_label_correction", () => p4({ before: "not the label", idempotencyKey: "client-key-6" }), "PATCH_BEFORE_MISMATCH"],
+    ["propose_label_correction", () => p4({ collectionId: COLLECTION_HIDDEN, baseManifestDigest: HIDDEN_DIGEST, idempotencyKey: "client-key-7" }), "NOT_FOUND"],
+  ];
+
+  it("every tool, to success and to each refusal: only exact-name reads, GETs and the proposal row; fetch never called", async () => {
+    const seen = new Set<string>();
+    const objects = await call("get_candidate_objects", { collectionId: REAL, manifestDigest: CANDIDATE });
+    evidenceId = (objects as { output: { objects: { evidenceIds: string[] }[] } }).output.objects.flatMap((object) => object.evidenceIds)[0]!;
+    for (const [tool, args, expected] of CASES) {
+      calls.length = 0;
+      r2Calls.length = 0;
+      const answer = await call(tool, args());
+      expect(answer.ok ? "ok" : answer.code, `${tool} ${JSON.stringify(args())} ${calls.map((entry) => `${entry.method} ${entry.path}`).join(" | ")}`).toBe(expected);
+      expectOnlyReadsAndTheProposalRow();
+      for (const entry of calls) seen.add(`${entry.method} ${entry.path.split("?")[0]}`);
+    }
+    // A real get_proposal of the first created row, and of a random id.
+    const first = [...proposals.keys()][0]!;
+    expect((await call("get_proposal", { proposalId: first })).ok).toBe(true);
+    expect(await call("get_proposal", { proposalId: uuid(0x7ff) })).toEqual({ ok: false, code: "NOT_FOUND" });
+    expectOnlyReadsAndTheProposalRow();
+    expect(calls.filter((entry) => entry.path.endsWith("/create_world_change_proposal")).length).toBe(0);
+    expect(fetched).toEqual([]);
+    expect(postCompile).not.toHaveBeenCalled();
+    // The real readers were reached: the reads §8 names are observed, not only assumed.
+    expect([...seen]).toEqual(expect.arrayContaining(["POST /rest/v1/rpc/connector_documents_blocked", "POST /rest/v1/rpc/read_library_organize",
+      "POST /rest/v1/rpc/list_collection_candidates", "POST /rest/v1/rpc/quote_foundation_compile_recharge"]));
+  });
+
+  it("with the customer-data gate on v2 and no accepted terms: the gate's reads are reads, and its refusals write nothing", async () => {
+    realGate = true;
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "a".repeat(40));
+    const seen = new Set<string>();
+    for (const [tool, args] of [["propose_compile", { documentIds: [DOC_A], idempotencyKey: "client-key-8" }],
+      ["get_candidate_objects", { collectionId: REAL, manifestDigest: CANDIDATE }],
+      ["propose_label_correction", p4({ evidenceId: "ev-1", idempotencyKey: "client-key-9" })]] as const) {
+      calls.length = 0;
+      const answer = await call(tool, args);
+      expect(answer, tool).toEqual({ ok: false, code: tool === "propose_compile" ? "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" : "NOT_FOUND" });
+      expectOnlyReadsAndTheProposalRow();
+      for (const entry of calls) seen.add(`${entry.method} ${entry.path.split("?")[0]}`);
+    }
+    // The gates ran for real: their own reads are observed.
+    expect([...seen]).toEqual(expect.arrayContaining(["GET /rest/v1/connector_document_bindings", "GET /rest/v1/foundation_intake_admissions",
+      "GET /rest/v1/customer_data_workspace_decisions"]));
   });
 });
