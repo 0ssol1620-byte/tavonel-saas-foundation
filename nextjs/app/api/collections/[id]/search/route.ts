@@ -7,6 +7,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
+import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import { DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
@@ -42,7 +43,12 @@ const NO_STORE = { "Cache-Control": "no-store" };
 // caller can fix by compiling), not a 500 (our fault) and not a 404 (the collection exists).
 const CONFLICT_CODES = new Set(["RETRIEVAL_RUN_NOT_FOUND", "RETRIEVAL_PROFILE_NOT_FOUND"]);
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+/** One answered search is one knowledge query unit (lib/kqu-meter.ts); a refusal or failure is none. */
+export function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  return meterKnowledgeQuery((meter) => search(request, context, meter));
+}
+
+async function search(request: Request, context: { params: Promise<{ id: string }> }, meter: KquMeter) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(contentLength) || contentLength > 2_048) {
     return NextResponse.json({ code: "QUERY_TOO_LARGE" }, { status: 413, headers: NO_STORE });
@@ -137,6 +143,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // A missing GPU runtime is a degradation, not a failure: the pipeline falls back to
   // lexical + structure and reports it in `degradations`, so the caller can tell a
   // full-pipeline result from a degraded one instead of silently receiving weaker retrieval.
+  // The allowance, before the index read and retrieval.
+  const admitted = await meter.admit(auth.principal);
+  if (!admitted.ok) return NextResponse.json({ code: admitted.code }, { status: admitted.status, headers: NO_STORE });
   const served = historical ?? active.world;
   const indexStateAtAdmission = await readRetrievalIndexState({
     workspaceKey: auth.principal.workspaceKey,

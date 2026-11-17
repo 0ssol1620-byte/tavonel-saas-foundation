@@ -9,6 +9,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
+import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { COLLECTION_PACKAGE_TOO_LARGE, collectionPackageSizeRefusal, validatePromotableCollectionArtifact } from "@/lib/collection-download";
@@ -255,10 +256,12 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
   };
 }
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+/** One answered question is one knowledge query unit (lib/kqu-meter.ts); a refusal or failure is none. */
+export function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  return meterKnowledgeQuery((meter) => ask(request, context, meter));
+}
+
+async function ask(request: Request, context: { params: Promise<{ id: string }> }, meter: KquMeter) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(contentLength) || contentLength > 2_048) {
     return NextResponse.json(
@@ -345,6 +348,11 @@ export async function POST(
     });
     if (!await admitsDerivedCustomerData(workspaceKey, documentIds)) {
       return NextResponse.json({ code: DERIVED_DATA_REFUSED }, { status: 403, headers: NO_STORE });
+    }
+    // The allowance, before retrieval. A replay ran no retrieval and was counted when it was answered.
+    if (!lease.replay) {
+      const admitted = await meter.admit(auth.principal);
+      if (!admitted.ok) return NextResponse.json({ code: admitted.code }, { status: admitted.status, headers: NO_STORE });
     }
     answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active, documentIds.length);
     if (answered.status === 200) {
