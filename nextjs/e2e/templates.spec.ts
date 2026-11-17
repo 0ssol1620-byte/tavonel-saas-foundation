@@ -10,7 +10,10 @@ import { measureOverflow } from "./support/overflow";
     the inventory assigns. T6 (the workspace and sign-in app shell) is not a public template and is
     not declared; /research/experiments is in the inventory but serves a 404, so it is not measured
     (the same list as type-scale.spec.ts and site-alignment.spec.ts).
-  - §5.1. T0-T5 are PAPER: the ground behind the H1 is the light surface, never the instrument one.
+  - §5.1. T1-T5 are PAPER: the ground behind the H1 is the light surface, never the instrument one.
+    T0 (Home) is restated by WO-CI-20, lead decision 4: its ground is the V34 home hero token
+    (`--v34-hero-c`, the colour `.heroHome` in components/v34/tokens.module.css paints under its
+    gradient), read off the page and compared, so a hero repainted any other colour still fails.
   - R7. An internal link -- an <a> whose href resolves to this origin -- carries no ↗, in its text or
     in a generated ::before/::after. ↗ says "this leaves the site"; a link to the sample, to a page or
     to a file this origin serves does not.
@@ -28,10 +31,9 @@ import { measureOverflow } from "./support/overflow";
   V34 (WO-CI-5a). Every page renders inside the V34 page root (`[data-v34-site]`, components/v34/shell/
   v34-page.tsx), which is where a retained page declares its template. A route the program moved answers
   308 to its V34 page (`V34_REDIRECTS`), and that page is the one read. Every page, a V34 registry page
-  included, declares the inventory's template once on the root that holds <main>. The V34 registry
-  (lib/v34/routes.ts) has no template field, so a registry page declares none and fails here: that is
-  the filed defect (WO-CI-5a receipt, D18), not a page this spec lets through. The other rules -- paper
-  behind the H1, no internal ↗, a marker on every summary, no overflow -- are unchanged.
+  included, declares the inventory's template once on the root that holds <main>. A registry page
+  declares the template `lib/v34/route-templates.ts` gives its key (WO-CI-20, closing D18). The other
+  rules -- the ground behind the H1, no internal ↗, a marker on every summary, no overflow -- are unchanged.
 */
 
 const TEMPLATES = {
@@ -65,6 +67,8 @@ type Reading = {
   internalArrows: string[];
   bareSummaries: string[];
   ground: { colour: string; luminance: number; from: string } | null;
+  /** `--v34-hero-c` resolved as a background colour inside the V34 page root; null without one. */
+  heroToken: string | null;
 };
 
 /** Runs in the page; self-contained because Playwright serialises it. */
@@ -120,7 +124,30 @@ function read(): Reading {
     break;
   }
 
-  return { roots, internalArrows, bareSummaries, ground };
+  let heroToken: string | null = null;
+  const site = document.querySelector("[data-v34-site]");
+  if (site) {
+    const probe = document.createElement("div");
+    probe.style.setProperty("position", "absolute");
+    probe.style.setProperty("background-color", "var(--v34-hero-c)");
+    site.append(probe);
+    const resolved = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    // An undeclared token leaves the probe transparent: that is "no token", not a colour to match.
+    heroToken = transparent(resolved) ? null : resolved;
+  }
+
+  return { roots, internalArrows, bareSummaries, ground, heroToken };
+}
+
+/** The H1 ground rule for a template: T0 sits on the home hero token, T1-T5 on paper. */
+function groundFindings(template: Template, m: Reading, at: string): string[] {
+  if (!m.ground) return [`${at}: no ground behind the H1`];
+  if (template === "T0") {
+    if (!m.heroToken) return [`${at}: no V34 home hero token on the page`];
+    return m.ground.colour === m.heroToken ? [] : [`${at}: H1 ground ${m.ground.colour} on ${m.ground.from} is not the home hero token ${m.heroToken}`];
+  }
+  return m.ground.luminance >= PAPER_FLOOR ? [] : [`${at}: H1 ground ${m.ground.colour} on ${m.ground.from} is not paper (luminance ${m.ground.luminance.toFixed(3)})`];
 }
 
 async function visit(page: Page, route: string, width: number) {
@@ -148,8 +175,7 @@ test.describe("page templates (UX-L7)", () => {
           const m = await page.evaluate(read);
           const landed = new URL(page.url()).pathname;
           expect.soft(m.roots, `${at} (landed on ${landed}): data-template roots`).toEqual([expect.objectContaining({ template, holdsMain: true })]);
-          expect.soft(m.ground, `${at}: no ground behind the H1`).not.toBeNull();
-          if (m.ground) expect.soft(m.ground.luminance, `${at}: H1 ground ${m.ground.colour} on ${m.ground.from} is not paper`).toBeGreaterThanOrEqual(PAPER_FLOOR);
+          expect.soft(groundFindings(template, m, at), `${at}: H1 ground`).toEqual([]);
           expect.soft(m.internalArrows, `${at}: internal links carrying ↗`).toEqual([]);
           expect.soft(m.bareSummaries, `${at}: summaries without a visible marker`).toEqual([]);
           const overflow = await page.evaluate(measureOverflow);
@@ -201,6 +227,7 @@ test.describe("page templates (UX-L7)", () => {
     expect(m.internalArrows).toEqual(['/explore?detector=1 "Open the sample ↗"']);
     expect(m.bareSummaries).toEqual(['"Read the bare disclosure" (display flex, list-style disclosure-closed)']);
     expect(m.ground?.luminance ?? 1).toBeLessThan(PAPER_FLOOR);
+    expect(groundFindings("T2", m, "/evaluation")).toHaveLength(1);
     const overflow = await page.evaluate(measureOverflow);
     expect(overflow.offenders.length).toBeGreaterThan(0);
 
@@ -230,5 +257,23 @@ test.describe("page templates (UX-L7)", () => {
     });
     expect(doubled).toBe(2);
     expect((await page.evaluate(read)).roots).toHaveLength(2);
+  });
+
+  /* T0's restated ground (decision 4): Home passes on the hero token and fails once the hero is repainted, paper included. */
+  test("the detector reports a Home hero that left the home hero token", async ({ page }) => {
+    await visit(page, "/", 1440);
+    const clean = await page.evaluate(read);
+    expect(clean.heroToken).not.toBeNull();
+    expect(groundFindings("T0", clean, "/")).toEqual([]);
+    // The same reading is not paper, so the T0 rule is what lets Home through, not a lenient floor.
+    expect(groundFindings("T1", clean, "/")).toHaveLength(1);
+
+    await page.evaluate(() => {
+      const hero = document.querySelector("main h1")!.closest("section")!;
+      hero.style.setProperty("background", "#f7f8f4", "important");
+    });
+    const repainted = await page.evaluate(read);
+    expect(repainted.ground?.colour).toBe("rgb(247, 248, 244)");
+    expect(groundFindings("T0", repainted, "/")).toEqual([expect.stringContaining("is not the home hero token")]);
   });
 });

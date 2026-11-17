@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ROUTE_TEMPLATES } from "@/lib/v34/route-templates";
 import { v34Route, type V34RouteKey } from "@/lib/v34/routes";
 import tokens from "../tokens.module.css";
 import { surfaceClass, type V34Surface } from "../ui/surface";
@@ -29,12 +30,16 @@ export default function V34Page({ route, path, surface = "paper", className, tem
   surface?: V34Surface;
   /** Classes a retained page's own stylesheets key on (`PublicSitePage` passes "page public-page"). */
   className?: string;
-  /** The page template a retained public page declares (T1..T5); absent on a V34 route. */
+  /**
+   * The page template a retained public page declares (T1..T5). A registry route declares the one
+   * `ROUTE_TEMPLATES` gives it (null there: outside the §5.4 inventory, nothing declared).
+   */
   template?: string;
   children: ReactNode;
 }) {
+  const declared = template ?? (route ? ROUTE_TEMPLATES[route] ?? undefined : undefined);
   return (
-    <div className={className ? `${tokens.site} ${className}` : tokens.site} data-v34-site="" data-template={template}>
+    <div className={className ? `${tokens.site} ${className}` : tokens.site} data-v34-site="" data-template={declared}>
       <SiteHeader currentPath={route ? v34Route(route).path : path} />
       <main id="main" tabIndex={-1} className={`${surfaceClass(surface)} ${s.main}`}>
         {children}
