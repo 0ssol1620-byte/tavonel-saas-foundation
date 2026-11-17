@@ -34,7 +34,7 @@ import {
   type Violation,
 } from "./support/v34-passes";
 import { contrastPass, controlContrastPass, openContentDetails } from "./support/v34-contrast";
-import { DRAWER_MAX_WIDTH, DRAWER_TRIGGER, drawerPass, tapUntilOpen } from "./support/v34-drawer";
+import { DRAWER_MAX_WIDTH, DRAWER_TRIGGER, drawerPass, moreMenuPass, tapUntilOpen } from "./support/v34-drawer";
 import { keyboardWalk } from "./support/v34-keyboard";
 import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, WORLD_ROOT, type WorldMode, type WorldState } from "./support/v34-world";
 import { checkSeo, checkSeoUnique, fetchSeo, fetchSitemapPaths, type SeoFacts } from "./support/v34-seo";
@@ -262,8 +262,9 @@ for (const { path: route, release } of routes) {
 
   /*
     The phone and tablet drawer (WO-CI-9), at every width of the run that it serves: it opens, its
-    contents hold contrast while open, Escape closes it and returns focus, a followed link closes it.
-    The page is opened at its first response byte, not settled, so taps lost before hydration are measured.
+    contents hold contrast while open, Escape closes it and returns focus without reaching the page's
+    own key listeners (WO-CI-14), a followed link closes it. The page is opened at its first response
+    byte, not settled, so taps lost before hydration are measured.
   */
   for (const width of widths.filter(w => w <= DRAWER_MAX_WIDTH)) {
     test(`${route} ${width}px drawer`, tags(route, width, "drawer"), async ({ browser, browserName }) => {
@@ -283,6 +284,28 @@ for (const { path: route, release } of routes) {
         }
         record({ route, width, engine: browserName, colorScheme: "light", pass: "drawer", violations: drawer.violations, reported: drawer.reported });
         expect(drawer.violations, report(route, width, drawer.violations)).toEqual([]);
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+
+  /* Above the drawer's widths the header's More menu holds the same Escape promises (WO-CI-14). */
+  for (const width of widths.filter(w => w > DRAWER_MAX_WIDTH)) {
+    test(`${route} ${width}px more menu`, tags(route, width, "drawer"), async ({ browser, browserName }) => {
+      test.skip(heldInProduction, "held in production");
+      const ctx = await openContext(browser, width);
+      const page = await ctx.newPage();
+      try {
+        await settle(page, route);
+        const outsideRegistry = !registryRoutes.some(r => r.path === route);
+        if (outsideRegistry && (await page.locator("[data-v34-header]").count()) === 0) {
+          record({ route, width, engine: browserName, colorScheme: "light", pass: "menu", state: "no V34 header: not a V34-shell page", violations: [] });
+          test.skip(true, `${route} renders no V34 header (outside the registry), so it has no V34 More menu`);
+        }
+        const violations = await moreMenuPass(page);
+        record({ route, width, engine: browserName, colorScheme: "light", pass: "menu", violations });
+        expect(violations, report(route, width, violations)).toEqual([]);
       } finally {
         await ctx.close();
       }

@@ -7,14 +7,16 @@ import { useEffect, useId, useRef, useState } from "react";
 import { HeaderAccountActions } from "@/components/site-nav/desktop-primary-nav";
 import { current, type NavGroupLinks, NavLink } from "@/lib/v34/nav";
 import tokens from "../tokens.module.css";
+import { listenShellEscape } from "./more-menu";
 import s from "./mobile-drawer.module.css";
 
 /**
  * The phone and tablet menu, a native modal `<dialog>`. The platform traps focus inside it, makes
  * the page behind it inert, closes it on Escape and hands focus back to the button that opened it.
- * What this adds: scroll lock (the stylesheet, from the `open` attribute), closing when a link is
- * followed or the route changes, and closing if the viewport grows past the point where the bar
- * shows its own items. Groups arrive already filtered for held routes.
+ * What this adds: scroll lock (the stylesheet, from the `open` attribute), keeping that Escape from
+ * the page's own key listeners, closing when a link is followed or the route changes, and closing
+ * if the viewport grows past the point where the bar shows its own items. Groups arrive already
+ * filtered for held routes.
  */
 export default function MobileDrawer({ primary, groups, start }: {
   primary: readonly NavLink[];
@@ -29,6 +31,9 @@ export default function MobileDrawer({ primary, groups, start }: {
   useEffect(() => {
     dialog.current?.close();
   }, [pathname]);
+
+  // The open dialog closes itself on Escape; the press goes no further than the shell.
+  useEffect(() => listenShellEscape(() => dialog.current?.open === true), []);
 
   useEffect(() => {
     const wide = window.matchMedia("(min-width: 1001px)");
@@ -64,6 +69,11 @@ export default function MobileDrawer({ primary, groups, start }: {
           <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
+      {/*
+        Following any link in the drawer closes it, including a link to the page already open, which
+        changes no route. One handler on the dialog, so a link anywhere in it (the brand, the nav, the
+        account actions, one added later) is covered without a handler of its own.
+      */}
       <dialog
         ref={dialog}
         id={id}
@@ -71,6 +81,9 @@ export default function MobileDrawer({ primary, groups, start }: {
         aria-label="Site navigation"
         data-v34-overlay=""
         onClose={() => setOpen(false)}
+        onClick={(event) => {
+          if (event.target instanceof Element && event.target.closest("a")) dialog.current?.close();
+        }}
       >
         <div className={s.bar}>
           <Link href="/" className={s.brand} aria-label="TAVONEL home" prefetch={false}>TAVONEL</Link>
@@ -80,14 +93,7 @@ export default function MobileDrawer({ primary, groups, start }: {
             </svg>
           </button>
         </div>
-        {/* Following any link closes the drawer, including a link to the page already open, which changes no route. */}
-        <nav
-          aria-label="Site"
-          className={s.nav}
-          onClick={(event) => {
-            if (event.target instanceof Element && event.target.closest("a")) dialog.current?.close();
-          }}
-        >
+        <nav aria-label="Site" className={s.nav}>
           <ul className={s.primary}>
             {primary.map((link) => (
               <li key={link.href}>
@@ -112,9 +118,7 @@ export default function MobileDrawer({ primary, groups, start }: {
             </details>
           ))}
         </nav>
-        <div className={s.foot} onClick={(event) => {
-          if (event.target instanceof Element && event.target.closest("a")) dialog.current?.close();
-        }}>
+        <div className={s.foot}>
           <HeaderAccountActions
             start={start}
             labels={{ signIn: "Sign in", workspace: "Open workspace" }}

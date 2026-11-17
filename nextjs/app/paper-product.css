@@ -122,6 +122,18 @@ html:has(.evaluation-page) { color-scheme: light; }
   .pricing-page .pricing-utility-links a:hover { text-decoration-line: none; }
   .pricing-page .plan-action .pricing-secondary-link:hover { text-decoration-line: underline; }
 }
+/*
+  WO-CI-14: fine print that carries more than one link ("Before you buy: ... · ... · ...").
+  The 44px floor in tavonel.css (same media query) grows an inline link 12.5px above and below its line and
+  pulls the margin back so the paragraph does not reflow. That is sound for one link in a sentence; two links
+  on adjacent lines sit one line (about 22px) apart, so each grown box covered half of the other and a tap
+  there opened the wrong page (v34 matrix: 128x25 at 390 and 412, and at 1440 under 200% zoom). Here each link
+  is an atomic 44px box with no pull-back, so the line box grows to hold it and no two targets can share a
+  line's height. Same pattern as `.fine .dev-actions a` (product-polish.css); unlayered, so it outranks the floor.
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .pricing-page .fine:has(> a ~ a) > a { display: inline-flex; align-items: center; min-height: 44px; padding-block: 0; margin-block: 0; }
+}
 /* Direction C (2026-11-04): the four plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
 .pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
 .pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 32px 28px 28px; border: 0; border-right: 1px solid var(--tv-rule); border-radius: 0; background: transparent; box-shadow: none; }

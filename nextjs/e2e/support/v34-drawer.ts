@@ -4,8 +4,12 @@
  *
  * Promises judged (each a violation when broken): a tap opens the drawer inside the viewport and
  * modal; its text and controls hold AA contrast while open, the closed groups opened; Escape closes
- * it and hands focus back to the trigger (`escapeRestoresFocus`); following any link in it — one to
- * the page already open, and one to another page — leaves no drawer open and the page scrollable.
+ * it and hands focus back to the trigger (`escapeRestoresFocus`), and that Escape stays in the shell:
+ * no key listener the page has on `window` or `document`, capture or bubble, receives the press the
+ * drawer consumed (WO-CI-14; on /explore the workbench acted on it too); following any link in it —
+ * one to the page already open, and one to another page — leaves no drawer open and the page scrollable.
+ *
+ * `moreMenuPass` holds the same Escape promises for the header's More menu above 1000px.
  *
  * Measured and reported, not judged (the shell makes no promise about them): taps that opened
  * nothing before hydration, and where focus lands after a followed link.
@@ -34,6 +38,49 @@ const focusName = (page: Page) =>
     if (a === document.querySelector(trigger)) return "trigger";
     return `${a.tagName.toLowerCase()}[${(a.getAttribute("aria-label") ?? a.textContent ?? "").trim().slice(0, 24)}]`;
   }, DRAWER_TRIGGER);
+
+/*
+  Escape probe. Page-level key listeners on window and document, in both phases, that log every Escape
+  they receive while `act` runs. `act` presses Escape on a shell surface and says whether the surface
+  was open for that press; only then is what the probe logged a leak, and it is all of it. The probe
+  never asks the page whether the surface is open from inside its own listener: the shell's listener
+  runs first and may already have closed it (WO-CI-14 r2: the More menu's panel was `hidden` before any
+  later listener ran, so a press the shell did not stop went unseen).
+  Added after the shell has mounted, the probe stands for a page listener added after the shell's;
+  added before `act` opens the surface, it also catches a shell that only starts listening once it is
+  open, which a listener the page added at mount would precede.
+*/
+type EscapeProbeWindow = Window & { __v34EscapeProbe?: { seen: string[]; off: () => void } };
+
+async function escapeReach(page: Page, act: () => Promise<boolean>): Promise<string[]> {
+  await page.evaluate(() => {
+    const w = window as EscapeProbeWindow;
+    w.__v34EscapeProbe?.off();
+    const seen: string[] = [];
+    const offs: (() => void)[] = [];
+    for (const [target, name] of [[window, "window"], [document, "document"]] as const) {
+      for (const capture of [true, false]) {
+        const listener = (event: Event) => {
+          if ((event as KeyboardEvent).key === "Escape") seen.push(`${name} ${capture ? "capture" : "bubble"}`);
+        };
+        target.addEventListener("keydown", listener, capture);
+        offs.push(() => target.removeEventListener("keydown", listener, capture));
+      }
+    }
+    w.__v34EscapeProbe = { seen, off: () => offs.forEach(off => off()) };
+  });
+  const consumed = await act();
+  const seen = await page.evaluate(() => {
+    const probe = (window as EscapeProbeWindow).__v34EscapeProbe;
+    probe?.off();
+    delete (window as EscapeProbeWindow).__v34EscapeProbe;
+    return probe ? probe.seen : ["the probe was lost (the page reloaded)"];
+  });
+  return consumed ? seen : [];
+}
+
+/** `escapeRestoresFocus` says this when its Enter opened nothing; its Escape then was the page's, not the shell's. */
+const notOpenedByKeyboard = (violations: Violation[]) => violations.some(x => x.detail === "did not open from the trigger");
 
 /** No modal dialog anywhere, no open drawer, and the root scrolls (the shell locks it while the drawer is open). */
 const leftOpen = (page: Page) =>
@@ -147,14 +194,25 @@ export async function drawerPass(page: Page, route: string): Promise<DrawerResul
   if (text.checked === 0) v("contrast", DRAWER, "drawer open: no text in the drawer could be sampled");
   result.violations.push(...(await controlContrastPass(page, 30, DRAWER)).map(x => ({ ...x, detail: `drawer open: ${x.detail}` })));
 
-  /* 3. Escape closes it and focus returns to the trigger: from the open drawer, then again from the keyboard. */
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
+  /* 3. Escape closes it and focus returns to the trigger: from the open drawer, then again from the keyboard.
+        Neither press reaches a page key listener while the drawer is open. */
+  const leaked = await escapeReach(page, async () => {
+    const wasOpen = await isOpen(page);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    return wasOpen;
+  });
   if (await isOpen(page)) v("escape-restore", DRAWER, "still open after Escape");
   else if ((await focusName(page)) !== "trigger") v("escape-restore", DRAWER_TRIGGER, `focus went to ${await focusName(page)}, not the trigger, after Escape`);
-  result.violations.push(...(await escapeRestoresFocus(page, DRAWER_TRIGGER, DRAWER)));
+  let fromKeyboard: Violation[] = [];
+  leaked.push(...(await escapeReach(page, async () => {
+    fromKeyboard = await escapeRestoresFocus(page, DRAWER_TRIGGER, DRAWER);
+    return !notOpenedByKeyboard(fromKeyboard);
+  })));
+  result.violations.push(...fromKeyboard);
   const expanded = await page.locator(DRAWER_TRIGGER).first().getAttribute("aria-expanded");
   if (expanded !== "false") v("escape-restore", DRAWER_TRIGGER, `aria-expanded is ${JSON.stringify(expanded)} after the drawer closed`);
+  if (leaked.length > 0) v("escape-in-shell", DRAWER, `the Escape that closed the drawer also reached the page's key listeners: ${[...new Set(leaked)].join(", ")}`);
   if (await isOpen(page)) await page.keyboard.press("Escape");
 
   /* 4. A followed link closes it: every link to the page already open (no route change), then one to another page. */
@@ -188,4 +246,41 @@ export async function drawerPass(page: Page, route: string): Promise<DrawerResul
     r("drawer-link-focus", `a[${other.label}] -> ${other.path}`, `focus after following a link to another page: ${after.focus}`);
   }
   return result;
+}
+
+export const MORE_BUTTON = `${DRAWER_HEADER} button[aria-controls]:not([aria-haspopup])`;
+
+/**
+ * The header's More menu, above DRAWER_MAX_WIDTH, on a settled page: opened by a click, Escape closes
+ * it and focus returns to the button; then the same from the keyboard (`escapeRestoresFocus`). Neither
+ * Escape reaches a page key listener while the menu is open.
+ */
+export async function moreMenuPass(page: Page): Promise<Violation[]> {
+  const out: Violation[] = [];
+  const button = page.locator(MORE_BUTTON).first();
+  if ((await page.locator(DRAWER_HEADER).count()) === 0) return [{ pass: "menu-open", selector: DRAWER_HEADER, detail: "the page renders no V34 header" }];
+  if (!(await button.isVisible())) return [{ pass: "menu-open", selector: MORE_BUTTON, detail: `no visible More button at ${page.viewportSize()?.width ?? 0}px` }];
+  const panelId = await button.getAttribute("aria-controls");
+  if (!panelId) return [{ pass: "menu-open", selector: MORE_BUTTON, detail: "the More button names no panel" }];
+  const panel = `[id="${panelId}"]`;
+
+  const leaked = await escapeReach(page, async () => {
+    await button.click({ timeout: 3000 });
+    await page.waitForTimeout(150);
+    const opened = await page.locator(panel).first().isVisible();
+    if (!opened) out.push({ pass: "menu-open", selector: MORE_BUTTON, detail: "a click did not open the More menu" });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    return opened;
+  });
+  if (await page.locator(panel).first().isVisible()) out.push({ pass: "escape-restore", selector: panel, detail: "the More menu is still open after Escape" });
+  else if (!(await button.evaluate(e => e === document.activeElement))) out.push({ pass: "escape-restore", selector: MORE_BUTTON, detail: "focus did not return to the More button after Escape" });
+  let fromKeyboard: Violation[] = [];
+  leaked.push(...(await escapeReach(page, async () => {
+    fromKeyboard = await escapeRestoresFocus(page, MORE_BUTTON, panel);
+    return !notOpenedByKeyboard(fromKeyboard);
+  })));
+  out.push(...fromKeyboard);
+  if (leaked.length > 0) out.push({ pass: "escape-in-shell", selector: panel, detail: `the Escape that closed the More menu also reached the page's key listeners: ${[...new Set(leaked)].join(", ")}` });
+  return out;
 }

@@ -324,7 +324,7 @@ jobs:
           V34_RELEASE: live
           V34_WIDTHS: 390,412,1440
           V34_QA_OUT: v34-qa-out/qa
-        run: pnpm exec playwright test --project=v34-selftest --project=v34-chromium
+        run: pnpm exec playwright test --project=v34-selftest --project=v34-chromium --retries=0
       # Runs even when the matrix failed, so a held route that renders in production is never hidden behind it.
       # Its own output and report folders: a second invocation empties the first one's test-results.
       - name: Held routes answer 404 on the server without V34_SHOW_HELD
@@ -335,7 +335,7 @@ jobs:
           PLAYWRIGHT_HTML_REPORT: playwright-report-held
           V34_SERVER_MODE: production
           V34_QA_OUT: v34-qa-out/production
-        run: pnpm exec playwright test --project=v34-chromium --grep "@pass:held" --output=test-results-held
+        run: pnpm exec playwright test --project=v34-chromium --grep "@pass:held" --output=test-results-held --retries=0
       - name: Show the server logs on failure
         if: failure()
         run: tail -n 200 /tmp/v34-qa-server.log /tmp/v34-production-server.log
