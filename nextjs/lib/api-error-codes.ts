@@ -200,6 +200,12 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
         whatToDo: "Accept a valid workspace invitation, or ask a workspace owner to restore membership before retrying.",
       },
       {
+        code: "WORKSPACE_SEAT_LIMIT_REACHED",
+        status: 402,
+        meaning: "The workspace's active members and pending invitations already fill the seats its plan includes, so the invitation was not created or not accepted. Existing members keep their access.",
+        whatToDo: "Revoke a pending invitation or remove a member to free a seat, or see /pricing for a plan with more seats.",
+      },
+      {
         code: "API_KEY_AUTHORIZATION_REVOKED",
         status: 403,
         meaning: "The API key was issued under an older membership authority revision and cannot regain access after that grant changes.",
