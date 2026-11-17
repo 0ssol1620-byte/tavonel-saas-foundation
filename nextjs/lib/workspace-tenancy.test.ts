@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BILLING_OFFERS } from "./billing-catalog";
+import { BILLING_OFFERS, DELIVERED, planAvailability, readConfiguredBillingOffers } from "./billing-catalog";
 import { foundationWorkspaceId } from "./foundation-pilot";
 
 /*
@@ -55,13 +55,25 @@ describe("the workspace key is a function of the user", () => {
 });
 
 describe("nothing claims a membership feature that the tenancy model cannot carry", () => {
-  it("keeps Pro on contact sales, a volume plan, never a membership plan", () => {
-    // Starter/Pro rename (2026-11-10, founder, intended): "Team" read as seats the tenancy model cannot carry, so the plan is
-    // Pro and its card names what it delivers. No seat, member or role is sold or promised.
+  it("keeps every plan a Request-access volume plan, never a membership plan sold online", () => {
+    // Catalog v2 (PB-2026-11-V22, CAT-D1): no plan is purchasable while DELIVERED is empty, and the plans that carry
+    // seats or shared sources (Team, Business) additionally wait on per-member source scopes the tenancy model cannot carry.
+    expect(DELIVERED.size).toBe(0);
+    for (const code of ["personal", "developer", "team", "business"] as const) {
+      // Even with its price configured, the plan is requested: the capabilities on its line are not delivered.
+      const configured = readConfiguredBillingOffers({ [BILLING_OFFERS[code].priceEnv]: `pri_${"a".repeat(26)}` });
+      expect(configured.has(code), `${code} has its price`).toBe(true);
+      expect(planAvailability(code, configured), code).toBe("request_access");
+      // The card's feature bullets promise no seat, member, role or onboarding.
+      const card = [BILLING_OFFERS[code].description, ...BILLING_OFFERS[code].features].join(" ");
+      expect(card, code).not.toMatch(/\b(seats?|members?|roles?|onboarding)\b/i);
+    }
+    // The shared-access plans name what is not sold yet rather than implying it.
+    expect(BILLING_OFFERS.team.requires).toContain("per_member_source_scopes");
+    expect(BILLING_OFFERS.team.notYetSold).toContain("Per-member source permissions");
+    expect(BILLING_OFFERS.business.requires).toContain("org_policy_audit");
+    // The 2026-09 contact plan stays contact sales for the holders it has.
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
-    expect(BILLING_OFFERS.studio_access.label).toBe("Pro");
-    const card = [BILLING_OFFERS.studio_access.description, ...BILLING_OFFERS.studio_access.features].join(" ");
-    expect(card).not.toMatch(/\b(seats?|members?|roles?|team|onboarding)\b/i);
   });
 
   it("ships no invitation or seat surface while the key is derived", () => {

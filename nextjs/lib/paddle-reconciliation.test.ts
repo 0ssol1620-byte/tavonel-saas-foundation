@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import type { PaddleAdjustment, PaddlePrice, PaddleTransaction } from "./paddle-api";
-import { priceBookDelta, processorDelta as delta, readLedgerForReconciliation, type LedgerRow } from "./paddle-reconciliation";
+import { priceBookDelta, priceBookNotConfigured, processorDelta as delta, readLedgerForReconciliation, type LedgerRow } from "./paddle-reconciliation";
 
 const txn = (c: string) => `txn_${c.repeat(26)}`;
 const tx = (id: string, status = "completed"): PaddleTransaction =>
@@ -221,5 +221,21 @@ describe("priceBookDelta", () => {
     expect(priceBookDelta(offer(29), new Map([[pid, null]]))[0].problems).toEqual(["price_unreadable"]);
     expect(priceBookDelta(offer(29), new Map())[0].problems).toEqual(["price_unreadable"]);
     expect(priceBookDelta(offer(29, null), new Map())[0].problems).toEqual(["price_id_not_configured"]);
+  });
+
+  it("reads retired offers like any other, and a v2 offer with no env is not_configured, not a mismatch", () => {
+    const offers = [
+      { code: "studio_access", priceId: null, priceUsd: 99 },
+      { code: "personal", priceId: null, priceUsd: 29 },
+      { code: "team", priceId: null, priceUsd: 199 },
+    ];
+    // A missing retired env stays a delta: a renewal could not resolve.
+    expect(priceBookDelta(offers, new Map())).toEqual([{ offerCode: "studio_access", priceId: null, problems: ["price_id_not_configured"] }]);
+    expect(priceBookNotConfigured(offers)).toEqual(["personal", "team"]);
+    // A configured v2 offer is compared in full, and an unknown code is never excused.
+    expect(priceBookDelta([{ code: "personal", priceId: pid, priceUsd: 29 }], new Map([[pid, price("2900")]]))).toEqual([]);
+    expect(priceBookDelta([{ code: "personal", priceId: pid, priceUsd: 29 }], new Map([[pid, price("4900")]]))[0].problems).toEqual(["amount_mismatch"]);
+    expect(priceBookDelta([{ code: "mystery", priceId: null, priceUsd: 1 }], new Map())[0].problems).toEqual(["price_id_not_configured"]);
+    expect(priceBookNotConfigured([{ code: "mystery", priceId: null }])).toEqual([]);
   });
 });

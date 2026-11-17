@@ -205,12 +205,13 @@ export const SOLUTIONS = {
       /*
         BA-049. "Membership is not available yet for shared workspaces; Team remains contact-only
         until tenancy is complete" put an internal engineering milestone in front of knowledge
-        owners and security reviewers. The commercial fact is unchanged and is the one a buyer has
-        to plan for: Pro is `saleChannel: "contact"` in `lib/billing-catalog.ts` (CAT-D4), so it is set up
-        with us rather than bought at a checkout. The roadmap half belongs in the pricing footnote
-        where a reader is comparing plans, and goes to `copy-commerce-legal` as a cross-lane item.
+        owners and security reviewers. The fact a buyer has to plan for is unchanged: setting up a
+        shared workspace is arranged with us rather than bought at a checkout, because the plans
+        that carry shared access (Team and Business, catalog v2) are requested -- their per-member
+        source permissions and organization policy are not delivered, `/pricing`'s
+        `planAvailability`. The sentence names no plan, so it cannot disagree with that page.
       */
-      "Pro setup is arranged with us rather than bought at a checkout. Each workspace has a single owner, and shared administration is scoped with Enterprise.",
+      "Shared-workspace setup is arranged with us rather than bought at a checkout. Each workspace has a single owner, and shared administration is scoped with Enterprise.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },

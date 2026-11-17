@@ -1,0 +1,347 @@
+"use client";
+
+/**
+ * Sign in.
+ *
+ * There was no sign-in page before this: the landing page opened a Google popup from its nav and
+ * a failure surfaced as a toast on a marketing page, with no way back and nothing explaining
+ * what a person was signing in *to*. That is the moment a private pilot loses people.
+ *
+ * Two jobs, in this order. Tell someone what they get and what is gated -- read live from
+ * `/api/status`, so the page never promises a capability this deployment does not have -- and
+ * then get them in with one control. Google is the only provider configured; if it is not
+ * configured, the button says so instead of failing on click.
+ */
+
+import Link from "next/link";
+import type { Route } from "next";
+import { useEffect, useState } from "react";
+import CheckoutIntentNotice from "@/components/checkout-intent-notice";
+import Logomark from "@/components/logomark";
+import { RecipeContinuation, RecipePreflight } from "@/components/recipe-preflight";
+import { checkoutSellable, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ServedAvailability } from "@/lib/checkout-intent";
+import { trackFunnel } from "@/lib/funnel-events";
+import {
+  readRecipeParams,
+  rememberFirstTouch,
+  rememberRecipeIntent,
+  resumeDestination,
+  takeRecipeIntent,
+  type RecipeIntent,
+} from "@/lib/recipe-intent";
+import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { EXPLORE_CTA, TRIAL_ALLOWANCE } from "@/lib/site-navigation";
+import { parsePublicStatusV2 } from "@/lib/public-status-contract";
+
+type AuthState = "checking" | "ready" | "unconfigured";
+
+/*
+  Catalog v2. Every offer's `planAvailability`, computed by the server page (`./page.tsx`) and passed
+  in. This module runs in the browser and reads no price environment, so it never decides a plan's
+  availability itself: the H1 and the intent notice both read this one answer.
+*/
+export type LoginAvailability = Readonly<Record<BillingOfferCode, ServedAvailability>>;
+
+/*
+  BQ-113. One claim per heading. "One step before checkout" is a promise, so it is made only where the
+  server computed the plan as purchasable and the deployment's `purchasePlan` is open (`checkoutSellable`,
+  which the notice reads too). A pure function, so the promise is tested without a browser.
+*/
+export function loginHeading({ intent, availability, purchaseOpen, signedIn, recipe }: {
+  intent: BillingOfferCode | null;
+  availability: LoginAvailability;
+  purchaseOpen: boolean | null;
+  signedIn: boolean;
+  recipe: RecipeIntent | null;
+}) {
+  return intent && checkoutSellable(availability[intent], purchaseOpen) ? "One step before checkout."
+    : signedIn && recipe ? "Continue your recipe."
+    : recipe ? "One step before you run this."
+      : "Sign in to TAVONEL.";
+}
+
+export default function LoginClient({ availability }: { availability: LoginAvailability }) {
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  /*
+    Audit M05. This was initialised to "pilot", and the PRIVATE PILOT badge renders on
+    `commercialMode === "pilot"` from the first paint -- so a commercially live deployment served
+    the literal words PRIVATE PILOT in its own /login HTML and then took them away a moment later
+    when the fetch resolved. A badge is a statement about the deployment; until /api/status has
+    answered, this page has no such statement to make, and `null` renders nothing. The catch
+    branch leaves it null for the same reason: an unreachable status endpoint is not evidence of
+    a pilot.
+  */
+  const [commercialMode, setCommercialMode] = useState<"pilot" | "live" | null>(null);
+  const [selfService, setSelfService] = useState(false);
+  const [customerProcessingEnabled, setCustomerProcessingEnabled] = useState(false);
+  /* P2-10 (JOURNEY-MAP D-02): whether a plan can be bought, so the intent notice promises no more. */
+  const [purchaseOpen, setPurchaseOpen] = useState<boolean | null>(null);
+  /**
+   * R1, second half. Someone who arrived by picking a plan is not here to "open a workspace" --
+   * they are part-way through a purchase, and the page has to say so or the detour looks like the
+   * product losing their place. The offer is read from the URL, validated against the offer list
+   * (never a price), and put in sessionStorage because the Google round trip returns to a fixed
+   * callback path that cannot carry a query string of ours.
+   */
+  const [intent, setIntent] = useState<BillingOfferCode | null>(null);
+  /**
+   * WG-082/084. The same hop for a reader who came from a cookbook rather than from a price.
+   *
+   * `next=recipe` is a different arrival from `next=checkout` and the two never mix: one of them
+   * is at most present, the checkout path is untouched, and the recipe is validated against the
+   * closed slug list before it is stored or rendered. A recipe carries no plan and no price, so
+   * what this page can say about cost comes from `usage-pricing.ts` and the plan catalog, never
+   * from the URL.
+   */
+  const [recipe, setRecipe] = useState<RecipeIntent | null>(null);
+  /** X08. A confirmed session arriving with a valid recipe: this page becomes its continuation. */
+  const [signedIn, setSignedIn] = useState(false);
+  /** False when this browser refused to hold the recipe across the Google round trip. */
+  const [recipeKept, setRecipeKept] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    /*
+      WG-085. First touch is recorded before any internal id is written, and `rememberFirstTouch`
+      never overwrites a record that already exists -- so a reader who arrived from a campaign and
+      then clicked through three internal pages keeps the campaign. The recipe intent is a
+      separate key and nothing below writes an internal id into the attribution record.
+    */
+    rememberFirstTouch(window.location.search);
+    const offer = readOfferParam(window.location.search);
+    if (offer) {
+      setIntent(offer);
+      rememberCheckoutIntent(offer);
+      trackFunnel("login_reached_with_intent", { offer });
+    }
+    const startedRecipe = readRecipeParams(window.location.search);
+    if (startedRecipe) {
+      setRecipe(startedRecipe);
+      setRecipeKept(rememberRecipeIntent(startedRecipe));
+    }
+    void (async () => {
+      // Already signed in? Do not make someone sign in twice.
+      const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
+      const client = getSupabaseBrowserClient();
+      let signedInWithRecipe = false;
+      if (client) {
+        const { data } = await client.auth.getSession();
+        if (data.session && !cancelled) {
+          const resume = takeCheckoutIntent();
+          /*
+            X08. The stored recipe is consumed here, once, on every signed-in arrival -- so an
+            abandoned one can never surface on a later, unrelated hop. What this page continues
+            is the recipe in its own URL, which `readRecipeParams` has already held to the slug
+            list, the current version and the return allow-list; a stale or tampered one parsed
+            to null above and falls through to the workspace like any other signed-in visit.
+
+            A signed-in recipe is not redirected anywhere -- not back to the cookbook it came
+            from, which would be a loop, and not to an empty workspace, which is where it used to
+            be dropped. It renders the continuation below and waits for a click. Checkout keeps
+            precedence, exactly as on the callback.
+          */
+          takeRecipeIntent();
+          // The URL's own offer counts too, so a checkout still wins where storage is blocked.
+          const checkout = resume ?? offer;
+          if (checkout || !startedRecipe) {
+            window.location.replace(resumeDestination({ checkout, recipe: null }));
+            return;
+          }
+          signedInWithRecipe = true;
+          setSignedIn(true);
+        }
+      }
+      // Counted on the arrival that is headed for a sign-in, not on the continuation a sign-in
+      // returns to -- otherwise every resumed recipe would be counted as reaching the page twice.
+      if (startedRecipe && !signedInWithRecipe && !cancelled) trackFunnel("login_reached_with_intent", { kind: "recipe" });
+      try {
+        const response = await fetch("/api/status/v2", { cache: "no-store" });
+        if (!response.ok) throw new Error("status unavailable");
+        const body = parsePublicStatusV2(await response.json());
+        if (!body) throw new Error("invalid status contract");
+        if (cancelled) return;
+        setCommercialMode(body.service.commercialMode);
+        setSelfService(body.availableActions.createAccount.enabled);
+        setCustomerProcessingEnabled(body.availableActions.compileCustomerDocuments.enabled);
+        setPurchaseOpen(body.availableActions.purchasePlan.enabled);
+        setAuthState(body.availableActions.signIn.enabled ? "ready" : "unconfigured");
+      } catch {
+        // Fail closed: if the deployment cannot be asked, do not offer a control that will fail.
+        // B-08: purchaseOpen stays null. The page never read the sale state, so it neither promises
+        // a checkout nor says a plan is "not sold online today"; the unavailable notice says why.
+        if (!cancelled) {
+          setSelfService(false);
+          setAuthState("unconfigured");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const signIn = async () => {
+    setBusy(true);
+    setError(null);
+    const { getSupabaseBrowserClient } = await import("@/lib/supabase-browser");
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      setError("Sign-in is not available right now.");
+      setBusy(false);
+      return;
+    }
+    const { error: authError } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (authError) {
+      setError("Google sign-in could not start. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main id="main" className="auth" tabIndex={-1}>
+      <header>
+        <Link href="/" className="wordmark"><Logomark /><b>TAVONEL</b></Link>
+        {commercialMode === "pilot" ? <span className="mode"><i aria-hidden="true" />PRIVATE PILOT</span> : null}
+      </header>
+
+      <div className="auth-body">
+        <div className="auth-card">
+          {/*
+            BQ-113. One claim per heading.
+
+            The default read "Open your workspace." -- and on a deployment where customer file
+            processing is closed, the notice directly under it read "Customer file processing is
+            not open yet." The heading and the first paragraph contradicted each other on the
+            surface that converts. The heading now says what the page does, which is true in
+            every deployment state; what is and is not open is the notice’s job.
+
+            P2-10 (JOURNEY-MAP D-02): the same rule for a reader who arrived with a plan. "One step
+            before checkout" is a promise, so it waits for `purchasePlan` exactly as the notice
+            under it does; until then, and wherever no plan can be bought, the heading is the one
+            that is true in every state.
+          */}
+          <h1>{loginHeading({ intent, availability, purchaseOpen, signedIn, recipe })}</h1>
+          <p className="lead">
+            TAVONEL turns your documents and connected sources into a structured, source-grounded
+            World. Your workspace is tenant-scoped and source data is processed under the published
+            data and subprocessor policies.
+          </p>
+
+          {/*
+            X08. Signed in with a valid recipe: the continuation replaces the sign-in controls.
+            `processing` stays null until /api/status answers, and a failed answer is false --
+            the same fail-closed reading the sign-in button gets.
+          */}
+          {signedIn && recipe ? (
+            <RecipeContinuation
+              intent={recipe}
+              processing={authState === "checking" ? null : customerProcessingEnabled}
+            />
+          ) : <>
+          {intent ? (
+            <CheckoutIntentNotice offer={intent} purchaseOpen={purchaseOpen} availability={availability[intent]} />
+          ) : recipe ? (
+            <>
+              {/*
+                No silent fallback: where site data is blocked the recipe cannot survive the
+                Google round trip, so the page says that rather than promising a resume.
+              */}
+              <p className="notice static" role="status">
+                {recipeKept ? (
+                  <>
+                    <strong>Your recipe is kept for you.</strong> Signing in brings you straight to
+                    this recipe&rsquo;s first step, with nothing running until you ask for it.
+                  </>
+                ) : (
+                  <>
+                    <strong>This browser is not keeping site data.</strong> Sign-in still works,
+                    but it will open your workspace; start the recipe again from{" "}
+                    <a href={recipe.returnTo}>its page</a> once you are signed in.
+                  </>
+                )}
+              </p>
+              <RecipePreflight intent={recipe} omitLanding={!recipeKept} />
+            </>
+          ) : selfService && customerProcessingEnabled ? (
+            <p className="notice static" role="status">
+              {/* Review PR201-R2, ADR 0008: uploads open per workspace on the owner's terms acceptance, so the evaluation is conditioned on it. */}
+              <strong>Signing in creates your workspace.</strong> Uploading your own sources opens once you
+              accept the processing terms there, and your workspace shows whether it is open. Once it is
+              open, a free evaluation uses up to {TRIAL_ALLOWANCE.files} files and {TRIAL_ALLOWANCE.pages} standard pages to
+              compile 1 World for {TRIAL_ALLOWANCE.days} days. No card is required.
+            </p>
+          ) : null}
+
+          {authState === "ready" && !customerProcessingEnabled ? (
+            <p className="notice static" role="status">
+              <strong>Customer file processing is not open yet.</strong> You can sign in to view
+              your workspace, or explore a completed public example.
+            </p>
+          ) : null}
+
+          <div className="auth-actions">
+            {/*
+              G2-031. The control a visitor came for, present from the first paint.
+
+              While `/api/status` was in flight the button's label was replaced by "Checking this
+              deployment…", so one cold load in three at 412px showed no sign-in control at 300ms
+              and settled well inside 1.5s. Nothing wrong was claimed; the page simply looked like
+              it had nothing to offer for a third of a second on the surface that converts.
+
+              The button is the button the whole time. It is disabled and `aria-busy` while the
+              deployment answers -- so a click cannot start a flow the page has not confirmed is
+              configured -- and it says "Sign-in unavailable" only once the answer is in. That is
+              the same fail-closed behaviour with the label held still.
+            */}
+            <button
+              className="btn"
+              type="button"
+              onClick={() => void signIn()}
+              disabled={busy || authState !== "ready"}
+              aria-busy={authState === "checking" || busy}
+              data-loading={authState === "checking" || busy ? "1" : undefined}
+            >
+              {authState === "unconfigured" ? "Sign-in unavailable" :
+                busy ? "Opening Google…" : "Continue with Google"}
+            </button>
+            {authState === "ready" && !customerProcessingEnabled ? (
+              <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
+            ) : null}
+          </div>
+
+          {authState === "unconfigured" ? (
+            <p className="notice static" role="status">
+              <strong>Sign-in is temporarily unavailable.</strong> Try again shortly, or reach us
+              at <a href="mailto:support@tavonel.com">support@tavonel.com</a>.
+            </p>
+          ) : null}
+          {error ? <p className="notice static" role="alert"><strong>Sign-in did not start.</strong> {error}</p> : null}
+
+          <ul className="auth-facts">
+            <li><b>Google sign-in.</b> No separate TAVONEL password is created or stored.</li>
+            <li><b>Tenant scoped.</b> Workspace access and source processing remain bound to your account.</li>
+            <li><b>Human review.</b> Review gates remain visible before a candidate World is activated.</li>
+            {selfService && customerProcessingEnabled ? <li><b>Bounded evaluation.</b> Free compute is limited before processing begins, so paid workloads remain protected.</li> : null}
+          </ul>
+          </>}
+        </div>
+        {/*
+          The way back, after BQ-113 cut the action row to one primary and one ghost.
+
+          The ghost that went was "Back to the site", and the sign-in shell has no site header --
+          only the wordmark, which does link home but says so to nobody who has not learned that a
+          wordmark is a link. It belongs in this row rather than back in the action row: these are
+          the onward links, and the row above is the one decision the page is asking for.
+        */}
+        <p className="fine auth-legal">
+          <Link href="/">Back to the site</Link> ·{" "}
+          <Link href="/privacy">Privacy notice</Link> · <Link href="/terms">Terms</Link> ·{" "}
+          <Link href="/security">Security</Link> · <Link href="/contact">Contact</Link>
+        </p>
+      </div>
+    </main>
+  );
+}

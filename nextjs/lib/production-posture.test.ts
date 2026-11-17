@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 import { activationPolicy } from "./activation-policy";
-import { BILLING_OFFERS } from "./billing-catalog";
+import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "./billing-catalog";
 import { qualifiedBenchmarkRecords } from "./benchmark-registry";
 import registry from "./benchmark-registry.records.json";
 
@@ -58,7 +58,21 @@ describe("production posture @ 4c80bb30", () => {
     const channels = Object.fromEntries(
       Object.entries(BILLING_OFFERS).map(([code, offer]) => [code, offer.saleChannel]),
     );
-    expect(channels).toEqual({ observer_access: "self_serve", studio_access: "contact" });
+    // Catalog v2: the four V22 plans are self-serve by channel; the 2026-09 plans keep the channels they were sold on.
+    expect(channels).toEqual({
+      personal: "self_serve", developer: "self_serve", team: "self_serve", business: "self_serve",
+      observer_access: "self_serve", studio_access: "contact",
+    });
+  });
+
+  it("sells no plan online while no capability is delivered, even with every price configured", () => {
+    // The posture a channel alone cannot state: the deployment sells what `planAvailability` says, and that is nothing yet.
+    const codes = Object.keys(BILLING_OFFERS) as BillingOfferCode[];
+    const env = Object.fromEntries(codes.map((code, index) => [BILLING_OFFERS[code].priceEnv, `pri_${String(index).repeat(26)}`]));
+    const configured = readConfiguredBillingOffers(env);
+    expect(configured.size, "every plan has a price").toBe(codes.length);
+    expect(codes.filter((code) => planAvailability(code, configured) === "purchasable")).toEqual([]);
+    expect(codes.filter((code) => planAvailability(code, configured) === "retired")).toEqual(["observer_access", "studio_access"]);
   });
 
   it("keeps every shipped manifest row's status and known limitations", () => {

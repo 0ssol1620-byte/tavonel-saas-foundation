@@ -21,10 +21,11 @@ import {
  * to stop, so `pages={null}` is the normal case and not a degraded one.
  *
  * The activation row is the fact readers are most likely to get wrong on the way in: turning a
- * reviewed candidate into a live World needs a paid plan -- Developer if the reader owns the
- * workspace (FD-02, `planReachesLevel(..., "activation", "owner")`), or Team, which is arranged
- * in a conversation. Every half is read from the catalog, so if either `saleChannel` flips the
- * sentence follows it. The refusal is stated as plainly as the permission: a free evaluation
+ * reviewed candidate into a live World needs a paid plan -- Personal or Developer if the reader owns
+ * the workspace (FD-02, `planReachesLevel(..., "activation", "owner")`; both carry the
+ * `observer_access` level), or Team or Business. Every plan name is read from the catalog and says
+ * nothing about how a plan is bought: that is /pricing's availability, decided on the server. The
+ * refusal is stated as plainly as the permission: a free evaluation
  * compiles, reviews and exports and is refused at activation, which is the sentence that must
  * not soften. What a given deployment will accept from a given account is a separate question
  * the sign-in page asks `/api/status`; this component states the plan, not the deployment.
@@ -43,8 +44,7 @@ export function RecipePreflight({
    */
   omitLanding?: boolean;
 }) {
-  const team = BILLING_OFFERS.studio_access;
-  const developer = BILLING_OFFERS.observer_access;
+  const { personal, developer, team, business } = BILLING_OFFERS;
   const quote = typeof pages === "number" ? quoteCompilePages(pages) : null;
   const perPageCeiling = formatUsd(MAX_UNITS_PER_PAGE * PROCESSING_UNIT_USD);
 
@@ -70,22 +70,8 @@ export function RecipePreflight({
       </li>
       <li>
         <b>Activation.</b> Turning a reviewed candidate into a live World needs a paid plan: the{" "}
-        {developer.label} plan if you own the workspace
-        {developer.saleChannel === "self_serve" ? (
-          <>, which you can start on <Link href="/pricing">pricing</Link></>
-        ) : (
-          <>, which we arrange with you</>
-        )}
-        , or the {team.label} plan
-        {team.saleChannel === "contact" ? (
-          <>
-            , which we set up with you directly — <Link href="/contact">talk to us</Link> to arrange
-            it
-          </>
-        ) : (
-          <>, also shown on <Link href="/pricing">pricing</Link></>
-        )}
-        . A free evaluation activates one World, as its owner. A second World needs one of these plans.
+        {personal.label} or {developer.label} plan if you own the workspace, or the {team.label} or{" "}
+        {business.label} plan. All four are on <Link href="/pricing">pricing</Link>. A free evaluation activates one World, as its owner. A second World needs one of these plans.
       </li>
       {omitLanding ? null : <li>
         {/*

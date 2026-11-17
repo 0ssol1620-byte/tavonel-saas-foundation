@@ -136,6 +136,17 @@ export function processorDelta(
 
 export type PriceBookDelta = { offerCode: string; priceId: string | null; problems: string[] };
 
+/**
+ * A current (v2) offer with no price id is waiting for its capabilities and is not a mismatch; a retired
+ * offer with none is a renewal incident, and a code the catalog does not know is read strictly.
+ */
+const awaitsPrice = (code: string) => Object.hasOwn(BILLING_OFFERS, code) && BILLING_OFFERS[code as BillingOfferCode].status === "v2";
+
+/** The offers `priceBookDelta` leaves out because they are not configured yet. Reported, never counted as agreement. */
+export function priceBookNotConfigured(offers: ReadonlyArray<{ code: string; priceId: string | null }>): string[] {
+  return offers.filter((o) => !o.priceId && awaitsPrice(o.code)).map((o) => o.code);
+}
+
 /** `paddlePrices` maps a price id to the read price, or to null when it could not be read. */
 export function priceBookDelta(
   offers: ReadonlyArray<{ code: string; priceId: string | null; priceUsd: number }>,
@@ -144,6 +155,7 @@ export function priceBookDelta(
   const out: PriceBookDelta[] = [];
   for (const offer of offers) {
     const problems: string[] = [];
+    if (!offer.priceId && awaitsPrice(offer.code)) continue;
     if (!offer.priceId) problems.push("price_id_not_configured");
     else {
       const price = paddlePrices.get(offer.priceId);

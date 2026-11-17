@@ -348,7 +348,17 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!resumeOffer || purchaseOpen === undefined) return;
     if (purchaseOpen === true && customerDataAccess === "checking") return;
-    const decision = decideCheckoutResume(resumeOffer, purchaseOpen, resumeAccess);
+    /*
+      Catalog v2 (WO-CAT-2 L4, N2). This page runs in the browser and holds no price environment, so it never
+      decides whether a plan is on sale: it passes no availability (null), which claims none. A current (v2)
+      offer is held through terms and release under its public label (its usual way here is the terms-first
+      link, which the checkout route sends only after its offer policy passed), and when the hold ends the
+      checkout route answers: a plan that is not sold online is its 403 BILLING_OFFER_CONTACT_REQUIRED,
+      rendered as the request-access sentence, with nothing opened or charged. A retired offer is catalog
+      data, not environment: it is never held or named, and goes straight to the route, whose refusal is the
+      sentence (as before catalog v2). An unknown code never reaches here (`readOfferParam` returns null).
+    */
+    const decision = BILLING_OFFERS[resumeOffer].status === "v2" ? decideCheckoutResume(null, purchaseOpen, resumeAccess) : "open";
     if (decision === "hold_terms" || decision === "hold_release") {
       rememberCheckoutIntent(resumeOffer);
       setNotice(heldOfferSentence(resumeOffer));
@@ -4001,7 +4011,7 @@ export default function WorkspacePage() {
                   so the card does not repeat it. It is still headed -- by the plan the account is
                   actually on, or, when that has not been read, by a neutral name for the card.
                   Never by a plan name this panel does not have. */}
-              <h2>{isBillingOfferCode(billingAccount?.accessPlan ?? null) ? `${BILLING_OFFERS[billingAccount!.accessPlan as BillingOfferCode].label} plan` : billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
+              <h2>{isBillingOfferCode(billingAccount?.accessPlan ?? null) ? BILLING_OFFERS[billingAccount!.accessPlan as BillingOfferCode].label.replace(/(?<!\bplan\)|\bplan)$/, " plan") : billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*

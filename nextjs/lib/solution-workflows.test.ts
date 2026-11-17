@@ -174,10 +174,12 @@ describe("Solutions task choices and workflow evidence", () => {
     }
   });
 
-  it("keeps Pro contact-led without promising shared membership administration", async () => {
+  it("keeps shared-workspace setup contact-led without promising shared membership administration", async () => {
     const html = renderToStaticMarkup(await SolutionPage({ params: Promise.resolve({ slug: "knowledge-operations" }) }));
-    // Starter/Pro rename (2026-11-10, founder, intended). Pro stays contact-led (CAT-D4, 2026-11-16).
-    expect(html).toContain("Pro setup is arranged with us rather than bought at a checkout");
+    // Catalog v2 (PB-2026-11-V22, WO-CAT-2): the page no longer names a plan for the shared workspace -- nothing is on sale and
+    // the 2026-09 Pro label is retired -- so the sentence states the setup itself, still arranged with us and not bought.
+    expect(html).toContain("Shared-workspace setup is arranged with us rather than bought at a checkout");
+    expect(html).not.toMatch(/Pro/);
     expect(html).toContain("Each workspace has a single owner, and shared administration is scoped with Enterprise.");
     expect(html).not.toContain("we provision the tenant and the roles with you");
   });

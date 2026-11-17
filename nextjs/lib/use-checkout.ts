@@ -3,7 +3,7 @@
 /** Paddle checkout, in one place. */
 
 import { useCallback, useState } from "react";
-import type { BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, type BillingOfferCode } from "./billing-catalog";
 import { trackFunnel } from "./funnel-events";
 import { failureSentence } from "./workspace-failure-copy";
 import {
@@ -19,6 +19,7 @@ type CheckoutResponse = {
   environment?: "sandbox" | "production";
   clientToken?: string;
   offer?: { priceId?: string; label?: string };
+  quote?: { offerCode?: string; priceUsd?: number };
   customer?: { email?: string };
   customData?: Record<string, string>;
 };
@@ -138,6 +139,12 @@ export function useCheckout(
         }
         if (!checkout.clientToken || !checkout.environment || !checkout.offer?.priceId || !checkout.customData) {
           notify("Checkout is unavailable. The checkout response was incomplete, so nothing was opened or charged.", "alert");
+          return;
+        }
+
+        // The quote the buyer is shown must be the plan this page sells: a different price opens nothing.
+        if (checkout.quote?.offerCode !== offerCode || checkout.quote.priceUsd !== BILLING_OFFERS[offerCode]?.priceUsd) {
+          notify("Checkout is unavailable. The quoted price did not match this plan, so nothing was opened or charged.", "alert");
           return;
         }
 

@@ -77,7 +77,12 @@ async function pricesReport(_args, env, d) {
     prices.set(id, r.ok ? r.price : null); // an unreadable price is reported by priceBookDelta as price_unreadable
   }
   const delta = d.priceBookDelta(offers, prices);
-  return { exit: delta.length ? 1 : 0, report: { offersChecked: offers.length, delta } };
+  // A v2 offer with no price id is waiting for its capabilities: listed and counted apart, never counted as checked.
+  const notConfigured = d.priceBookNotConfigured(offers);
+  return {
+    exit: delta.length ? 1 : 0,
+    report: { offersChecked: offers.length - notConfigured.length, notConfiguredCount: notConfigured.length, notConfigured, delta },
+  };
 }
 
 async function transactionsReport(args, env, d) {

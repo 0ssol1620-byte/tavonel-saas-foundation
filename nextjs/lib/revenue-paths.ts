@@ -12,10 +12,15 @@ export type RevenuePath = {
   family: string;
   state: RevenuePathState;
   offerCodes: readonly BillingOfferCode[];
-  /** Null for not_sold, and for sold_contract (invoiced outside the self-serve ledger). */
+  /** Null for sold_contract (invoiced outside the self-serve ledger) and for a not_sold family that holds no offer. */
   ledgerPath: LedgerPath | null;
-  /** Public-copy terms that must not appear while the path is not_sold. */
+  /**
+   * Public-copy terms of a not_sold family. On /pricing one may appear only in the allowance line of a plan whose action
+   * is Request access and in a Request access row of the overage table (`revenue-paths.test.ts`).
+   */
   terms: readonly string[];
+  /** The key of a plan's `included` allowance this family meters, where it meters one. A seat is a cap, not a family. */
+  meter?: "pcu" | "kqu" | "storageGb";
 };
 
 const notSold = (family: string, ...terms: string[]): RevenuePath => ({
@@ -30,17 +35,25 @@ export const REVENUE_PATHS: readonly RevenuePath[] = [
   // Trial usage is not an allowance row (that kind is unique per Paddle transaction_id); it is counted
   // through foundation_trial_policy and reserve_foundation_compute_v3 with billing source "trial".
   { family: "CORE_FREE", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
+  /*
+    Catalog v2 (PB-2026-11-V22). No v2 plan is purchasable until `DELIVERED` holds every capability on
+    its line (`planAvailability`), so these paths are `not_sold`; WO-CAT-7 flips them with the release
+    that proves the meters. They already name their ledger path, because the two retired offers settle
+    renewals through it today: they are never sold again, and an existing subscriber keeps both the
+    price and the `allowance` path until they change plan.
+  */
   {
     family: "CORE_PERSONAL_TEAM_BUSINESS",
-    state: "sold_self_serve",
-    offerCodes: ["observer_access", "studio_access"],
-    ledgerPath: "allowance", // both offers are kind "subscription"; paddle-billing-event emits action "allowance"
+    state: "not_sold",
+    offerCodes: ["personal", "team", "business", "observer_access", "studio_access"],
+    ledgerPath: "allowance", // every offer is kind "subscription"; paddle-billing-event emits action "allowance"
     terms: [],
   },
-  notSold("DEV"),
-  { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
-  notSold("CONTEXT_KQU", "KQU"),
-  notSold("STORAGE_RETENTION", "GB-month"),
+  { family: "DEV", state: "not_sold", offerCodes: ["developer"], ledgerPath: "allowance", terms: [] },
+  { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [], meter: "pcu" },
+  { ...notSold("CONTEXT_KQU", "KQU"), meter: "kqu" },
+  // "GB", not only "GB-month": a storage quantity in GB (an allowance, a comparison row) names the meter as surely as its rate (WO-CAT-2 N5).
+  { ...notSold("STORAGE_RETENTION", "GB"), meter: "storageGb" },
   notSold("STEWARD_SYNC", "Steward sync"),
   notSold("SKILL_RUN_LICENSE", "Verified Skill", "Skill run"),
   notSold("WORLD_FIRST_PARTY", "first-party World"),

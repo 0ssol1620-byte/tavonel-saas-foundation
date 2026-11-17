@@ -123,11 +123,13 @@ export default function RefundsPage() {
           provided fewer than {Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)}% of your plan&apos;s
           included pages have been consumed when you ask
         </b>
-        : {refundablePageAllowance(BILLING_OFFERS.observer_access)} pages on{" "}
-        {BILLING_OFFERS.observer_access.label},{" "}
-        {refundablePageAllowance(BILLING_OFFERS.studio_access)} on{" "}
-        {BILLING_OFFERS.studio_access.label}. That is the whole rule, and there is no second,
-        looser version of it anywhere on this site.
+        : {refundablePageAllowance(BILLING_OFFERS.personal)} pages on{" "}
+        {BILLING_OFFERS.personal.label},{" "}
+        {refundablePageAllowance(BILLING_OFFERS.developer)} on{" "}
+        {BILLING_OFFERS.developer.label},{" "}
+        {refundablePageAllowance(BILLING_OFFERS.team)} on {BILLING_OFFERS.team.label} and{" "}
+        {refundablePageAllowance(BILLING_OFFERS.business)} on {BILLING_OFFERS.business.label}.
+        That is the whole rule, and there is no second, looser version of it anywhere on this site.
       </p>
       <p>
         Past that line the payment is not refunded, and unused pages are not refunded on

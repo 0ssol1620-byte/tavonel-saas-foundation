@@ -298,7 +298,7 @@ describe("product claims sync", () => {
     later. The fix is the initial value, so that is what this reads.
   */
   it("never paints the pilot badge before /api/status has confirmed the mode", () => {
-    const page = read("app/login/page.tsx");
+    const page = read("app/login/login-client.tsx");
     expect(page, "an unconfirmed commercial mode is null, not pilot")
       .toContain('useState<"pilot" | "live" | null>(null)');
     expect(strip(page), "the old initialiser must not come back")
@@ -421,20 +421,23 @@ describe("product claims sync", () => {
     it has no published price (`null`, rendered "Arranged with us").
   */
   it("computes the pricing scenarios from the catalog, and prices no page past the plan", () => {
-    const developer = BILLING_OFFERS.observer_access;
-    const team = BILLING_OFFERS.studio_access;
+    const { personal, team, business } = BILLING_OFFERS;
 
-    expect(monthlyTotalUsd(developer, developer.includedPages)).toBe(developer.priceUsd);
+    expect(monthlyTotalUsd(personal, personal.includedPages)).toBe(personal.priceUsd);
     expect(monthlyTotalUsd(team, team.includedPages)).toBe(team.priceUsd);
+    expect(monthlyTotalUsd(business, business.includedPages)).toBe(business.priceUsd);
     // A volume under the included pages is the subscription and nothing else.
     expect(monthlyTotalUsd(team, 1)).toBe(team.priceUsd);
     // Failure path: one page past the included pages is not given a price.
-    expect(monthlyTotalUsd(developer, developer.includedPages + 1)).toBeNull();
-    expect(monthlyTotalUsd(developer, developer.includedPages * 2)).toBeNull();
+    expect(monthlyTotalUsd(personal, personal.includedPages + 1)).toBeNull();
+    expect(monthlyTotalUsd(personal, personal.includedPages * 2)).toBeNull();
+    expect(monthlyTotalUsd(business, business.includedPages + 1)).toBeNull();
 
     const pricing = read("components/pricing-page-client.tsx");
     expect(pricing, "the volumes are derived from the catalog, not typed")
-      .toContain("BILLING_OFFERS.observer_access.includedPages");
+      .toContain("PERSONAL.includedPages");
+    expect(pricing, "and the catalog is where those names come from")
+      .toContain("personal: PERSONAL, developer: DEVELOPER, team: TEAM, business: BUSINESS } = BILLING_OFFERS");
     expect(pricing, "no scenario dollar figure is written into the page")
       .not.toMatch(/\$\d+\.\d\d/);
   });
@@ -476,6 +479,10 @@ describe("product claims sync", () => {
       .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
     // R1 (delegated decision 2026-11-09): no per-page price past the plan, on any public surface that
     // talks about plans -- neither by name nor as a literal cents figure (review PR201-R1 note 4).
+    // Amendment 2 (founder, 2026-11-16) puts the V22 meter rates on /pricing, and only there: they are read from
+    // `METER_RATES_USD`, never typed, and sit beside Request access. The literal-figure ban below still stands.
+    expect(pricing, "the V22 meter rates on /pricing are the catalog's constants")
+      .toContain("rate(METER_RATES_USD.pcu)");
     const R1_RATE = /per standard page|STANDARD_PAGE_USD|MAXIMUM_PAGE_USD|PROCESSING_UNIT_USD|\$\s?0\.\d/;
     for (const [surface, source] of [
       ["pricing", pricing], ["docs", read("lib/docs-content.ts")],
@@ -519,7 +526,7 @@ describe("product claims sync", () => {
     const refunds = read("app/refunds/page.tsx");
     expect(refunds, "the window is the catalog's").toContain("{REFUND_WINDOW_DAYS}");
     expect(refunds, "the share is the catalog's").toContain("Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)");
-    for (const offer of ["observer_access", "studio_access"] as const) {
+    for (const offer of ["personal", "developer", "team", "business"] as const) {
       expect(refunds, `${offer}'s page allowance is derived`).toContain(`refundablePageAllowance(BILLING_OFFERS.${offer})`);
     }
     const copy = strip(refunds);

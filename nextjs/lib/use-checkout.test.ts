@@ -20,6 +20,7 @@ import { failureSentence } from "./workspace-failure-copy";
 import { ENTITLEMENT_PENDING_SENTENCE, type BillingStatusAccount, type EntitlementWaitResult } from "./entitlement-wait";
 import { readOfferParam } from "./checkout-intent";
 import type { CheckoutHandlers } from "./use-checkout";
+import { BILLING_OFFERS, isBillingOfferCode } from "./billing-catalog";
 
 /* ---------------------------------------------------------------- module doubles */
 
@@ -84,6 +85,7 @@ async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWait
     else if (internals?.ReactCurrentDispatcher) internals.ReactCurrentDispatcher.current = previous;
   }
 
+  startedOffer = offer;
   await start(offer);
   return notices;
 }
@@ -96,10 +98,18 @@ const tones: string[] = [];
 /** The link each notice carried, in order (hotfix 2026-11-10). */
 const links: unknown[] = [];
 
+let startedOffer = "";
+/** A ready response carries the quote the server would build for the offer being started, unless the test sets its own. */
+function withQuote(body: unknown) {
+  const ready = body as { offer?: { priceId?: string }; quote?: unknown } | null;
+  if (!ready?.offer?.priceId || "quote" in ready || !isBillingOfferCode(startedOffer)) return body;
+  return { ...ready, quote: { offerCode: startedOffer, priceUsd: BILLING_OFFERS[startedOffer].priceUsd } };
+}
+
 function respondWith(body: unknown, ok = true, status = ok ? 200 : 402) {
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
-    return { ok, status, json: async () => body } as unknown as Response;
+    return { ok, status, json: async () => withQuote(body) } as unknown as Response;
   }) as unknown as typeof fetch;
 }
 
@@ -134,7 +144,7 @@ afterEach(() => {
 describe("checkout", () => {
   it("asks the server for nothing until there is a session", async () => {
     session.token = null;
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
 
     expect(fetchCalls).toHaveLength(0);
     expect(paddle.opened).toHaveLength(0);
@@ -147,18 +157,28 @@ describe("checkout", () => {
       offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
     });
 
-    await runCheckout("credit_starter");
+    await runCheckout("developer");
 
     expect(fetchCalls).toHaveLength(1);
     const body = JSON.parse(String(fetchCalls[0].init.body));
-    expect(body).toEqual({ offerCode: "credit_starter" });
+    expect(body).toEqual({ offerCode: "developer" });
     // The allow-list belongs to the server. A client that can name a price can name any price.
     expect(JSON.stringify(body)).not.toMatch(/pri_|price|amount|\$/i);
   });
 
+  it("opens nothing when the quoted price differs from the plan's price, or the quote is missing", async () => {
+    const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1" }, customData: { u: "1" } };
+    for (const quote of [{ offerCode: "developer", priceUsd: 1 }, { offerCode: "team", priceUsd: 49 }, undefined]) {
+      respondWith({ ...ready, quote });
+      const notices = await runCheckout("developer");
+      expect(notices.join(" ")).toMatch(/quoted price did not match/i);
+    }
+    expect(paddle.opened).toHaveLength(0);
+  });
+
   it("carries the session as a bearer token", async () => {
     respondWith({ clientToken: "ct", environment: "sandbox", offer: { priceId: "p" }, customData: {} });
-    await runCheckout("credit_starter");
+    await runCheckout("developer");
     const headers = fetchCalls[0].init.headers as Record<string, string>;
     expect(headers.authorization).toBe("Bearer session-token");
   });
@@ -171,7 +191,7 @@ describe("checkout", () => {
   ] as const) {
     it(`refuses to open when the response is missing ${missing}`, async () => {
       respondWith(body);
-      const notices = await runCheckout("credit_starter");
+      const notices = await runCheckout("developer");
 
       // A partial response is a failure, not something to route around.
       expect(paddle.opened).toHaveLength(0);
@@ -181,14 +201,14 @@ describe("checkout", () => {
 
   it("refuses to open on a non-ok response even when the body looks complete", async () => {
     respondWith({ clientToken: "ct", environment: "sandbox", offer: { priceId: "p" }, customData: {} }, false);
-    await runCheckout("credit_starter");
+    await runCheckout("developer");
     expect(paddle.opened).toHaveLength(0);
   });
 
   it("changes no entitlement when Paddle fails to initialize", async () => {
     paddle.init = null;
     respondWith({ clientToken: "ct", environment: "sandbox", offer: { priceId: "p" }, customData: {} });
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
     expect(paddle.opened).toHaveLength(0);
     expect(notices.join(" ")).toMatch(/could not initialize/i);
   });
@@ -199,7 +219,7 @@ describe("checkout", () => {
       offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
     });
 
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
     const said = notices.join(" ").toLowerCase();
 
     expect(paddle.opened).toHaveLength(1);
@@ -215,7 +235,7 @@ describe("checkout", () => {
       offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
     });
 
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
     const said = notices.join(" ").toLowerCase();
 
     expect(paddle.opened).toHaveLength(1);
@@ -383,7 +403,7 @@ describe("waiting for the entitlement after checkout", () => {
     let reads = 0;
     globalThis.fetch = (async (url: string, init: RequestInit) => {
       fetchCalls.push({ url: String(url), init });
-      if (String(url) !== "/api/billing/status") return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+      if (String(url) !== "/api/billing/status") return { ok: true, status: 200, json: async () => withQuote(ready) } as unknown as Response;
       const answer = statusAnswers[Math.min(reads++, statusAnswers.length - 1)];
       return { ok: answer.ok, status: answer.status, json: async () => answer.body } as unknown as Response;
     }) as unknown as typeof fetch;
@@ -527,7 +547,7 @@ describe("notice tone", () => {
     globalThis.fetch = (async (url: string, init: RequestInit) => {
       fetchCalls.push({ url: String(url), init });
       if (String(url) === "/api/billing/status") return { ok: true, status: 200, json: async () => ({ account: null }) } as unknown as Response;
-      return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+      return { ok: true, status: 200, json: async () => withQuote(ready) } as unknown as Response;
     }) as unknown as typeof fetch;
     const notices = await runCheckout("observer_access");
     vi.useFakeTimers();
