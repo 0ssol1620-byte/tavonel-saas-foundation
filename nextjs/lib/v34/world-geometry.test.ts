@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { GET } from "@/app/v34/world-layers.svg/route";
 import { publicCorpusIdsSha256, readPublicCorpus } from "./public-corpus";
@@ -211,7 +212,7 @@ describe("static SVG", () => {
   });
 
   it("is served by the route handler with the corpus's own ids and relationships and the same digest", async () => {
-    const response = GET();
+    const response = GET(new Request("http://localhost/v34/world-layers.svg"));
     expect(response.headers.get("content-type")).toBe("image/svg+xml");
     const svg = await response.text();
     const ids = [...svg.matchAll(/<circle [^>]*data-id="([^"]*)"/g)].map((m) => m[1]!);
@@ -227,5 +228,66 @@ describe("static SVG", () => {
     expect(svg).toContain(`data-ids-sha="${publicCorpusIdsSha256(corpus)}"`);
     expect(svg).toContain('data-node-count="567"');
     expect(svg).toContain('data-edge-count="1513"');
+  });
+});
+
+/*
+  WO-CI-1: `next start` does not compress app-route responses, so the home LCP image left the server at
+  ~196 KB. The handler negotiates gzip itself. Every case decodes to the exact bytes the renderer draws.
+*/
+describe("static SVG transfer encoding", () => {
+  const expected = Buffer.from(renderStaticSvg(corpus, { idsSha: publicCorpusIdsSha256(corpus) }), "utf8");
+
+  async function fetchWith(acceptEncoding: string | null) {
+    const headers = new Headers();
+    if (acceptEncoding !== null) headers.set("accept-encoding", acceptEncoding);
+    const response = GET(new Request("http://localhost/v34/world-layers.svg", { headers }));
+    const sent = Buffer.from(await response.arrayBuffer());
+    const encoding = response.headers.get("content-encoding");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/svg+xml");
+    expect(response.headers.get("cache-control")).toBe("s-maxage=31536000");
+    expect(response.headers.get("vary")).toBe("Accept-Encoding");
+    expect(response.headers.get("content-length")).toBe(String(sent.length));
+    expect(encoding === null || encoding === "gzip").toBe(true);
+    const decoded = encoding === "gzip" ? gunzipSync(sent) : sent;
+    expect(decoded.equals(expected)).toBe(true);
+    return { encoding, sent };
+  }
+
+  it.each([["gzip"], ["gzip, deflate, br"], ["GZIP"], ["br;q=1.0, gzip;q=0.8"], ["gzip;q=1"], ["gzip;Q=0.001"]])("compresses for %j", async (header) => {
+    const { encoding, sent } = await fetchWith(header);
+    expect(encoding).toBe("gzip");
+    expect(sent.length).toBeLessThan(expected.length / 4);
+  });
+
+  it.each([[null], [""], ["gzip;q=0"], ["gzip;q=0.000"], ["identity"], ["br"], ["deflate"], ["*"], ["*;q=1, identity;q=0"], ["xgzip"], ["gzipx"], ["gzip;q=abc"], ["gzip;q=1.5"], ["gzip;q="], ["gzip;q=0, gzip"], ["br, gzip;q=0"]])(
+    "sends identity for %j",
+    async (header) => {
+      const { encoding } = await fetchWith(header);
+      expect(encoding).toBeNull();
+    },
+  );
+
+  it("answers every Accept-Encoding header it can be sent with a decodable body and true headers", async () => {
+    // Deterministic fuzz over the header grammar and its malformed neighbours (mulberry32, fixed seed).
+    let seed = 0x5eed;
+    const rand = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)]!;
+    const codings = ["gzip", "GZip", "x-gzip", "br", "deflate", "identity", "*", "compress", "zstd", "", " ", "gzip ", "g zip", "ü"];
+    const params = ["", ";q=0", ";q=1", ";q=0.5", ";q=0.000", ";q=1.000", ";q=1.001", ";q=-1", ";q=NaN", ";q=", ";q", "; q = 0.3", ";level=1", ";;", ";q=0.5;q=0"];
+    const seps = [",", ", ", " ,", ",,", ";", "\t,"];
+    for (let i = 0; i < 400; i += 1) {
+      const parts = Array.from({ length: 1 + Math.floor(rand() * 4) }, () => pick(codings) + pick(params));
+      const header = parts.map((p, j) => (j === 0 ? p : pick(seps) + p)).join("");
+      const { encoding } = await fetchWith(header);
+      if (encoding === "gzip") expect(header.toLowerCase()).toContain("gzip");
+      if (!/gzip/i.test(header)) expect(encoding).toBeNull();
+    }
   });
 });
