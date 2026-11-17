@@ -113,7 +113,7 @@ set local role service_role;
 select is(pg_temp.admit('pilot-sto003', 'e3e3e3e3-0000-4000-8000-0000000000e3', 'f3f3f3f3-0000-4000-8000-0000000000f2', 2048, '{"personal": 2048}')->>'intakeClass',
   'paid', 'an expired, unconfirmed admission holds no bytes');
 select throws_ok($$select pg_temp.admit('pilot-sto003', 'e3e3e3e3-0000-4000-8000-0000000000e3', 'f3f3f3f3-0000-4000-8000-0000000000f1', 1024, '{"personal": 2048}')$$,
-  '23514', 're-arming the expired admission is refused, before the allowance: since WO-CAT-8 the inner function runs first, and its re-arm (now + 10 min) cannot pass foundation_intake_admissions_check1 (created_at + 15 min) for any expired row');
+  'P0001', 'foundation_storage_allowance_exhausted', 're-arming the expired admission past the allowance is refused by the allowance (the re-arm itself works since 20261117160100)');
 
 -- 17-19: legacy, owner and trial are never refused by the allowance.
 select is(pg_temp.admit('pilot-sto002', 'e2e2e2e2-0000-4000-8000-0000000000e2', 'f2f2f2f2-0000-4000-8000-0000000000f1', 4096,
