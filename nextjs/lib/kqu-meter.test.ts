@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -349,6 +351,17 @@ describe("fails closed", () => {
   it("search has the same platform bound as ask (WO-CAT-8: a unit's hold outlives neither)", () => {
     expect(searchRoute.maxDuration).toBe(askRoute.maxDuration);
     expect(askRoute.maxDuration).toBe(60);
+  });
+
+  it("each /api/v1 route declares the same platform bound as the route it wraps (WO-CAT-9)", () => {
+    // Read from the source, as Next.js reads segment config: a literal, never an imported identifier.
+    const declared = (path: string) =>
+      Number(/export const maxDuration = (\d+);/.exec(readFileSync(resolve(import.meta.dirname, path), "utf8"))?.[1]);
+    expect([
+      declared("../app/api/v1/collections/[id]/ask/route.ts"),
+      declared("../app/api/v1/collections/[id]/search/route.ts"),
+      declared("../app/api/v1/world/[id]/ask/route.ts"),
+    ]).toEqual([askRoute.maxDuration, searchRoute.maxDuration, askRoute.maxDuration]);
   });
 
   it("outside production and the durable opt-in the meter makes no call at all (the cost guard's switch)", async () => {
