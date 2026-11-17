@@ -83,6 +83,9 @@ const FAILURE_COPY: Record<string, string> = {
   TRIAL_LIMIT_REACHED: "Your free evaluation has reached one of its limits.",
   TRIAL_NOT_ACTIVE: "Your free evaluation has ended.",
   TRIAL_AI_ACCESS_CHECK_FAILED: "We could not check your free evaluation limits, so nothing ran. Try again in a minute.",
+  /* WO-CAT-8: the plan meters. Each says which allowance it was and what changes the answer; no number is stated here. */
+  STORAGE_ALLOWANCE_EXHAUSTED: "This workspace has used its plan's storage allowance, so this file was not added. Delete sources the workspace no longer needs to make room.",
+  KQU_ALLOWANCE_EXHAUSTED: "This workspace has used its plan's knowledge queries for this month, so nothing was asked. The allowance renews on the first day of next month (UTC).",
 };
 
 /** Refusals a plan can lift. Their sentence is shown with a link to /pricing. */
