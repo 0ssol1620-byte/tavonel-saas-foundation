@@ -775,20 +775,31 @@ const sourceFiles = (dirs: readonly string[]) => dirs.flatMap((dir) => {
 const isTest = (path: string) => /\.test\.|\.spec\.|[\\/]e2e[\\/]|[\\/]tests?[\\/]/.test(path);
 
 describe("source tests", () => {
-  it("the string /api/agent-mcp appears only in the agent route, lib/agent-*, the Agent access panel, tests and three named files", () => {
+  it("the string /api/agent-mcp appears only in the agent route, lib/agent-*, the Agent access panel, tests and four named files", () => {
     /*
-      The three named files: the route's own classification row (this work order adds it), and the audience switch of
-      developer-auth.ts and developer-store.ts (WO-AN-3), whose comments name the one route an agent credential serves.
+      The four named files: the route's own classification row (this work order adds it), the audience switch of
+      developer-auth.ts and developer-store.ts (WO-AN-3), whose comments name the one route an agent credential serves,
+      and scripts/repair-scope.mjs, which owns the route's files by path (every occurrence is checked below).
     */
     const allowed = (path: string) => {
       const rel = relative(NEXTJS, path).replaceAll("\\", "/");
       return rel.startsWith("app/api/agent-mcp/") || /^lib\/agent-[^/]+$/.test(rel) || rel === "components/workspace/agent-access-panel.tsx"
-        || isTest(rel) || ["lib/security/route-classification.json", "lib/developer-auth.ts", "lib/developer-store.ts"].includes(rel);
+        || isTest(rel) || ["lib/security/route-classification.json", "lib/developer-auth.ts", "lib/developer-store.ts", "scripts/repair-scope.mjs"].includes(rel);
     };
     const offenders = sourceFiles(["app", "lib", "components", "public", "scripts", "content", "data"].map((dir) => join(NEXTJS, dir)))
       .filter((path) => !allowed(path) && readFileSync(path, "utf8").includes("/api/agent-mcp"))
       .map((path) => relative(NEXTJS, path));
     expect(offenders).toEqual([]);
+  });
+
+  it("every /api/agent-mcp in scripts/repair-scope.mjs sits inside a quoted owned path", () => {
+    const text = readFileSync(join(NEXTJS, "scripts/repair-scope.mjs"), "utf8");
+    const route = "/api/agent-mcp";
+    const inQuotedPath = /'app\/api\/agent-mcp\/[^'\s]*'/g;
+    expect(text).toContain(route);
+    expect(text.replace(inQuotedPath, "").includes(route)).toBe(false);
+    // Mutation: the same text outside a quoted path must be caught.
+    expect(`// see ${route} in prose`.replace(inQuotedPath, "").includes(route)).toBe(true);
   });
 
   it("no auto-activation switch exists anywhere", () => {

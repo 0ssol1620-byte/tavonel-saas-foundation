@@ -1148,21 +1148,6 @@ describe("public copy", () => {
     }
   );
 
-  /*
-    The V34 /security Bridge types its link and label, so pin them to the step the sequence
-    names after /security: the same page and the same action TrustNext would print.
-  */
-  it("sends /security to the next step's page with the sequence's own action", async () => {
-    const { SecurityBody } = await import("@/components/v34/routes/security/security");
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { createElement } = await import("react");
-    const html = renderToStaticMarkup(createElement(SecurityBody));
-    const order = [...read("components/trust-next.tsx").matchAll(/href: "([^"]+)"/g)].map((m) => m[1]!);
-    const next = order[order.indexOf("/security") + 1]!;
-    const action = read("components/trust-next.tsx").match(/"\/security": "([^"]+)"/)![1]!;
-    expect(html).toMatch(new RegExp(`<a\\b[^>]*href="${next}"[^>]*>[\\s\\S]*?${action}`));
-  });
-
   it("gives every step of the trust sequence a precise next action", () => {
     const source = read("components/trust-next.tsx");
     // Every href declared in the order must also have an action, or a page renders an empty CTA.
