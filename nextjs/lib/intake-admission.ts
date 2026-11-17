@@ -1,3 +1,4 @@
+import { BILLING_OFFERS } from "./billing-catalog";
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "./immutable-keys";
 import { FOUNDATION_INTAKE_MAX_BYTES } from "./r2-presign";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
@@ -12,6 +13,20 @@ export type IntakeAdmission = {
   requestedBytes: number;
   declaredMimeType: string;
 };
+
+/** One GB of a plan's storage allowance: the SI gigabyte the catalog's "10 GB" names. */
+const BYTES_PER_GB = 1_000_000_000;
+
+/**
+ * Every v2 offer's storage allowance in bytes, sent with each admission. The database picks the
+ * workspace's entry by its `plan_code` under the intake lock (20261117150100). A retired offer has
+ * no entry: legacy, owner and trial admissions are never capped, and a v2 code with no entry is
+ * refused by the database rather than admitted uncapped.
+ */
+export const STORAGE_LIMIT_BYTES: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(BILLING_OFFERS).flatMap(([code, offer]) =>
+    offer.included ? [[code, offer.included.storageGb * BYTES_PER_GB]] : []),
+);
 
 export type IntakeConfirmation = Pick<IntakeAdmission, "workspaceKey" | "documentId" | "userId">;
 
@@ -43,6 +58,7 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
         p_object_key: value.objectKey,
         p_requested_bytes: value.requestedBytes,
         p_declared_mime_type: value.declaredMimeType,
+        p_storage_limits: STORAGE_LIMIT_BYTES,
       }),
     });
   } catch {
@@ -59,6 +75,7 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
     if (message.includes("foundation_trial_not_active")) return { ok: false as const, code: "TRIAL_NOT_ACTIVE" };
     if (message.includes("foundation_intake_idempotency_conflict")) return { ok: false as const, code: "INTAKE_IDEMPOTENCY_CONFLICT" };
     if (message.includes("foundation_intake_source_deleted")) return { ok: false as const, code: "SOURCE_DELETED" };
+    if (message.includes("foundation_storage_allowance_exhausted")) return { ok: false as const, code: "STORAGE_ALLOWANCE_EXHAUSTED" };
     return { ok: false as const, code: "INTAKE_ADMISSION_FAILED" };
   }
   const result = await response.json().catch(() => null) as Record<string, unknown> | null;

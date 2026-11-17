@@ -344,6 +344,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "SOURCE_REVOKED", meaning: "The source's connection was revoked; its bytes are no longer reachable.", whatToDo: "Reconnect the source, or drop it from the set." },
       { code: "SOURCE_TOMBSTONED", meaning: "The source was deleted at origin and is recorded as gone rather than silently omitted.", whatToDo: "Remove it from the compile set." },
       { code: "SOURCE_DELETED", status: 409, meaning: "The uploaded source has a deletion tombstone, so its bytes cannot be admitted or served again.", whatToDo: "Choose a different source; a deleted upload cannot be restored through this request." },
+      { code: "STORAGE_ALLOWANCE_EXHAUSTED", meaning: "The workspace's retained source bytes plus this file would pass its plan's storage allowance, so nothing was admitted. A deleted source stops counting when its deletion is recorded.", whatToDo: "Delete sources the workspace no longer needs, or move to a plan with a larger allowance." },
       { code: "TRIAL_FILE_TOO_LARGE", status: 413, meaning: "Above the free-evaluation per-file bound, which is lower than the deployment ceiling.", whatToDo: "The body carries `maxBytes`. Split the file, or move to a paid plan." },
       { code: "TRIAL_ARCHIVE_NOT_INCLUDED", status: 402, meaning: "ZIP upload is not included in the free evaluation.", whatToDo: "Upload the files individually, or move to a paid plan." },
       { code: "TRIAL_FILE_LIMIT_EXCEEDED", meaning: "The free evaluation's file count is spent.", whatToDo: "Move to a paid plan." },
