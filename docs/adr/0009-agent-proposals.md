@@ -73,6 +73,8 @@ There are exactly two levers; no third switch is built.
 
 Use 2 when a credential may be in the wrong hands, 1 when the feature itself must pause.
 
+The flag stops new effects, never a reversal: with it off, a person can still undo an executed agent-origin proposal.
+
 ## Rollback
 
 In order: flag off (reversible); revoke-all (irreversible, ends every credential); then, only when

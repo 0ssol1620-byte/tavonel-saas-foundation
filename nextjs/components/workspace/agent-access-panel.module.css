@@ -1,0 +1,38 @@
+/* Agent access -- hairlines, no hue; text 12px or larger; long labels wrap instead of widening a 360 px screen. */
+
+.panel {
+  --aa-ink: var(--text-hi, #edeae4);
+  --aa-muted: var(--text-lo, #7d878d);
+  --aa-line: var(--hairline, #23282d);
+  --aa-line-hi: var(--hairline-hi, #2e353b);
+  --aa-changed: var(--changed, #f2a65a);
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 24px 0;
+}
+.panel h3 { margin: 0; }
+.panel p { margin: 0; max-width: 70ch; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.muted { color: var(--aa-muted); font-size: 12px; }
+.problem { padding: 10px 12px; border: 1px solid var(--aa-changed); color: var(--aa-ink); }
+
+.form { display: grid; gap: 10px; min-width: 0; }
+.form label { font-size: 13px; }
+.form input { min-height: 40px; padding: 0 10px; border: 1px solid var(--aa-line-hi); background: transparent; color: var(--aa-ink); font-size: 14px; min-width: 0; max-width: 28rem; }
+.consent { display: grid; gap: 6px; min-width: 0; }
+
+.reveal { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--aa-line-hi); min-width: 0; }
+.token { padding: 8px 10px; border: 1px solid var(--aa-line); font: 12px var(--f-mono, monospace); overflow-wrap: anywhere; word-break: break-all; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.action { min-height: 36px; padding: 0 12px; border: 1px solid var(--aa-line-hi); color: var(--aa-ink); font-size: 12px; justify-self: start; }
+.action:hover:not(:disabled) { border-color: var(--aa-ink); }
+.action:disabled { opacity: .5; cursor: progress; }
+.action:focus-visible, .link:focus-visible, .form input:focus-visible { outline: 2px solid var(--aa-ink); outline-offset: 2px; }
+.link { color: var(--aa-ink); text-decoration: underline; font-size: inherit; }
+@media (pointer: coarse) { .action { min-height: 44px; min-width: 44px; } }
+
+.list { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--aa-line); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; background: var(--ground, #08090a); min-width: 0; }
+.row > div { min-width: 0; overflow-wrap: anywhere; }
+.row[data-revoked="true"] { color: var(--aa-muted); }
