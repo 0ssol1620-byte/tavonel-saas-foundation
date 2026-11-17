@@ -149,6 +149,71 @@ describe("the import graph the legacy-chrome check walks", () => {
   });
 });
 
+/** Every declaration of `prop` in a stylesheet, with the rule's selector and the at-rules around it. */
+function declarations(css: string, prop: string): { selector: string; media: string[]; value: string }[] {
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const found: { selector: string; media: string[]; value: string }[] = [];
+  const stack: string[] = [];
+  let text = "";
+  const take = () => {
+    const decl = text.trim();
+    if (decl.startsWith(`${prop}:`)) {
+      found.push({ selector: stack.at(-1) ?? "", media: stack.filter((at) => at.startsWith("@")), value: decl.slice(prop.length + 1).trim() });
+    }
+    text = "";
+  };
+  for (const char of source) {
+    if (char === "{") { stack.push(text.trim()); text = ""; }
+    else if (char === "}") { take(); stack.pop(); }
+    else if (char === ";") take();
+    else text += char;
+  }
+  return found;
+}
+
+describe("the stage's sticky-bar height is the shell's own (WO-CI-6C, E2)", () => {
+  /*
+    The stage sits outside `.site` (M2), so it cannot inherit `--v34-header-h`; it states the bar's
+    height once, as `--v34-bar`, and subtracts it from every size that is "the viewport minus the
+    stage's chrome". This holds that statement to the shell's stylesheets: the header's height token
+    at each breakpoint, plus the rule under the bar. A change to either breaks this test, not the page.
+  */
+  const read = (file: string) => readFileSync(join(root, file), "utf8");
+  const pxOf = (value: string) => {
+    const match = /^(\d+(?:\.\d+)?)px\b/.exec(value);
+    expect(match, `a px value: ${value}`).not.toBeNull();
+    return Number(match![1]);
+  };
+  const tokens = declarations(read("components/v34/tokens.module.css"), "--v34-header-h").filter((d) => d.selector === ".site");
+  const rule = declarations(read("components/v34/shell/site-header.module.css"), "border-bottom").filter((d) => d.selector === ".header" && d.media.length === 0);
+  const stage = declarations(read("components/explore/explore-stage.module.css"), "--v34-bar").filter((d) => d.selector === ".page");
+
+  it("finds one wide and one narrow value on each side, under the same media query", () => {
+    expect(tokens.map((d) => d.media.length).sort()).toEqual([0, 1]);
+    expect(stage.map((d) => d.media.length).sort()).toEqual([0, 1]);
+    expect(rule).toHaveLength(1);
+    const narrow = (list: typeof tokens) => list.find((d) => d.media.length === 1)!.media[0]!.replace(/\s+/g, " ");
+    expect(narrow(stage)).toBe(narrow(tokens));
+  });
+
+  it("states the bar as the header height plus its rule, at every breakpoint", () => {
+    const border = pxOf(rule[0]!.value);
+    for (const width of [0, 1]) {
+      const token = tokens.find((d) => d.media.length === width)!;
+      const own = stage.find((d) => d.media.length === width)!;
+      expect(pxOf(own.value), `--v34-bar ${width ? token.media[0] : "(wide)"}`).toBe(pxOf(token.value) + border);
+    }
+  });
+
+  it("reads its own declarations, not a lookalike (parser check)", () => {
+    expect(declarations(".a{--x:1px}@media (max-width: 9px){.a{color:red;--x:2px}}", "--x")).toEqual([
+      { selector: ".a", media: [], value: "1px" },
+      { selector: ".a", media: ["@media (max-width: 9px)"], value: "2px" },
+    ]);
+    expect(declarations(".a{/* --x: 5px; */--xy:3px}", "--x")).toEqual([]);
+  });
+});
+
 describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main", ({ path, page }) => {
   it("never reaches the legacy chrome module, so its stylesheet chunk stays off the route", () => {
     const reached = reach(page);
@@ -185,6 +250,9 @@ describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main"
     // The main sits between the V34 header and the V34 footer, as V34Page places its own.
     expect(headerAt).toBeLessThan(mainAt);
     expect(footerAt).toBeGreaterThan(html.indexOf("</main>"));
+    // The stage's phone rules that apply only under the shell select `[data-v34-site] ~ main` (E1).
+    expect(ancestors(html, mainAt), `${path}: main is a sibling of the shell's wrappers`).toEqual([]);
+    expect(html.slice(0, mainAt)).toMatch(/<div\b[^>]*\bdata-v34-site=""/);
     expect(html).not.toMatch(/chrome-v2-(?:header|footer)/);
   }, 120_000);
 });

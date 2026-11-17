@@ -293,9 +293,19 @@ export default function ExploreStage({ access, model, layout, change, answers, t
         Focus counts as well as the target: Safari does not focus a button on click, so Escape after
         a mouse-opened More panel targets <body>, and the panel has already closed and handed focus
         back to its button (inside the header) by the time the key reaches `window`.
+
+        WO-CI-6C. Where focus sits after a click differs by engine, so focus alone cannot say whose key
+        it is: in WebKit, "/" typed with a mouse-opened More panel targeted <body> and opened Ask behind
+        the panel. A surface the header has open -- any control in it with `aria-expanded="true"` --
+        owns the keyboard as well. `dialog:modal`, not `dialog[open]`: only a modal dialog makes the
+        page behind it inert; a non-modal <dialog open> anywhere must not switch the workbench's keys off.
       */
       const inShell = (node: EventTarget | null) => node instanceof Element && node.closest("[data-v34-header]") !== null;
-      if (inShell(event.target) || inShell(document.activeElement) || document.querySelector("dialog[open]")) return;
+      if (
+        inShell(event.target) ||
+        inShell(document.activeElement) ||
+        document.querySelector('dialog:modal, [data-v34-header] [aria-expanded="true"]')
+      ) return;
       if (event.key === "/" && act !== "entry" && act !== "ask") {
         const target = event.target as HTMLElement | null;
         if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;

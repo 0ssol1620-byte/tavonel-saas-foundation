@@ -19,6 +19,31 @@
     here, it is the value the stage always had, whatever the root says.
   */
   color-scheme: dark;
+  /*
+    WO-CI-6C (E2). The V34 site header sits above the stage and stays on screen (`position: sticky`),
+    so every size here that is "the viewport minus the stage's chrome" loses its height too. The shell
+    declares that height (`--v34-header-h`, components/v34/tokens.module.css) on `.site`, and the stage
+    is deliberately outside `.site` (M2), so it cannot inherit it. This is the one place the stage
+    states it, measured in a browser: the bar is `--v34-header-h` plus its 1px rule, 67px above 760px
+    and 61px at 760px and below. `lib/v34/retained-shell.test.ts` derives both values and the
+    breakpoint from the shell's own stylesheets and fails if they drift.
+  */
+  --v34-bar: 67px;
+}
+@media (max-width: 760px) {
+  .page { --v34-bar: 61px; }
+}
+
+/*
+  WO-CI-6C. Before the V34 shell, the document's root was dark (app/tavonel.css, BA-254) with no
+  ground of its own, so the page scrollbar was dark and the overscroll showed the body's near-black.
+  The shell's `html:has(.site)` turns the root light and paper-coloured for V34 pages; on this one
+  document the root keeps what it had before the shell (lead decision, WO-CI-6C). One more type
+  selector than the shell's rule, so it wins without depending on stylesheet order.
+*/
+:global(html):has(main.page) {
+  color-scheme: dark;
+  background: transparent;
 }
 
 /* ------------------------------------------------------------------ header */
@@ -104,6 +129,21 @@
 }
 @media (max-width: 380px) {
   .siteLinks a[data-phone="start"] { display: none; }
+  /*
+    WO-CI-6C (E3). The narrowest phones get a tighter gap between the header's controls, so the
+    actions row keeps to one line there and the find input stays above the fold at 320px.
+  */
+  .headerActions,
+  .siteLinks { column-gap: 6px; }
+}
+
+/*
+  WO-CI-6C (E1). Under the V34 header, the header's own wordmark is the way back to the site, so on a
+  phone the stage does not draw a second exit beside it: B-09's two header rows, with Pricing,
+  Technical details and, above 380px, the access action kept. Above 430px the link stays, as it was.
+*/
+@media (max-width: 430px) {
+  :global([data-v34-site]) ~ .page .close { display: none; }
 }
 
 /*
@@ -196,6 +236,20 @@
   could read, and two planes of text competing for the same pixels. The entry shows the entry;
   ENTER WORLD shows the World, and the act's own opening is what that transition was always for.
 */
+
+/*
+  WO-CI-6C (E2). The World act's field, where it is drawn as a composition (from 1101px; below that
+  world-visual.module.css lays the objects out as cards or a list), is as wide as the stage allows
+  only while its whole 16:10 height still fits on screen under the sticky bar: the reader sees every
+  object's label without scrolling. The 169px is the stage chrome above the field at these widths,
+  measured: the stage header (64), the stage's top padding (18), the rail and its rule (46), the gap
+  (22) and the act's padding and rule (19). Before the shell the field started 67px higher; on a 1440x900 screen
+  it now gives up 197px of width instead of pushing its last row of labels under the fold.
+  world-visual's 560px floor still holds on a short screen, as it did before.
+*/
+@media (min-width: 1101px) {
+  .worldAct > [role="group"] { width: min(100%, calc((100vh - var(--v34-bar) - 169px) * 1.6)); }
+}
 
 .worldFoot {
   display: flex;
@@ -314,8 +368,8 @@
 */
 .objectPane,
 .sourcePane {
-  max-height: calc(100vh - 210px);
-  max-height: calc(100dvh - 210px);
+  max-height: calc(100vh - 210px - var(--v34-bar));
+  max-height: calc(100dvh - 210px - var(--v34-bar));
 }
 
 .objectPane {
@@ -1230,8 +1284,8 @@
   */
   .objectPane,
   .sourcePane {
-    max-height: calc(100vh - 150px);
-    max-height: calc(100dvh - 150px);
+    max-height: calc(100vh - 150px - var(--v34-bar));
+    max-height: calc(100dvh - 150px - var(--v34-bar));
   }
 
   /*
