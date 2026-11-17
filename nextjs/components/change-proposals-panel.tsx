@@ -19,7 +19,7 @@ type Action = "confirm" | "reject" | "undo";
 
 const STATE_WORD: Record<ProposalState, string> = {
   proposed: "Proposed", confirmed: "Confirmed", executed: "Done", rejected: "Rejected",
-  expired: "Expired", stale: "Out of date", failed: "Failed", undone: "Undone",
+  expired: "Expired", stale: "Out of date", failed: "Failed", undone: "Undone", withdrawn: "Withdrawn",
 };
 const REFUSED: Record<number, string> = {
   403: "You can not decide on this proposal.",
@@ -61,14 +61,17 @@ export default function ChangeProposalsPanel({ collectionId }: Props) {
   }, [collectionId]);
   useEffect(() => { void refresh(); }, [refresh]);
 
-  async function act(proposalId: string, action: Action) {
+  async function act(proposal: PublicProposal, action: Action) {
+    const { proposalId } = proposal;
     setBusy(proposalId);
     setProblem(null);
     try {
       let status: number;
       try {
+        // A confirmation carries the digest of the preview this row rendered; the server refuses any other.
+        const decision = action === "confirm" ? { collectionId, decision: action, previewDigest: proposal.previewDigest } : { collectionId, decision: action };
         const response = await api(`/api/proposals/${proposalId}/${action === "undo" ? "undo" : "decision"}`, { method: "POST",
-          body: JSON.stringify(action === "undo" ? { collectionId } : { collectionId, decision: action }) });
+          body: JSON.stringify(action === "undo" ? { collectionId } : decision) });
         status = response.ok ? 200 : response.status;
       } catch {
         status = 0;
@@ -102,7 +105,8 @@ export default function ChangeProposalsPanel({ collectionId }: Props) {
       {load.proposals.length === 0 ? <p className={styles.empty}>No proposals.</p> : (
         <ul className={styles.list}>
           {load.proposals.map((proposal) => {
-            const { preview } = proposal;
+            // Only a label row is drawn here until WO-AN-6; every other type says its change is not shown.
+            const preview = proposal.actionType === "library_label" ? proposal.preview : null;
             const disabled = busy !== null;
             return (
               <li key={proposal.proposalId} className={styles.row} data-state={proposal.state}>
@@ -116,12 +120,12 @@ export default function ChangeProposalsPanel({ collectionId }: Props) {
                 {proposal.evidenceIds.length > 0 ? <p className={styles.note}>Evidence: <span className={styles.id}>{proposal.evidenceIds.join(", ")}</span></p> : null}
                 <div className={styles.actions}>
                   {proposal.state === "proposed" ? (["confirm", "reject"] as const).map((action) => (
-                    <button key={action} type="button" className={styles.action} disabled={disabled} onClick={() => void act(proposal.proposalId, action)}>
+                    <button key={action} type="button" className={styles.action} disabled={disabled} onClick={() => void act(proposal, action)}>
                       {action === "confirm" ? "Confirm" : "Reject"}
                     </button>
                   )) : null}
                   {proposal.state === "executed" ? (
-                    <button type="button" className={styles.action} disabled={disabled} onClick={() => void act(proposal.proposalId, "undo")}>Undo</button>
+                    <button type="button" className={styles.action} disabled={disabled} onClick={() => void act(proposal, "undo")}>Undo</button>
                   ) : null}
                 </div>
               </li>

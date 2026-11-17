@@ -13,8 +13,10 @@ export const ANSWER_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_answer_receipt.v1"
 // whatever scope is expected, so new modules call isScopedSignature first.
 export const CAPABILITY_MANIFEST_SIGNATURE_SCOPE = "tavonel.signed_capability_manifest.v1" as const;
 export const WORLD_RELEASE_SIGNATURE_SCOPE = "tavonel.signed_world_release.v1" as const;
+// WO-AN-2: the receipt of an agent-originated proposal a person confirmed (lib/action-receipt-signing.ts).
+export const ACTION_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_action_receipt.v1" as const;
 export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE | typeof ANSWER_RECEIPT_SIGNATURE_SCOPE
-  | typeof CAPABILITY_MANIFEST_SIGNATURE_SCOPE | typeof WORLD_RELEASE_SIGNATURE_SCOPE;
+  | typeof CAPABILITY_MANIFEST_SIGNATURE_SCOPE | typeof WORLD_RELEASE_SIGNATURE_SCOPE | typeof ACTION_RECEIPT_SIGNATURE_SCOPE;
 
 export type ExportSignatureV1 = {
   schemaVersion: "tavonel.export_signature.v1";
