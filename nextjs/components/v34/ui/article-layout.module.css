@@ -2,9 +2,11 @@
   padding: clamp(32px, 5vw, 64px) 0 clamp(48px, 7vw, 96px);
 }
 
+/* The reading column starts on the container edge, where the wordmark is (UX-L2 R1, lead decision 5),
+   and keeps its 760px measure; under that width it fills the shell between the V34 gutters. */
 .column {
-  width: min(760px, 100% - 36px);
-  margin-inline: auto;
+  width: min(760px, var(--v34-shell));
+  margin-inline: max(var(--v34-gutter), (100% - var(--v34-max)) / 2) auto;
 }
 
 .crumbs {
@@ -154,6 +156,9 @@
 }
 
 .sourceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--v34-fg-link);
   font-weight: 650;
   text-decoration: underline;

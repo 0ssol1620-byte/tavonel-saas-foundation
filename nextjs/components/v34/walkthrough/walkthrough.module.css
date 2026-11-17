@@ -84,7 +84,7 @@
    inside the record's 196px at a 320px viewport. */
 .id { display: inline-block; white-space: nowrap; }
 .meta { margin: 0 0 16px; color: var(--v34-body); line-height: 1.45; }
-.link { display: inline-flex; align-items: center; align-self: flex-start; margin-top: auto; min-height: 36px; color: var(--v34-link); font-weight: 600; text-underline-offset: 4px; }
+.link { display: inline-flex; align-items: center; align-self: flex-start; margin-top: auto; min-height: 44px; color: var(--v34-link); font-weight: 600; text-underline-offset: 4px; }
 .link:hover { color: var(--v34-ink); text-decoration-thickness: 2px; }
 
 .tab:focus-visible, .next:focus-visible, .link:focus-visible { outline: 3px solid var(--v34-focus); outline-offset: -3px; }

@@ -76,13 +76,15 @@ export function RevisionCover() {
 export function ResearchCover() {
   return (
     <svg className={s.art} viewBox="0 0 640 320" role="img" aria-label="Method, source and result overlap in one research record" xmlns="http://www.w3.org/2000/svg">
-      <circle className={s.line} cx={250} cy={140} r={84} />
-      <circle className={s.line} cx={390} cy={140} r={84} />
-      <circle className={s.line} cx={320} cy={196} r={84} />
-      <text className={s.small} x={206} y={128} textAnchor="middle">Method</text>
-      <text className={s.small} x={434} y={128} textAnchor="middle">Source</text>
-      <text className={s.small} x={320} y={232} textAnchor="middle">Result</text>
-      <circle className={s.node} cx={320} cy={158} r={10} />
+      {/* Each label names its circle from outside it: inside, the 20px label's box met another
+          circle's outline at every width (overlap-audit, /journal and /journal/research). */}
+      <circle className={s.line} cx={250} cy={130} r={84} />
+      <circle className={s.line} cx={390} cy={130} r={84} />
+      <circle className={s.line} cx={320} cy={186} r={84} />
+      <text className={s.small} x={250} y={28} textAnchor="middle">Method</text>
+      <text className={s.small} x={390} y={28} textAnchor="middle">Source</text>
+      <text className={s.small} x={320} y={306} textAnchor="middle">Result</text>
+      <circle className={s.node} cx={320} cy={148} r={10} />
     </svg>
   );
 }

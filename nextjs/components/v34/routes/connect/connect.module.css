@@ -72,10 +72,6 @@
   text-underline-offset: 4px;
 }
 
-.inlineLink {
-  min-height: 24px;
-}
-
 .link:hover,
 .inlineLink:hover {
   background: var(--v34-fg-hover);
@@ -218,10 +214,12 @@
   margin-top: 28px;
 }
 
+/* list-item, not flex: a flex summary loses the native disclosure marker (templates R8); /changes does the same. */
 .summary {
-  display: flex;
-  align-items: center;
+  display: list-item;
+  box-sizing: border-box;
   min-height: 44px;
+  padding: 10px 0;
   color: var(--v34-fg-link);
   font-weight: 600;
   cursor: pointer;

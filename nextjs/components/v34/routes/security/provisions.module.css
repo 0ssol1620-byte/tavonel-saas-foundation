@@ -45,7 +45,7 @@
 .source {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 44px;
   color: var(--v34-fg-link);
   font-size: var(--v34-small);
   font-weight: 600;
