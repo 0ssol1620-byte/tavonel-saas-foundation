@@ -7,6 +7,8 @@ export type FoundationBillingAccount = {
   workspaceKey: string;
   userId: string;
   accessPlan: string | null;
+  /** The v2 offer the subscription was bought as (catalog v2, 20261117140000); null for a legacy plan, whose code is `accessPlan`. */
+  planCode: string | null;
   subscriptionStatus: string;
   creditBalance: number;
   lifetimeCreditsPurchased: number;
@@ -22,6 +24,7 @@ export type FoundationBillingAccount = {
 
 export const EMPTY_BILLING_ACCOUNT: Omit<FoundationBillingAccount, "workspaceKey" | "userId"> = {
   accessPlan: null,
+  planCode: null,
   subscriptionStatus: "inactive",
   creditBalance: 0,
   lifetimeCreditsPurchased: 0,
@@ -60,6 +63,7 @@ function normalizeAccount(row: Record<string, unknown>, workspaceKey: string, us
     workspaceKey,
     userId,
     accessPlan: typeof row.access_plan === "string" ? row.access_plan : null,
+    planCode: typeof row.plan_code === "string" ? row.plan_code : null,
     subscriptionStatus: typeof row.subscription_status === "string" ? row.subscription_status : "inactive",
     creditBalance: typeof row.credit_balance === "number" ? row.credit_balance : 0,
     lifetimeCreditsPurchased: typeof row.lifetime_credits_purchased === "number" ? row.lifetime_credits_purchased : 0,
@@ -78,7 +82,7 @@ export async function getFoundationBillingAccount(workspaceKey: string, userId: 
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
   const query = new URLSearchParams({
-    select: "workspace_key,user_id,access_plan,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,overage_enabled,overage_units,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at",
+    select: "workspace_key,user_id,access_plan,plan_code,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,overage_enabled,overage_units,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at",
     workspace_key: `eq.${workspaceKey}`,
     user_id: `eq.${userId}`,
     limit: "1",

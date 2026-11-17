@@ -13,6 +13,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { BILLING_OFFERS } from "../lib/billing-catalog";
 import {
   INACTIVE_BILLING,
   installFixtureSession,
@@ -46,7 +47,9 @@ test("an active subscription shows its state, its remaining pages and a working 
     updatedAt: "2026-09-01T00:00:00Z",
   }));
 
-  await expect(card.getByRole("heading", { name: "Pro plan" })).toBeVisible();
+  // A legacy Team holder (`studio_access`, no plan code) is headed by its own plan's catalog label, the retired
+  // "Team (2026-09 plan)" since catalog v2; the 2026-11-10 "Pro" name no longer exists (WO-CAT-3 repoint).
+  await expect(card.getByRole("heading", { name: BILLING_OFFERS.studio_access.label, exact: true })).toBeVisible();
   await expect(card.locator(":scope > dl")).toContainText("active");
   // 4 credits to a standard page, so 4,000 credits is 1,000 pages. Derived, never invented.
   await expect(card.locator(":scope > dl")).toContainText("1,000");
