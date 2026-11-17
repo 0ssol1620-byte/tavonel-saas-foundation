@@ -95,13 +95,17 @@ test("under reduced motion nothing in the band animates or transitions", async (
   expect(motion.properties).toEqual(["opacity"]);
 });
 
-test("each receipt link lands on the research note that prints the whole digest and serves the bytes", async ({ page, request }, testInfo) => {
+/*
+  V34 Home (WO-CI-5b): Home no longer prints the receipted band, so the receipt links that opened this note are gone. The note's own promise
+  stays and is asserted where it lives, with no Home click first: each receipt prints its whole digest and serves bytes that hash to it.
+  What Home prints now is bound to the corpus file by e2e/home-v34.spec.ts and lib/v34/public-corpus.test.ts.
+*/
+test("each receipt on the research note prints the whole digest and serves the bytes", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "one width");
   await seedRefusal(page);
-  await page.goto("/");
-  // The last receipt on the band (R-02 since the 2026-11-10 public-copy cleanup) is the deepest anchor on the note.
+  // The last receipt (R-02 since the 2026-11-10 public-copy cleanup) is the deepest anchor on the note.
   const last = RECEIPTS[RECEIPTS.length - 1];
-  await page.locator(`a[data-receipt="${last}"]`).click();
+  await page.goto(`/research/notes#${last}`);
   await expect(page).toHaveURL(new RegExp(`/research/notes#${last}$`));
   for (const id of RECEIPTS) {
     const note = page.locator(`article[id="${id}"]`);
