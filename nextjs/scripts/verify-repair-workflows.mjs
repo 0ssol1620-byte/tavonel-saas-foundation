@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sharedBrowserProjectsMapExcludesExplore, NATIVE_RACE_ADDITIONS, NATIVE_RACE_CONFIG_PATHS, NATIVE_RACE_CHANGED_PATHS, NATIVE_RACE_MAIN_OVERLAYS, NATIVE_RACE_MAIN_OVERLAY_PROVENANCE } from './repair-collector-only.mjs';
-import { V34_PROGRAM_AFFECTED_OWNERS, V34_PROGRAM_PENDING_OWNERS, V34_PROGRAM_UNEXECUTED_PATHS, DATABASE_CONTRACT_DATABASE_TESTS, externalCheckClaimFailures } from './repair-scope.mjs';
+import { V34_PROGRAM_AFFECTED_OWNERS, V34_PROGRAM_PENDING_OWNERS, V34_PROGRAM_UNEXECUTED_PATHS, DATABASE_CONTRACT_DATABASE_TESTS, externalCheckClaimFailures, specSelfSkipReason } from './repair-scope.mjs';
 import { planBrowserRuns, V34_SELFTEST_WEBKIT_CASE } from './run-repair-check.mjs';
 import { PR141_MAIN_MERGE_BCBA_AFFECTED_PATHS, PR141_MAIN_MERGE_BCBA_AFFECTED_UNIT_FILES, PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { CHANGE_NOTIFY_AFFECTED_PATHS, CHANGE_NOTIFY_AFFECTED_UNIT_FILES, CHANGE_NOTIFY_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
@@ -98,11 +98,16 @@ assertFullEvents(launch, 'Launch QA');
 for (const job of ['  root:', '  nextjs:']) assert(ci.includes(job), `CI full job context changed: ${job.trim()}`);
 for (const full of [
   'Browser QA (${{ matrix.browser }})', 'Product QA (widths + reduced motion + audit)',
-  'Lighthouse budgets', 'Launch gate',
+  'Lighthouse budgets', 'V34 matrix (chromium, drawer pass)', 'Launch gate',
 ]) assert(launch.includes(full), `Launch QA full check context missing: ${full}`);
-assert(launch.includes('needs: [preflight, browser-qa, product-qa, lighthouse]'), 'Launch gate final dependency set changed');
-for (const result of ['needs.preflight.result', 'needs.browser-qa.result', 'needs.product-qa.result', 'needs.lighthouse.result']) {
-  assert(launch.includes(result), `Launch gate no longer checks ${result}`);
+// The Launch gate needs every launch job, the V34 matrix (WO-CI-9) included, and requires each one's success.
+{
+  const gate = launch.slice(launch.indexOf('\n  launch-gate:\n'));
+  assert(launch.indexOf('\n  launch-gate:\n') > 0 && gate.includes('\n    needs: [preflight, browser-qa, product-qa, lighthouse, v34-matrix]\n') && (launch.match(/needs: \[preflight, browser-qa, product-qa, lighthouse/g) ?? []).length === 1,
+    'Launch gate final dependency set changed');
+  for (const job of ['preflight', 'browser-qa', 'product-qa', 'lighthouse', 'v34-matrix']) {
+    assert(gate.includes(`\n          test "\${{ needs.${job}.result }}" = "success"\n`), `Launch gate no longer checks needs.${job}.result`);
+  }
 }
 assert(/pull_request:\n\s+types: \[opened, synchronize, reopened\]/.test(repair), 'repair event set changed');
 assert(repair.includes('name: Repair scope validation'), 'repair check must remain distinct');
@@ -631,7 +636,7 @@ const currentOwnerBindings = [
     && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
     && paths.every(p => owner.match.test(p))
     && ['nextjs/.gitattributes', '.gitattributes.bak', 'nextjs/app/page.tsx.bak', 'nextjs/public/film/poster-5-t17.96.webp'].every(p => !owner.match.test(p))
-    && runner.includes("['e2e/home-measures.spec.ts', ['1440', '390', 'reduced-motion']]") && runner.includes("['e2e/overflow-audit.spec.ts', ['audit']]"),
+    && runner.includes("['e2e/home-measures.spec.ts', ['1440']]") && runner.includes("['e2e/overflow-audit.spec.ts', ['audit']]"),
     'PR #141 main merge bcba7173 owner must keep its thirty exact paths, their direct suites and six browser suites');
 }
 // B-01 (2026-10-19): the UX program's four finite owners, restated independently: exact paths, direct suites, browser suites with
@@ -775,8 +780,9 @@ for (const binding of [
     exportedBrowsers: HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES,
     paths: ['public/film/hero-r2-c1-hq-1440.mp4', 'public/film/hero-r2-c1-hq.mp4', 'public/film/hero-r2-c1.mp4', 'public/film/hero-r2-c2.mp4', 'public/film/hero-r2-c3.mp4', 'public/film/hero-r2-c4.mp4', 'public/film/hero-r3-c1-hq-1440.mp4', 'public/film/hero-r3-c1-hq.mp4', 'public/film/hero-r3-c1.mp4', 'public/film/hero-r3-c2-hq.mp4', 'public/film/hero-r3-c2.mp4', 'public/film/hero-r3-c3-hq.mp4', 'public/film/hero-r3-c3.mp4', 'public/film/hero-r3-c4-hq.mp4', 'public/film/hero-r3-c4.mp4', 'public/film/poster-r2-c1-t13.60-2x.avif', 'public/film/poster-r2-c1-t13.60-2x.webp', 'public/film/poster-r2-c1-t13.60-pane1-684x855.avif', 'public/film/poster-r2-c1-t13.60-pane1-684x855.webp', 'public/film/poster-r2-c1-t13.60.avif', 'public/film/poster-r2-c1-t13.60.webp', 'public/film/poster-r2-c2-t4.40-2x.avif', 'public/film/poster-r2-c2-t4.40-2x.webp', 'public/film/poster-r2-c2-t4.40.avif', 'public/film/poster-r2-c2-t4.40.webp', 'public/film/poster-r2-c3-t17.96-2x.avif', 'public/film/poster-r2-c3-t17.96-2x.webp', 'public/film/poster-r2-c3-t17.96.avif', 'public/film/poster-r2-c3-t17.96.webp', 'public/film/poster-r2-c4-t6.80-2x.avif', 'public/film/poster-r2-c4-t6.80-2x.webp', 'public/film/poster-r2-c4-t6.80.avif', 'public/film/poster-r2-c4-t6.80.webp', 'public/film/poster-r3-c1-t10.40-2x.avif', 'public/film/poster-r3-c1-t10.40-2x.webp', 'public/film/poster-r3-c1-t10.40-pane1-848x1060.avif', 'public/film/poster-r3-c1-t10.40-pane1-848x1060.webp', 'public/film/poster-r3-c1-t10.40.avif', 'public/film/poster-r3-c1-t10.40.webp', 'public/film/poster-r3-c2-t17.96-2x.avif', 'public/film/poster-r3-c2-t17.96-2x.webp', 'public/film/poster-r3-c2-t17.96.avif', 'public/film/poster-r3-c2-t17.96.webp', 'public/film/poster-r3-c3-t17.96-2x.avif', 'public/film/poster-r3-c3-t17.96-2x.webp', 'public/film/poster-r3-c3-t17.96.avif', 'public/film/poster-r3-c3-t17.96.webp', 'public/film/poster-r3-c4-t8.80-2x.avif', 'public/film/poster-r3-c4-t8.80-2x.webp', 'public/film/poster-r3-c4-t8.80.avif', 'public/film/poster-r3-c4-t8.80.webp', 'scripts/film/encode-fallback.sh', 'scripts/film/fixture.mjs', 'scripts/film/frame-strings.mjs', 'scripts/film/posters.mjs', 'scripts/film/record.mjs', 'scripts/film/scan.mjs', 'scripts/film/stages.mjs', 'scripts/guide/GUIDE-SCRIPTS.json', 'scripts/guide/capture-terminal.mjs', 'scripts/guide/encode-guides.mjs', 'scripts/guide/record-guide.mjs', 'scripts/guide/terminal-replay.mjs', 'scripts/guide/terminal/api.json', 'scripts/guide/terminal/mcp.json', 'scripts/measure-film-start.mjs'],
     suites: ['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts'],
-    browsers: ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts'],
-    rows: ["['e2e/hero-four-stage-restoration.spec.ts', ['1440', '390']],", "['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],"],
+    // e2e/hero-four-stage-restoration.spec.ts was deleted by the retire commit 2be02934; its row and selection went with it.
+    browsers: ['e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts'],
+    rows: ["['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],"],
     neighbors: ['nextjs/public/film/hero-r2-c5.mp4', 'nextjs/public/film/hero-r2-c1-hq-720.mp4', 'nextjs/public/film/poster-r2-c1-t13.60-3x.avif', 'nextjs/public/film/poster-r2-c5-t1.00.avif', 'nextjs/public/film/compile-cut-5.mp4', 'nextjs/scripts/measure-film-end.mjs', 'nextjs/scripts/film/record-2.mjs', 'nextjs/scripts/film/scan.sh'] },
   // W1-L7 visuals lane (PR #191), placed in PR #194: exact paths, four direct suites, three browser suites.
   { group: 'visuals', prefix: 'nextjs/', exportedPaths: VISUALS_AFFECTED_PATHS, exportedSuites: VISUALS_AFFECTED_UNIT_FILES,
@@ -823,8 +829,9 @@ for (const binding of [
     exportedBrowsers: HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES,
     paths: ['components/landing-v2/hero-compile-tabs.module.css', 'components/landing-v2/hero-compile-tabs.tsx', 'components/opening-film-2.tsx', 'components/opening-film-3.tsx', 'components/opening-film-4.tsx', 'components/opening-film.tsx', 'lib/film-tone.ts', 'public/film/hero-tab-1-2x.avif', 'public/film/hero-tab-1-2x.webp', 'public/film/hero-tab-1.avif', 'public/film/hero-tab-1.mp4', 'public/film/hero-tab-1.webp', 'public/film/hero-tab-2-2x.avif', 'public/film/hero-tab-2-2x.webp', 'public/film/hero-tab-2.avif', 'public/film/hero-tab-2.mp4', 'public/film/hero-tab-2.webp', 'public/film/hero-tab-3-2x.avif', 'public/film/hero-tab-3-2x.webp', 'public/film/hero-tab-3.avif', 'public/film/hero-tab-3.mp4', 'public/film/hero-tab-3.webp', 'public/film/hero-tab-4-2x.avif', 'public/film/hero-tab-4-2x.webp', 'public/film/hero-tab-4.avif', 'public/film/hero-tab-4.mp4', 'public/film/hero-tab-4.webp', 'scripts/film/capture-film-2-tone.mjs', 'scripts/film/hero-tabs.mjs'],
     suites: ['components/compile-stage-player.mobile-view.test.tsx', 'lib/brand-copy.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/opening-film.test.ts'],
-    browsers: ['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts'],
-    rows: ["['e2e/hero-four-stage-restoration.spec.ts', ['1440', '390']],", "['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],"],
+    // e2e/hero-four-stage-restoration.spec.ts was deleted by the retire commit 2be02934; its row and selection went with it.
+    browsers: ['e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts'],
+    rows: ["['e2e/hero-home-responsive.spec.ts', ['1440']],", "['e2e/landing-hero-film-loading.spec.ts', ['390']],", "['e2e/landing-v2.spec.ts', ['1440', '390', '360', 'reduced-motion']],"],
     neighbors: ['nextjs/components/landing-v2/hero-compile-tabs.module.scss', 'nextjs/components/landing-v2/hero-compile-tabs.test.tsx', 'nextjs/components/opening-film-5.tsx', 'nextjs/lib/film-tone.test.ts', 'nextjs/public/film/hero-tab-5.mp4', 'nextjs/public/film/hero-tab-1-3x.webp', 'nextjs/scripts/film/hero-tabs-2.mjs', 'lib/film-tone.ts'] },
   // connectors-developer-20261110: four exact paths, nine direct suites, the one browser suite it edits.
   { group: 'connectors-developer-20261110', prefix: 'nextjs/', exportedPaths: CONNECTORS_DEVELOPER_AFFECTED_PATHS, exportedSuites: CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES,
@@ -1100,37 +1107,63 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     &&e2Suites.every(file=>existsSync(resolve(repo,'nextjs',file))),
     'W2-E2 answerability owner must keep its exact ten paths and two suites, leave the Ask route with w1-remote-mcp-a1-a5 and admit no neighbour');
 }
+// Every Repair browser row names a spec present at head and runs at least one of its tests in every project it names, read by the
+// same skip reader the claim reader uses (WO-CI-7 round 4: the retire commit 2be02934 deleted one spec and left two with one test
+// that skips itself outside 1440).
+{
+  const rows = [...sharedMap.matchAll(/\n  \['([^']+)', \[([^\]]*)\]\],/g)].map(([, file, list]) => [file, [...list.matchAll(/'([^']+)'/g)].map(match => match[1])]);
+  assert(rows.length === (sharedMap.match(/\n  \['/g) ?? []).length && rows.length > 0, 'every shared browser row must be read as a file and a literal project list');
+  const dead = [];
+  for (const [file, projects] of rows) {
+    const path = resolve(repo, 'nextjs', file);
+    if (!existsSync(path)) { dead.push(`${file}: absent at head`); continue; }
+    const source = readFileSync(path, 'utf8');
+    for (const project of projects) { const reason = specSelfSkipReason(source, project); if (reason) dead.push(`${file} [${project}]: ${reason}`); }
+  }
+  assert(!dead.length, 'a Repair browser row runs nothing: ' + dead.join('; '));
+}
 // V34 program owners (WO-CI-7, D-1, D-4, K1-K5 and round 3), restated independently: each owner exists once with exact paths and
 // selects at least one suite the Repair job itself executes (an external check never counts; a Node suite counts only when the Repair
 // Node runner registers it), and every external check is a claim that the named workflow job's exact step runs the file, read here
-// from that workflow, the Playwright config, the Vitest include and the spec itself at this head. The pending owners hold paths two
-// running lanes add (WO-AN-2, WO-AN-3): a suite they name that is absent at this head must be one of their own paths, so only the
-// change that adds it can select it.
+// from that workflow, the Playwright config, the Vitest include and the spec itself at this head. A pending owner holds paths a running
+// lane adds: a suite it names that is absent at this head must be one of its own paths, so only the change that adds it can select it.
+// None is pending at this head: every lane that had one has merged, and pendingPins stays empty until a running lane adds an owner.
 {
   const pins = [['v34-shell', 47, 23, 3, 0], ['v34-route-registry', 6, 55, 2, 0], ['v34-world', 18, 22, 2, 0], ['v34-route-bodies', 258, 60, 3, 0],
     ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 1, 0], ['proposals-library', 18, 11, 0, 1],
     ['workspace-journey', 8, 3, 0, 1], ['compile-pipeline', 15, 12, 0, 2], ['world-temporal-lens', 13, 6, 0, 2], ['control-plane', 5, 3, 0, 0],
     ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
-    ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 5, 11, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
-    ['v34-qa-harness', 9, 0, 2, 0], ['db-harness', 15, 7, 0, 0], ['agent-proposals', 5, 2, 0, 0]];
-  const pendingPins = [['proposals-decision-path', 3, 6, 0, 0], ['agent-grants', 6, 5, 0, 0]];
+    ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 6, 12, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
+    ['v34-qa-harness', 10, 0, 2, 2], ['db-harness', 15, 7, 0, 0], ['agent-proposals', 5, 2, 0, 0],
+    ['proposals-decision-path', 3, 6, 0, 0], ['agent-grants', 6, 5, 0, 0], ['proposal-executors', 5, 4, 0, 0], ['agent-access-panel', 3, 1, 0, 1],
+    ['agent-mcp-route', 6, 7, 0, 0], ['v34-retained-shell', 2, 1, 0, 1]];
+  const pendingPins = [];
+  // Paths another owner keeps that also select a program owner's suite (round 5: WO-CI-6B's shell suite for the /explore page and stage).
+  const boundPins = { 'v34-retained-shell': ['app/explore/page.tsx', 'components/explore/explore-stage.module.css', 'components/explore/explore-stage.tsx'] };
   const nodeRegistry = runner.split('\n').find(line => line.startsWith('const nodeUnitTestPaths = new Set(')) ?? '';
   const readRepoFile = path => existsSync(resolve(repo, path)) ? readFileSync(resolve(repo, path), 'utf8') : null;
+  // Repair runs only part of the file: every planned run of it carries a grep or a grep-invert.
+  const repairRunsPart = file => { const runs = planBrowserRuns([file], false); return runs.length > 0 && runs.every(run => run.grep || run.grepInvert); };
   assert(JSON.stringify(Object.keys(V34_PROGRAM_AFFECTED_OWNERS)) === JSON.stringify(pins.map(([group]) => group))
-    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the twenty-one reviewed groups and the two pending ones');
+    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the twenty-seven reviewed groups and no pending one');
   for (const [pending, [group, pathCount, unitCount, browserCount, externalCount]] of [...pins.map(pin => [false, pin]), ...pendingPins.map(pin => [true, pin])]) {
     const declared = (pending ? V34_PROGRAM_PENDING_OWNERS : V34_PROGRAM_AFFECTED_OWNERS)[group], owners = AFFECTED_GROUPS.filter(owner => owner.group === group), [owner] = owners;
     const external = Object.keys(owner?.externalChecks ?? {});
     const present = file => existsSync(resolve(repo, 'nextjs', file)) || (pending && declared.paths.includes(file));
+    const bound = declared.boundPaths ?? [];
+    const boundOwners = path => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group);
     assert(owners.length === 1 && owner.requireExecutedCheck === true && declared.paths.length === pathCount && owner.unitFiles.length === unitCount && owner.browserFiles.length === browserCount && external.length === externalCount
       && JSON.stringify([...owner.unitFiles]) === JSON.stringify([...declared.unitFiles]) && JSON.stringify([...owner.browserFiles]) === JSON.stringify([...declared.browserFiles])
-      && unitCount + browserCount > 0 && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
+      // A pending owner may select nothing yet (a spec with no Repair row): built with requireExecutedCheck, it fails the map closed.
+      && (unitCount + browserCount > 0 || pending) && !owner.databaseTests.length && !owner.nativeReuse && !owner.selector && !owner.worker && !owner.database
       && declared.paths.every(p => AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + p)).map(o => o.group).join() === group)
+      && JSON.stringify([...bound]) === JSON.stringify(boundPins[group] ?? [])
+      && bound.every(p => existsSync(resolve(repo, 'nextjs', p)) && boundOwners(p).includes(group) && boundOwners(p).some(g => g !== group) && !declared.paths.includes(p))
       && declared.paths.every(p => !owner.match.test(p) && !owner.match.test('nextjs/' + p + '.bak'))
       && [...owner.unitFiles, ...owner.browserFiles, ...external].every(present)
       && owner.unitFiles.every(file => !file.endsWith('.mjs') || nodeRegistry.includes(`'${file}'`)) && owner.browserFiles.every(file => sharedMap.includes(`\n  ['${file}', [`))
-      && external.every(file => !owner.unitFiles.includes(file) && !owner.browserFiles.includes(file))
-      && external.filter(file => file.endsWith('.spec.ts')).every(file => !sharedMap.includes(`'${file}'`))
+      && external.every(file => !owner.unitFiles.includes(file) && (!owner.browserFiles.includes(file) || repairRunsPart(file)))
+      && external.filter(file => file.endsWith('.spec.ts')).every(file => !sharedMap.includes(`'${file}'`) || repairRunsPart(file))
       && external.filter(file => file.endsWith('.mjs')).every(file => !nodeRegistry.includes(`'${file}'`)),
       'V34 program owner must keep its exact paths, at least one executed suite and its external checks: ' + group);
     for (const file of external) {
@@ -1155,13 +1188,13 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     'the V34 harness must run in the Repair browser stage: the self-test without only its WebKit case, the matrix SEO and held passes in production mode');
   const pageMeter = AFFECTED_GROUPS.filter(owner => owner.group === 'page-meter');
   const database = AFFECTED_GROUPS.filter(owner => owner.group === 'database-contract');
-  const pgtap = ['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql'];
+  const pgtap = ['supabase/tests/agent_proposals.sql', 'supabase/tests/catalog_v2_offer_codes.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql'];
   assert(pageMeter.length === 1 && pageMeter[0].match.test('nextjs/lib/billing-ledger-replay.ts') && pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.test.ts')
     && !pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.db.test.ts') && pageMeter[0].externalChecks === undefined
     && database.length === 1 && database[0].database === true && JSON.stringify([...database[0].databaseTests]) === JSON.stringify(pgtap) && JSON.stringify([...DATABASE_CONTRACT_DATABASE_TESTS]) === JSON.stringify(pgtap)
     && pgtap.every(file => existsSync(resolve(repo, file))) && database[0].match.test('supabase/drafts/rollback-20261117130000-agent-proposals.sql')
     && planner.includes('named external owner check is absent at head: ') && planner.includes('selects no check the Repair job executes: ')
     && planner.includes('name different runners for one external check: ') && planner.includes('externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource)'),
-    'page-meter must own the ledger replay without an unrun claim, database-contract must select the four program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
+    'page-meter must own the ledger replay without an unrun claim, database-contract must select the five program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
 }
-console.log('V34 program owners: twenty-one exact owners and two pending, every external claim read at head, no program path unexecuted, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
+console.log('V34 program owners: twenty-seven exact owners (one binding the /explore paths to its checks, the /explore key spec a verified Product QA claim) and none pending, every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
