@@ -2546,7 +2546,8 @@ export const HOME_FILM_RERECORD_AFFECTED_PATHS = Object.freeze([
   'scripts/measure-film-start.mjs',
 ]);
 export const HOME_FILM_RERECORD_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage-player.mobile-view.test.tsx', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts']);
-export const HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts']);
+// e2e/hero-four-stage-restoration.spec.ts left the list when the retire commit 2be02934 deleted it (WO-CI-7 round 4).
+export const HOME_FILM_RERECORD_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts']);
 export const CONSENT_POSTER_AFFECTED_PATHS = Object.freeze([
   'app/privacy/page.tsx',
   'app/subprocessors/page.tsx',
@@ -2616,7 +2617,7 @@ export const VISUALS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/landing-v2.spe
 // scripts/remote-mcp (test plumbing, never shipped). They select those suites and the suites that read every app/api route
 // source. Product code, so never nativeReuse; no browser, database, worker or build lane.
 export const W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/ask/route.ts', 'app/api/developer/keys/route.ts', 'app/api/internal/remote-mcp/revoke-all/route.ts', 'app/api/v1/developer/keys/[id]/rotate/route.ts', 'app/one-path.css', 'components/workspace-use-with-ai.tsx', 'components/workspace/connect-ai-panel.module.css', 'components/workspace/connect-ai-panel.tsx', 'lib/answer-receipt-signing.test.ts', 'lib/answer-receipt-signing.ts', 'lib/connect-ai-panel.test.ts', 'lib/developer-auth.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/developer-store.ts', 'lib/export-signing.ts', 'lib/funnel-events.test.ts', 'lib/remote-mcp-dispatch.ts', 'lib/remote-mcp-r1.test.ts', 'public/developer/tavonel-verify-answer.mjs', 'scripts/remote-mcp/conformance.mjs', 'scripts/remote-mcp/connect-ai-qa.mjs', 'scripts/remote-mcp/loopback-fetch.mjs', 'scripts/remote-mcp/security.mjs', 'scripts/remote-mcp/shadow-common.mjs']);
-export const W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES = Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compiler-contract.test.ts', 'lib/connect-ai-panel.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/export-signing.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp-r1.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/trial-ai-access.test.ts']);
+export const W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES = Object.freeze(['lib/agent-grants.test.ts', 'lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/api-error-codes.test.ts', 'lib/ask-route-limits.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compiler-contract.test.ts', 'lib/connect-ai-panel.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/developer-distribution.test.ts', 'lib/developer-store.test.ts', 'lib/export-signing.test.ts', 'lib/funnel-events.test.ts', 'lib/openapi-handler-contract.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/remote-mcp-r1.test.ts', 'lib/remote-mcp.test.ts', 'lib/route-classification.test.ts', 'lib/trial-ai-access.test.ts']);
 export const OPERATIONAL_SLI_ALERT_DELIVERY_AFFECTED_PATHS = Object.freeze(['app/api/internal/sli-alerts/route.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-alert-store.test.ts', 'lib/operational-sli-alert-store.ts']);
 // W1 trial AI access + operations alert producers (codex/w1-a2-20261104): the four 402 routes' key-route trio, the settle route
 // (OCR alerts), the session/key authorizer, the trial decision, the alert producers and the E2E timing receipt, with their suites.
@@ -2914,7 +2915,6 @@ export const PUBLIC_MARKETING_AFFECTED_BROWSER_FILES = Object.freeze([
   "e2e/evidence-first.spec.ts",
   "e2e/failure-states-audit.spec.ts",
   "e2e/film-line-stability.spec.ts",
-  "e2e/hero-four-stage-restoration.spec.ts",
   "e2e/hero-home-responsive.spec.ts",
   "e2e/home-evidence-line.spec.ts",
   "e2e/home-source-routes.spec.ts",
@@ -3071,7 +3071,8 @@ export const SLI_ALERT_NOISE_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error
 // paths, no glob; a new cut or poster name is a new review. Product UI, so never nativeReuse.
 export const HERO_COMPILE_TABS_AFFECTED_PATHS = Object.freeze(['components/landing-v2/hero-compile-tabs.module.css', 'components/landing-v2/hero-compile-tabs.tsx', 'components/opening-film-2.tsx', 'components/opening-film-3.tsx', 'components/opening-film-4.tsx', 'components/opening-film.tsx', 'lib/film-tone.ts', 'public/film/hero-tab-1-2x.avif', 'public/film/hero-tab-1-2x.webp', 'public/film/hero-tab-1.avif', 'public/film/hero-tab-1.mp4', 'public/film/hero-tab-1.webp', 'public/film/hero-tab-2-2x.avif', 'public/film/hero-tab-2-2x.webp', 'public/film/hero-tab-2.avif', 'public/film/hero-tab-2.mp4', 'public/film/hero-tab-2.webp', 'public/film/hero-tab-3-2x.avif', 'public/film/hero-tab-3-2x.webp', 'public/film/hero-tab-3.avif', 'public/film/hero-tab-3.mp4', 'public/film/hero-tab-3.webp', 'public/film/hero-tab-4-2x.avif', 'public/film/hero-tab-4-2x.webp', 'public/film/hero-tab-4.avif', 'public/film/hero-tab-4.mp4', 'public/film/hero-tab-4.webp', 'scripts/film/capture-film-2-tone.mjs', 'scripts/film/hero-tabs.mjs']);
 export const HERO_COMPILE_TABS_AFFECTED_UNIT_FILES = Object.freeze(['components/compile-stage-player.mobile-view.test.tsx', 'lib/brand-copy.test.ts', 'lib/landing-v2-page.test.ts', 'lib/one-path-contract.test.ts', 'lib/opening-film.test.ts']);
-export const HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-four-stage-restoration.spec.ts', 'e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts']);
+// e2e/hero-four-stage-restoration.spec.ts left the list when the retire commit 2be02934 deleted it (WO-CI-7 round 4).
+export const HERO_COMPILE_TABS_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/hero-home-responsive.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-v2.spec.ts']);
 // connectors-developer-20261110: storage connections move from Team to both paid plans; the panel shows plan availability before the click.
 export const CONNECTORS_DEVELOPER_AFFECTED_PATHS = Object.freeze(['app/api/connections/route.ts', 'app/api/v1/oauth-connectors/authorize/route.ts', 'components/connections-panel.tsx', 'e2e/connection-sync-status.spec.ts']);
 export const CONNECTORS_DEVELOPER_AFFECTED_UNIT_FILES = Object.freeze(['lib/billing-product-access.test.ts', 'lib/connection-sync-lag.test.ts', 'lib/connector-contract.test.ts', 'lib/connector-oauth-route.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/plan-entitlement.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
@@ -3096,6 +3097,15 @@ const LAUNCH_QA_PRODUCT_STEP = 'pnpm exec playwright test --project=1440 --proje
 const productQaClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, project });
 // ci.yml's nextjs job: `pnpm test` is `vitest run && pnpm test:scripts`, so it runs every file the shared Vitest include admits.
 const CI_NEXTJS_VITEST_CLAIM = Object.freeze({ kind: 'vitest', workflow: '.github/workflows/ci.yml', job: 'nextjs', run: 'pnpm test' });
+// Product QA runs e2e/change-proposals.spec.ts on every width project and reduced-motion; WO-AN-6 asked for 390, 360, 1440 and
+// reduced-motion, so the claim names those four and each is read at head (the spec has no project skip).
+const CHANGE_PROPOSALS_CLAIM = Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, projects: Object.freeze(['1440', '390', '360', 'reduced-motion']) });
+// Launch QA's v34-matrix job (WO-CI-9): the whole matrix over the live registry rows and the harness self-test, in one step whose
+// environment is part of the claim (the QA server, live rows, the three widths). The Repair browser stage runs only the matrix's
+// SEO and held passes and the self-test without its WebKit case, so this claim names what only that job runs.
+const LAUNCH_QA_V34_STEP = 'pnpm exec playwright test --project=v34-selftest --project=v34-chromium';
+const LAUNCH_QA_V34_ENV = Object.freeze({ PLAYWRIGHT_EXTERNAL_SERVER: '1', PLAYWRIGHT_BASE_URL: 'http://127.0.0.1:3117', V34_RELEASE: 'live', V34_WIDTHS: '390,412,1440', V34_QA_OUT: 'v34-qa-out/qa' });
+const v34MatrixJobClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'v34-matrix', run: LAUNCH_QA_V34_STEP, env: LAUNCH_QA_V34_ENV, project });
 // Program paths no owner takes, so each fails the map as unmapped with its reason: a red gate with a true reason, not a green one that
 // runs nothing (lead decision K3). Empty at this head: the V34 QA harness and the local database harness are run by the Repair job
 // (WO-CI-7 round 3, L5/L6), so they have owners below.
@@ -3154,7 +3164,7 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     unitFiles: Object.freeze(['lib/change-inbox.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/library-label-decisions-migration.test.ts', 'lib/library-routes.test.ts', 'lib/library-shadow.test.ts', 'lib/route-classification.test.ts', 'lib/world-change-proposals-migration.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'e2e/change-proposals.spec.ts': productQaClaim('1440'),
+      'e2e/change-proposals.spec.ts': CHANGE_PROPOSALS_CLAIM,
     }),
   }),
   // workspace-journey: D23-1/3/5: the file states, purpose picker and journey rail. The census browser spec has no repair project row.
@@ -3252,14 +3262,18 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze(['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
-  // v34-qa-harness (lane F-qa, L6): the V34 matrix helpers, the matrix and the harness's self-test. The self-test imports every helper
-  // and runs in the Repair browser stage under v34-selftest; the matrix runs under v34-chromium in production mode, its SEO and
-  // held-route passes (run-repair-check.mjs browserRunOptionsByProject).
+  // v34-qa-harness (lane F-qa, L6, WO-CI-9): the V34 matrix helpers, the matrix and the harness's self-test. The self-test imports every
+  // helper (v34-drawer.ts included) and runs in the Repair browser stage under v34-selftest; the matrix runs under v34-chromium in
+  // production mode, its SEO and held-route passes (run-repair-check.mjs browserRunOptionsByProject). The full matrix and the whole
+  // self-test run in Launch QA's v34-matrix job: a claim, read at head, never counted as executed here.
   'v34-qa-harness': Object.freeze({
-    paths: Object.freeze(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
+    paths: Object.freeze(['e2e/support/v34-contrast.ts', 'e2e/support/v34-drawer.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
     unitFiles: Object.freeze([]),
     browserFiles: Object.freeze(['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
-    externalChecks: Object.freeze({}),
+    externalChecks: Object.freeze({
+      'e2e/v34-matrix.spec.ts': v34MatrixJobClaim('v34-chromium'),
+      'e2e/v34-support.selftest.spec.ts': v34MatrixJobClaim('v34-selftest'),
+    }),
   }),
   // db-harness (L5, L7): the local database harness and the race harnesses. Their seven node:test suites run without a DSN and with
   // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script.
@@ -3277,24 +3291,62 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
-});
-// Owners for paths two running lanes add, fixed by their work orders (agent-native.md, WO-AN-2 and WO-AN-3 "Repair-scope request").
-// None of these paths exists at this head. Each owner is its own group, selected only by a change to its own paths, so a suite it
-// names that is absent today can only be selected by the change that adds it; until then the map is unchanged. The suites the work
-// orders ask existing owners to add (lib/agent-grants.test.ts for the remote-mcp group) wait for the refresh after those lanes merge:
-// naming an absent suite in an existing owner would fail every change to that owner now.
-export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
-  // proposals-decision-path (WO-AN-2): lookup by id and the signed action receipt, with the proposals suites and the route matrices.
+  // proposals-decision-path (WO-AN-2, merged): lookup by id and the signed action receipt, with the proposals suites and the route matrices.
   'proposals-decision-path': Object.freeze({
     paths: Object.freeze(['app/api/proposals/[id]/route.ts', 'lib/action-receipt-signing.test.ts', 'lib/action-receipt-signing.ts']),
     unitFiles: Object.freeze(['lib/action-receipt-signing.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/route-classification.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
-  // agent-grants (WO-AN-3): the agent grant, its credential routes and the agent dispatch scope, with the agent proposals suites.
+  // agent-grants (WO-AN-3, merged): the agent grant, its credential routes and the agent dispatch scope, with the agent proposals suites.
+  // The suite also runs for developer-store.ts and developer-auth.ts, through their owner w1-remote-mcp-a1-a5 (WO-AN-3 request).
   'agent-grants': Object.freeze({
     paths: Object.freeze(['app/api/agent-grants/[id]/route.ts', 'app/api/agent-grants/route.ts', 'app/api/internal/agent-grants/revoke-all/route.ts', 'lib/agent-grants.test.ts', 'lib/agent-grants.ts', 'lib/agent-mcp-dispatch.ts']),
     unitFiles: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-grants.test.ts', 'lib/agent-mcp-isolation.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // proposal-executors (WO-AN-4): the compile_plan and ontology_label_patch executors and the two review-store functions the label
+  // correction calls. Each executor suite imports its module; proposal-label-correction.ts imports review-store.ts unmocked (no other
+  // suite exercises review-store.ts: review-route, collection-candidate-breakdown and synthetic-customer-journey mock it);
+  // change-proposals.test.ts and change-proposals-routes.test.ts import the registry that imports both executors.
+  'proposal-executors': Object.freeze({
+    paths: Object.freeze(['lib/proposal-compile-plan.test.ts', 'lib/proposal-compile-plan.ts', 'lib/proposal-label-correction.test.ts', 'lib/proposal-label-correction.ts', 'lib/review-store.ts']),
+    unitFiles: Object.freeze(['lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/proposal-compile-plan.test.ts', 'lib/proposal-label-correction.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-access-panel (WO-AN-6): the Agent access panel. agent-access-panel.test.ts renders it; change-proposals.spec.ts walks it
+  // (consent, create, disconnect), run by Launch QA Product QA on the four projects WO-AN-6 named: a claim read at head.
+  'agent-access-panel': Object.freeze({
+    paths: Object.freeze(['components/workspace/agent-access-panel.module.css', 'components/workspace/agent-access-panel.tsx', 'lib/agent-access-panel.test.ts']),
+    unitFiles: Object.freeze(['lib/agent-access-panel.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/change-proposals.spec.ts': CHANGE_PROPOSALS_CLAIM,
+    }),
+  }),
+});
+// Owners for paths lanes still in flight add, fixed by their work orders. None of these paths exists at this head. Each owner is its
+// own group, selected only by a change to its own paths, so a suite it names that is absent today can only be selected by the change
+// that adds it; until then the map is unchanged.
+// WO-AN-7B's migration 20261117130300 and its rollback draft need no entry: every supabase/{migrations,tests,drafts}/*.sql is the
+// database-contract group's. WO-CI-6B also changes app/explore/page.tsx and components/explore/explore-stage.module.css: both are
+// already owned (public-marketing-surface, which executes 52 unit and 33 browser suites) and are changed in this plan, so naming
+// lib/v34/retained-shell.test.ts for them before that file exists would fail this plan; the refresh after WO-CI-6B merges adds it.
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
+  // agent-mcp-route (WO-AN-5): the agent MCP route, its nine tools, the agent proposal DTO and the security suite, with the route
+  // matrices every new API route enters.
+  'agent-mcp-route': Object.freeze({
+    paths: Object.freeze(['app/api/agent-mcp/route.ts', 'lib/agent-mcp-tools.test.ts', 'lib/agent-mcp-tools.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposal-view.ts', 'lib/agent-proposals-security.test.ts']),
+    unitFiles: Object.freeze(['lib/agent-mcp-tools.test.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposals-security.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-retained-shell (WO-CI-6B): the retained-route shell suite, selected by itself.
+  'v34-retained-shell': Object.freeze({
+    paths: Object.freeze(['lib/v34/retained-shell.test.ts']),
+    unitFiles: Object.freeze(['lib/v34/retained-shell.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3642,7 +3694,18 @@ function workflowJobSteps(text, job) {
         run = block.join(inline.startsWith('|') ? '\n' : ' ');
       }
     }
-    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell|env):/.test(candidate)) });
+    // A step env is read as flat `KEY: value` lines (quotes removed); any other shape under `env:` makes it unreadable (null).
+    const envAt = step.findIndex(candidate => /^ {8}env:\s*$/.test(candidate));
+    let env = envAt < 0 ? undefined : {};
+    if (envAt >= 0) for (const candidate of step.slice(envAt + 1)) {
+      if (!candidate.startsWith('          ')) { if (/^ {9}\S/.test(candidate)) env = null; break; }
+      if (!candidate.trim() || candidate.trim().startsWith('#')) continue;
+      const pair = /^ {10}([A-Z][A-Z0-9_]*): (?:"([^"\\]*)"|([^\s"'#][^#]*?))\s*$/.exec(candidate);
+      if (!pair || !env || Object.hasOwn(env, pair[1])) { env = null; break; }
+      env[pair[1]] = pair[2] ?? pair[3];
+    }
+    if (step.some(candidate => /^ {8}env:\s*\S/.test(candidate))) env = null;
+    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell):/.test(candidate)), env });
   }
   const needsAt = /^ {4}needs:(.*)$/m.exec(jobText)?.[1].trim(), needsList = needsAt === undefined ? '' : /^\[([A-Za-z0-9_, -]*)\]$/.exec(needsAt)?.[1] ?? (/^[A-Za-z0-9_-]+$/.test(needsAt) ? needsAt : null);
   const needs = needsList === null ? null : needsList.split(',').map(name => name.trim()).filter(Boolean);
@@ -3650,10 +3713,65 @@ function workflowJobSteps(text, job) {
 }
 const globSource = glob => '^' + glob.split('**/').map(part => part.split('*').map(text => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('(?:[^/]+/)*') + '$';
 // Two claims are one claim when they hold the same keys and values, in any key order.
-const canonicalClaim = claim => JSON.stringify(claim && typeof claim === 'object' && !Array.isArray(claim) ? Object.fromEntries(Object.keys(claim).sort().map(key => [key, claim[key]])) : claim);
-// A spec that skips itself unless the project is in a literal list runs nothing in any other project. Only this literal form is read:
-// test.skip(![...].includes(testInfo.project.name)). Any other skip condition (a variable list, ===/!==, a helper) is not detected.
-const SELF_SKIP_PROJECTS = /test\.skip\(\s*!\s*\[([^\]]*)\]\.includes\(\s*testInfo\.project\.name\s*\)/g;
+const canonicalValue = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalValue(value[key])])) : Array.isArray(value) ? value.map(canonicalValue) : value;
+const canonicalClaim = claim => JSON.stringify(canonicalValue(claim));
+// The projects a spec runs nothing in, read from its source: shared by the external claim reader and the Repair browser rows
+// (verify-repair-workflows.mjs and the `affected` selector tests read every row through it).
+// Two skip conditions are read, with the project name spelled `<identifier>.project.name` or `test.info().project.name`:
+//   test.skip(!["a", "b"].includes(<name>), ...)        allowed: a, b
+//   test.skip(<name> !== "a" && <name> !== "b", ...)   allowed: a, b
+// A skip belongs to the nearest test(...) or test.beforeEach(...) declared above it (line-start declarations only); a hook at
+// column 0 applies to every test in the file, an indented one to the tests below it up to the next declaration indented less.
+// A project runs nothing when every test declared in the file has a read skip that leaves it out. Not detected, so never a
+// refusal: any other condition (a variable list, ===, ||, a helper such as phoneShowsStill), skips in helpers above the first
+// test, and tests declared off the line start. The reader is linear: each skip is read from a bounded window, and a spec above
+// SPEC_SKIP_READ_LIMIT bytes is not read at all (the caller refuses it).
+export const SPEC_SKIP_READ_LIMIT = 256 * 1024;
+const SKIP_STRING = String.raw`(?:"([^"\\\n]{0,64})"|'([^'\\\n]{0,64})')`;
+const SKIP_PROJECT_NAME = String.raw`(?:test\.info\(\)|[A-Za-z_$][\w$]{0,40})\.project\.name`;
+const SKIP_LIST_FORM = new RegExp(String.raw`^\s*!\s*\[((?:\s*${SKIP_STRING}\s*,){0,32}\s*${SKIP_STRING}\s*,?\s*)\]\.includes\(\s*${SKIP_PROJECT_NAME}\s*\)\s*[,)]`);
+const SKIP_CHAIN_FORM = new RegExp(String.raw`^\s*(${SKIP_PROJECT_NAME}\s*!==\s*${SKIP_STRING}(?:\s*&&\s*${SKIP_PROJECT_NAME}\s*!==\s*${SKIP_STRING}){0,32})\s*[,)]`);
+const SKIP_WINDOW = 2048;
+const skipStrings = text => [...text.matchAll(new RegExp(SKIP_STRING, 'g'))].map(match => match[1] ?? match[2]);
+// { tests, allowed } where allowed[i] is the project list test i is limited to, or null when nothing read limits it;
+// null for a non-string or a source above the read limit.
+export function specSkipAllowance(source) {
+  if (typeof source !== 'string' || source.length > SPEC_SKIP_READ_LIMIT) return null;
+  const text = source.replace(/\r\n/g, '\n'), declarations = [];
+  for (const match of text.matchAll(/^([ \t]*)test(\.beforeEach|\.describe(?:\.[A-Za-z]+)?|\.(?:only|fail|slow|fixme))?\(/gm))
+    declarations.push({ at: match.index, indent: match[1].length, kind: match[2] === '.beforeEach' ? 'hook' : match[2]?.startsWith('.describe') ? 'describe' : 'test', allowed: null });
+  const narrow = (declaration, allowed) => { declaration.allowed = declaration.allowed ? declaration.allowed.filter(project => allowed.includes(project)) : [...allowed]; };
+  let owner = null, next = 0;
+  for (let at = text.indexOf('test.skip('); at >= 0; at = text.indexOf('test.skip(', at + 1)) {
+    const window = text.slice(at + 'test.skip('.length, at + 'test.skip('.length + SKIP_WINDOW);
+    const form = SKIP_LIST_FORM.exec(window) ?? SKIP_CHAIN_FORM.exec(window);
+    if (!form) continue;
+    while (next < declarations.length && declarations[next].at < at) { if (declarations[next].kind !== 'describe') owner = declarations[next]; next++; }
+    if (owner) narrow(owner, skipStrings(form[1]));
+  }
+  const tests = declarations.filter(declaration => declaration.kind === 'test');
+  for (const [index, hook] of declarations.entries()) {
+    if (hook.kind !== 'hook' || !hook.allowed) continue;
+    if (hook.indent === 0) { for (const test of tests) narrow(test, hook.allowed); continue; }
+    const end = declarations.find((declaration, at) => at > index && declaration.indent < hook.indent)?.at ?? Infinity;
+    for (const test of tests) if (test.at > hook.at && test.at < end && test.indent >= hook.indent) narrow(test, hook.allowed);
+  }
+  return { tests: tests.length, allowed: tests.map(test => test.allowed) };
+}
+// Why `project` runs nothing of the spec, or null when it runs something (or nothing read proves otherwise).
+export function specSelfSkipReason(source, project) {
+  if (typeof source === 'string' && source.length > SPEC_SKIP_READ_LIMIT) return `the spec is above ${SPEC_SKIP_READ_LIMIT} bytes, so its skips are not read`;
+  const read = specSkipAllowance(source);
+  if (!read) return 'the spec could not be read';
+  if (!read.tests || !read.allowed.every(allowed => allowed && !allowed.includes(project))) return null;
+  return `the spec skips itself outside projects ${[...new Set(read.allowed.flat())].join(', ')}, so project ${project} runs none of it`;
+}
+// A reviewed Playwright project's testMatch, read from playwright.config.ts: the audit project, the v34-<engine> projects and v34-selftest.
+const PROJECT_TEST_MATCH = Object.freeze({
+  audit: /name: "audit",\n\s+testMatch: auditSpecs,/,
+  'v34-chromium': /\.\.\.\(\["chromium"(?:, "[a-z]+")*\] as const\)\.map\(browserName => \(\{\n\s+name: `v34-\$\{browserName\}`,\n\s+testMatch: \/v34-matrix\\\.spec\\\.ts\/,\n/,
+  'v34-selftest': /\{\n\s+name: "v34-selftest",\n\s+testMatch: \/v34-support\\\.selftest\\\.spec\\\.ts\/,\n/,
+});
 // Why a claim that another workflow runs `file` (a path under nextjs/) is refused at head; [] when the named job and its exact,
 // unconditional step do run it. `read` returns a repository-root path's head text, or null when it is absent. Every shape this reader
 // has not reviewed is refused, and whatever the head text holds, the answer is a refusal with this prefix, never an exception.
@@ -3679,10 +3797,18 @@ function claimFailures(file, claim, read) {
   for (const need of job.needs) { const needed = workflowJobSteps(lf, need); if (!needed || needed.conditional) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional`); }
   const steps = job.steps.filter(step => step.run === claim.run);
   if (steps.length !== 1 || steps[0].conditional) return refuse(`job ${claim.job} has no single unconditional step running: ${claim.run}`);
-  if (steps[0].rebound) return refuse(`the step running ${claim.run} sets its own directory, shell or environment`);
+  if (steps[0].rebound) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (a directory or shell)`);
+  // A step environment is part of what the step runs: it holds only when the claim names exactly that environment.
+  if (steps[0].env === null) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment this check cannot read)`);
+  if (claim.env !== undefined && (!claim.env || typeof claim.env !== 'object' || Array.isArray(claim.env))) return refuse('the claim names an environment that is not a flat map');
+  if (canonicalClaim(steps[0].env ?? {}) !== canonicalClaim(claim.env ?? {})) return refuse(`the step running ${claim.run} sets its own directory, shell or environment (an environment the claim does not name exactly)`);
   const tokens = claim.run.split(/\s+/);
   if (claim.kind === 'playwright') {
-    if (tokens.slice(0, 4).join(' ') !== 'pnpm exec playwright test' || !tokens.includes(`--project=${claim.project}`)) return refuse(`the step does not run Playwright project ${claim.project}`);
+    // One project (`project`) or several (`projects`), never both; each is read below.
+    const projects = claim.projects === undefined ? [claim.project] : claim.projects;
+    if ((claim.projects !== undefined && claim.project !== undefined) || !Array.isArray(projects) || !projects.length || projects.some(project => typeof project !== 'string' || !project) || new Set(projects).size !== projects.length)
+      return refuse('the claim must name one project or a list of distinct projects');
+    for (const project of projects) if (tokens.slice(0, 4).join(' ') !== 'pnpm exec playwright test' || !tokens.includes(`--project=${project}`)) return refuse(`the step does not run Playwright project ${project}`);
     if (tokens.some(token => /^(?:-g|--grep|--grep-invert|--last-failed|--only-changed)(?:=|$)/.test(token) || (/\.spec\.ts$/.test(token) && token !== file))) return refuse('the step filters its specs');
     const source = read('nextjs/playwright.config.ts');
     if (typeof source !== 'string') return refuse('nextjs/playwright.config.ts is absent or unreadable at head');
@@ -3697,16 +3823,17 @@ function claimFailures(file, claim, read) {
     if (!auditSpecs || !v34Specs) return refuse('playwright.config.ts no longer declares auditSpecs and v34Specs as regex literals');
     const spec = read(`nextjs/${file}`);
     if (typeof spec !== 'string') return refuse(`nextjs/${file} is absent or unreadable at head`);
-    for (const [, list] of spec.matchAll(SELF_SKIP_PROJECTS)) {
-      const allowed = [...list.matchAll(/(["'])([^"'\\]*)\1/g)].map(match => match[2]);
-      if (!allowed.includes(claim.project)) return refuse(`the spec skips itself outside projects ${allowed.join(', ')}, so project ${claim.project} runs none of it`);
+    for (const project of projects) {
+      const skipped = specSelfSkipReason(spec, project);
+      if (skipped) return refuse(skipped);
+      if ([...widths, 'reduced-motion'].includes(project)) {
+        if ((config.match(/testIgnore: \[\/launch-qa\.\*\\\.spec\\\.ts\/, auditSpecs, v34Specs\],/g) ?? []).length !== 2) return refuse('the width and reduced-motion projects no longer share the reviewed testIgnore');
+        if (/launch-qa.*\.spec\.ts/.test(name) || auditSpecs.test(name) || v34Specs.test(name)) return refuse(`project ${project} ignores it`);
+      } else if (Object.hasOwn(PROJECT_TEST_MATCH, project)) {
+        const matches = project === 'audit' ? auditSpecs : project === 'v34-chromium' ? /v34-matrix\.spec\.ts/ : /v34-support\.selftest\.spec\.ts/;
+        if (!PROJECT_TEST_MATCH[project].test(config) || !matches.test(name)) return refuse(`project ${project} does not match it`);
+      } else return refuse(`project ${project} is not a reviewed Playwright project`);
     }
-    if ([...widths, 'reduced-motion'].includes(claim.project)) {
-      if ((config.match(/testIgnore: \[\/launch-qa\.\*\\\.spec\\\.ts\/, auditSpecs, v34Specs\],/g) ?? []).length !== 2) return refuse('the width and reduced-motion projects no longer share the reviewed testIgnore');
-      if (/launch-qa.*\.spec\.ts/.test(name) || auditSpecs.test(name) || v34Specs.test(name)) return refuse(`project ${claim.project} ignores it`);
-    } else if (claim.project === 'audit') {
-      if (!/name: "audit",\n\s+testMatch: auditSpecs,/.test(config) || !auditSpecs.test(name)) return refuse('project audit does not match it');
-    } else return refuse(`project ${claim.project} is not a reviewed Product QA project`);
   } else {
     if (claim.run !== 'pnpm test') return refuse('a Vitest claim must name the step `pnpm test`');
     let test;
