@@ -260,7 +260,8 @@ test("in the 768-899 band in Focus the scrolled sheet never covers the reading b
 
 /*
   The card reads as its own surface. Text >= 4.5:1 on the card, and the two answers' borders >= 3:1 (WCAG 1.4.11)
-  against the card; the card's ground is not the ground behind it (the legacy failure was a row the colour of the page).
+  against the card; its edge rule >= 3:1 against the card and against the ground behind it (the legacy failure was a row
+  the colour of the page with a 1.31:1 rule). A bordered card is not enough: the border has to be visible.
 */
 test("on Home from 900px the consent card reads as its own surface", async ({ page }, testInfo) => {
   test.skip(!["1920", "1440", "1280", "1024"].includes(testInfo.project.name), "the card is the desktop placement");
@@ -286,17 +287,19 @@ test("on Home from 900px the consent card reads as its own surface", async ({ pa
       text: ratio(over(rgb(getComputedStyle(element.querySelector("p")!).color), card), card),
       answer: ratio(over(rgb(button.color), card), card),
       answerBorder: ratio(over(rgb(button.borderTopColor), card), card),
-      cardOnGround: ratio(card, ground),
-      shadow: style.boxShadow,
       borderWidth: parseFloat(style.borderTopWidth),
+      borderOnCard: ratio(over(rgb(style.borderTopColor), card), card),
+      borderOnGround: ratio(over(rgb(style.borderTopColor), ground), ground),
     };
   });
   await testInfo.attach("home-card-contrast", { body: JSON.stringify(contrast, null, 2), contentType: "application/json" });
   expect(contrast.text).toBeGreaterThanOrEqual(4.5);
   expect(contrast.answer).toBeGreaterThanOrEqual(4.5);
   expect(contrast.answerBorder).toBeGreaterThanOrEqual(3);
-  // Distinct from what is behind it by ground, or by an edge or a shadow of its own.
-  expect(contrast.cardOnGround > 1.05 || contrast.shadow !== "none" || contrast.borderWidth >= 1, "the card is its own surface").toBe(true);
+  // The legacy bar (WCAG 1.4.11, fix round 3): the panel's edge rule is >= 3:1 against the panel and against the ground behind it.
+  expect(contrast.borderWidth).toBeGreaterThanOrEqual(1);
+  expect(contrast.borderOnCard, "the card's edge against the card").toBeGreaterThanOrEqual(3);
+  expect(contrast.borderOnGround, "the card's edge against the ground behind it").toBeGreaterThanOrEqual(3);
 });
 
 test("Escape inside the consent card refuses, persists, and loads no analytics", async ({ page }) => {
