@@ -2,14 +2,14 @@ import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode
 import { test, expect } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
 import { EXPLORE_CTA } from "../lib/site-navigation";
-import { HELD_REASON, HELD_SHOWN } from "./support/held-feature";
+import { HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON } from "./support/held-feature";
 
 /*
   V34 (WO-CI-5a): the chrome is the V34 shell (`[data-v34-header]`, the page's contentinfo footer), Home is
   the V34 page (its H1 is `#v34-title`, its hero a `section[aria-labelledby="v34-title"]` whose first
   child is the shell-width column), and /product answers 308 to /platform. Promises are unchanged; the
   four-stage hero film is not on V34 Home (/film is held, ADR D01 A9), so its half of the edge test is
-  its own test and runs when the server shows held work (e2e/support/held-feature.ts) -- not removed.
+  its own test and runs when Home mounts landing-v2 (e2e/support/held-feature.ts) -- not removed.
 */
 const HEADER = "[data-v34-header]";
 const FOOTER = "[data-v34-site] > footer";
@@ -72,7 +72,7 @@ for (const path of ["/"]) {
   });
 
   test(`${path} keeps the opened walkthrough inside the shared edge`, async ({ page }, testInfo) => {
-    test.skip(!HELD_SHOWN, HELD_REASON);
+    test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
