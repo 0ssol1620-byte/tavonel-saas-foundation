@@ -9,10 +9,31 @@ import tokens from "../tokens.module.css";
 import s from "./more-menu.module.css";
 
 /**
+ * An Escape a shell surface consumes is the shell's alone (WO-CI-14). `consume` runs for every
+ * Escape and returns true when it closed something; that press is then stopped, so no key listener
+ * of the page acts on it too (the /explore workbench closed its evidence view on the same press).
+ *
+ * The listener sits on `window` in the capture phase, the first place a key event reaches, and is
+ * added once when the shell mounts, not when a surface opens: the header mounts before `main`, so
+ * it precedes every listener a page body adds, on window or document, capture or bubble. Stopping
+ * propagation does not cancel the press, so a modal <dialog> still closes itself on it.
+ * ponytail: a window capture listener added before the header mounted (a script outside React) would
+ * still run first; the drawer pass arms its probe after mount and before opening, which is the order a page has.
+ */
+export function listenShellEscape(consume: () => boolean): () => void {
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && consume()) event.stopImmediatePropagation();
+  };
+  window.addEventListener("keydown", onKey, true);
+  return () => window.removeEventListener("keydown", onKey, true);
+}
+
+/**
  * The "More" disclosure: a button and the panel it controls. It is not a modal, so there is no
  * focus trap and the page behind it stays reachable. Escape closes it and returns focus to the
- * button; a click or focus outside closes it; navigating closes it. The groups arrive already
- * filtered for held routes, so a held route's link is not in this bundle.
+ * button, and goes no further than the shell; a click or focus outside closes it; navigating
+ * closes it. The groups arrive already filtered for held routes, so a held route's link is not
+ * in this bundle.
  */
 export default function MoreMenu({ groups }: { groups: readonly NavGroupLinks[] }) {
   const [open, setOpen] = useState(false);
@@ -23,23 +44,28 @@ export default function MoreMenu({ groups }: { groups: readonly NavGroupLinks[] 
 
   useEffect(() => setOpen(false), [pathname]);
 
+  // Open is read from the panel itself, so the listener never needs re-adding after the page's.
+  useEffect(
+    () =>
+      listenShellEscape(() => {
+        if (!panel.current || panel.current.hidden) return false;
+        setOpen(false);
+        button.current?.focus();
+        return true;
+      }),
+    [],
+  );
+
   useEffect(() => {
     if (!open) return;
     const inside = (target: EventTarget | null) =>
       target instanceof Node && (panel.current?.contains(target) || button.current?.contains(target));
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      button.current?.focus();
-    };
     const onOutside = (event: Event) => {
       if (!inside(event.target)) setOpen(false);
     };
-    document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onOutside);
     document.addEventListener("focusin", onOutside);
     return () => {
-      document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onOutside);
       document.removeEventListener("focusin", onOutside);
     };
