@@ -5,6 +5,7 @@ import { createElement, type FunctionComponent, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import V34Page from "@/components/v34/shell/v34-page";
+import tokens from "@/components/v34/tokens.module.css";
 import { reach as reachFrom, specifiers } from "./import-graph";
 import { h1Text } from "./route-test-support";
 
@@ -216,10 +217,12 @@ describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main"
     // (WO-CI-19, decision 1): layout custom properties only, not V34Page's wrapper.
     const mainAncestors = ancestors(html, mainAt);
     expect(mainAncestors, `${path}: main's only ancestor is the container wrapper`).toHaveLength(1);
-    expect(mainAncestors[0]).toMatch(/style="display:contents"/);
-    expect(mainAncestors[0]).not.toContain(siteClass);
+    expect(tokens.container, "the token sheet's container class").toMatch(/\S/);
+    expect(tokens.container).not.toBe(siteClass);
+    expect(mainAncestors[0], `${path}: main's ancestor is exactly the box-less container wrapper`).toBe(
+      `<div class="${tokens.container}" style="display:contents">`);
     expect(ancestors(html, headerAt), `${path}: main is a sibling of the shell's wrappers`).toEqual([mainAncestors[0], wrapperOf(headerAt)[0]]);
-    expect(ancestors(html, footerAt)[0], `${path}: the footer's wrapper shares main's parent`).toBe(mainAncestors[0]);
+    expect(ancestors(html, footerAt), `${path}: the footer's wrapper shares main's parent`).toEqual([mainAncestors[0], wrapperOf(footerAt)[0]]);
     expect(html.slice(0, mainAt)).toMatch(/<div\b[^>]*\bdata-v34-site=""/);
     expect(html).not.toMatch(/chrome-v2-(?:header|footer)/);
   }, 120_000);
