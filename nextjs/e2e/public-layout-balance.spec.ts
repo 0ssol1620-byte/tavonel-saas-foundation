@@ -100,13 +100,18 @@ test("odd two-column record grids do not expose an empty placeholder cell", asyn
     .toBeGreaterThan(0);
 });
 
+/*
+  V34 (WO-CI-5a): /integrations answers 308 to /connect, and the footer is the V34 shell's (the page's
+  contentinfo landmark); its link groups are the labelled <nav> elements, and the grid that holds them
+  is their common parent. The measurements and budgets are unchanged.
+*/
 test("the public footer stays compact and fully painted on narrow screens", async ({ page }) => {
   await page.goto("/integrations");
-  const footer = page.locator("footer.site");
+  const footer = page.locator("[data-v34-site] > footer");
   await footer.scrollIntoViewIfNeeded();
 
   const result = await footer.evaluate((element) => {
-    const group = element.querySelector<HTMLElement>(".site-footer-groups")!;
+    const group = element.querySelector<HTMLElement>("nav[aria-label]")!.parentElement!;
     const navs = [...group.querySelectorAll<HTMLElement>(":scope > nav")];
     const links = [...group.querySelectorAll<HTMLElement>("a")];
     const intersects = (a: DOMRect, b: DOMRect) =>

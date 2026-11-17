@@ -22,7 +22,20 @@ import { expect, test, type Page } from "@playwright/test";
 
   Driven from the 1440 project at 1440 and 390, the two widths §8.2 names. /research/experiments is
   in §5.4 but serves a 404, so it is not measured (the same list as site-alignment.spec.ts).
+
+  V34 (WO-CI-5a). A route the program moved answers 308 to its V34 page (`V34_REDIRECTS`,
+  next.config.mjs), and that page is the one read. R2 is held per page by what the page declares:
+  a retained page declares its legacy template (`data-template` on the V34 page root) and is held
+  to Display 2 as before; a V34 registry page declares none, and its H1 is held to the V34 display
+  roles instead -- the size of one of `--v34-h1-sub` / `--v34-h1-split` as resolved on the page
+  (components/v34/tokens.module.css; the Hero's sub and split variants and the article layout set
+  their H1 from these), at the V34 title weight 500 and in the one face. Equal-but-wrong still
+  fails: each H1 is compared to a token's resolved value, not only to its neighbours. And a template
+  has ONE H1 role: V34 pages of one template that use both roles fail, and the mix is a filed defect
+  (WO-CI-5a receipt, D19), not something either role excuses.
 */
+/** The V34 heading weight (components/v34/ui/hero.module.css and article-layout.module.css `.title`). */
+const V34_TITLE_WEIGHT = "500";
 
 const TEMPLATES = {
   T0: ["/"],
@@ -56,6 +69,10 @@ type Reading = {
   retiredFaces: string[];
   h1: (Signature & { text: string }) | null;
   displayTwo: Signature;
+  /** The legacy template the page root declares, or null on a V34 registry page. */
+  template: string | null;
+  /** The V34 display roles (`--v34-h1-sub`, `--v34-h1-split`) resolved on this page; empty without the shell. */
+  v34Roles: string[];
   h2Groups: { parent: string; items: { size: string; text: string }[] }[];
   koMeta: { count: number; tracked: string[] };
 };
@@ -103,6 +120,19 @@ function read(): Reading {
   const displayTwo = signature(probe);
   probe.remove();
 
+  const site = document.querySelector("[data-v34-site]");
+  const v34Roles: string[] = [];
+  if (site) {
+    for (const token of ["--v34-h1-sub", "--v34-h1-split"]) {
+      const role = document.createElement("div");
+      role.style.setProperty("position", "absolute");
+      role.style.setProperty("font-size", `var(${token})`);
+      site.append(role);
+      v34Roles.push(getComputedStyle(role).fontSize);
+      role.remove();
+    }
+  }
+
   const groups = new Map<Element | null, { size: string; text: string }[]>();
   for (const heading of document.querySelectorAll("h2")) {
     if (!visible(heading)) continue;
@@ -129,6 +159,8 @@ function read(): Reading {
     retiredFaces: [...retiredFaces],
     h1: h1 ? { ...signature(h1), text: (h1.textContent ?? "").trim().slice(0, 48) } : null,
     displayTwo,
+    template: document.querySelector("[data-template]")?.getAttribute("data-template") ?? null,
+    v34Roles,
     h2Groups: [...groups].map(([parent, items]) => ({ parent: name(parent), items })),
     koMeta: { count: meta.length, tracked },
   };
@@ -153,6 +185,27 @@ function h1Drift(readings: { route: string; h1: Signature | null }[], expected?:
     for (const key of ["size", "weight", "variation", "face"] as const) {
       if (h1[key] !== reference[key]) drift.push(`${route}: H1 ${key} ${h1[key]}, expected ${reference[key]}`);
     }
+  }
+  return drift;
+}
+
+/** Where a V34 page's H1 leaves the V34 display roles: a token size, the title weight, the one face. */
+function v34Drift(readings: { route: string; h1: Signature | null; roles: string[] }[], face: string): string[] {
+  const drift: string[] = [];
+  for (const { route, h1, roles } of readings) {
+    if (!h1) {
+      drift.push(`${route}: no visible H1`);
+      continue;
+    }
+    if (!roles.includes(h1.size)) drift.push(`${route}: H1 size ${h1.size}, expected one of the V34 roles ${roles.join(" / ") || "(no V34 shell)"}`);
+    if (h1.weight !== V34_TITLE_WEIGHT) drift.push(`${route}: H1 weight ${h1.weight}, expected ${V34_TITLE_WEIGHT}`);
+    if (h1.face !== face) drift.push(`${route}: H1 face ${h1.face}, expected ${face}`);
+  }
+  // One role per template: every V34 H1 of the template at one size.
+  const bySize = new Map<string, string[]>();
+  for (const { route, h1 } of readings) if (h1) bySize.set(h1.size, [...(bySize.get(h1.size) ?? []), route]);
+  if (bySize.size > 1) {
+    drift.push(`one H1 role per template, V34 pages use ${bySize.size}: ${[...bySize].map(([size, routes]) => `${size} (${routes.join(", ")})`).join(" / ")}`);
   }
   return drift;
 }
@@ -188,10 +241,13 @@ for (const width of WIDTHS) test.describe(`type scale (UX-L3) at ${width}`, () =
   for (const [template, routes] of Object.entries(TEMPLATES) as [Template, readonly string[]][]) {
     test(`${template}: every route computes the same H1`, async ({ page }) => {
       const readings: { route: string; h1: Signature | null }[] = [];
+      const v34Readings: { route: string; h1: Signature | null; roles: string[] }[] = [];
       let displayTwo: Signature | undefined;
       for (const route of routes) {
         const reading = await readRoute(page, route);
-        readings.push({ route, h1: reading.h1 });
+        // T0 is Home's own pair; any other page that declares no legacy template is a V34 registry page.
+        if (template === "T0" || reading.template) readings.push({ route, h1: reading.h1 });
+        else v34Readings.push({ route, h1: reading.h1, roles: reading.v34Roles });
         displayTwo ??= reading.displayTwo;
       }
       // Display 2 is the face the role names, at the token's size and decision.md G-B's 510.
@@ -200,7 +256,8 @@ for (const width of WIDTHS) test.describe(`type scale (UX-L3) at ${width}`, () =
         expect(displayTwo?.weight).toBe("510");
         expect(displayTwo?.size).toBe(width === 1440 ? "52px" : "32px");
       }
-      expect(h1Drift(readings, DISPLAY_TWO.includes(template) ? displayTwo : undefined), `${template} @${width}`).toEqual([]);
+      expect.soft(h1Drift(readings, DISPLAY_TWO.includes(template) ? displayTwo : undefined), `${template} @${width}`).toEqual([]);
+      expect.soft(v34Drift(v34Readings, displayTwo?.face ?? "Wanted Sans Variable"), `${template} @${width}, V34 pages`).toEqual([]);
     });
   }
 });
@@ -229,13 +286,23 @@ test.describe("the type-scale detector", () => {
     expect(mixedSiblings(clean)).toEqual([]);
     expect(clean.retiredFaces).toEqual([]);
 
-    await set(page, "#home-measures-title", "font-size", "24px");
+    // V34 Home has no #home-measures-title: the probe is the first H2 that has a sibling H2 (read() decides siblings).
+    const shrunk = await page.evaluate(() => {
+      const sectionOf = (heading: Element) => heading.closest("section, article, aside") ?? heading;
+      const headings = [...document.querySelectorAll("h2")].filter((heading) => heading.getBoundingClientRect().height > 1);
+      const target = headings.find((heading) =>
+        headings.some((other) => other !== heading && sectionOf(other).parentElement === sectionOf(heading).parentElement));
+      if (!target) throw new Error("no H2 with a sibling H2 on /");
+      target.setAttribute("data-type-scale-probe", "");
+      return (target.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 48);
+    });
+    await set(page, "[data-type-scale-probe]", "font-size", "24px");
     const mixed = mixedSiblings(await page.evaluate(read));
     expect(mixed).toHaveLength(1);
-    expect(mixed[0]).toContain("24px «Research figures, with receipts.»");
+    expect(mixed[0]).toContain(`24px «${shrunk}»`);
 
-    // FINAL-SPEC 2026-10-26 deleted `.lv2-scene-support`; the workbench's heading is the element set in a retired face.
-    await set(page, "#s2 h2", "font-family", "Geist, sans-serif");
+    // One element set in a retired face is reported.
+    await set(page, "main h2", "font-family", "Geist, sans-serif");
     expect((await page.evaluate(read)).retiredFaces).toHaveLength(1);
   });
 

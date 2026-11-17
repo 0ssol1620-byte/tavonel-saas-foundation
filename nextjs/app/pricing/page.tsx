@@ -11,6 +11,7 @@ import type { FoundationBillingAccount } from "@/lib/billing-store";
 import { readPublicStatusV2 } from "@/lib/public-status";
 import SiteFooter from "@/components/v34/shell/site-footer";
 import SiteHeader from "@/components/v34/shell/site-header";
+import { v34Route } from "@/lib/v34/routes";
 
 export const dynamic = "force-dynamic";
 
@@ -167,7 +168,7 @@ export default function PricingPage() {
       availability={availability}
       initialLiveCheckout={status.availableActions.purchasePlan.enabled}
       initialSelfService={status.availableActions.createAccount.enabled}
-      header={<SiteHeader />}
+      header={<SiteHeader currentPath={v34Route("pricing").path} />}
       footer={<SiteFooter />}
       gates={PURCHASE_GATES}
       planCapabilities={PLAN_CAPABILITIES}

@@ -329,7 +329,12 @@ export type PageTemplate = "T0" | "T1" | "T2" | "T3" | "T4" | "T5";
   `template` is required: a new public page has to say which template it is, and a page outside
   §5.4's inventory (the 404, the noindex /arena) says so with `null` rather than by forgetting.
 */
-export function PublicSitePage({ children, template }: { children: React.ReactNode; template: PageTemplate | null }) {
+export function PublicSitePage({ children, template, path }: {
+  children: React.ReactNode;
+  template: PageTemplate | null;
+  /** The page's own path, so the V34 bar marks the primary section it sits in. */
+  path?: string;
+}) {
   /*
     The commercial posture, read once per page rather than fetched once per visitor.
 
@@ -340,6 +345,6 @@ export function PublicSitePage({ children, template }: { children: React.ReactNo
     the closed posture.
   */
   return (
-    <V34Page className="page public-page" template={template ?? undefined}>{children}</V34Page>
+    <V34Page className="page public-page" template={template ?? undefined} path={path}>{children}</V34Page>
   );
 }

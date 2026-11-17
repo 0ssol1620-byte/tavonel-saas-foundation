@@ -103,8 +103,12 @@ export default function MobileDrawer({ primary, groups, start }: {
               </li>
             ))}
           </ul>
+          {/*
+            One group open at a time: the groups share a `name`, so opening one closes the others
+            (the platform's exclusive accordion; no script).
+          */}
           {groups.map((group) => (
-            <details key={group.title} className={s.group}>
+            <details key={group.title} name={`${id}-groups`} className={s.group}>
               <summary className={s.summary}>{group.title}</summary>
               <ul className={s.list}>
                 {group.links.map((link) => (

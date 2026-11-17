@@ -120,6 +120,8 @@ export const V34_FOOTER_GROUPS: readonly NavGroup[] = [
       route("evidence", "Evidence"),
       route("changes", "Changes"),
       route("compiler", "Compiler"),
+      /* One step from every page (WO-CI-5a D7): "which files can I put in" is answered by a footer row. */
+      retained("/sources", "Sources"),
       route("capabilities", "Capabilities"),
       route("studio", "Reference walkthrough"),
       retained("/explore", "Explore a Compiled World"),

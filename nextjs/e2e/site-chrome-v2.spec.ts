@@ -16,22 +16,87 @@
  *
  * Widths: 1440 is the grid §32 is drawn against, and 390 is a phone the founder checks. The
  * projects are named for their widths, so each half skips at the other.
+ *
+ * V34 (WO-CI-5a). The chrome on every public page is now the V34 shell (components/v34/shell): the bar
+ * is `[data-v34-header]` with the five `V34_PRIMARY_NAV` links (Pricing is one of them, a plain link),
+ * the start action "Create your World" (`createWorldAction()`) and Sign in; below 1001px a native
+ * `<dialog>` drawer; the footer is the page's contentinfo landmark. `/product` answers 308 to `/platform`,
+ * the page measured here. Colours are the V34 tokens read from components/v34/tokens.module.css, not
+ * typed: the bar is the paper surface, the footer the forest one. Two legacy mechanisms have no V34
+ * counterpart and are not asserted: the `data-scrolled` scroll listener (the V34 bar has no scroll
+ * state; its surface is asserted on both sides of the old threshold instead) and the phone menu icon's
+ * pseudo-element morph (the V34 trigger is an SVG with no morph).
  */
 
+import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
-import { primaryCallToAction } from "../lib/commercial-state";
+import { createWorldAction } from "../components/v34/ui/create-world";
+import { v34Route, type V34RouteKey } from "../lib/v34/routes";
 
-/** The four section links; Pricing is the separate emphasized header control. */
-const CUSTOMER_NAV = [
-  { href: "/product", label: "Product" },
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/resources", label: "Resources" },
-  { href: "/docs", label: "Docs" },
-] as const;
+/*
+  The bar's five links: `V34_PRIMARY_NAV` (lib/v34/nav.ts), whose module this spec cannot import (it
+  reaches next/navigation). Paths from the registry, held routes dropped as the shell drops them.
+*/
+const CUSTOMER_NAV = ([
+  ["platform", "Product"],
+  ["solutions", "Solutions"],
+  ["connect", "Integrations"],
+  ["pricing", "Pricing"],
+  ["journal", "Journal"],
+] as const satisfies readonly (readonly [V34RouteKey, string])[])
+  .filter(([key]) => v34Route(key).release !== "held")
+  .map(([key, label]) => ({ href: v34Route(key).path as string, label }));
 
-const HEADER = "header.nav";
-const BAR = `${HEADER} nav[aria-label="Sections"]`;
-const SHEET = `${HEADER} details.mobile-primary-nav`;
+const HEADER = "[data-v34-header]";
+const BAR = `${HEADER} nav[aria-label="Primary"]`;
+const SHEET = `${HEADER} dialog`;
+const FOOTER = "[data-v34-site] > footer";
+const START = createWorldAction();
+
+/** A `--v34-*` colour token as tokens.module.css declares it on `.site`, as rgb(). */
+function v34Token(name: string) {
+  const sheet = readFileSync(new URL("../components/v34/tokens.module.css", import.meta.url), "utf8");
+  const hex = sheet.match(new RegExp(`${name}:\\s*#([0-9a-f]{6});`, "i"))?.[1];
+  if (!hex) throw new Error(`${name} is not a six-digit colour in tokens.module.css`);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+const PAPER = v34Token("--v34-paper");
+const INK = v34Token("--v34-ink");
+const FOREST = v34Token("--v34-forest");
+const ON_DARK = v34Token("--v34-on-dark");
+const ACTION = v34Token("--v34-header-btn");
+
+/** The header row as the tokens define it: `--v34-header-h` plus the header's bottom rule. */
+const tokenRow = (page: Page) => page.locator(HEADER).evaluate((element) => {
+  const probe = document.createElement("div");
+  probe.style.setProperty("height", "var(--v34-header-h)");
+  element.append(probe);
+  const height = probe.getBoundingClientRect().height;
+  probe.remove();
+  return height + parseFloat(getComputedStyle(element).borderBottomWidth);
+});
+
+/** The container's left edge as `--v34-shell` resolves inside the V34 page root. */
+const shellEdge = (page: Page) => page.locator("[data-v34-site]").first().evaluate((site) => {
+  const probe = document.createElement("div");
+  probe.style.setProperty("width", "var(--v34-shell)");
+  probe.style.setProperty("margin-inline", "auto");
+  site.prepend(probe);
+  const left = probe.getBoundingClientRect().left;
+  probe.remove();
+  return left;
+});
+
+/** Open the drawer; a press before hydration does nothing, so press until it opens. */
+async function openDrawer(page: Page) {
+  const trigger = page.locator(HEADER).getByRole("button", { name: "Open navigation" });
+  await expect(async () => {
+    if (!(await page.locator(SHEET).isVisible())) await trigger.click();
+    await expect(page.locator(SHEET)).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  return page.locator(SHEET);
+}
 
 const hrefsOf = (locator: ReturnType<Page["locator"]>) =>
   locator.evaluateAll((elements) => elements.map((element) => element.getAttribute("href")));
@@ -47,14 +112,15 @@ test.describe("at 1440", () => {
     test.skip(testInfo.project.name !== "1440", "the desktop bar is measured at the width it is drawn for");
   });
 
-  test("is a 64px bar carrying the four section destinations in order", async ({ page }) => {
+  test("is a token-height bar carrying the primary destinations in order", async ({ page }) => {
     await page.goto("/product");
     const box = await page.locator(HEADER).boundingBox();
     expect(box, "the header has no box").not.toBeNull();
     // +-1 for the sub-pixel rounding a 1px bottom border and a fractional device ratio produce.
-    expect(Math.abs((box?.height ?? 0) - 64), `header height ${box?.height}`).toBeLessThanOrEqual(1);
+    const row = await tokenRow(page);
+    expect(Math.abs((box?.height ?? 0) - row), `header height ${box?.height}, token row ${row}`).toBeLessThanOrEqual(1);
 
-    const links = page.locator(`${BAR} a.site-nav-direct`);
+    const links = page.locator(`${BAR} a`);
     await expect(links).toHaveCount(CUSTOMER_NAV.length);
     expect(await hrefsOf(links)).toEqual(CUSTOMER_NAV.map((item) => item.href));
     await expect(links).toHaveText(CUSTOMER_NAV.map((item) => item.label));
@@ -71,13 +137,13 @@ test.describe("at 1440", () => {
   */
   test("keeps Pricing and Sign in readable without competing with the hero action", async ({ page }) => {
     await page.goto("/product");
-    const action = page.locator(`${HEADER} .nav-actions a[href="/pricing"]`);
+    const action = page.locator(`${BAR} a[href="/pricing"]`);
     await expect(action).toHaveCount(1);
     await expect(action).toHaveText("Pricing");
     await expect(action).toBeVisible();
     await expect(action).toHaveAttribute("href", "/pricing");
 
-    const filled = await page.locator(`${HEADER} a, ${HEADER} button`).evaluateAll((elements) =>
+    const filled = await page.locator(`${HEADER} a, ${HEADER} button`).evaluateAll((elements: Element[]) =>
       elements
         .filter((element) => {
           /*
@@ -99,12 +165,14 @@ test.describe("at 1440", () => {
         .map((element) => (element.textContent ?? "").trim().slice(0, 24)),
     );
     // Brief 2026-10-15 move 1: the bar carries exactly one filled control. Founder 2026-11-10: it is the visitor's
-    // start (this runner's posture: the access action, or Start free once live), not the public sample.
-    // Pricing stays a plain link at link weight.
-    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual([primaryCallToAction().label.slice(0, 24)]);
-    await expect(action).toHaveCSS("font-weight", "400");
+    // start (D33 #2: "Create your World", to where primaryCallToAction() points), not the public sample.
+    // Pricing stays a plain link at link weight: the weight of the bar's other links, not emphasised.
+    expect(filled, `filled controls in the bar: ${JSON.stringify(filled)}`).toEqual([START.label.slice(0, 24)]);
+    const linkWeight = await page.locator(`${BAR} a[href="${CUSTOMER_NAV[0].href}"]`).evaluate((element) => getComputedStyle(element).fontWeight);
+    await expect(action).toHaveCSS("font-weight", linkWeight);
+    await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toHaveAttribute("href", START.href);
 
-    const signIn = page.locator(`${HEADER} .nav-signin`);
+    const signIn = page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true });
     await expect(signIn).toHaveAttribute("href", "/login");
     await expect(signIn).toBeVisible();
   });
@@ -117,10 +185,10 @@ test.describe("at 1440", () => {
   test("swaps Sign in and the start for Open workspace when a session is stored", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("sb-test-auth-token", "{}"));
     await page.goto("/product");
-    const action = page.locator(`${HEADER} .nav-actions a.btn`);
+    const action = page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-workspace"]`);
     await expect(action).toHaveText("Open workspace");
     await expect(action).toHaveAttribute("href", "/workspace");
-    await expect(page.locator(`${HEADER} .nav-signin`)).toHaveCount(0);
+    await expect(page.locator(`${HEADER} a[href="/login"]`)).toHaveCount(0);
   });
 
   /*
@@ -140,34 +208,26 @@ test.describe("at 1440", () => {
   });
 
   /*
-    The paper surface stays opaque. The scroll threshold is asserted from both sides:
-    a listener that fires but reads the wrong number is the failure mode worth catching, and an
-    attribute that is simply always "1" passes a one-sided check.
+    The paper surface stays opaque on both sides of the old 40px threshold. The V34 bar has no scroll
+    listener (no `data-scrolled`): its surface is the paper token at every scroll position, which is
+    what is measured, before, past and back across the threshold.
   */
-  test("keeps its readable surface while tracking both sides of the scroll threshold", async ({ page }) => {
+  test("keeps its readable surface on both sides of the scroll threshold", async ({ page }) => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     const background = () => header.evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(await background(), "the initial bar has its readable paper surface").toBe("rgb(245, 243, 238)");
+    expect(await background(), "the initial bar has its readable paper surface").toBe(PAPER);
+    await expect(header).toHaveCSS("color", INK);
 
     await page.evaluate(() => window.scrollTo(0, 20));
-    await expect(header).toHaveAttribute("data-scrolled", "0");
+    await expect(header).toHaveCSS("background-color", PAPER);
 
     await page.evaluate(() => window.scrollTo(0, 80));
-    await expect(header).toHaveAttribute("data-scrolled", "1");
-    /*
-      `toHaveCSS` retries; a bare read does not.
-
-      The paper surface remains stable while the scroll state changes; a single sample taken the
-      instant the attribute flips reads whatever alpha the interpolation is at -- 0.75, then 0.76
-      on the retry, then 0.77. The threshold and the toggle were never the flake; the stopwatch
-      was. This waits for the transition to land on the declared value instead.
-    */
-    await expect(header).toHaveCSS("background-color", "rgb(245, 243, 238)");
+    await expect(header).toHaveCSS("background-color", PAPER);
+    expect((await header.boundingBox())!.y, "the bar stays at the top of the viewport").toBeLessThanOrEqual(1);
 
     await page.evaluate(() => window.scrollTo(0, 0));
-    await expect(header).toHaveAttribute("data-scrolled", "0");
-    await expect(header).toHaveCSS("background-color", "rgb(245, 243, 238)");
+    await expect(header).toHaveCSS("background-color", PAPER);
   });
 
   /*
@@ -179,24 +239,22 @@ test.describe("at 1440", () => {
   */
   test("aligns the wordmark and footer on the shared fluid content edge", async ({ page }) => {
     await page.goto("/product");
-    const width = page.viewportSize()!.width;
-    // UX-PLAN-2026-10-17 §4.5 (UX-L2): the one container is DESIGN_MASTER_V3 §6.4's 1320px with a
-    // clamp(24px, 5vw, 72px) margin; it was 1280px with clamp(20px, 2.5vw, 32px).
-    const edge = Math.max(Math.min(Math.max(width * .05, 24), 72), (width - 1320) / 2);
-    const wordmark = await page.locator(`${HEADER} .wordmark`).first().boundingBox();
+    // V34: the one container is the shell's `--v34-shell`, read off the page (components/v34/tokens.module.css).
+    const edge = await shellEdge(page);
+    const wordmark = await page.locator(`${HEADER} > div > a[aria-label="TAVONEL home"]`).first().boundingBox();
     expect(wordmark).not.toBeNull();
-    expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}`).toBeLessThanOrEqual(1);
+    expect(Math.abs((wordmark?.x ?? 0) - edge), `wordmark x ${wordmark?.x}, edge ${edge}`).toBeLessThanOrEqual(1);
 
-    const footer = await page.locator("footer.site .chrome-v2-wrap").boundingBox();
-    expect(footer, "the footer has no V2 measure").not.toBeNull();
-    expect(Math.abs((footer?.x ?? 0) - edge), `footer x ${footer?.x}`).toBeLessThanOrEqual(1);
+    const footer = await page.locator(`${FOOTER} a[aria-label="TAVONEL home"]`).boundingBox();
+    expect(footer, "the footer has no home link").not.toBeNull();
+    expect(Math.abs((footer?.x ?? 0) - edge), `footer x ${footer?.x}, edge ${edge}`).toBeLessThanOrEqual(1);
   });
 
   test("fits the whole row inside the viewport with no horizontal overflow", async ({ page }) => {
     await page.goto("/product");
     const escaped = await page.evaluate(() => {
       const found: string[] = [];
-      for (const element of document.querySelectorAll<HTMLElement>("header.nav *")) {
+      for (const element of document.querySelectorAll<HTMLElement>("[data-v34-header] *")) {
         const box = element.getBoundingClientRect();
         if (!box.width || !box.height) continue;
         if (box.left < -1 || box.right > innerWidth + 1) found.push(`${element.tagName}.${String(element.className).slice(0, 40)}`);
@@ -214,58 +272,59 @@ test.describe("at 390", () => {
     test.skip(testInfo.project.name !== "390", "the phone sheet is measured at a phone width");
   });
 
-  test("opens a sheet of four section destinations plus Sign in, with the action still in the row", async ({ page }) => {
+  test("opens a drawer of the primary destinations plus Sign in and the start", async ({ page }) => {
     await page.goto("/product");
-    // Brief 2026-10-15 move 6: the phone row is the wordmark and Menu; Pricing is a sheet row.
-    await expect(page.locator(`${HEADER} .nav-actions`)).toBeHidden();
+    // Brief 2026-10-15 move 6: the phone row is the wordmark and the menu; Sign in and the start leave it.
+    await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
+    await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toBeHidden();
 
-    await page.locator(`${SHEET} > summary`).click();
-    const panel = page.locator(`${SHEET} > nav`);
-    await expect(panel).toBeVisible();
-
-    const rows = panel.locator("a.mobile-nav-direct");
-    // Brief 2026-10-15 move 6: the sections, then Pricing as the sheet's last section row.
-    await expect(rows).toHaveCount(CUSTOMER_NAV.length + 1);
-    expect(await hrefsOf(rows)).toEqual([...CUSTOMER_NAV.map((item) => item.href), "/pricing"]);
-    await expect(panel.locator("a.mobile-nav-signin")).toHaveAttribute("href", "/login");
-    await expect(panel.locator("a.mobile-nav-cta"), "the sheet does not repeat the header action").toHaveCount(0);
-    // Founder 2026-11-10: the sheet's foot is the same start the desktop header offers, never the public sample.
-    const start = panel.locator("a.mobile-nav-start");
-    await expect(start).toHaveText(primaryCallToAction().label);
-    await expect(start).toHaveAttribute("href", primaryCallToAction().href);
-    // The sections may link the sample; the sheet's one filled action is the start, not the sample.
-    await expect(panel.locator("a.btn")).toHaveCount(1);
-    await expect(panel.locator('a.btn[href="/explore"]')).toHaveCount(0);
-    expect((await start.boundingBox())!.height, "the sheet's start is a 44px target").toBeGreaterThanOrEqual(44);
+    const panel = await openDrawer(page);
+    const rows = panel.locator('nav[aria-label="Site"] > ul > li > a');
+    await expect(rows).toHaveCount(CUSTOMER_NAV.length);
+    expect(await hrefsOf(rows)).toEqual(CUSTOMER_NAV.map((item) => item.href));
+    await expect(panel.getByRole("link", { name: "Sign in", exact: true })).toHaveAttribute("href", "/login");
+    // Founder 2026-11-10: the drawer's foot is the same start the desktop header offers, never the public sample.
+    const start = panel.locator('a[data-analytics="header-start"]');
+    await expect(start).toHaveCount(1);
+    await expect(start).toHaveText(START.label);
+    await expect(start).toHaveAttribute("href", START.href);
+    // The groups may link the sample; the drawer's one filled action is the start, not the sample. Links, as the
+    // legacy `a.btn` count was: the drawer's close button is a control, not an action.
+    const filled = await panel.locator("a").evaluateAll((elements: Element[]) => elements
+      .filter((element) => element.getClientRects().length > 0)
+      .filter((element) => {
+        const background = getComputedStyle(element).backgroundColor;
+        return background !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(background);
+      })
+      .map((element) => element.getAttribute("href")));
+    expect(filled, `filled controls in the drawer: ${JSON.stringify(filled)}`).toEqual([START.href]);
+    expect((await start.boundingBox())!.height, "the drawer's start is a 44px target").toBeGreaterThanOrEqual(44);
   });
 
-  test("the sheet's foot is Open workspace when a session is stored", async ({ page }) => {
+  test("the drawer's foot is Open workspace when a session is stored", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("sb-test-auth-token", "{}"));
     await page.goto("/product");
-    await page.locator(`${SHEET} > summary`).click();
-    const panel = page.locator(`${SHEET} > nav`);
-    await expect(panel.locator("a.mobile-nav-start")).toHaveText("Open workspace");
-    await expect(panel.locator("a.mobile-nav-start")).toHaveAttribute("href", "/workspace");
-    await expect(panel.locator("a.mobile-nav-signin")).toHaveCount(0);
+    const panel = await openDrawer(page);
+    const start = panel.locator('a[data-analytics="header-workspace"]');
+    await expect(start).toHaveText("Open workspace");
+    await expect(start).toHaveAttribute("href", "/workspace");
+    await expect(panel.locator('a[href="/login"]')).toHaveCount(0);
   });
 
   test("closes on Escape and returns focus to the control that opened it", async ({ page }) => {
     await page.goto("/product");
-    const panel = page.locator(`${SHEET} > nav`);
-    await page.locator(`${SHEET} > summary`).click();
-    await expect(panel).toBeVisible();
+    const panel = await openDrawer(page);
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
-    await expect(page.locator(`${SHEET} > summary`)).toBeFocused();
+    await expect(page.locator(HEADER).getByRole("button", { name: "Open navigation" })).toBeFocused();
   });
 
   test("keeps every reachable control in the chrome at 44px and inside the viewport", async ({ page }) => {
     await page.goto("/product");
-    await page.locator(`${SHEET} > summary`).click();
-    await expect(page.locator(`${SHEET} > nav`)).toBeVisible();
+    await openDrawer(page);
     const short = await page.evaluate(() => {
       const found: { text: string; height: number; right: number }[] = [];
-      for (const element of document.querySelectorAll<HTMLElement>("header.nav a, header.nav summary")) {
+      for (const element of document.querySelectorAll<HTMLElement>("[data-v34-header] a, [data-v34-header] summary, [data-v34-header] button")) {
         const box = element.getBoundingClientRect();
         if (!box.width || !box.height) continue;
         if (box.height >= 44 && box.left >= -1 && box.right <= window.innerWidth + 1) continue;
@@ -284,86 +343,58 @@ test.describe("at 390", () => {
     await page.goto("/product");
     const header = page.locator(HEADER);
     await page.evaluate(() => window.scrollTo(0, 80));
-    await expect(header).toHaveAttribute("data-scrolled", "1");
     // The phone shares the same stable paper surface as the desktop.
-    await expect(header).toHaveCSS("background-color", "rgb(245, 243, 238)");
+    await expect(header).toHaveCSS("background-color", PAPER);
+    expect((await header.boundingBox())!.y, "the bar stays at the top of the viewport").toBeLessThanOrEqual(1);
   });
 
-  test("does not scroll sideways with the sheet open", async ({ page }) => {
+  test("does not scroll sideways with the drawer open", async ({ page }) => {
     await page.goto("/product");
-    await page.locator(`${SHEET} > summary`).click();
-    await expect(page.locator(`${SHEET} > nav`)).toBeVisible();
+    await openDrawer(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 });
 
 /*
-  Review 2 (FE-B1). The paper chrome (app/chrome-v2.css) is for the public reading pages, not Home:
-  its rules are unlayered, so without the Home exclusion they beat Home's own header and footer
-  (source-first-home.module.css, @layer overrides) and Release 2's dark footer turned paper. The
-  expected values are main's: first dbe22b1e's, then bcba7173's (Home Release 3), whose 255° accent
-  moved the header action to #005bb3 (rgb(0, 91, 179)) and Home's --source to var(--action). They
-  were read off tavonel.com (deployment dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2) on 2026-10-16 at these
-  three widths, and the merged build matched all 160 measured Home header and footer properties.
-
-  Review 3 (FE-H1, FE-H2) found what that list left out: pseudo-elements and motion. The phone menu
-  icon's ::before/::after keep main's `transform .18s ease, box-shadow .18s ease` morph on Home (an
-  unscoped `transition: none` had stopped it at 400px and below), and Home's header keeps main's
-  min-height at 1440. Both read off the same deployment on 2026-10-16: "transform 0.18s, box-shadow
-  0.18s" on / and /ko at 390 and 360, header min-height "0px" at 1440. The paper pages keep the
-  instant swap, and their own 64px minimum.
+  Review 2 (FE-B1) guarded Home's own header and footer against the paper chrome's unlayered rules,
+  which once turned Release 2's dark footer paper. Under V34 there is one shell, so the guard is that
+  Home and the reading pages paint the same chrome: the bar on the paper surface in ink with the
+  action token on its start, the footer on the forest surface in the on-dark text colour, every value
+  read from components/v34/tokens.module.css. Review 3's menu-icon morph has no V34 counterpart (the
+  drawer trigger is an SVG with no pseudo-element), so it is not asserted.
 */
 test.describe("Home keeps main's header and footer colours", () => {
   test.beforeEach(async ({}, testInfo) => {
     test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
   });
 
+  const chromeColours = async (page: Page, testInfo: import("@playwright/test").TestInfo) => {
+    const footer = page.locator(FOOTER);
+    await expect(footer).toHaveCSS("background-color", FOREST);
+    await expect(footer).toHaveCSS("color", ON_DARK);
+    // The footer's links paint the forest surface's text token (`.link { color: var(--v34-fg) }`, which the
+    // forest surface sets to --v34-on-dark), read from the tokens module like every colour here.
+    await expect(footer.locator("nav a").first()).toHaveCSS("color", ON_DARK);
+    const header = page.locator(HEADER);
+    await expect(header).toHaveCSS("background-color", PAPER);
+    await expect(header).toHaveCSS("color", INK);
+    if (testInfo.project.name === "1440") {
+      await expect(header.locator(':scope > div > :not(dialog) a[data-analytics="header-start"]')).toHaveCSS("background-color", ACTION);
+      await expect(header.locator(`nav[aria-label="Primary"] a`).first()).toHaveCSS("color", INK);
+    } else {
+      await expect(header.getByRole("button", { name: "Open navigation" })).toBeVisible();
+    }
+  };
+
   for (const path of ["/"]) {
     test(`on ${path}`, async ({ page }, testInfo) => {
       await page.goto(path);
-      const footer = page.locator("footer.site");
-      // Direction C (2026-11-04): the Home footer sits on the warm canvas in the canvas ink, not on the instrument ground.
-      await expect(footer).toHaveCSS("background-color", "rgb(245, 243, 238)");
-      await expect(footer.locator(".site-footer-groups a").first()).toHaveCSS("color", "rgb(76, 84, 93)");
-      const header = page.locator(HEADER);
-      await expect(header).toHaveCSS("color", "rgb(21, 25, 29)");
-      expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
-      // FINAL-SPEC 2026-10-26 §2.8 / acceptance 6: Home's header action is the ghost pill -- transparent, a 1px inset
-      // rule, ink text -- so the hero's and the close's filled action is the one filled button on a screen.
-      const cta = header.locator(".nav-actions .btn");
-      await expect(cta).toHaveClass(/\bbtn-ghost\b/);
-      // Direction C: the quiet header action is a white pill on the warm shadow (still not the filled accent).
-      await expect(cta).toHaveCSS("background-color", "rgb(255, 255, 255)");
-      await expect(cta).toHaveCSS("color", "rgb(21, 25, 29)");
-      if (testInfo.project.name === "1440") {
-        await expect(header.locator(".site-nav-direct").first()).toHaveCSS("color", "rgb(66, 73, 81)");
-        await expect(header.locator(".nav-signin")).toHaveCSS("color", "rgb(21, 25, 29)");
-        await expect(header).toHaveCSS("min-height", "0px");
-      } else {
-        const summary = header.locator("details.mobile-primary-nav > summary");
-        for (const pseudo of ["::before", "::after"]) {
-          expect(await summary.evaluate((element, which) => getComputedStyle(element, which).transition, pseudo), `menu icon ${pseudo}`)
-            .toBe("transform 0.18s, box-shadow 0.18s");
-        }
-      }
+      await chromeColours(page, testInfo);
     });
   }
 
   test("while the reading pages keep the paper chrome", async ({ page }, testInfo) => {
     await page.goto("/pricing");
-    await expect(page.locator("footer.site")).toHaveCSS("background-color", "rgb(245, 243, 238)");
-    // Direction C (REVIEW-R1 M-3): the footer reads --text-lo, which is --tv-ink-muted #4c545d (6.93:1 on the canvas) now.
-    await expect(page.locator("footer.site .site-footer-groups a").first()).toHaveCSS("color", "rgb(76, 84, 93)");
-    // UX-L1 (UX-PLAN-2026-10-17 §4.2-5, §8.2): the paper header's --source was the retired 265° #2447b3; it reads
-    // var(--tv-action) now, the same 255° accent Home's header carries above.
-    expect(await page.locator(HEADER).evaluate((element) => getComputedStyle(element).getPropertyValue("--source").trim())).toBe("#005bb3");
-    if (testInfo.project.name === "1440") {
-      await expect(page.locator(HEADER)).toHaveCSS("min-height", "64px");
-    } else {
-      const summary = page.locator(`${HEADER} details.mobile-primary-nav > summary`);
-      for (const pseudo of ["::before", "::after"]) {
-        expect(await summary.evaluate((element, which) => getComputedStyle(element, which).transition, pseudo), `menu icon ${pseudo}`).toBe("none");
-      }
-    }
+    await chromeColours(page, testInfo);
   });
 });

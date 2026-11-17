@@ -55,7 +55,8 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   await page.goto("/pricing");
   await dismissConsent(page);
   const plans = page.locator(".pricing-page .plans");
-  await expect(plans.locator(".plan")).toHaveCount(4);
+  // Six plans since catalog v2 (PB-2026-11-V22, lib/billing-catalog.ts); it was four (WO-CI-5a).
+  await expect(plans.locator(".plan")).toHaveCount(6);
   await expect(page.locator(".pricing-faq details")).toHaveCount(17);
   const planDetails = page.locator("#plan-details");
   await expect(planDetails).not.toHaveAttribute("open", "");
@@ -75,6 +76,8 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   await expect(page.locator(".pricing-glance .tile h3")).toHaveText([
     "Base subscription",
     "Included pages",
+    // WO-CAT-2 (abe2cf84, PB-2026-11-V22) added the Units tile; recorded under WO-CI-5a.
+    "Units",
     "Past the included pages",
     "Unused pages",
     "What differs by plan",

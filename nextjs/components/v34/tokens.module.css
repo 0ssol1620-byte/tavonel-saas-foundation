@@ -77,8 +77,24 @@
 
   /* layout */
   --v34-max: 1260px;
-  --v34-shell: min(var(--v34-max), 100% - 72px);
+  --v34-gutter: 36px;
+  --v34-shell: min(var(--v34-max), 100% - 2 * var(--v34-gutter));
   --v34-header-h: 66px;
+  /*
+    Retained public bodies (docs, legal, status, solutions ...) render inside this wrapper but read the
+    legacy container names (app/chrome-v2.css, app/tavonel.css). They are pointed at the shell's
+    container here, so a retained body starts on the same edge as the V34 header above it -- R1, one
+    container (e2e/site-alignment.spec.ts). Batch E re-skins those bodies; until then this is where
+    their container comes from inside the V34 frame. Outside the wrapper nothing changes.
+
+    Only the legacy chrome names are re-pointed. A `--tv-*` name is never declared here: app/tavonel.css
+    is the one sheet that declares them, so no later copy can shadow a brand token
+    (lib/brand-tokens.test.ts). A retained body that sizes itself from `--tv-page-w` is a route-body
+    defect in the WO-CI-5a receipt, not something this wrapper papers over.
+  */
+  --chrome-measure: var(--v34-max);
+  --chrome-gutter: var(--v34-gutter);
+  --chrome-edge: max(var(--v34-gutter), calc((100% - var(--v34-max)) / 2));
   --v34-radius-pill: 100px;
   --v34-radius-panel: 8px;
   --v34-radius-art: 6px;
@@ -271,13 +287,13 @@
 
 @media (max-width: 760px) {
   .site {
-    --v34-shell: min(var(--v34-max), 100% - 36px);
+    --v34-gutter: 18px;
     --v34-header-h: 60px;
   }
 }
 
 @media (max-width: 360px) {
-  .site { --v34-shell: min(var(--v34-max), 100% - 28px); }
+  .site { --v34-gutter: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

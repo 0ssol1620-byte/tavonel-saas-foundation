@@ -6,13 +6,20 @@ import { expect, test } from "@playwright/test";
 
   R1: the container token is one. On every T0-T5 route of the plan's §5.4 inventory, at all seven
   widths, the header wordmark, the H1 and the first section's content share one left edge (±1px),
-  and that edge is the one the tokens define -- `--tv-page-w`, min(1320px, 100% - 2 ×
-  clamp(24px, 5vw, 72px)), centred (DESIGN_MASTER_V3 §6.4). Before this lane Home ran a 1200px
-  container and the rest of the site 1280px, so the wordmark moved 40px when a reader left Home.
+  and that edge is the one the tokens define. Before this lane Home ran a 1200px container and the
+  rest of the site 1280px, so the wordmark moved 40px when a reader left Home.
 
-  §5.2: from 900px the header shows its one filled action (except on /explore, which it would point
-  at); below 900 the row is the wordmark and Menu. The header is 64px tall from 900 and 56px below
-  (`--tv-header-h`), and /explore and /login take the same geometry.
+  V34 (WO-CI-5a): every route of the inventory renders inside the V34 shell (`[data-v34-header]`,
+  components/v34/shell), and a route that the V34 program moved answers 308 to its V34 page
+  (`V34_REDIRECTS`, next.config.mjs), which is the page measured. The container is the shell's
+  `--v34-shell` token (components/v34/tokens.module.css), centred; the edge is read off the page
+  through that token, not typed here. The wordmark is the header's home link (accessible name
+  "TAVONEL home"), the action is the header's start link (`data-analytics="header-start"`).
+
+  §5.2, restated for the V34 shell: above the drawer breakpoint the header shows its one filled
+  action (except on the page it points at); at and below it the row is the wordmark and the drawer
+  trigger. The header is the `--v34-header-h` row plus its bottom rule, at every width, and /explore
+  and /login take the same geometry.
 
   "First section" is the first block below the hero -- the <section> or <header> holding the H1 --
   found by climbing out of the hero's wrappers to the next sibling that starts under it; a column
@@ -48,27 +55,32 @@ const ROUTES = [
 const WIDTHS = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
 const viewportOf = (width: number) => ({ width, height: width <= 390 ? 844 : 900 });
 
-/** The container's left edge as the tokens define it: max(clamp(24px, 5vw, 72px), (100% - 1320px) / 2). */
-const edgeFor = (viewport: number) => Math.max(Math.min(Math.max(viewport * 0.05, 24), 72), (viewport - 1320) / 2);
-const headerHeightFor = (viewport: number) => (viewport >= 900 ? 64 : 56);
 /*
-  B-09 (delegated decision 2, 2026-10-19). Below 821px the /explore stage header is two rows: the
-  wordmark with the crumb, then its two actions. Each row holds controls on the 44px touch floor
-  (e2e/explore-touch-targets.spec.ts), so two rows cannot fit inside the 56px header row -- 2 x 44 =
-  88 > 56 with no gap at all -- and neither shrinking a target nor hiding a label is allowed. Its
-  ceiling is therefore the two-row geometry it has, 44 + 8 + 44 + 8 + 1 (border) = 105px: no third
-  row, and no label in it cut (no ellipsis, nothing wider than its box).
+  The V34 header's drawer breakpoint (components/v34/shell/site-header.module.css: "At 1000 and below
+  the items, More and the account actions leave; the drawer takes over"). Above it the bar carries the
+  one filled action; at and below it the row is the wordmark and the drawer trigger.
 */
-const EXPLORE_TWO_ROW_HEADER = 105;
+const DRAWER_MAX = 1000;
+/*
+  B-09 (delegated decision 2, 2026-10-19) held the /explore stage header to a two-row ceiling below
+  821px. Under the V34 shell the stage header is part of the page body and the site header is the
+  shell's one row, so /explore is held to the same header geometry as every other route, and the
+  "no label cut" check that B-09 made for /explore now runs on every route.
+*/
 
 type Edges = {
   viewport: number;
+  /** The container's left edge as the `--v34-shell` token resolves on this page. */
+  edge: number | null;
   wordmark: number | null;
   headerHeight: number | null;
+  /** The header row as the tokens define it: `--v34-header-h` plus the header's bottom rule. */
+  headerToken: number | null;
   h1: number | null;
   content: number | null;
   contentFrom: string;
   cta: string | null;
+  ctaHref: string | null;
   /** Header labels that are cut: an ellipsis, or text wider than its box. */
   headerClipped: string[];
 };
@@ -120,10 +132,28 @@ function measure(): Edges {
   };
 
   const viewport = document.documentElement.clientWidth;
-  const header = [...document.querySelectorAll("header")].find((el) => !el.closest("footer") && el.querySelector(".wordmark") && visible(el)) ?? null;
-  const wordmark = header ? [...header.querySelectorAll(".wordmark")].find(visible) ?? null : null;
-  const cta = header ? [...header.querySelectorAll("a.btn")].find(visible) ?? null : null;
+  const header = [...document.querySelectorAll("[data-v34-header]")].find((el) => !el.closest("footer") && visible(el)) ?? null;
+  const inBar = (el: Element) => !el.closest("dialog");
+  const wordmark = header ? [...header.querySelectorAll("a[aria-label=\"TAVONEL home\"]")].filter(inBar).find(visible) ?? null : null;
+  const cta = header ? [...header.querySelectorAll("a[data-analytics=\"header-start\"]")].filter(inBar).find(visible) ?? null : null;
+  cta?.setAttribute("data-alignment-cta", "1");
   const h1 = [...document.querySelectorAll("h1")].find(visible) ?? null;
+
+  // The tokens, resolved where the shell declares them: a probe sized by them inside the V34 wrapper.
+  const site = header?.closest("[data-v34-site]") ?? null;
+  let edge: number | null = null;
+  let headerToken: number | null = null;
+  if (site && header) {
+    const probe = document.createElement("div");
+    for (const [property, value] of [
+      ["width", "var(--v34-shell)"], ["height", "var(--v34-header-h)"], ["margin-inline", "auto"], ["visibility", "hidden"],
+    ]) probe.style.setProperty(property, value);
+    site.prepend(probe);
+    const box = probe.getBoundingClientRect();
+    probe.remove();
+    edge = box.left;
+    headerToken = box.height + parseFloat(getComputedStyle(header).borderBottomWidth);
+  }
 
   let content: number | null = null;
   let contentFrom = "no H1";
@@ -163,13 +193,16 @@ function measure(): Edges {
     : [];
   return {
     viewport,
+    edge,
     headerClipped,
     wordmark: wordmark ? wordmark.getBoundingClientRect().left : null,
     headerHeight: header ? header.getBoundingClientRect().height : null,
+    headerToken,
     h1: h1 ? h1.getBoundingClientRect().left : null,
     content,
     contentFrom,
     cta: cta ? (cta.textContent ?? "").trim() : null,
+    ctaHref: cta ? new URL((cta as HTMLAnchorElement).href).pathname : null,
   };
 }
 
@@ -177,7 +210,10 @@ async function edgesOf(page: import("@playwright/test").Page, route: string) {
   const response = await page.goto(route);
   expect(response?.status(), `${route} answers`).toBeLessThan(400);
   await page.evaluate(() => document.fonts.ready);
-  return page.evaluate(measure);
+  const m = await page.evaluate(measure);
+  // The token probe needs the V34 wrapper; a route without it has no container edge to hold.
+  expect(m.edge, `no V34 container token on ${route}`).not.toBeNull();
+  return m;
 }
 
 for (const width of WIDTHS) test.describe(`one container (UX-L2, R1) at ${width}`, () => {
@@ -195,7 +231,7 @@ for (const width of WIDTHS) test.describe(`one container (UX-L2, R1) at ${width}
         1080px and up, which also swallowed a 500 or a missing H1 on those routes.
       */
       const m = await edgesOf(page, route);
-      const edge = edgeFor(m.viewport);
+      const edge = m.edge!;
       const at = `${route} @${m.viewport}: wordmark ${m.wordmark}, H1 ${m.h1}, content ${m.content} (${m.contentFrom}), edge ${edge}`;
       expect(m.wordmark, `no header wordmark on ${route}`).not.toBeNull();
       expect(m.h1, `no H1 on ${route}`).not.toBeNull();
@@ -203,16 +239,10 @@ for (const width of WIDTHS) test.describe(`one container (UX-L2, R1) at ${width}
       expect.soft(Math.abs(m.wordmark! - edge), `wordmark off the container edge. ${at}`).toBeLessThanOrEqual(1);
       expect.soft(Math.abs(m.wordmark! - m.h1!), `|wordmark − H1| > 1px. ${at}`).toBeLessThanOrEqual(1);
       expect.soft(Math.abs(m.h1! - m.content!), `|H1 − first section| > 1px. ${at}`).toBeLessThanOrEqual(1);
-      if (route === "/explore" && m.viewport <= 820) {
-        // B-09: two rows are allowed below 821px, within the two-row ceiling and with no label cut.
-        expect.soft(m.headerHeight!, `/explore header height ${m.headerHeight} @${m.viewport}`).toBeGreaterThanOrEqual(headerHeightFor(m.viewport) - 1);
-        expect.soft(m.headerHeight!, `/explore header height ${m.headerHeight} @${m.viewport}`).toBeLessThanOrEqual(EXPLORE_TWO_ROW_HEADER + 1);
-        expect.soft(m.headerClipped, `/explore header labels cut @${m.viewport}`).toEqual([]);
-      } else {
-        expect.soft(Math.abs(m.headerHeight! - headerHeightFor(m.viewport)), `header height ${m.headerHeight} on ${route}`).toBeLessThanOrEqual(1);
-      }
-      // §5.2: the one filled action from 900px, never on the page it points at; wordmark + Menu below 900.
-      if (m.viewport >= 900 && route !== "/explore") expect.soft(m.cta, `no header action at ${m.viewport} on ${route}`).not.toBeNull();
+      expect.soft(Math.abs(m.headerHeight! - m.headerToken!), `header height ${m.headerHeight} on ${route}, token row ${m.headerToken}`).toBeLessThanOrEqual(1);
+      expect.soft(m.headerClipped, `${route} header labels cut @${m.viewport}`).toEqual([]);
+      // §5.2: the one filled action above the drawer breakpoint, never on the page it points at; wordmark + drawer at and below it.
+      if (m.viewport > DRAWER_MAX && m.ctaHref !== new URL(page.url()).pathname) expect.soft(m.cta, `no header action at ${m.viewport} on ${route}`).not.toBeNull();
       else expect.soft(m.cta, `a header action at ${m.viewport} on ${route}`).toBeNull();
     });
   }
@@ -221,33 +251,49 @@ for (const width of WIDTHS) test.describe(`one container (UX-L2, R1) at ${width}
   test("/login: the header sits on the container edge at the shared height", async ({ page }) => {
     const m = await edgesOf(page, "/login");
     expect(m.wordmark, "no header wordmark on /login").not.toBeNull();
-    expect.soft(Math.abs(m.wordmark! - edgeFor(m.viewport)), `/login wordmark ${m.wordmark} @${m.viewport}`).toBeLessThanOrEqual(1);
-    expect.soft(Math.abs(m.headerHeight! - headerHeightFor(m.viewport)), `/login header ${m.headerHeight} @${m.viewport}`).toBeLessThanOrEqual(1);
+    expect.soft(Math.abs(m.wordmark! - m.edge!), `/login wordmark ${m.wordmark} @${m.viewport}, edge ${m.edge}`).toBeLessThanOrEqual(1);
+    expect.soft(Math.abs(m.headerHeight! - m.headerToken!), `/login header ${m.headerHeight} @${m.viewport}, token row ${m.headerToken}`).toBeLessThanOrEqual(1);
   });
 
-  test("the header row holds between 900 and 1249: wordmark, Menu and the action on one line", async ({ page }) => {
-    test.skip(width !== 1024, "the one width of the seven inside the 900-1249 band");
-    await page.goto("/product");
-    const header = page.locator("header.nav");
-    await expect(header.locator(".nav-actions a.btn")).toBeVisible();
-    await expect(header.locator(".nav-actions a[href='/pricing']")).toBeHidden();
-    await expect(header.locator(".nav-actions .nav-signin")).toBeHidden();
-    // Pricing and Sign in are rows of the sheet in this band, not gone.
-    await header.locator("details.mobile-primary-nav > summary").click();
-    await expect(header.locator("details.mobile-primary-nav a.mobile-nav-direct[href='/pricing']")).toBeVisible();
-    await expect(header.locator("details.mobile-primary-nav a.mobile-nav-signin")).toBeVisible();
+  /*
+    The band the bar is tightest in. Under the legacy header this was 900-1249, where Pricing and Sign
+    in moved into the sheet; under the V34 header the bar keeps its items, More, Sign in and the action
+    down to 1001px and hands all of them to the drawer at 1000. The promise is the same: one row, the
+    action on it above the breakpoint, Pricing and Sign in reachable on both sides of it, no overflow.
+  */
+  test("the header row holds down to the drawer breakpoint: items, Sign in and the action on one line", async ({ page }) => {
+    test.skip(width !== 1024, "the one width of the seven inside the tight band");
+    await page.goto("/platform");
+    const header = page.locator("[data-v34-header]");
+    const bar = header.locator("nav[aria-label='Primary']");
+    const cta = header.locator("a[data-analytics='header-start']").first();
+    await expect(cta).toBeVisible();
+    await expect(bar.getByRole("link", { name: "Pricing", exact: true })).toBeVisible();
+    await expect(header.getByRole("link", { name: "Sign in", exact: true }).first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await header.locator("details.mobile-primary-nav > summary").click();
 
-    // The band's edges: the action holds on one 64px row at 900 and 1249, and leaves the row at 899.
-    for (const [band, action, height] of [[900, true, 64], [1249, true, 64], [899, false, 56]] as const) {
+    // The band's edges: the action holds on one row at 1001 and 1249, and leaves the row at 1000,
+    // where Pricing and Sign in are rows of the drawer, not gone.
+    const tokenRow = () => header.evaluate((element) => {
+      const probe = document.createElement("div");
+      probe.style.setProperty("height", "var(--v34-header-h)");
+      element.append(probe);
+      const height = probe.getBoundingClientRect().height;
+      probe.remove();
+      return height + parseFloat(getComputedStyle(element).borderBottomWidth);
+    });
+    for (const [band, action] of [[DRAWER_MAX + 1, true], [1249, true], [DRAWER_MAX, false]] as const) {
       await page.setViewportSize({ width: band, height: 900 });
-      const cta = header.locator(".nav-actions a.btn");
       if (action) await expect(cta, `the action at ${band}`).toBeVisible();
       else await expect(cta, `the action at ${band}`).toBeHidden();
-      expect(Math.round((await header.boundingBox())!.height), `header height at ${band}`).toBe(height);
+      expect(Math.abs((await header.boundingBox())!.height - await tokenRow()), `header height at ${band}`).toBeLessThanOrEqual(1);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${band}`).toBe(true);
     }
+    await header.getByRole("button", { name: "Open navigation" }).click();
+    const drawer = header.locator("dialog");
+    await expect(drawer.getByRole("link", { name: "Pricing", exact: true })).toBeVisible();
+    await expect(drawer.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 });
 
@@ -264,7 +310,7 @@ test.describe("the alignment detector", () => {
 
   test("reports a shifted H1, a shifted section, an off-edge wordmark and a missing action", async ({ page }) => {
     const clean = await edgesOf(page, "/");
-    const edge = edgeFor(clean.viewport);
+    const edge = clean.edge!;
     expect(Math.abs(clean.h1! - clean.content!)).toBeLessThanOrEqual(1);
 
     // The CSP forbids injected <style>; CSSOM writes are not stylesheets and are allowed.
@@ -282,8 +328,8 @@ test.describe("the alignment detector", () => {
     const sectionShifted = await page.evaluate(measure);
     expect(Math.abs(sectionShifted.h1! - sectionShifted.content!)).toBeGreaterThan(1);
 
-    await shift("header .wordmark", "transform", "translateX(9px)");
-    await shift("header a.btn", "display", "none");
+    await shift("[data-v34-header] a[aria-label=\"TAVONEL home\"]", "transform", "translateX(9px)");
+    await shift("[data-alignment-cta]", "display", "none");
     const chromeBroken = await page.evaluate(measure);
     expect(Math.abs(chromeBroken.wordmark! - edge)).toBeGreaterThan(1);
     expect(chromeBroken.cta).toBeNull();

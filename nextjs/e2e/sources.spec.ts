@@ -3,7 +3,19 @@ const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 /* D2's five customer sections, read from the site's own table rather than typed into a test. */
-import { HEADER_NAV } from "../lib/site-navigation";
+import { v34Route, type V34RouteKey } from "../lib/v34/routes";
+
+/*
+  V34 (WO-CI-5a): the chrome is the V34 shell. The bar's items are `V34_PRIMARY_NAV` (lib/v34/nav.ts,
+  which this spec cannot import because it reaches next/navigation): paths from the registry, held
+  routes dropped as the shell drops them. The bar shows its items, More and the action from 1001px;
+  at 1000 and below the drawer takes them.
+*/
+const HEADER_NAV = (["platform", "solutions", "connect", "pricing", "journal"] as const satisfies readonly V34RouteKey[])
+  .filter((key) => v34Route(key).release !== "held")
+  .map((key) => ({ href: v34Route(key).path as string }));
+const HEADER = "[data-v34-header]";
+const DRAWER_MAX = 1000;
 
 /*
   /sources, in a browser.
@@ -200,22 +212,22 @@ test("carries no empty structural cell and never overflows its viewport", async 
   test is what fails if the row stops fitting.
 */
 test("keeps the header's primary action reachable at the width the section row appears", async ({ page }) => {
-  // Brief 2026-10-15 move 6, narrowed by UX-PLAN-2026-10-17 §5.2 (UX-L2): below the section row's
-  // switch (1250px) Pricing and Sign in move to the sheet but the filled action stays in the row
-  // down to 900px; at 1250 the whole group must fit.
-  await page.setViewportSize({ width: 1249, height: 900 });
+  // V34: the row (items, More, Sign in and the filled action) appears at 1001px; at 1000 the drawer
+  // holds all of them. At the first width that shows the row the whole group must fit.
+  await page.setViewportSize({ width: DRAWER_MAX, height: 900 });
   await page.goto("/sources");
-  const actions = page.locator("header.nav .nav-actions");
-  await expect(actions.locator("a.btn")).toBeVisible();
-  await expect(actions.locator('a[href="/pricing"]')).toBeHidden();
-  await page.setViewportSize({ width: 1250, height: 900 });
-  await expect(actions).toBeVisible();
-  const box = await actions.boundingBox();
-  expect(box, "the header's action group has no box").not.toBeNull();
+  const action = page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`);
+  await expect(action).toBeHidden();
+  await expect(page.locator(HEADER).getByRole("button", { name: "Open navigation" })).toBeVisible();
+  await page.setViewportSize({ width: DRAWER_MAX + 1, height: 900 });
+  await expect(action).toBeVisible();
+  await expect(page.locator(`${HEADER} nav[aria-label="Primary"] a[href="/pricing"]`)).toBeVisible();
+  const box = await action.boundingBox();
+  expect(box, "the header's action has no box").not.toBeNull();
   expect(
     (box?.x ?? 0) + (box?.width ?? 0),
     "the header's primary action is laid out past the right edge and clipped",
-  ).toBeLessThanOrEqual(1250);
+  ).toBeLessThanOrEqual(DRAWER_MAX + 1);
 });
 
 /*
@@ -251,36 +263,46 @@ test("is reachable from the footer and /integrations, and no bar item claims to 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/sources");
 
-  // The bar has four section links; Pricing is its separate emphasized action.
-  const bar = page.locator("header.nav .one-path-primary-nav");
-  const items = bar.locator("a.site-nav-direct");
+  // The bar has the V34 primary items; Pricing is one of them. None of them is /sources or /integrations.
+  const bar = page.locator(`${HEADER} nav[aria-label="Primary"]`);
+  const items = bar.locator("a");
   await expect(items).toHaveCount(HEADER_NAV.length);
-  for (const item of HEADER_NAV) await expect(bar.locator(`a.site-nav-direct[href="${item.href}"]`)).toHaveCount(1);
-  await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toHaveCount(1);
+  for (const item of HEADER_NAV) await expect(bar.locator(`a[href="${item.href}"]`)).toHaveCount(1);
+  await expect(bar.locator('a[href="/pricing"]')).toHaveCount(1);
   await expect(items.and(page.locator('[href="/integrations"]'))).toHaveCount(0);
   await expect(items.and(page.locator('[href="/sources"]'))).toHaveCount(0);
-  // NAV PANELS 2026-11-09: /sources is a row of the Product panel again, not a bar item.
-  await expect(bar.locator('#bar-nav-panel-product a[href="/sources"]')).toHaveCount(1);
+  /*
+    NAV PANELS 2026-11-09 put /sources in the panel behind the bar. V34 More carries live registry routes
+    only (D33 §3.5, held by lib/site-nav-model.test.ts and lib/v34/nav.test.ts), and /sources is a retained
+    route, so its one step is the footer row (WO-CI-5a D7) and More does not list it.
+  */
+  await expect(page.locator(`${HEADER} nav[aria-label="All pages"] a[href="/sources"]`)).toHaveCount(0);
   /*
     And none of the five is marked current here. `customerNavOwns` returns false for every bar
     href on this path; a bar that highlighted one anyway would be the false-location defect the
     navigation comment names.
   */
-  await expect(bar.locator('a[aria-current="page"]')).toHaveCount(0);
+  await expect(bar.locator("a[aria-current]")).toHaveCount(0);
 
   // The footer, which needs no menu at all, and the URL that did not move.
-  await expect(page.locator('.site-footer-groups a[href="/sources"]')).toHaveCount(1);
+  await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/sources");
 
   // Phone: the same four section links, with Pricing still available in the header.
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator("header.nav details.mobile-primary-nav > summary").click();
-  const sheet = page.locator("header.nav details.mobile-primary-nav > nav");
+  const trigger = page.locator(HEADER).getByRole("button", { name: "Open navigation" });
+  const sheet = page.locator(`${HEADER} dialog nav[aria-label="Site"]`);
+  await expect(async () => {
+    if (!(await sheet.isVisible())) await trigger.click();
+    await expect(sheet).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   for (const item of HEADER_NAV) {
-    await expect(sheet.locator(`a.mobile-nav-direct[href="${item.href}"]`)).toHaveCount(1);
+    await expect(sheet.locator(`:scope > ul > li > a[href="${item.href}"]`)).toHaveCount(1);
   }
-  await expect(sheet.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
-  await expect(sheet.locator('#sheet-nav-panel-product a[href="/sources"]')).toHaveCount(1);
+  await expect(sheet.locator(":scope > ul > li > a[aria-current]")).toHaveCount(0);
+  // The drawer's groups are the More groups (D33 §3.5, as above); the footer row is the phone's one step too.
+  await expect(sheet.locator('details a[href="/sources"]')).toHaveCount(0);
+  await expect(page.locator('[data-v34-site] > footer a[href="/sources"]')).toHaveCount(1);
 
   const sitemap = await page.request.get("/sitemap.xml");
   expect(await sitemap.text()).toContain("https://tavonel.com/sources");

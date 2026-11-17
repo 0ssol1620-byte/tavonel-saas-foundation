@@ -24,6 +24,14 @@ import { measureOverflow } from "./support/overflow";
   The seven widths of AGENTS.md's capture set are driven from the 1440 project, as site-alignment.spec.ts
   does: CI's Product QA job runs the 1440, 390 and 360 projects only, and these rules have to hold at all
   seven where they are enforced.
+
+  V34 (WO-CI-5a). Every page renders inside the V34 page root (`[data-v34-site]`, components/v34/shell/
+  v34-page.tsx), which is where a retained page declares its template. A route the program moved answers
+  308 to its V34 page (`V34_REDIRECTS`), and that page is the one read. Every page, a V34 registry page
+  included, declares the inventory's template once on the root that holds <main>. The V34 registry
+  (lib/v34/routes.ts) has no template field, so a registry page declares none and fails here: that is
+  the filed defect (WO-CI-5a receipt, D18), not a page this spec lets through. The other rules -- paper
+  behind the H1, no internal ↗, a marker on every summary, no overflow -- are unchanged.
 */
 
 const TEMPLATES = {
@@ -138,7 +146,8 @@ test.describe("page templates (UX-L7)", () => {
           await visit(page, route, width);
           const at = `${route} @${width}`;
           const m = await page.evaluate(read);
-          expect.soft(m.roots, `${at}: data-template roots`).toEqual([expect.objectContaining({ template, holdsMain: true })]);
+          const landed = new URL(page.url()).pathname;
+          expect.soft(m.roots, `${at} (landed on ${landed}): data-template roots`).toEqual([expect.objectContaining({ template, holdsMain: true })]);
           expect.soft(m.ground, `${at}: no ground behind the H1`).not.toBeNull();
           if (m.ground) expect.soft(m.ground.luminance, `${at}: H1 ground ${m.ground.colour} on ${m.ground.from} is not paper`).toBeGreaterThanOrEqual(PAPER_FLOOR);
           expect.soft(m.internalArrows, `${at}: internal links carrying ↗`).toEqual([]);

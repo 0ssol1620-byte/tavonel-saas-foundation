@@ -63,7 +63,11 @@
 .link {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  /*
+    The 44px touch floor every public control keeps (e2e/mobile-landing.spec.ts, visual-refinement.spec.ts,
+    public-layout-balance.spec.ts). It wins over the footer's phone height budget: WO-CI-5a lead decision D5+D6.
+  */
+  min-height: 44px;
   /* WCAG 2.5.8: a three-letter link ("API") is under 24px wide on its own. */
   min-width: 24px;
   color: var(--v34-fg);

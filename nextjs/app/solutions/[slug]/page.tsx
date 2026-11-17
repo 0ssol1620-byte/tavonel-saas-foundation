@@ -257,7 +257,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
   if (!solution) notFound();
 
   return (
-    <PublicPageShell template="T1">
+    <PublicPageShell template="T1" path={`/solutions/${slug}`}>
       <section className={`scene doc solution-page ${styles.surface}`}><div className="shell">
         <div className={`solution-hero ${styles.hero}`}>
           <h1 className="document-title">{solution.title}</h1>

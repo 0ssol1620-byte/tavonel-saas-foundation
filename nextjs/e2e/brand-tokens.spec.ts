@@ -1,13 +1,22 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
   UX-L1 (lane P2-03), the painted half: UX-PLAN-2026-10-17 §8.2's acceptance, read off the browser.
 
   On every T0-T5 route of the plan's §5.4 inventory at 1440, each visible filled primary action
-  paints the one accent, rgb(0, 91, 179) (--tv-action, decision.md G-H 255°), and no element
-  resolves a value §4.2-5 retires. lib/brand-tokens.test.ts reads the stylesheets; this reads what
-  the cascade actually produced, which is the only place a fallback, an inherited token or an
-  unlayered rule beating a layered one shows up.
+  paints the one accent, and no element resolves a value §4.2-5 retires. lib/brand-tokens.test.ts
+  reads the stylesheets; this reads what the cascade actually produced, which is the only place a
+  fallback, an inherited token or an unlayered rule beating a layered one shows up.
+
+  V34 (WO-CI-5a): every route of the inventory now renders in the V34 shell (a route the program
+  moved answers 308 to its V34 page, which is the page measured), and the accent is the V34 action
+  token, read from components/v34/tokens.module.css rather than typed here: `--v34-header-btn` on a
+  light ground, and its dark-scene counterpart `--v34-lime` on a dark one (components/v34/ui/
+  button-link.module.css, `.primary` and `.onDark`). The legacy accent rgb(0, 91, 179) (--tv-action,
+  decision.md G-H 255°) is not a V34 action colour, so a filled action that still paints it fails.
+  A filled action is a legacy `.btn` (still used by retained page bodies) or a V34 pill: a link or
+  button with an opaque ground and the `--v34-radius-pill` radius.
 
   Two retirement sets. The four blues are retired everywhere. The rest -- the paper green, the dark
   mint, Home's region amber and the violets -- are retired on the public PAPER surfaces: the dark
@@ -35,9 +44,18 @@ const ROUTES = [
 
 const RETIRED_EVERYWHERE = ["2447b3", "244ac8", "2347b8", "2259ce"];
 const RETIRED_ON_PAPER = ["226849", "7be0be", "795400", "f2b73a", "fff1c7", "a996ff", "5f42e0", "5f42a1"];
-const ACTION = "rgb(0, 91, 179)";
 
-type Audit = { retired: string[]; actions: Array<{ what: string; background: string }> };
+/** A `--v34-*` colour token as `components/v34/tokens.module.css` declares it on `.site`, as rgb(). */
+function v34Token(name: string) {
+  const sheet = readFileSync(new URL("../components/v34/tokens.module.css", import.meta.url), "utf8");
+  const hex = sheet.match(new RegExp(`${name}:\\s*#([0-9a-f]{6});`, "i"))?.[1];
+  if (!hex) throw new Error(`${name} is not a six-digit colour in tokens.module.css`);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+const ACTION = { light: v34Token("--v34-header-btn"), dark: v34Token("--v34-lime") };
+
+type Audit = { retired: string[]; actions: Array<{ what: string; background: string; darkGround: boolean }> };
 
 /** Runs in the page; self-contained because Playwright serialises it. */
 function audit({ everywhere, onPaper }: { everywhere: string[]; onPaper: string[] }): Audit {
@@ -93,13 +111,35 @@ function audit({ everywhere, onPaper }: { everywhere: string[]; onPaper: string[
     }
   }
   const actions: Audit["actions"] = [];
-  const filled = ":is(.btn, .btn-primary, .lv2-cta):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled=\"true\"])";
-  for (const el of document.querySelectorAll(filled)) {
+  const legacyFilled = ":is(.btn, .btn-primary, .lv2-cta):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled=\"true\"])";
+  // The V34 pill radius, resolved where the shell declares it (`.site`); absent on a page without the shell.
+  const site = document.querySelector("[data-v34-site]");
+  let pill: string | null = null;
+  if (site) {
+    const probe = document.createElement("span");
+    probe.style.setProperty("border-top-left-radius", "var(--v34-radius-pill)");
+    site.append(probe);
+    pill = getComputedStyle(probe).borderTopLeftRadius;
+    probe.remove();
+  }
+  const isFilled = (el: Element) => {
+    if (el.matches(legacyFilled)) return true;
+    if (!pill || !el.matches("a, button") || el.matches(":disabled, [aria-disabled=\"true\"]")) return false;
+    const style = getComputedStyle(el);
+    const bg = colours(style.backgroundColor)[0];
+    return Boolean(bg && bg.alpha === 1) && style.borderTopLeftRadius === pill;
+  };
+  for (const el of document.querySelectorAll("body *")) {
+    if (!isFilled(el)) continue;
     if (el.closest("[data-marketing-consent-panel]")) continue;
     const rect = el.getBoundingClientRect();
     const style = getComputedStyle(el);
     if (rect.width === 0 || rect.height === 0 || style.visibility === "hidden" || style.display === "none") continue;
-    actions.push({ what: `${name(el)} "${(el.textContent ?? "").trim().slice(0, 40)}"`, background: style.backgroundColor });
+    actions.push({
+      what: `${name(el)} "${(el.textContent ?? "").trim().slice(0, 40)}"`,
+      background: style.backgroundColor,
+      darkGround: luminance(ground(el.parentElement)) <= 0.5,
+    });
   }
   return { retired: [...retired].sort(), actions };
 }
@@ -121,9 +161,9 @@ test.describe("brand tokens as painted (UX-L1)", () => {
       expect(response?.status(), `${route} answers`).toBeLessThan(400);
       const { retired, actions } = await measure(page);
       expect(retired, "elements resolving a retired value").toEqual([]);
-      // /explore draws no header action (it would point at itself) and has no filled action of its own.
+      // /explore had no filled action of its own under the legacy header; the V34 header's action is measured there too.
       if (route !== "/explore") expect(actions.length, "a visible filled action to measure").toBeGreaterThan(0);
-      for (const action of actions) expect(action.background, action.what).toBe(ACTION);
+      for (const action of actions) expect.soft(action.background, action.what).toBe(action.darkGround ? ACTION.dark : ACTION.light);
     });
   }
 
@@ -144,7 +184,9 @@ test.describe("brand tokens as painted (UX-L1)", () => {
         probe.style.background = "#faf9f6";
         probe.innerHTML = `<p id="probe-blue" style="color:#2447b3">a</p>`
           + `<p id="probe-mint" style="color:#7be0be">b</p>`
-          + `<a class="btn" id="probe-ink" href="#" style="background:#15191d">c</a>`;
+          + `<a class="btn" id="probe-ink" href="#" style="background:#15191d">c</a>`
+          // A V34 pill (no legacy class) painted in the retired legacy accent.
+          + `<a id="probe-pill" href="#" style="background:#005bb3;border-radius:var(--v34-radius-pill)">e</a>`;
         main.prepend(probe);
         const dark = document.createElement("div");
         dark.style.background = "#0e1013";
@@ -160,5 +202,8 @@ test.describe("brand tokens as painted (UX-L1)", () => {
     // The same mint on an instrument face is the dark-ground "verified", not a retirement.
     expect(retired.filter((hit) => hit.startsWith("p#probe-dark-mint "))).toEqual([]);
     expect(actions.find((action) => action.what.startsWith("a#probe-ink"))?.background).toBe("rgb(21, 25, 29)");
+    const pill = actions.find((action) => action.what.startsWith("a#probe-pill"));
+    expect(pill?.background, "a V34 pill is measured as a filled action").toBe("rgb(0, 91, 179)");
+    expect(pill?.background).not.toBe(pill?.darkGround ? ACTION.dark : ACTION.light);
   });
 });
