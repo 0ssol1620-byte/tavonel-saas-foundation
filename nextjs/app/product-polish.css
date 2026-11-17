@@ -713,6 +713,23 @@
     padding-top: 12px;
   }
 }
+/*
+  WO-CI-28 (lead decision 18). The same fixed-header allowance on the policy document (`PolicyDocument`:
+  /status, /privacy, /terms, /refunds, /subprocessors): `.public-page .scene.doc` pads 112-156px and the
+  shell adds 18, so the H1 stood 174px under the sticky header at 1440 and 110px at 390 (WO-CI-21
+  gap-after.txt). These are T5 pages, and a V34-native T5 opening sets its H1 under the hero's top
+  padding, `clamp(45px, 6vw, 92px)` (components/v34/ui/hero.module.css), and an eyebrow line,
+  `--v34-eyebrow` at line-height 1.4 with its 14px step (components/v34/ui/text.module.css): 75.8px at
+  390, 117.2px at 1440. The policy title has no eyebrow, so its top padding is that whole distance,
+  read from those same values. Pinned against the V34 T5 pages in the same run by
+  e2e/docs-reading-layout.spec.ts. Scoped to the frame; a policy body outside it keeps the rules above.
+*/
+[data-v34-site] .scene.doc.policy-page {
+  padding-top: calc(clamp(45px, 6vw, 92px) + var(--v34-eyebrow) * 1.4 + 14px);
+}
+[data-v34-site] .scene.doc.policy-page > .shell {
+  padding-top: 0;
+}
 
 /*
   Phase 4 follow-ups (2026-10-19), two rules this sheet owns for the doc template.
