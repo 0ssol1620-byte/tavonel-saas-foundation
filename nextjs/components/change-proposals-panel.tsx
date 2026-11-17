@@ -60,8 +60,14 @@ export function rowActions(proposal: PublicProposal): Action[] {
 export const batchEligible = (proposals: readonly PublicProposal[]) =>
   proposals.filter((p) => p.actionType === "library_label" && rowActions(p).includes("confirm"));
 
-export const agentBadge = (proposer: PublicProposal["proposer"]): string | null =>
-  proposer.kind === "agent" ? `Suggested by an agent connected by ${proposer.grantedBy} — client name “${proposer.clientLabel}” (not verified)` : null;
+/** The badge in three parts, so the client-chosen name can sit in its own bidi isolate. */
+export const agentBadgeParts = (proposer: PublicProposal["proposer"]) =>
+  proposer.kind === "agent" ? { head: `Suggested by an agent connected by ${proposer.grantedBy} — client name “`, label: proposer.clientLabel, tail: "” (not verified)" } : null;
+
+export const agentBadge = (proposer: PublicProposal["proposer"]): string | null => {
+  const parts = agentBadgeParts(proposer);
+  return parts ? parts.head + parts.label + parts.tail : null;
+};
 
 async function api(path: string, init: RequestInit = {}) {
   const client = getSupabaseBrowserClient();
@@ -70,6 +76,17 @@ async function api(path: string, init: RequestInit = {}) {
     ...(init.body ? { "Content-Type": "application/json" } : {}) } });
 }
 
+const ACTION_TYPES: ReadonlySet<string> = new Set(["library_label", "compile_plan", "ontology_label_patch"]);
+
+/** A page of rows: a row of an action type this build does not know is left out; any other malformed row refuses the page. */
+export function listable(proposals: readonly PublicProposal[]): PublicProposal[] | null {
+  const known = proposals.filter((p) => !p || ACTION_TYPES.has(p.actionType));
+  return known.every(wellFormed) ? known : null;
+}
+
+/** A deep-linked row whose read by id answered 404 is gone: it is cleared, not shown stale. */
+export const deepLinkGone = (one: { proposal: PublicProposal } | { status: number }) => "status" in one && one.status === 404;
+
 const wellFormed = (p: PublicProposal) => Boolean(p) && p.state in STATE_WORD && typeof p.proposalId === "string" && Array.isArray(p.evidenceIds)
   && Boolean(p.proposer) && typeof p.createdAt === "string";
 
@@ -77,8 +94,9 @@ async function fetchPage(cursor: string | null): Promise<{ proposals: PublicProp
   try {
     const response = await api(cursor ? `/api/proposals?cursor=${encodeURIComponent(cursor)}` : "/api/proposals");
     const body = await response.json().catch(() => null) as { proposals?: PublicProposal[]; nextCursor?: string | null } | null;
-    if (!response.ok || !body || !Array.isArray(body.proposals) || !body.proposals.every(wellFormed)) return null;
-    return { proposals: body.proposals, nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null };
+    const rows = response.ok && body && Array.isArray(body.proposals) ? listable(body.proposals) : null;
+    if (!body || !rows) return null;
+    return { proposals: rows, nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null };
   } catch {
     return null;
   }
@@ -103,7 +121,7 @@ async function fetchOne(id: string): Promise<{ proposal: PublicProposal } | { st
   try {
     const response = await api(`/api/proposals/${encodeURIComponent(id)}`);
     const body = await response.json().catch(() => null) as { proposal?: PublicProposal } | null;
-    return response.ok && body?.proposal && wellFormed(body.proposal) ? { proposal: body.proposal } : { status: response.ok ? 503 : response.status };
+    return response.ok && body?.proposal && ACTION_TYPES.has(body.proposal.actionType) && wellFormed(body.proposal) ? { proposal: body.proposal } : { status: response.ok ? 503 : response.status };
   } catch {
     return { status: 0 };
   }
@@ -118,7 +136,7 @@ function Preview({ proposal }: { proposal: PublicProposal }) {
     return (
       <p className={styles.preview}>
         {preview.decision === "confirmed" ? "Confirm" : "Reject"} {preview.labelKind === "doc_type" ? "type" : "topic"}{" "}
-        <strong>{preview.labelKind === "doc_type" ? preview.labelKey.replace(/_/g, " ") : preview.labelKey}</strong> on <span className={styles.id}>{preview.documentId}</span>
+        <strong><bdi>{preview.labelKind === "doc_type" ? preview.labelKey.replace(/_/g, " ") : preview.labelKey}</bdi></strong> on <span className={styles.id}>{preview.documentId}</span>
       </p>
     );
   }
@@ -131,7 +149,8 @@ function Preview({ proposal }: { proposal: PublicProposal }) {
           {documentIds.map((id) => <span key={id} className={styles.id}>{id}</span>)}
         </div>
         <p className={styles.note}>
-          Re-charges up to {quote.rechargeCredits} credits{quote.overageCredits > 0 ? `, of which up to ${quote.overageCredits} as overage` : ""}.
+          {quote.rechargeCredits === 0 ? "Re-charges no credits."
+            : `Re-charges up to ${quote.rechargeCredits} credits${quote.overageCredits > 0 ? `, of which up to ${quote.overageCredits} as overage` : ""}.`}
         </p>
         {proposal.notes.includes("approver_only")
           ? <p className={styles.note}>Only the person who approved these files at upload can start this compile.</p> : null}
@@ -141,7 +160,7 @@ function Preview({ proposal }: { proposal: PublicProposal }) {
   const { kind, before, after, baseManifestDigest } = proposal.preview;
   return (
     <p className={styles.preview}>
-      Correct {kind.toLowerCase()} label: <q>{before}</q> → <q>{after}</q>{" "}
+      Correct {kind.toLowerCase()} label: <q><bdi>{before}</bdi></q> → <q><bdi>{after}</bdi></q>{" "}
       <span className={styles.id}>base {baseManifestDigest.replace(/^sha256:/, "").slice(0, 12)}</span>
     </p>
   );
@@ -149,12 +168,12 @@ function Preview({ proposal }: { proposal: PublicProposal }) {
 
 /** One row. Presentational: what it offers comes from `rowActions`, what a click does from the parent. */
 export function ProposalItem({ proposal, disabled, onAct }: { proposal: PublicProposal; disabled: boolean; onAct: (action: Action) => void }) {
-  const badge = agentBadge(proposal.proposer);
+  const badge = agentBadgeParts(proposal.proposer);
   const label: Record<Action, string> = { confirm: "Confirm", reject: "Reject", undo: "Undo", finish: "Finish" };
   return (
     <li id={rowDomId(proposal.proposalId)} tabIndex={-1} className={styles.row} data-state={proposal.state}>
       <span className={styles.state}>{STATE_WORD[proposal.state]}</span>
-      {badge ? <p className={styles.note}>{badge}</p> : null}
+      {badge ? <p className={styles.note}>{badge.head}<bdi>{badge.label}</bdi>{badge.tail}</p> : null}
       <Preview proposal={proposal} />
       {proposal.evidenceIds.length > 0 ? <p className={styles.note}>Evidence: <span className={styles.id}>{proposal.evidenceIds.join(", ")}</span></p> : null}
       <div className={styles.actions}>
@@ -182,6 +201,7 @@ export default function ChangeProposalsPanel(_props: Props) {
     if (extraId.current) {
       const one = await fetchOne(extraId.current);
       if ("proposal" in one) setExtra(one.proposal);
+      else if (deepLinkGone(one)) { extraId.current = null; setExtra(null); setProblem(NOT_AVAILABLE); }
     }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -227,10 +247,15 @@ export default function ChangeProposalsPanel(_props: Props) {
 
   async function showMore() {
     if (load.state !== "ready" || !load.nextCursor) return;
-    const read = await fetchPage(load.nextCursor);
-    if (!read) { setProblem("More could not be read."); return; }
-    pages.current += 1;
-    setLoad({ state: "ready", proposals: [...load.proposals, ...read.proposals], nextCursor: read.nextCursor });
+    setBusy("more"); // Show more is disabled while this read is out: no second request, no duplicate page or key
+    try {
+      const read = await fetchPage(load.nextCursor);
+      if (!read) { setProblem("More could not be read."); return; }
+      pages.current += 1;
+      setLoad({ state: "ready", proposals: [...load.proposals, ...read.proposals], nextCursor: read.nextCursor });
+    } finally {
+      setBusy(null);
+    }
   }
 
   // Deep link: ?proposal=<id>. On a loaded page the row is focused; otherwise it is read by id.
@@ -251,7 +276,7 @@ export default function ChangeProposalsPanel(_props: Props) {
     tried.current = id;
     void fetchOne(id).then((one) => {
       if ("proposal" in one) { extraId.current = id; setExtra(one.proposal); }
-      else setProblem(one.status === 404 ? NOT_AVAILABLE : "The suggestion could not be read.");
+      else setProblem(deepLinkGone(one) ? NOT_AVAILABLE : "The suggestion could not be read.");
     });
   }, [ready, extra]);
 

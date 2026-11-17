@@ -565,6 +565,7 @@ test("Proposals: an injected client name is shown as text", async ({ page }) => 
   const panel = await openProposals(page, store);
   await expect(panel.getByRole("listitem")).toContainText("<img src=x onerror=alert(1)>");
   await expect(panel.locator("img")).toHaveCount(0);
+  await expect(panel.locator("bdi").filter({ hasText: "<img src=x onerror=alert(1)>" })).toHaveCount(1);
 });
 
 type Grant = { grantId: string; clientLabel: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastUsedAt: string | null };
@@ -606,6 +607,9 @@ test("Agent access: consent before Create, the credential once, then Disconnect"
 
   await expect(panel.getByText(FAKE_CREDENTIAL)).toBeVisible();
   await expect(panel.getByText("It will not be shown again.", { exact: false })).toBeVisible();
+  await expect(panel.getByRole("status").filter({ hasText: "A credential was created." })).toHaveCount(1);
+  await expect(panel.getByRole("status").filter({ hasText: FAKE_CREDENTIAL })).toHaveCount(0);
+  await expect(panel.locator("[aria-live]").filter({ hasText: FAKE_CREDENTIAL })).toHaveCount(0);
   await expect(panel.getByRole("listitem")).toContainText("“Desk Agent”");
   expect(await overflow(page)).toBeLessThanOrEqual(1);
   await shot(page, "agent-access-credential");

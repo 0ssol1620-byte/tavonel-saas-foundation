@@ -1,13 +1,13 @@
 /**
- * Concurrency races of the agent-proposal store (migrations 20261117130000 and 20261117130200,
- * workorders/agent-native.md §8 I-8, I-12, I-13; lead decision G3(b) of WO-AN-3; WO-AN-7) against a real
- * PostgreSQL 17, through real psql sessions as service_role.
+ * Concurrency races of the agent-proposal store (migrations 20261117130000, 20261117130200 and
+ * 20261117130300, workorders/agent-native.md §8 I-8, I-12, I-13; lead decision G3(b) of WO-AN-3; WO-AN-7;
+ * WO-AN-7B) against a real PostgreSQL 17, through real psql sessions as service_role.
  *
  *   LOCAL_RACE_TEST=1 node scripts/db/local-cluster.mjs up --port 55439
  *   LOCAL_RACE_TEST=1 [RACE_SEED=n] [RACE_ITERATIONS=200] [RACE_PORT=55439] [RACE_RECEIPT_DIR=<dir>] \
  *     [PSQL_BIN=<psql>] node scripts/db/agent-grant-race.mjs
  *
- * Every iteration runs seven scenarios in a seeded order, each on two sessions plus an observer:
+ * Every iteration runs nine scenarios in a seeded order, each on two sessions plus an observer:
  *   I12A  revoke holds the grant in an open transaction, a create on that grant blocks on `for share`,
  *         the revoke commits: the create raises proposal_agent_grant_revoked; no open row of the grant.
  *   I12B  a create commits first (sequential), or holds the grant in an open transaction while a revoke
@@ -27,6 +27,15 @@
  *         commits, then the creation: a grant whose creation committed after the kill switch is a new,
  *         live grant. A creation that answered before the revoke-all committed (what happens without the
  *         lock) committed first and must be revoked.
+ *   BOUNDA a grant creation holds its transaction open; a revoke-all (autocommit) waits on the kill-switch lock:
+ *         it must answer agent_grant_lock_timeout within BOUND_MS and change nothing (no grant, key, proposal or
+ *         audit row); after the creation commits, the same revoke-all succeeds and revokes the held grant.
+ *   BOUNDB a revoke-all holds its transaction open; a grant creation (autocommit) waits on the same lock: it must
+ *         answer agent_grant_lock_timeout within BOUND_MS and create nothing; after the revoke-all commits, the
+ *         same creation succeeds and its grant is live.
+ *         Without lock_timeout (20261117130200, whose function-level statement_timeout never re-arms for the
+ *         calling statement) the waiter is still waiting at BOUND_MS: the harness then releases the holder, the
+ *         waiter goes on to succeed, and both "past the bound" and "changed the store" are reported.
  *   The kill switch revokes every grant in the database, so the standing grant I8 and I13 use is made
  *   again after each KILL scenario, and the live grant KILLB leaves is revoked by the observer.
  * "Blocked" is observed, not assumed: the observer polls pg_stat_activity for a Lock wait of the
@@ -50,16 +59,21 @@ import { mulberry32, validateEnvironment } from "./job-lease-race.mjs";
 export { mulberry32, validateEnvironment };
 
 const REPO_ROOT = resolve(import.meta.dirname, "..", "..", "..");
-export const SCENARIOS = ["I12A", "I12B", "I8", "I13", "LEAF", "KILLA", "KILLB"];
+export const SCENARIOS = ["I12A", "I12B", "I8", "I13", "LEAF", "KILLA", "KILLB", "BOUNDA", "BOUNDB"];
+/** The lock_timeout both kill-switch functions set (20261117130300); a unit test pins it to the migration text. */
+export const LOCK_TIMEOUT_MS = 2000;
+/** How long a waiter may take to answer: the lock timeout plus room for psql and the scheduler. */
+export const BOUND_MS = LOCK_TIMEOUT_MS + 1500;
 export const INVARIANTS = {
   I8: "two concurrent decides of one proposal: exactly one confirmed, the other proposal_not_decidable; the row ends confirmed",
   I12: "no proposal of a revoked grant is ever left open; a create that waited on the revoke is refused proposal_agent_grant_revoked; a create committed first is withdrawn by the revoke",
   I13: "two concurrent creates at open limit - 1: exactly one admitted, the other proposal_open_limit; the open count rises by one",
   LEAF: "two corrections of one base: exactly one recorded, the other review_base_not_head; the base carries exactly one correction",
   KILL: "every grant whose creation committed before revoke-all's commit is revoked with its credential; a grant whose creation committed after it is live",
+  BOUND: "a creation or revoke-all waiting on the kill-switch lock answers agent_grant_lock_timeout within BOUND_MS and changes nothing; the same call succeeds once the holder commits",
   ERR: "every refusal is exactly one known error token",
 };
-export const KNOWN_REFUSALS = new Set(["proposal_agent_grant_revoked", "proposal_not_decidable", "proposal_open_limit", "review_base_not_head"]);
+export const KNOWN_REFUSALS = new Set(["proposal_agent_grant_revoked", "proposal_not_decidable", "proposal_open_limit", "review_base_not_head", "agent_grant_lock_timeout"]);
 
 /** One psql result as {ok, value, error}: `value` is the JSON the RPC returned, `error` the error token or raw text. */
 export function parseOutcome({ out, err }) {
@@ -167,6 +181,23 @@ export function checkKill(obs) {
   return v;
 }
 
+/**
+ * obs = {waiter, elapsedMs, unchanged, retry, retryTookEffect}. `waiter` is the call that queued behind the held
+ * lock, `unchanged` whether the store is as it was before it (read after it answered, before the holder
+ * committed), `retry` the same call after the holder committed, `retryTookEffect` whether it did what it is for.
+ */
+export function checkBound(obs) {
+  const v = refusalViolations([obs.waiter, obs.retry]);
+  if (!(obs.elapsedMs <= BOUND_MS)) v.push({ invariant: "BOUND", detail: `the waiter answered after ${obs.elapsedMs} ms, past the ${BOUND_MS} ms bound` });
+  if (obs.waiter.ok || obs.waiter.error !== "agent_grant_lock_timeout") {
+    v.push({ invariant: "BOUND", detail: `the waiter answered ${obs.waiter.ok ? "ok" : obs.waiter.error}, not agent_grant_lock_timeout` });
+  }
+  if (!obs.unchanged) v.push({ invariant: "BOUND", detail: "the waiter changed the store (a half state, or it went on after the bound)" });
+  if (!obs.retry.ok) v.push({ invariant: "BOUND", detail: `the retry after the holder committed was refused ${obs.retry.error}` });
+  else if (!obs.retryTookEffect) v.push({ invariant: "BOUND", detail: "the retry answered ok but did not take effect" });
+  return v;
+}
+
 /** One persistent psql session; statements run one at a time, errors come back as text. */
 class Session {
   constructor(psql, host, port, id) {
@@ -205,8 +236,7 @@ const hex = (rng, n) => Array.from({ length: n }, () => Math.floor(rng() * 16).t
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const failOn = (what, r) => { if (/^(ERROR|FATAL)/m.test(r.err)) throw new Error(`${what}: ${r.err.trim()}`); return r.out.trim(); };
 
-function grantCall(ctx, ids) {
-  const prefix = `r${hex(ids, 11)}`;
+function grantCall(ctx, ids, prefix = `r${hex(ids, 11)}`) {
   return `public.create_foundation_agent_grant(${q(ctx.ws)}, ${q(ctx.user)}::uuid, 1, 'Race agent', null, ${q(prefix)},
     ${q(hex(ids, 64))}, array['agent:read','agent:propose'], now() + interval '1 day')`;
 }
@@ -280,9 +310,64 @@ async function killScenario(kind, plan, s, ctx, ids) {
   return { blocked, violations: checkKill({ create, revoke, createCommittedFirst, grantRevoked, keyRevoked }) };
 }
 
+/** Everything the kill switch and grant creation write, as one comparable string (the observer's snapshot). */
+const storeStateSql = `select (select count(*) from public.foundation_agent_grants) || '|'
+  || (select count(*) from public.foundation_agent_grants where revoked_at is null) || '|'
+  || (select count(*) from public.foundation_api_keys where token_kind = 'agent' and revoked_at is null) || '|'
+  || (select count(*) from public.world_change_proposals where principal_kind = 'agent' and state = 'proposed') || '|'
+  || (select count(*) from public.foundation_developer_audit_events where action in ('api_key_created', 'api_key_revoked'));`;
+
+async function boundScenario(kind, s, ctx, ids) {
+  const [a, b, obs] = s;
+  // An open proposal of the standing grant, so a revoke-all that ran would have a proposal to withdraw too.
+  const seeded = parseOutcome(await obs.run(agentCreateSql(ctx, ctx.grant, `agt_race_t_${hex(ids, 12)}`, 10000)));
+  if (!seeded.ok) throw new Error(`${kind} setup create: ${seeded.error}`);
+  const before = failOn("state before", await obs.run(storeStateSql));
+  const createSql = `select ${grantCall(ctx, ids)};`;
+  const [holder, waiterSession, holdSql, waitSql] = kind === "BOUNDA"
+    ? [a, b, `begin; ${createSql}`, revokeAllSql]
+    : [b, a, `begin; ${revokeAllSql}`, createSql];
+  const held = parseOutcome(await holder.run(holdSql));
+  if (!held.ok) throw new Error(`${kind} holder: ${held.error}`);
+  const started = performance.now();
+  const pending = waiterSession.run(waitSql);
+  const blocked = await waitBlocked(obs, waiterSession.pid, BOUND_MS, "advisory");
+  let answer = await Promise.race([pending, sleep(Math.max(0, BOUND_MS - (performance.now() - started))).then(() => null)]);
+  let elapsedMs = Math.round(performance.now() - started);
+  let unchanged = false;
+  if (answer === null) {
+    // Still waiting at the bound (no lock_timeout): release the holder so the run can go on; the waiter proceeds.
+    elapsedMs = Infinity;
+    failOn(`${kind} holder commit`, await holder.run("commit;"));
+    answer = await pending;
+  } else {
+    unchanged = failOn("state after", await obs.run(storeStateSql)) === before;
+    failOn(`${kind} holder commit`, await holder.run("commit;"));
+  }
+  const waiter = parseOutcome(answer);
+  // The same call again, now that the holder committed.
+  const retry = parseOutcome(await waiterSession.run(waitSql));
+  let retryTookEffect = false;
+  const leftLive = [];
+  if (kind === "BOUNDA") {
+    retryTookEffect = retry.ok && failOn("held grant", await obs.run(grantStateSql(held.value.grantId))) === "true|true";
+  } else {
+    if (retry.ok) retryTookEffect = failOn("retried grant", await obs.run(grantStateSql(retry.value.grantId))) === "false|false";
+    for (const o of [waiter, retry]) if (o.ok) leftLive.push(o.value.grantId);
+  }
+  for (const g of leftLive) {
+    const live = failOn("live?", await obs.run(`select revoked_at is null from public.foundation_agent_grants where grant_id = ${q(g)}::uuid;`)) === "t";
+    if (live) failOn("cleanup revoke", await obs.run(revokeSql(ctx, g)));
+  }
+  // Each kill switch above revoked the standing grant.
+  ctx.grant = failOn("standing grant", await obs.run(grantSql(ctx, ids)));
+  return { blocked, violations: checkBound({ waiter, elapsedMs, unchanged, retry, retryTookEffect }) };
+}
+
 async function scenario(kind, plan, s, ctx, ids) {
   const [a, b, obs] = s;
   if (kind === "KILLA" || kind === "KILLB") return killScenario(kind, plan, s, ctx, ids);
+  if (kind === "BOUNDA" || kind === "BOUNDB") return boundScenario(kind, s, ctx, ids);
   if (kind === "I12A") {
     const grantId = failOn("grant", await obs.run(grantSql(ctx, ids)));
     failOn("revoke (open)", await a.run(`begin; ${revokeSql(ctx, grantId)}`));
@@ -418,7 +503,7 @@ export async function main(env = process.env) {
     const stem = join(receiptDir, `agent-grant-race-seed${seed}`);
     writeFileSync(`${stem}.log`, logText);
     writeFileSync(`${stem}.json`, JSON.stringify(receipt, null, 2));
-    process.stdout.write(`${receipt.status} ${done}/${iterations} iterations; blocked I12A ${counts.I12A.blocked}/${counts.I12A.runs}, I12B ${counts.I12B.blocked}/${counts.I12B.runs}, LEAF ${counts.LEAF.blocked}/${counts.LEAF.runs}, KILLA ${counts.KILLA.blocked}/${counts.KILLA.runs}, KILLB ${counts.KILLB.blocked}/${counts.KILLB.runs}; receipt ${stem}.json\n`);
+    process.stdout.write(`${receipt.status} ${done}/${iterations} iterations; blocked I12A ${counts.I12A.blocked}/${counts.I12A.runs}, I12B ${counts.I12B.blocked}/${counts.I12B.runs}, LEAF ${counts.LEAF.blocked}/${counts.LEAF.runs}, KILLA ${counts.KILLA.blocked}/${counts.KILLA.runs}, KILLB ${counts.KILLB.blocked}/${counts.KILLB.runs}, BOUNDA ${counts.BOUNDA.blocked}/${counts.BOUNDA.runs}, BOUNDB ${counts.BOUNDB.blocked}/${counts.BOUNDB.runs}; receipt ${stem}.json\n`);
     if (failure) process.stdout.write(`FAILED at iteration ${failure.iteration} seed ${seed}: ${JSON.stringify(failure)}\n`);
     return failure ? 1 : 0;
   } finally {
