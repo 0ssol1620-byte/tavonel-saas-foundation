@@ -3281,12 +3281,13 @@ test('affected owner map covers all 26 requested product paths and their executi
     if (group==='ocr-worker') assert.equal(map.runCdrWorkerChecks,true,path);
   }
   const aclSql=select('supabase/tests/google_viewer_principal_boundary.sql');
-  assert.ok(aclSql.groups.includes('database-contract'));assert.equal(aclSql.databaseChanged,true);assert.deepEqual(aclSql.databaseTests,['supabase/tests/google_viewer_principal_boundary.sql']);
+  assert.ok(aclSql.groups.includes('database-contract'));assert.equal(aclSql.databaseChanged,true);assert.deepEqual(aclSql.databaseTests,['supabase/tests/foundation_page_meter.sql','supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
   assert.deepEqual(aclSql.databaseDependencyReasons,{});
   const dropboxSql=select('supabase/migrations/20261007100000_dropbox_source_path_reconciliation.sql');
   assert.ok(dropboxSql.groups.includes('database-contract'));assert.equal(dropboxSql.databaseChanged,true);
   assert.deepEqual(dropboxSql.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
-    'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql']);
+    'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql',
+    'supabase/tests/foundation_page_meter.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
   assert.equal(dropboxSql.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
   assert.equal(select('README.md').nativeEvidence.disposition,'historical-input-reuse');
   assert.equal(AFFECTED_CI_OWNER_PATHS.length,15);
@@ -3306,7 +3307,8 @@ test('affected 43-path integrated map selects the Dropbox SQL dependency fixture
   assert.deepEqual(map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
   assert.deepEqual([map.databaseChanged,map.runSelectorContracts,map.runCdrWorkerChecks,map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
   assert.deepEqual(map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
-    'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
+    'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/foundation_page_meter.sql',
+    'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
   assert.deepEqual(map.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
   // Every selected fixture must exist at the head; a removed dependency contract fails the map closed instead of shrinking the lane.
   // The absent fixture carries no change record, exactly as before the SQL fixtures joined the integrated delta.
@@ -3317,7 +3319,7 @@ test('affected 43-path integrated map selects the Dropbox SQL dependency fixture
   assert.deepEqual([tsOnly.databaseChanged,tsOnly.databaseTests,tsOnly.databaseDependencyReasons],[false,[],{}]);
   // Any required DB lane carries the Dropbox owner's dependencies, even when the SQL change belongs to another owner.
   const aclSqlWithDropbox=affectedMap([affectedRecord('M',['nextjs/lib/source-import.ts']),affectedRecord('M',['supabase/tests/google_viewer_principal_boundary.sql'])]);
-  assert.deepEqual(aclSqlWithDropbox.databaseTests,[...Object.keys(AFFECTED_DROPBOX_DEPENDENCY_REASONS),'supabase/tests/google_viewer_principal_boundary.sql'].sort());
+  assert.deepEqual(aclSqlWithDropbox.databaseTests,[...Object.keys(AFFECTED_DROPBOX_DEPENDENCY_REASONS),'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql'].sort());
   assert.deepEqual(aclSqlWithDropbox.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
   // Normal Auth/storage transport and the full pgTAP set are never part of the affected selection.
   assert.ok(!map.databaseTests.some(path=>/auth_|storage|tenant_rls/.test(path)));
@@ -3390,12 +3392,15 @@ const AFFECTED_CI_CONTRACT_SUPPORT_PATHS=Object.freeze([
   'nextjs/lib/home-reader-heading-css-contract.test.ts','nextjs/lib/home-reader-heading-css-registration.test.ts',
   'nextjs/lib/repair-node-evidence.test.mjs','nextjs/lib/repair-node-gate-receipt.test.ts','nextjs/scripts/fixtures/home-reader-heading-css-baseline.json',
 ]);
-const AFFECTED_SUPPORTED_COMBINED_PATHS=Object.freeze([...AFFECTED_COMBINED_PATHS,...AFFECTED_CI_CONTRACT_SUPPORT_PATHS].sort());
+// WO-CI-7 (D-4): database-contract selects the program's three pgTAP files on every SQL change and requires them at head, so a
+// SQL-bearing fixture head carries their actual repository bytes too; heads without SQL stay exactly as they were.
+const AFFECTED_DB_FIXTURE_SUPPORT_PATHS=Object.freeze(['supabase/tests/foundation_page_meter.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
+const AFFECTED_SUPPORTED_COMBINED_PATHS=Object.freeze([...AFFECTED_COMBINED_PATHS,...AFFECTED_CI_CONTRACT_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS].sort());
 // CI owners carry their actual candidate bytes. Product (including the Ask answer leaves) and SQL fixture leaves are path-exact stand-ins (baseline
 // bytes plus one line, or a marker when absent at the baseline): the map binds paths and owners, and the reviewed product bytes belong to the parallel
 // product task.
 const affectedLeafBytes=path=>{
-  if(AFFECTED_CI_OWNER_PATHS.includes(path)||AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path))return readFileSync(resolve(affectedRepoRoot,path));
+  if(AFFECTED_CI_OWNER_PATHS.includes(path)||AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)||AFFECTED_DB_FIXTURE_SUPPORT_PATHS.includes(path))return readFileSync(resolve(affectedRepoRoot,path));
   let base;try{base=affectedBaselineBytes(path);}catch{return Buffer.from(`affected fixture stand-in for ${path}\n`);}
   return Buffer.concat([base,Buffer.from('\n')]);
 };
@@ -3451,14 +3456,19 @@ test('affected real Git map binds the original 48 paths plus current CI contract
     fixture=affectedRealGitFixture();const {root,B,git,put,move,remove,commit,checkout,written}=fixture;
     process.chdir(root);
     const source=head=>{const intent=affectedCollector.classifyAffectedIntent({headSha:head});assert.equal(intent.classification,'intended',intent.reason);return affectedCollector.verifyAffectedSource({headSha:head,intent});};
-    const leaves=paths=>[...new Set([...paths,...(paths.some(path=>AFFECTED_CI_OWNER_PATHS.includes(path))?AFFECTED_CI_CONTRACT_SUPPORT_PATHS:[])])].map(path=>put(path,affectedLeafBytes(path),'100644',AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)));
+    const leaves=paths=>[...new Set([...paths,...(paths.some(path=>AFFECTED_CI_OWNER_PATHS.includes(path))?AFFECTED_CI_CONTRACT_SUPPORT_PATHS:[]),
+      ...(paths.some(path=>/^supabase\/.+\.sql$/.test(path))?AFFECTED_DB_FIXTURE_SUPPORT_PATHS:[])])]
+      .map(path=>put(path,affectedLeafBytes(path),'100644',AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)||AFFECTED_DB_FIXTURE_SUPPORT_PATHS.includes(path)));
     assert.equal(AFFECTED_INTEGRATED_PATHS.length,43);
     assert.equal(AFFECTED_COMBINED_PATHS.length,48);assert.equal(new Set(AFFECTED_COMBINED_PATHS).size,48);
-    assert.equal(AFFECTED_CI_CONTRACT_SUPPORT_PATHS.length,5);assert.equal(AFFECTED_SUPPORTED_COMBINED_PATHS.length,53);
+    assert.equal(AFFECTED_CI_CONTRACT_SUPPORT_PATHS.length,5);assert.equal(AFFECTED_DB_FIXTURE_SUPPORT_PATHS.length,3);assert.equal(AFFECTED_SUPPORTED_COMBINED_PATHS.length,56);
+    // The same SQL-bearing head without the program's pgTAP files refuses on the first of them instead of shrinking the DB selection.
+    const fixtureless=source(commit(...[...new Set([...AFFECTED_COMBINED_PATHS,...AFFECTED_CI_CONTRACT_SUPPORT_PATHS])].map(path=>put(path,affectedLeafBytes(path),'100644',AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)))));
+    assert.equal(fixtureless.eligible,false);assert.match(fixtureless.reason,/selected database fixture is absent at head: supabase\/tests\/foundation_page_meter\.sql/);
     const integrated=commit(...leaves(AFFECTED_COMBINED_PATHS));
-    // Exact target tree retains all original 48 leaves and adds only the five required current CI contracts.
+    // Exact target tree retains all original 48 leaves and adds only the five required current CI contracts and the three program pgTAP files.
     assert.deepEqual(git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort(),AFFECTED_SUPPORTED_COMBINED_PATHS);
-    console.log('affected-current53-diff '+JSON.stringify({head:integrated,baseline:B,paths:git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort()}));
+    console.log('affected-current56-diff '+JSON.stringify({head:integrated,baseline:B,paths:git(['diff','--name-only','--no-renames','-z',B,integrated]).split('\0').filter(Boolean).sort()}));
     for(const path of AFFECTED_SUPPORTED_COMBINED_PATHS)assert.equal(git(['rev-parse',`${integrated}:${path}`]).trim(),written[path],path);
     for(const path of AFFECTED_CI_CONTRACT_SUPPORT_PATHS){
       const actual=readFileSync(resolve(affectedRepoRoot,path)),staged=git(['show',`${integrated}:${path}`],{encoding:'buffer'});
@@ -3474,7 +3484,8 @@ test('affected real Git map binds the original 48 paths plus current CI contract
     for(const suite of AFFECTED_GROUPS.find(owner=>owner.group==='grounded-ask').unitFiles)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
     assert.deepEqual(full.map.databaseTests,['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
-      'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/google_viewer_principal_boundary.sql']);
+      'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/foundation_page_meter.sql',
+      'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
     assert.deepEqual(full.map.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
     assert.ok(full.map.unitFiles.includes('lib/dropbox-source-reconciliation.test.ts'));
     // A real deletion of a baseline Dropbox owner path is mapped to its owner and keeps the integrated head eligible.
@@ -3728,7 +3739,7 @@ test('affected grounded-ask admission: ask-route-limits.test.ts overlaps acl and
     assert.deepEqual([acl.failures,acl.groups,acl.unitFiles],[[],['acl'],AFFECTED_ACL_UNITS],path);
   }
   const aclSql=affectedMap([affectedRecord('M',['supabase/tests/google_viewer_principal_boundary.sql'])]);
-  assert.deepEqual([aclSql.groups,aclSql.databaseTests],[['acl','database-contract'],['supabase/tests/google_viewer_principal_boundary.sql']]);
+  assert.deepEqual([aclSql.groups,aclSql.databaseTests],[['acl','database-contract'],['supabase/tests/foundation_page_meter.sql','supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']]);
 });
 test('affected grounded-ask admission: workspace page overlaps workspace-lifecycle, world-lifecycle.spec.ts is unchanged and the answer delta unions every selection', () => {
   const page=affectedMap([affectedRecord('M',['nextjs/app/workspace/page.tsx'])]);
@@ -6805,6 +6816,7 @@ test('affected pilot worksheet admission: the actual regular affectedPlan defers
   // An unmapped endpoint never enters invalidatingPaths, so its disposition still reads historical-input-reuse while the map fails closed
   // and no plan exists: that row is a classification, never current-head qualification.
   for (const path of [AFFECTED_PILOT_OLD_SUITE,'nextjs/public/evaluation/pilot-worksheet.ja.md','nextjs/components/contact-form.jsx']) {
+    if (assertV34ProgramEndpoint(path)) continue;
     const unmapped=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([unmapped.failures,unmapped.groups,unmapped.nativeEvidence.disposition,unmapped.nativeEvidence.invalidatingPaths],[[`unmapped changed endpoint: ${path}`],[],'historical-input-reuse',[]],path);
     assert.throws(()=>affectedAskPlan(unmapped),/clean fail-closed map/,path);
@@ -6838,7 +6850,7 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
     'supabase/functions/contact/index.ts','supabase/functions/evaluation-request/index.ts',
     'components/evaluation-page.tsx','public/evaluation/pilot-worksheet.en.md','lib/pilot-evaluation-worksheet.test.ts','components/evaluation-page.test.tsx',
     'evaluation/pilot-worksheet.ko.md','nextjs/nextjs/components/evaluation-page.tsx']) {
-    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path) || assertGlobalExposureEndpoint(path)) continue;
+    if (assertNewReviewedMarketingEndpoint(path) || assertLaunchSwitchEndpoint(path) || assertGlobalExposureEndpoint(path) || assertV34ProgramEndpoint(path)) continue;
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -6884,6 +6896,7 @@ test('affected pilot worksheet admission: adjacent and lookalike paths, other lo
 test('affected pilot worksheet admission: mixed unknown, an unknown rename endpoint or the old suite endpoint refuse the whole plan while the diagnostic selection remains; a deleted owned path still requires both direct suites at head', () => {
   // buildAffectedMap keeps the known owner's selection for diagnosis beside the failure; only the plan refuses, never a shrunken selection.
   for (const unknown of ['nextjs/components/evaluation-page-v2.tsx','nextjs/public/evaluation/pilot-worksheet.ja.md',AFFECTED_PILOT_OLD_SUITE,'nextjs/components/contact-form.jsx']) {
+    if (assertV34ProgramEndpoint(unknown)) continue;
     const mixed=affectedMap([...affectedPilotRaw(),affectedRecord(unknown===AFFECTED_PILOT_OLD_SUITE?'M':'A',[unknown],unknown===AFFECTED_PILOT_OLD_SUITE?'100644':'000000')]);
     assert.deepEqual([mixed.failures,mixed.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],unknown);
     assert.deepEqual([mixed.groups,mixed.unitFiles,mixed.browserFiles],[[AFFECTED_PILOT_GROUP],AFFECTED_PILOT_SUITES,[]],'diagnostic selection is retained beside the failure: '+unknown);
@@ -6895,6 +6908,8 @@ test('affected pilot worksheet admission: mixed unknown, an unknown rename endpo
     [AFFECTED_PILOT_TEST,'nextjs/lib/pilot-evaluation-worksheet.spec.ts'],[AFFECTED_PILOT_OLD_SUITE,AFFECTED_PILOT_TEST],[AFFECTED_PILOT_PAGE,AFFECTED_PILOT_OLD_SUITE]]) {
     const known=paths.find(path=>AFFECTED_PILOT_PATHS.includes(path)),unknown=paths.find(path=>path!==known);
     const map=affectedMap([affectedRecord('R090',paths)]),label=paths.join(' -> ');
+    // A rename to or from the old suite path joins its V34 program owner, so both endpoints are owned and the map stays clean.
+    if (assertV34ProgramEndpoint(unknown)) { assert.deepEqual([map.failures,map.unmappedPaths],[[],[]],label); assert.ok(map.groups.includes(AFFECTED_PILOT_GROUP),label); continue; }
     assert.deepEqual([map.failures,map.unmappedPaths],[[`unmapped changed endpoint: ${unknown}`],[unknown]],label);
     assert.deepEqual([map.entries.map(entry=>entry.groups),map.unitFiles,map.browserFiles],[[[AFFECTED_PILOT_GROUP]],AFFECTED_PILOT_SUITES,[]],label);
     assert.throws(()=>affectedAskPlan(map),/clean fail-closed map/,label);
@@ -6910,11 +6925,11 @@ test('affected pilot worksheet admission: mixed unknown, an unknown rename endpo
   assert.deepEqual([shared.failures,shared.unmappedPaths],[['unmapped changed endpoint: nextjs/app/evaluation/pilot-worksheet/route.ts'],['nextjs/app/evaluation/pilot-worksheet/route.ts']]);
   assert.ok(shared.groups.includes(AFFECTED_PILOT_GROUP)&&AFFECTED_PILOT_SUITES.every(file=>shared.unitFiles.includes(file)));
   assert.throws(()=>affectedAskPlan(shared),/clean fail-closed map/);
-  // Deleting the old suite path is itself an unknown endpoint, and the owner still requires that suite at head.
+  // Deleting the old suite path maps to the V34 program owner that changed it (D33 F0), and both owners still require that suite at head.
   const oldSuiteGone=buildAffectedMap({headSha:affectedHeadSha,records:[...affectedPilotRaw(),affectedRecord('D',[AFFECTED_PILOT_OLD_SUITE],'100644','000000')],
     headHasFile:file=>file!==AFFECTED_PILOT_OLD_SUITE&&affectedPilotPhysical(file)});
-  assert.deepEqual([oldSuiteGone.groups,oldSuiteGone.failures],[[AFFECTED_PILOT_GROUP],
-    [`unmapped changed endpoint: ${AFFECTED_PILOT_OLD_SUITE}`,'selected owner check is absent at head: components/evaluation-page.test.tsx']]);
+  assert.deepEqual([oldSuiteGone.groups,oldSuiteGone.failures],[['korean-surface-removal',AFFECTED_PILOT_GROUP],
+    ['selected owner check is absent at head: components/evaluation-page.test.tsx']]);
   assert.throws(()=>affectedAskPlan(oldSuiteGone),/clean fail-closed map/);
   // Deleting any owned path keeps the owner and still checks both direct suites at the physical head: with both present the plan qualifies
   // with the normal deferred native debt; with either absent (or the deleted path being the worksheet suite itself) the whole plan refuses.
@@ -7032,6 +7047,7 @@ test('affected pilot worksheet admission: the combined prior workspace, UX08 led
   // Evaluation and contact-form neighbours stay diagnostics only: beside the combined delta they close the whole plan, while the
   // diagnostic selection equals the clean combined selection.
   for (const adjacent of ['nextjs/components/contact-form.jsx','nextjs/app/evaluation/page.tsx',AFFECTED_PILOT_OLD_SUITE]) {
+    if (assertV34ProgramEndpoint(adjacent)) continue;
     // GX-02/GX-04 registered the evaluation page to global-exposure: asserted positively to that one owner, never to the worksheet owner.
     // It shares only the EvaluationPage render suite, which reads the page directly; the worksheet suite is never selected by it.
     if (assertGlobalExposureEndpoint(adjacent)) {
@@ -7768,7 +7784,7 @@ const UX_PROGRAM_OWNER_ROWS = [
   ['g1-copy-truth', 'nextjs/', G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES],
 ];
 function assertUxProgramEndpoint(path) {
-  if (assertNewReviewedMarketingEndpoint(path)) return true;
+  if (assertNewReviewedMarketingEndpoint(path) || assertV34ProgramEndpoint(path)) return true;
   const row = UX_PROGRAM_OWNER_ROWS.find(([, prefix, paths]) => paths.some(p => prefix + p === path));
   if (!row) return false;
   const [group, , , suites, browsers] = row, map = affectedMap([affectedRecord('M', [path])]);
@@ -8469,3 +8485,108 @@ test('affected world-read-cap-20261110 owner: 10 exact paths select 14 direct su
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
+// V34 program owners (WO-CI-7, lead decisions D-1 and D-4): one owner per area of the program branch, each restated here
+// independently of the planner's constants by count and digest, with its executed suites and the suites only another workflow runs.
+import { V34_PROGRAM_AFFECTED_OWNERS, DATABASE_CONTRACT_DATABASE_TESTS, PAGE_METER_AFFECTED_PATHS, PAGE_METER_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
+const v34Digest = list => createHash('sha256').update([...list].join('\n')).digest('hex').slice(0, 16);
+const V34_OWNER_PINS = Object.freeze([
+  // [group, path count, path digest, unit count, unit digest, browser suites, suites another workflow executes]
+  ['v34-shell', 47, '5415129e9d051183', 23, '21eb9fb399a9a589', ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
+  ['v34-route-registry', 6, '65af104d1ff748b6', 55, '669eeeff28aeda73', ['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
+  ['v34-world', 17, 'b4adb5928234787b', 21, '6a4128fa84844da3', ['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
+  ['v34-route-bodies', 258, '3a509398240a8c42', 60, '6f58f6df25341ff6', ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts'], []],
+  ['v34-qa-harness', 9, '63fbd4a74255f169', 0, 'e3b0c44298fc1c14', [], ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']],
+  ['v34-guard-suites', 15, 'ce918122ee61450c', 16, '68d9967a57ab1416', ['e2e/contrast-zoom-audit.spec.ts'], []],
+  ['korean-surface-removal', 7, '5a0ac5aad8981bd9', 7, 'da5472447e57fca6', [], []],
+  ['proposals-library', 18, '5fbfdcd64fff1ba7', 11, 'bc7f290839aedeb5', [], ['e2e/change-proposals.spec.ts']],
+  ['workspace-journey', 8, '13f26b4c96d356dd', 3, 'a0953aba9d5a75ff', [], ['e2e/file-census-resume.spec.ts']],
+  ['compile-pipeline', 15, 'c0dcca37df08a4b6', 12, 'd73d2c163da39980', [], ['e2e/compile-job-states-mobile.spec.ts', 'e2e/compile-resume.spec.ts']],
+  ['world-temporal-lens', 13, 'fdef27c6e8765cd3', 6, '2c6da671f58ed78b', [], ['e2e/world-graph-scale.spec.ts', 'e2e/world-lens.spec.ts']],
+  ['control-plane', 5, '69fb7d773a115e09', 3, '0252f55e061df2fc', [], []],
+  ['developer-surface', 10, '3e2063aec635d535', 8, '0c3198c499d7bbb0', [], []],
+  ['tenant-isolation', 6, 'd41829069c62cb31', 5, '26b862fea9f1ef7b', [], []],
+  ['billing-reconciliation', 12, 'd98a2e522659cc4b', 7, '00d0f2f362aa3ea7', [], ['scripts/billing/paddle-reconcile.test.mjs']],
+  ['db-harness', 13, 'c4ccbafac6ed2742', 0, 'e3b0c44298fc1c14', [], ['scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']],
+]);
+const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-ledger-replay.ts', 'lib/page-meter.test.ts', 'lib/usage-pricing.ts'];
+const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
+test('affected v34 program owners: every owner keeps its exact paths, its executed suites and the suites another workflow runs', () => {
+  assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
+  for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {
+    const declared = V34_PROGRAM_AFFECTED_OWNERS[group], owners = AFFECTED_GROUPS.filter(o => o.group === group), [owner] = owners;
+    assert.equal(owners.length, 1, group);
+    assert.deepEqual([declared.paths.length, v34Digest(declared.paths), declared.unitFiles.length, v34Digest(declared.unitFiles), [...declared.browserFiles], Object.keys(declared.externalChecks)],
+      [pathCount, pathDigest, unitCount, unitDigest, browsers, external], group);
+    assert.deepEqual([[...owner.unitFiles], [...owner.browserFiles], { ...owner.externalChecks }], [[...declared.unitFiles], [...declared.browserFiles], { ...declared.externalChecks }], group);
+    assert.deepEqual([owner.databaseTests, owner.nativeReuse, Boolean(owner.selector), Boolean(owner.worker), Boolean(owner.database)], [[], false, false, false, false], group);
+    // No owner whose check list is empty, and no check counted twice: an externally run suite is never also selected here.
+    assert.ok(owner.unitFiles.length + owner.browserFiles.length + Object.keys(owner.externalChecks).length > 0, group);
+    for (const file of Object.keys(owner.externalChecks)) assert.ok(!owner.unitFiles.includes(file) && !owner.browserFiles.includes(file), `${group}: ${file}`);
+    // Exact, sorted, duplicate-free paths: the match is built from them and admits nothing else.
+    assert.deepEqual([...declared.paths], [...new Set(declared.paths)].sort(), group);
+    for (const path of declared.paths) assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(`nextjs/${path}`)).map(o => o.group), [group], path);
+  }
+  assert.deepEqual([...PAGE_METER_AFFECTED_PATHS], V34_PAGE_METER_PATHS);
+  for (const suite of ['lib/billing-ledger-replay.test.ts', 'lib/billing-webhook-replay.db.test.ts', 'lib/page-meter.test.ts']) assert.ok(PAGE_METER_AFFECTED_UNIT_FILES.includes(suite), suite);
+  assert.ok(!PAGE_METER_AFFECTED_UNIT_FILES.includes('lib/billing-ledger-replay.db.test.ts'), 'a suite that skips entirely without a database is never a required executed suite');
+});
+test('affected v34 program owners: the whole program delta maps with no failure, and the plan carries the externally run suites', () => {
+  const paths = v34AllPaths();
+  const map = affectedMap([affectedRecord('M', paths.slice(0, 1)), ...paths.slice(1).map(p => affectedRecord('A', [p], '000000'))]);
+  assert.deepEqual([map.failures, map.unmappedPaths], [[], []]);
+  for (const [group] of V34_OWNER_PINS) assert.ok(map.groups.includes(group), group);
+  assert.ok(map.groups.includes('page-meter'));
+  const external = V34_OWNER_PINS.flatMap(([, , , , , , files]) => files).concat('lib/billing-ledger-replay.db.test.ts').sort();
+  assert.deepEqual(map.externalChecks.map(check => check.file), external);
+  for (const check of map.externalChecks) assert.ok(check.runner && !map.unitFiles.includes(check.file) && !map.browserFiles.includes(check.file), check.file);
+  assert.deepEqual(map.browserFiles, ['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']);
+  assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
+  const plan = affectedAskPlan(map);
+  assert.deepEqual(plan.affectedIntegration.externalChecks, map.externalChecks);
+  assert.deepEqual([plan.unitFiles, plan.browserFiles], [map.unitFiles, map.browserFiles]);
+});
+test('affected v34 program owners: a named external check absent at head fails the map closed', () => {
+  for (const [group, , , , , , external] of V34_OWNER_PINS.filter(pin => pin[6].length)) {
+    const path = `nextjs/${V34_PROGRAM_AFFECTED_OWNERS[group].paths[0]}`;
+    const map = buildAffectedMap({ headSha: affectedHeadSha, records: [affectedRecord('M', [path])], headHasFile: file => file !== `nextjs/${external[0]}` });
+    assert.deepEqual(map.failures, [`named external owner check is absent at head: ${external[0]}`], group);
+    assert.throws(() => affectedAskPlan(map), /clean fail-closed map/, group);
+  }
+});
+test('affected v34 program owners: no catch-all, so every near neighbour of every program path stays unmapped by them', () => {
+  const v34Groups = new Set([...V34_OWNER_PINS.map(([group]) => group), 'page-meter']);
+  // Every program path, bent five ways: a sibling file, a deeper file, another extension, a case change and the path outside nextjs/.
+  const neighbours = v34AllPaths().flatMap(path => {
+    const dot = path.lastIndexOf('.'), slash = path.lastIndexOf('/');
+    return [`${path.slice(0, slash)}/zz-new${path.slice(dot)}`, `${path.slice(0, dot)}/index${path.slice(dot)}`, `${path.slice(0, dot)}.bak`,
+      `${path.slice(0, slash + 1)}${path.slice(slash + 1, slash + 2).toUpperCase()}${path.slice(slash + 2)}`, path.slice('nextjs/'.length)];
+  }).concat(['nextjs/app/new-route/page.tsx', 'nextjs/components/v34/routes/new-route/new-route.tsx', 'nextjs/lib/v34/routes-new-route.test.ts',
+    'nextjs/e2e/support/v34-new.ts', 'nextjs/scripts/db/new-race.mjs', 'nextjs/app/api/proposals/[id]/route.ts', 'nextjs/lib/remote-mcp-new.ts']);
+  const programPaths = new Set(v34AllPaths());
+  for (const path of neighbours.filter(p => !programPaths.has(p))) {
+    const owners = AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group).filter(group => v34Groups.has(group));
+    assert.deepEqual(owners, [], path);
+  }
+});
+test('affected database-contract owner: every SQL change selects the three program pgTAP files, each required at head', () => {
+  assert.deepEqual([...DATABASE_CONTRACT_DATABASE_TESTS], ['supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
+  const [owner, ...rest] = AFFECTED_GROUPS.filter(o => o.group === 'database-contract');
+  assert.deepEqual([rest, owner.database, [...owner.databaseTests], [...owner.unitFiles]], [[], true, [...DATABASE_CONTRACT_DATABASE_TESTS], ['lib/pgtap-fixtures.test.ts']]);
+  for (const path of ['supabase/migrations/20261116130000_library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql', 'supabase/drafts/a.sql']) {
+    const map = affectedMap([affectedRecord('M', [path])]);
+    assert.deepEqual([map.failures, map.databaseChanged], [[], true], path);
+    for (const file of DATABASE_CONTRACT_DATABASE_TESTS) assert.ok(map.databaseTests.includes(file), `${path}: ${file}`);
+    const absent = buildAffectedMap({ headSha: affectedHeadSha, records: [affectedRecord('M', [path])], headHasFile: file => file !== 'supabase/tests/foundation_page_meter.sql' });
+    assert.deepEqual(absent.failures, ['selected database fixture is absent at head: supabase/tests/foundation_page_meter.sql'], path);
+  }
+  // A program change that is not SQL starts no DB lane.
+  assert.deepEqual(affectedMap([affectedRecord('M', ['nextjs/lib/change-proposals.ts'])]).databaseTests, []);
+});
+// A neighbour an earlier owner left unknown that the V34 program changed is now that program owner's: asserted to exactly it.
+function assertV34ProgramEndpoint(path) {
+  const entry = Object.entries(V34_PROGRAM_AFFECTED_OWNERS).find(([, owner]) => owner.paths.some(p => `nextjs/${p}` === path));
+  if (!entry) return false;
+  const [group, owner] = entry, map = affectedMap([affectedRecord('M', [path])]);
+  assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles], [[], [group], [], [...owner.unitFiles].sort(), [...owner.browserFiles].sort()], path);
+  return true;
+}

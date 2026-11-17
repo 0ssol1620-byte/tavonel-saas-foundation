@@ -1984,9 +1984,15 @@ export const SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES = Object.freeze([
 // shared rate helper and its new suite -- select every suite that quotes, holds or settles with those rates. The route, the
 // ledger client, the worker and the SQL are owned above (w1-trial-ops, intake-triage, ocr-worker, database-contract).
 // Product code, so never nativeReuse. No browser suite of its own.
-export const PAGE_METER_AFFECTED_PATHS = Object.freeze(['lib/page-meter.test.ts', 'lib/usage-pricing.ts']);
+// WO-D27-1 (V34) adds the ledger replay over the same rates: lib/billing-ledger-replay.ts, its pure suite and its database
+// suite. The pure suite and the webhook replay's adapter suite run here; the ledger replay's database suite skips entirely
+// without TAVONEL_LOCAL_DSN, so it is named as an external check, never as an executed one.
+export const PAGE_METER_AFFECTED_PATHS = Object.freeze(['lib/billing-ledger-replay.db.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-ledger-replay.ts', 'lib/page-meter.test.ts', 'lib/usage-pricing.ts']);
+export const PAGE_METER_AFFECTED_EXTERNAL_CHECKS = Object.freeze({
+  'lib/billing-ledger-replay.db.test.ts': 'a disposable local PostgreSQL 17 cluster with TAVONEL_LOCAL_DSN (scripts/db/local-cluster.mjs); no hosted lane sets it',
+});
 export const PAGE_METER_AFFECTED_UNIT_FILES = Object.freeze([
-  'app/api/compile-jobs/route.test.ts', 'lib/api-error-codes.test.ts', 'lib/billing-reconciliation.test.ts',
+  'app/api/compile-jobs/route.test.ts', 'lib/api-error-codes.test.ts', 'lib/billing-ledger-replay.test.ts', 'lib/billing-reconciliation.test.ts', 'lib/billing-webhook-replay.db.test.ts',
   'lib/compute-reservation.test.ts', 'lib/customer-data-admission-routes.test.ts', 'lib/intake-approval-rollout-off.test.ts',
   'lib/intake-approval-route.test.ts', 'lib/intake-capability-sealed-version.test.ts', 'lib/intake-rollout-compatibility.test.ts',
   'lib/intake-rollout-compile-compatibility.test.ts', 'lib/intake-rollout-server-db-mismatch.test.ts',
@@ -3079,6 +3085,160 @@ export const WORLD_READ_CAP_AFFECTED_UNIT_FILES = Object.freeze(['lib/api-error-
 // revoke-not-plan-gated-20261110: the three revocation routes ask for membership and scope, never the plan ("Never let an ACL revoke wait").
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_PATHS = Object.freeze(['app/api/connections/[id]/route.ts', 'app/api/v1/oauth-connectors/connections/[id]/route.ts', 'lib/connection-revoke-not-plan-gated.test.ts']);
 export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/connection-revoke-not-plan-gated.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/developer-auth.test.ts', 'lib/google-drive-viewer-link-off.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']);
+// V34 program owners (WO-CI-7, lead decisions D-1 and D-4). Every path the program branch changed since the verified baseline,
+// by what owns it. Exact paths, no glob: a new V34 file is a new review, and the map fails closed on it until it is owned.
+// Each owner selects the real suites this lane can execute: Vitest files and Playwright specs with a reviewed project row
+// in run-repair-check.mjs. A suite that only another workflow can run is named in externalChecks with that workflow; the map
+// requires it at head and carries it into the plan, and nothing here executes, inherits or claims it.
+// Product code, so never nativeReuse.
+// Pending (lane review): app/login/login-client.tsx lands with the catalog lane and is not in this tree, so it is not listed
+// here; until an owner names it, the map reports it unmapped at the head that adds it.
+export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
+  // v34-shell: header, drawer, More menu, footer, page frame, JSON-LD, tokens and the shared UI parts: the nav, token and containment suites, every
+  // suite that renders them, and the two audits that walk every V34 live route at ten widths, plus contrast over the core routes.
+  'v34-shell': Object.freeze({
+    paths: Object.freeze(['components/v34/shell/mobile-drawer.module.css', 'components/v34/shell/mobile-drawer.tsx', 'components/v34/shell/more-menu.module.css', 'components/v34/shell/more-menu.tsx', 'components/v34/shell/route-json-ld.tsx', 'components/v34/shell/site-footer.module.css', 'components/v34/shell/site-footer.tsx', 'components/v34/shell/site-header.module.css', 'components/v34/shell/site-header.tsx', 'components/v34/shell/v34-page.module.css', 'components/v34/shell/v34-page.tsx', 'components/v34/tokens.module.css', 'components/v34/ui/article-layout.module.css', 'components/v34/ui/article-layout.tsx', 'components/v34/ui/bridge.module.css', 'components/v34/ui/bridge.tsx', 'components/v34/ui/button-link.module.css', 'components/v34/ui/button-link.tsx', 'components/v34/ui/corpus-stats.module.css', 'components/v34/ui/corpus-stats.tsx', 'components/v34/ui/create-world.ts', 'components/v34/ui/figure.module.css', 'components/v34/ui/figure.tsx', 'components/v34/ui/final-cta.module.css', 'components/v34/ui/final-cta.tsx', 'components/v34/ui/hero.module.css', 'components/v34/ui/hero.tsx', 'components/v34/ui/plan-card.module.css', 'components/v34/ui/plan-card.tsx', 'components/v34/ui/record-card.module.css', 'components/v34/ui/record-card.tsx', 'components/v34/ui/scroll-table.module.css', 'components/v34/ui/scroll-table.tsx', 'components/v34/ui/section.module.css', 'components/v34/ui/section.tsx', 'components/v34/ui/surface.ts', 'components/v34/ui/tag.module.css', 'components/v34/ui/tag.tsx', 'components/v34/ui/text.module.css', 'components/v34/ui/text.tsx', 'components/v34/ui/tool-list.module.css', 'components/v34/ui/tool-list.tsx', 'lib/v34/css-containment.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/nav.ts', 'lib/v34/tokens.test.ts']),
+    unitFiles: Object.freeze(['lib/cta-truth.test.ts', 'lib/output-escaping.test.ts', 'lib/site-nav-model.test.ts', 'lib/structured-data.test.ts', 'lib/v34/css-containment.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/tokens.test.ts']),
+    browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-route-registry: the route registry, its metadata and release gate: every suite that imports them, and the two audits that walk V34_LIVE_PATHS.
+  'v34-route-registry': Object.freeze({
+    paths: Object.freeze(['lib/v34/release.test.ts', 'lib/v34/release.ts', 'lib/v34/route-metadata.test.ts', 'lib/v34/route-metadata.ts', 'lib/v34/routes.test.ts', 'lib/v34/routes.ts']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/landing-v2-outcome-ia.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/site-nav-model.test.ts', 'lib/solutions-hub.test.ts', 'lib/structured-data.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/nav.test.ts', 'lib/v34/release.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/route-metadata.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-capabilities.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-company.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-developers.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-film.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-markets.test.ts', 'lib/v34/routes-methods.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-personal.test.ts', 'lib/v34/routes-platform.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research-program.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-security.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-solutions.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-teams.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/routes.test.ts']),
+    browserFiles: Object.freeze(['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-world: the World instrument, the walkthrough, the public reference corpus and its SVG projection route: their suites and their importers.
+  'v34-world': Object.freeze({
+    paths: Object.freeze(['app/v34/world-layers.svg/route.ts', 'components/v34/walkthrough/identifiers.ts', 'components/v34/walkthrough/walkthrough.module.css', 'components/v34/walkthrough/walkthrough.tsx', 'components/v34/world/canvas2d-renderer.ts', 'components/v34/world/renderer-types.ts', 'components/v34/world/webgl-renderer.ts', 'components/v34/world/world-instrument.tsx', 'components/v34/world/world-island.tsx', 'components/v34/world/world.module.css', 'lib/v34/public-corpus.test.ts', 'lib/v34/public-corpus.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/walkthrough.ts', 'lib/v34/world-geometry.test.ts', 'lib/v34/world-geometry.ts', 'public/v34/corpus-d630a531e460.json']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/product-claims-sync.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/public-corpus.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/world-geometry.test.ts']),
+    browserFiles: Object.freeze(['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-route-bodies: every V34 route body and its app/ page, image card or retired stylesheet: the per-route suites, the body render suite and
+  // the site-wide SEO and metadata walks, plus the three audits over the rendered pages.
+  'v34-route-bodies': Object.freeze({
+    paths: Object.freeze(['app/autopilot/page.tsx', 'app/billing/opengraph-image.tsx', 'app/billing/page.tsx', 'app/capabilities/opengraph-image.tsx', 'app/capabilities/page.tsx', 'app/catalog/page.tsx', 'app/changes/opengraph-image.tsx', 'app/changes/page.tsx', 'app/community/page.tsx', 'app/company/opengraph-image.tsx', 'app/company/page.tsx', 'app/compiler/opengraph-image.tsx', 'app/compiler/page.tsx', 'app/connect/opengraph-image.tsx', 'app/connect/page.tsx', 'app/contact/contact-faq.module.css', 'app/contact/opengraph-image.tsx', 'app/creators/page.tsx', 'app/developers/opengraph-image.tsx', 'app/engineering/opengraph-image.tsx', 'app/engineering/page.tsx', 'app/evidence/evidence.module.css', 'app/federation/page.tsx', 'app/film/layout.tsx', 'app/film/page.tsx', 'app/governance/page.tsx', 'app/journal/compiler/opengraph-image.tsx', 'app/journal/compiler/page.tsx', 'app/journal/markets/page.tsx', 'app/journal/mcp/opengraph-image.tsx', 'app/journal/mcp/page.tsx', 'app/journal/opengraph-image.tsx', 'app/journal/page.tsx', 'app/journal/property/page.tsx', 'app/journal/research/opengraph-image.tsx', 'app/journal/research/page.tsx', 'app/journal/revision/opengraph-image.tsx', 'app/journal/revision/page.tsx', 'app/marketplace/page.tsx', 'app/markets/opengraph-image.tsx', 'app/markets/page.tsx', 'app/methods/opengraph-image.tsx', 'app/methods/page.tsx', 'app/outcomes/page.tsx', 'app/personal/opengraph-image.tsx', 'app/personal/page.tsx', 'app/platform/opengraph-image.tsx', 'app/platform/page.tsx', 'app/realestate/page.tsx', 'app/research/opengraph-image.tsx', 'app/research/program/opengraph-image.tsx', 'app/research/program/page.tsx', 'app/skills/page.tsx', 'app/solutions/opengraph-image.tsx', 'app/steward/page.tsx', 'app/studio/opengraph-image.tsx', 'app/studio/page.tsx', 'app/teams/page.tsx', 'app/trading/page.tsx', 'app/world/opengraph-image.tsx', 'app/world/page.tsx', 'components/v34/route-stub.tsx', 'components/v34/routes/autopilot/autopilot-content.ts', 'components/v34/routes/autopilot/autopilot.module.css', 'components/v34/routes/autopilot/autopilot.tsx', 'components/v34/routes/capabilities/capabilities-content.ts', 'components/v34/routes/capabilities/capabilities-status.ts', 'components/v34/routes/capabilities/capabilities.module.css', 'components/v34/routes/capabilities/capabilities.tsx', 'components/v34/routes/catalog/catalog.module.css', 'components/v34/routes/catalog/catalog.tsx', 'components/v34/routes/changes/changes-art.tsx', 'components/v34/routes/changes/changes-content.ts', 'components/v34/routes/changes/changes.module.css', 'components/v34/routes/changes/changes.tsx', 'components/v34/routes/community/community.module.css', 'components/v34/routes/community/community.tsx', 'components/v34/routes/company/company-art.tsx', 'components/v34/routes/company/company-content.ts', 'components/v34/routes/company/company.module.css', 'components/v34/routes/company/company.tsx', 'components/v34/routes/compiler/compiler-art.tsx', 'components/v34/routes/compiler/compiler-content.ts', 'components/v34/routes/compiler/compiler.module.css', 'components/v34/routes/compiler/compiler.tsx', 'components/v34/routes/connect/connect-content.ts', 'components/v34/routes/connect/connect-sources.ts', 'components/v34/routes/connect/connect.module.css', 'components/v34/routes/connect/connect.tsx', 'components/v34/routes/contact/contact-art.tsx', 'components/v34/routes/contact/contact-content.ts', 'components/v34/routes/contact/contact.module.css', 'components/v34/routes/contact/contact.tsx', 'components/v34/routes/creators/creators-content.ts', 'components/v34/routes/creators/creators.module.css', 'components/v34/routes/creators/creators.tsx', 'components/v34/routes/developers/code-block.module.css', 'components/v34/routes/developers/code-block.tsx', 'components/v34/routes/developers/developers-content.ts', 'components/v34/routes/developers/developers.module.css', 'components/v34/routes/developers/developers.tsx', 'components/v34/routes/engineering/engineering-art.tsx', 'components/v34/routes/engineering/engineering-content.ts', 'components/v34/routes/engineering/engineering.module.css', 'components/v34/routes/engineering/engineering.tsx', 'components/v34/routes/enterprise/enterprise-art.tsx', 'components/v34/routes/enterprise/enterprise-content.ts', 'components/v34/routes/enterprise/enterprise.module.css', 'components/v34/routes/enterprise/enterprise.tsx', 'components/v34/routes/enterprise/sample-frame.module.css', 'components/v34/routes/enterprise/sample-frame.tsx', 'components/v34/routes/evidence/evidence-art.tsx', 'components/v34/routes/evidence/evidence-content.ts', 'components/v34/routes/evidence/evidence-regions.tsx', 'components/v34/routes/evidence/evidence.module.css', 'components/v34/routes/evidence/evidence.tsx', 'components/v34/routes/federation/federation.module.css', 'components/v34/routes/federation/federation.tsx', 'components/v34/routes/film/film-art.tsx', 'components/v34/routes/film/film-content.ts', 'components/v34/routes/film/film.module.css', 'components/v34/routes/film/film.tsx', 'components/v34/routes/governance/governance.module.css', 'components/v34/routes/governance/governance.tsx', 'components/v34/routes/home/home-analytics.tsx', 'components/v34/routes/home/home-content.ts', 'components/v34/routes/home/home.module.css', 'components/v34/routes/home/home.tsx', 'components/v34/routes/journal-compiler/compiler-article.tsx', 'components/v34/routes/journal-compiler/compiler-sources.ts', 'components/v34/routes/journal-compiler/proof-line.module.css', 'components/v34/routes/journal-compiler/proof-line.tsx', 'components/v34/routes/journal-markets/figures.tsx', 'components/v34/routes/journal-markets/markets-article.tsx', 'components/v34/routes/journal-markets/markets-sources.ts', 'components/v34/routes/journal-mcp/config-block.module.css', 'components/v34/routes/journal-mcp/config-block.tsx', 'components/v34/routes/journal-mcp/mcp-article.tsx', 'components/v34/routes/journal-mcp/mcp-sources.ts', 'components/v34/routes/journal-property/figures.tsx', 'components/v34/routes/journal-property/property-article.tsx', 'components/v34/routes/journal-property/property-sources.ts', 'components/v34/routes/journal-research/figures.tsx', 'components/v34/routes/journal-research/research-article.tsx', 'components/v34/routes/journal-research/research-sources.ts', 'components/v34/routes/journal-revision/figures.tsx', 'components/v34/routes/journal-revision/revision-article.tsx', 'components/v34/routes/journal-revision/revision-sources.ts', 'components/v34/routes/journal/article-dates.ts', 'components/v34/routes/journal/covers.module.css', 'components/v34/routes/journal/covers.tsx', 'components/v34/routes/journal/journal-content.ts', 'components/v34/routes/journal/journal.module.css', 'components/v34/routes/journal/journal.tsx', 'components/v34/routes/journal/read-next.module.css', 'components/v34/routes/journal/read-next.tsx', 'components/v34/routes/marketplace/marketplace.module.css', 'components/v34/routes/marketplace/marketplace.tsx', 'components/v34/routes/markets/markets-art.tsx', 'components/v34/routes/markets/markets-content.ts', 'components/v34/routes/markets/markets.module.css', 'components/v34/routes/markets/markets.tsx', 'components/v34/routes/methods/methods-art.tsx', 'components/v34/routes/methods/methods-content.ts', 'components/v34/routes/methods/methods.module.css', 'components/v34/routes/methods/methods.tsx', 'components/v34/routes/outcomes/outcomes.module.css', 'components/v34/routes/outcomes/outcomes.tsx', 'components/v34/routes/personal/personal-art.tsx', 'components/v34/routes/personal/personal-content.ts', 'components/v34/routes/personal/personal.module.css', 'components/v34/routes/personal/personal.tsx', 'components/v34/routes/platform/platform-art.tsx', 'components/v34/routes/platform/platform-content.ts', 'components/v34/routes/platform/platform.module.css', 'components/v34/routes/platform/platform.tsx', 'components/v34/routes/realestate/realestate-content.ts', 'components/v34/routes/realestate/realestate.module.css', 'components/v34/routes/realestate/realestate.tsx', 'components/v34/routes/research-program/program-content.ts', 'components/v34/routes/research-program/program.module.css', 'components/v34/routes/research-program/program.tsx', 'components/v34/routes/research/research-art.tsx', 'components/v34/routes/research/research-content.ts', 'components/v34/routes/research/research-data.ts', 'components/v34/routes/research/research.module.css', 'components/v34/routes/research/research.tsx', 'components/v34/routes/security/provisions.module.css', 'components/v34/routes/security/provisions.tsx', 'components/v34/routes/security/security-art.tsx', 'components/v34/routes/security/security-content.ts', 'components/v34/routes/security/security.module.css', 'components/v34/routes/security/security.tsx', 'components/v34/routes/skills/skills-content.ts', 'components/v34/routes/skills/skills.module.css', 'components/v34/routes/skills/skills.tsx', 'components/v34/routes/solutions/solutions-art.tsx', 'components/v34/routes/solutions/solutions-content.ts', 'components/v34/routes/solutions/solutions.module.css', 'components/v34/routes/solutions/solutions.tsx', 'components/v34/routes/steward/steward-content.ts', 'components/v34/routes/steward/steward.module.css', 'components/v34/routes/steward/steward.tsx', 'components/v34/routes/studio/studio-content.ts', 'components/v34/routes/studio/studio.module.css', 'components/v34/routes/studio/studio.tsx', 'components/v34/routes/teams/teams-art.tsx', 'components/v34/routes/teams/teams-content.ts', 'components/v34/routes/teams/teams.module.css', 'components/v34/routes/teams/teams.tsx', 'components/v34/routes/trading/trading-content.ts', 'components/v34/routes/trading/trading.module.css', 'components/v34/routes/trading/trading.tsx', 'components/v34/routes/world/world-content.ts', 'components/v34/routes/world/world.module.css', 'components/v34/routes/world/world.tsx', 'lib/v34/home-page.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/route-test-support.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-capabilities.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-company.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-developers.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-film.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-markets.test.ts', 'lib/v34/routes-methods.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-personal.test.ts', 'lib/v34/routes-platform.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research-program.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-security.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-solutions.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-teams.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-snippets.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/keyless-try-it.test.ts', 'lib/page-metadata.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/solution-workflows.test.ts', 'lib/solutions-hub.test.ts', 'lib/support-targets.test.ts', 'lib/trust-page-answers.test.ts', 'lib/trust-provisions.test.ts', 'lib/v34/css-containment.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/route-bodies.test.ts', 'lib/v34/route-metadata.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-capabilities.test.ts', 'lib/v34/routes-catalog.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-community.test.ts', 'lib/v34/routes-company.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-developers.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-federation.test.ts', 'lib/v34/routes-film.test.ts', 'lib/v34/routes-governance.test.ts', 'lib/v34/routes-journal-markets.test.ts', 'lib/v34/routes-journal-property.test.ts', 'lib/v34/routes-journal-research.test.ts', 'lib/v34/routes-journal-revision.test.ts', 'lib/v34/routes-journal.test.ts', 'lib/v34/routes-marketplace.test.ts', 'lib/v34/routes-markets.test.ts', 'lib/v34/routes-methods.test.ts', 'lib/v34/routes-outcomes.test.ts', 'lib/v34/routes-personal.test.ts', 'lib/v34/routes-platform.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research-program.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-security.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-solutions.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-teams.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/routes.test.ts', 'lib/v34/tokens.test.ts']),
+    browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-qa-harness: the V34 QA matrix and its helpers. Their only checks are the v34-* Playwright projects, which run-repair-check.mjs has
+  // no reviewed project row for, so they are named as external checks and none is executed or claimed here.
+  'v34-qa-harness': Object.freeze({
+    paths: Object.freeze(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/v34-matrix.spec.ts': '.github/workflows/launch-qa.yml v34-chromium project (WO-CI-9)',
+      'e2e/v34-support.selftest.spec.ts': 'playwright.config.ts v34-selftest project',
+    }),
+  }),
+  // v34-guard-suites: the legacy guard suites brought to the V34 truth, the two helpers they follow and the contrast audit: each selects itself.
+  'v34-guard-suites': Object.freeze({
+    paths: Object.freeze(['e2e/contrast-zoom-audit.spec.ts', 'lib/client-route-weight.test.ts', 'lib/contact-locale.ts', 'lib/contact-qualification.test.ts', 'lib/developer-snippets.test.ts', 'lib/landing-experiments.test.ts', 'lib/landing-experiments.ts', 'lib/output-escaping.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/security-txt.test.ts', 'lib/solutions-hub.test.ts', 'lib/solutions-thumbnails.test.ts', 'lib/structured-data.test.ts', 'lib/support-targets.test.ts', 'lib/trust-provisions.test.ts']),
+    unitFiles: Object.freeze(['lib/client-route-weight.test.ts', 'lib/contact-locale.test.ts', 'lib/contact-qualification.test.ts', 'lib/cookbook-content.test.ts', 'lib/developer-snippets.test.ts', 'lib/landing-experiments.test.ts', 'lib/output-escaping.test.ts', 'lib/page-seo.test.ts', 'lib/route-canonical-metadata.test.ts', 'lib/security-txt.test.ts', 'lib/seo-surface.test.ts', 'lib/solutions-hub.test.ts', 'lib/solutions-thumbnails.test.ts', 'lib/structured-data.test.ts', 'lib/support-targets.test.ts', 'lib/trust-provisions.test.ts']),
+    browserFiles: Object.freeze(['e2e/contrast-zoom-audit.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // korean-surface-removal: D33 F0, the /ko surface removed (every /ko URL answers 308): the suites that assert the redirect and the English-only chrome.
+  'korean-surface-removal': Object.freeze({
+    paths: Object.freeze(['app/ko/contact/opengraph-image.tsx', 'app/ko/document-lang.tsx', 'app/ko/evaluation/page.tsx', 'app/ko/opengraph-image.tsx', 'components/evaluation-page.test.tsx', 'components/skip-link.tsx', 'lib/ko-terms.test.ts']),
+    unitFiles: Object.freeze(['components/evaluation-page.test.tsx', 'lib/cta-truth.test.ts', 'lib/ko-terms.test.ts', 'lib/og-card-frame.test.ts', 'lib/page-seo.test.ts', 'lib/seo-surface.test.ts', 'lib/site-nav-model.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // proposals-library: WO-D23-4 and WO-D30: Library decisions and change proposals, their routes, panels and migration suites, plus the route
+  // classification and CSRF matrices that every new API route enters. The browser spec has no repair project row.
+  'proposals-library': Object.freeze({
+    paths: Object.freeze(['app/api/library/decisions/route.ts', 'app/api/library/route.ts', 'app/api/proposals/[id]/decision/route.ts', 'app/api/proposals/[id]/undo/route.ts', 'app/api/proposals/route.ts', 'components/change-proposals-panel.module.css', 'components/change-proposals-panel.tsx', 'components/library-panel.module.css', 'components/library-panel.tsx', 'e2e/change-proposals.spec.ts', 'lib/change-inbox.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/change-proposals.ts', 'lib/library-label-decisions-migration.test.ts', 'lib/library-routes.test.ts', 'lib/world-change-proposals-migration.test.ts']),
+    unitFiles: Object.freeze(['lib/change-inbox.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/library-label-decisions-migration.test.ts', 'lib/library-routes.test.ts', 'lib/library-shadow.test.ts', 'lib/route-classification.test.ts', 'lib/world-change-proposals-migration.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/change-proposals.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+    }),
+  }),
+  // workspace-journey: D23-1/3/5: the file states, purpose picker and journey rail. The census browser spec has no repair project row.
+  'workspace-journey': Object.freeze({
+    paths: Object.freeze(['components/workspace-getting-started.tsx', 'components/workspace-purpose-picker.module.css', 'components/workspace-purpose-picker.tsx', 'e2e/file-census-resume.spec.ts', 'lib/file-states.test.ts', 'lib/file-states.ts', 'lib/workspace-journey.test.ts', 'lib/workspace-journey.ts']),
+    unitFiles: Object.freeze(['lib/copy-trust-guard.test.ts', 'lib/file-states.test.ts', 'lib/workspace-journey.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/file-census-resume.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+    }),
+  }),
+  // compile-pipeline: D06-3, D13 and D24-2: compile-input manifest, receipt v2 signing and its promote/rollback check, queue timing. The two
+  // compile browser specs have no repair project row.
+  'compile-pipeline': Object.freeze({
+    paths: Object.freeze(['e2e/compile-job-states-mobile.spec.ts', 'e2e/compile-resume.spec.ts', 'lib/collection-compile-v2-only.test.ts', 'lib/compile-input-manifest.test.ts', 'lib/compile-input-manifest.ts', 'lib/compile-queue-timing.test.ts', 'lib/compile-queue-timing.ts', 'lib/compile-receipt-signing.test.ts', 'lib/compile-receipt-signing.ts', 'lib/fixtures/compile-input-manifest.v1.json', 'lib/promotion-receipt-check.test.ts', 'lib/promotion-receipt-check.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/world-promotion-current-source.test.ts', 'lib/world-rollback-source-access.test.ts']),
+    unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/collection-compile-run.test.ts', 'lib/collection-compile-v2-only.test.ts', 'lib/compile-input-manifest.test.ts', 'lib/compile-queue-timing.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/promotion-receipt-check.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-promotion-current-source.test.ts', 'lib/world-rollback-source-access.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/compile-job-states-mobile.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+      'e2e/compile-resume.spec.ts': '.github/workflows/launch-qa.yml Product QA (audit project)',
+    }),
+  }),
+  // world-temporal-lens: D16 and D18: lens URL state, temporal view, activation history, by-id reads and sealed page tokens. The two lens
+  // browser specs have no repair project row.
+  'world-temporal-lens': Object.freeze({
+    paths: Object.freeze(['e2e/fixtures/world-lens-model.ts', 'e2e/world-graph-scale.spec.ts', 'e2e/world-lens.spec.ts', 'lib/sealed-claims.test.ts', 'lib/sealed-claims.ts', 'lib/world-activation-history.test.ts', 'lib/world-activation-history.ts', 'lib/world-lens-by-id.test.ts', 'lib/world-lens-url.test.ts', 'lib/world-lens-url.ts', 'lib/world-temporal-routes.test.ts', 'lib/world-temporal-view.test.ts', 'lib/world-temporal-view.ts']),
+    unitFiles: Object.freeze(['lib/sealed-claims.test.ts', 'lib/world-activation-history.test.ts', 'lib/world-lens-by-id.test.ts', 'lib/world-lens-url.test.ts', 'lib/world-temporal-routes.test.ts', 'lib/world-temporal-view.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'e2e/world-graph-scale.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+      'e2e/world-lens.spec.ts': '.github/workflows/launch-qa.yml Product QA (width projects)',
+    }),
+  }),
+  // control-plane: D29 and D31: the signed capability manifest and the World release contract, with the signature-scope suite.
+  'control-plane': Object.freeze({
+    paths: Object.freeze(['lib/capability-manifest.test.ts', 'lib/capability-manifest.ts', 'lib/export-signing.test.ts', 'lib/world-release.test.ts', 'lib/world-release.ts']),
+    unitFiles: Object.freeze(['lib/capability-manifest.test.ts', 'lib/export-signing.test.ts', 'lib/world-release.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // developer-surface: D18-3 and D19: the remote MCP facade, readiness, refresh and its matrices, and the signed answer receipt parity suite.
+  'developer-surface': Object.freeze({
+    paths: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-facade.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-readiness.ts', 'lib/remote-mcp-refresh.test.ts']),
+    unitFiles: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-refresh.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // tenant-isolation: D05, D15-3 and D24-3: tenant-key and same-bytes/distinct-ACL contracts, adversarial negatives, the fresh ACL read, the log guard.
+  'tenant-isolation': Object.freeze({
+    paths: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/connector-critical-read.test.ts', 'lib/connector-critical-read.ts', 'lib/no-sensitive-log.test.ts', 'lib/same-bytes-distinct-acl.test.ts', 'lib/tenant-key-contract.test.ts']),
+    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/connector-critical-read.test.ts', 'lib/no-sensitive-log.test.ts', 'lib/same-bytes-distinct-acl.test.ts', 'lib/tenant-key-contract.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // billing-reconciliation: D24-5, D27-2/3 and D28-3/4: Paddle reads and reconciliation, revenue paths, settlement economics and the local webhook
+  // replay. The operator CLI's suite is an .mjs Vitest file the repair runner does not register; ci.yml runs it.
+  'billing-reconciliation': Object.freeze({
+    paths: Object.freeze(['lib/billing-webhook-replay.db.test.ts', 'lib/paddle-api.test.ts', 'lib/paddle-api.ts', 'lib/paddle-reconciliation.test.ts', 'lib/paddle-reconciliation.ts', 'lib/revenue-paths.test.ts', 'lib/revenue-paths.ts', 'lib/settlement-economics.test.ts', 'lib/settlement-economics.ts', 'lib/testing/postgrest-rpc-psql.ts', 'scripts/billing/paddle-reconcile.mjs', 'scripts/billing/paddle-reconcile.test.mjs']),
+    unitFiles: Object.freeze(['lib/billing-gate-enforcement.test.ts', 'lib/billing-refund-request.test.ts', 'lib/billing-webhook-replay.db.test.ts', 'lib/paddle-api.test.ts', 'lib/paddle-reconciliation.test.ts', 'lib/revenue-paths.test.ts', 'lib/settlement-economics.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'scripts/billing/paddle-reconcile.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (Vitest include scripts/billing/*.test.mjs)',
+    }),
+  }),
+  // db-harness: D06-1, D15, D24-1/4: the disposable PostgreSQL 17 cluster, race harnesses, restore drill and SQL test runner. Their
+  // suites are node:test files the repair runner does not register; ci.yml runs them, so they are external checks here.
+  'db-harness': Object.freeze({
+    paths: Object.freeze(['scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({
+      'scripts/db/connector-acl-race.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+      'scripts/db/database-restore-drill.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+      'scripts/db/job-lease-race.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+      'scripts/db/local-cluster.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+      'scripts/db/run-sql-tests.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+      'scripts/db/world-transition-race.test.mjs': '.github/workflows/ci.yml nextjs job: pnpm test (test:scripts, node --test scripts/db/*.test.mjs)',
+    }),
+  }),
+});
+// D-4: the program's three pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full rehearsal.
+export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3221,7 +3381,7 @@ export const AFFECTED_GROUPS = Object.freeze([
     { unitFiles: SWITCH_ON_BILLING_INTEGRITY_AFFECTED_UNIT_FILES }),
   // Page meter: the two exact paths above select twenty-eight direct suites and no browser suite.
   affectedGroup('page-meter', new RegExp(`^nextjs/(?:${exactPathAlternation(PAGE_METER_AFFECTED_PATHS)})$`),
-    { unitFiles: PAGE_METER_AFFECTED_UNIT_FILES }),
+    { unitFiles: PAGE_METER_AFFECTED_UNIT_FILES, externalChecks: PAGE_METER_AFFECTED_EXTERNAL_CHECKS }),
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
@@ -3357,7 +3517,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // The exact global Vitest config only: selector/static checks, distinct from the Home owner; its content must pass
   // vitestDiscoveryConfigFailures at head or the map fails closed.
   affectedGroup('shared-test-discovery', /^nextjs\/vitest\.config\.ts$/, { selector: true }),
-  affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true }),
+  affectedGroup('database-contract', /^supabase\/(?:migrations|tests|drafts)\/[A-Za-z0-9_./-]+\.sql$/, { unitFiles: ['lib/pgtap-fixtures.test.ts'], database: true, databaseTests: DATABASE_CONTRACT_DATABASE_TESTS }),
   affectedGroup('native-harness-docs', /^docs\/integration\/NATIVE_WORLD_[A-Z_]+\.md$/),
   affectedGroup('repository-docs', /^(?:docs\/(?!integration\/NATIVE_WORLD_)[A-Za-z0-9_./-]+\.md|[A-Za-z0-9_.-]+\.md)$/, { nativeReuse: true }),
   // ask-answerability-e2: the 10 exact paths above select 2 direct suites and no browser suite.
@@ -3372,6 +3532,8 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
+  ...Object.entries(V34_PROGRAM_AFFECTED_OWNERS).map(([group, { paths, unitFiles, browserFiles, externalChecks }]) =>
+    affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation(paths)})$`), { unitFiles, browserFiles, externalChecks })),
 ]);const regularModes = ['100644', '100755'];
 
 export function parseAffectedRawDiff(output) {
@@ -3396,7 +3558,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
   if (!sha(headSha)) throw new Error('Affected map requires an exact head SHA.');
   const failures = [], entries = [], unmappedPaths = [];
   const groups = new Set(), unitFiles = new Set(), browserFiles = new Set(), databaseTests = new Set(), invalidatingPaths = new Set();
-  const dependencyReasons = new Map();
+  const dependencyReasons = new Map(), externalChecks = new Map();
   let worker = false, selector = false, database = false, discoveryConfig = false;
   for (const { oldMode, newMode, status, paths } of records) {
     const label = paths.join(' -> ');
@@ -3421,6 +3583,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
         for (const file of owner.browserFiles) browserFiles.add(file);
         for (const file of owner.databaseTests ?? []) databaseTests.add(file);
         for (const [file, reason] of Object.entries(owner.databaseDependencies ?? {})) dependencyReasons.set(file, new Set([...(dependencyReasons.get(file) ?? []), reason]));
+        for (const [file, runner] of Object.entries(owner.externalChecks ?? {})) externalChecks.set(file, runner);
         worker ||= Boolean(owner.worker);
         selector ||= Boolean(owner.selector);
         database ||= Boolean(owner.database);
@@ -3437,6 +3600,10 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
   }
   for (const file of [...databaseTests].sort()) {
     if (!headHasFile(file)) failures.push(`selected database fixture is absent at head: ${file}`);
+  }
+  // A suite only another workflow runs is still named and still required at head; it is recorded, never executed or claimed.
+  for (const file of [...externalChecks.keys()].sort()) {
+    if (!headHasFile(`nextjs/${file}`)) failures.push(`named external owner check is absent at head: ${file}`);
   }
   // Either rename endpoint or a deletion of the shared discovery config still requires its admitted content at head.
   if (discoveryConfig) {
@@ -3465,6 +3632,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
     databaseChanged: database,
     databaseTests: [...databaseTests].sort(),
     databaseDependencyReasons,
+    externalChecks: [...externalChecks.keys()].sort().map(file => ({ file, runner: externalChecks.get(file), status: 'run by its own workflow; neither executed, inherited nor claimed by this map' })),
     fixtureContracts: AFFECTED_GROUPS.filter((owner, index, owners) => groups.has(owner.group) && owner.fixtureContract && owners.findIndex(candidate => candidate.group === owner.group && candidate.fixtureContract?.suite === owner.fixtureContract.suite) === index)
       .map(owner => ({ group: owner.group, ...owner.fixtureContract, enforcement: 'selected as a required executed-passing suite; the declared case count is recorded, not asserted' })),
     nativeEvidence: {
