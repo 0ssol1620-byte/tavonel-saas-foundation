@@ -800,3 +800,82 @@ test.describe("More menu", () => {
     expect((await moreMenuPass(page)).map(v => v.detail)).toEqual(["no visible More button at 1440px"]);
   });
 });
+
+/*
+  WO-CI-27 (lead decision 19): "painted" is what the browser paints, not "inside a closed <details>".
+  The class: a closed <details> whose body the page shows anyway (the wide footer's ::details-content
+  is display: block and content-visibility: visible). Its contents are painted and tabbable, so every
+  helper measures them; a plain closed body stays unpainted and stays skipped (the cases above).
+*/
+test.describe("painted closed details", () => {
+  const SHOWN = `.shown::details-content{display:block;content-visibility:visible}`;
+  const ring = ".r:focus-visible{outline:2px solid #00e}";
+
+  /** Ground truth that does not use checkVisibility: the fixture's details is closed and its body is hit-tested. */
+  async function paintedClosed(page: Page, selector: string): Promise<void> {
+    expect(await page.locator(selector).first().evaluate(e => {
+      const r = e.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + Math.min(r.width / 2, 20), r.top + r.height / 2);
+      return { open: e.closest("details")!.open, hit: !!hit && (hit === e || e.contains(hit) || hit.contains(e)) };
+    })).toEqual({ open: false, hit: true });
+  }
+
+  test("clipping: text in a painted closed body is measured", async ({ page }) => {
+    const rows = `<div style="width:120px;overflow:hidden"><details class="shown"><summary>plan limits</summary><ul style="width:400px;margin:0"><li id="t">closed list item that is wider than the box</li></ul></details></div>`;
+    await load(page, rows, SHOWN);
+    await paintedClosed(page, "#t");
+    expect((await page.evaluate(measureClippedRows)).length).toBeGreaterThan(0);
+    await load(page, `<details class="shown"><summary>q</summary><p id="t" style="width:60px;overflow:hidden;white-space:nowrap;margin:0">a long clipped sentence here</p></details>`, SHOWN);
+    await paintedClosed(page, "#t");
+    expect((await page.evaluate(measureClippedText)).some(v => v.pass === "clipped-text")).toBe(true);
+    // The same fixtures without the shown body are not painted, so not measured.
+    await load(page, rows);
+    expect(await page.evaluate(measureClippedRows)).toEqual([]);
+  });
+
+  test("clipping: an element with no box of its own (display: contents) is judged where its content is painted", async ({ page }) => {
+    await load(page, `<div style="width:120px;overflow:hidden;white-space:nowrap"><span style="display:contents">a very long line of text clipped by the box</span></div>`);
+    expect((await page.evaluate(measureClippedRows)).length).toBeGreaterThan(0);
+    // Its parent is a details, but its content goes to the details' body: shown, painted; closed, not painted.
+    const inBody = `<div style="width:120px;overflow:hidden;white-space:nowrap"><details class="shown"><summary>s</summary><span style="display:contents">a very long line of text clipped by the box</span></details></div>`;
+    await load(page, inBody, SHOWN);
+    expect((await page.evaluate(measureClippedRows)).length).toBeGreaterThan(0);
+    await load(page, inBody);
+    expect(await page.evaluate(measureClippedRows)).toEqual([]);
+  });
+
+  test("a summary inside a closed body is not painted, so not sampled (/pricing: the questions inside 'Questions before you buy')", async ({ page }) => {
+    const nested = `<main style="background:#fff;padding:12px"><details><summary>outer</summary><details><summary id="t" style="color:#ccc">inner pale question</summary><p>answer</p></details></details></main>`;
+    await load(page, nested);
+    expect((await contrastPass(page)).violations).toEqual([]);
+    // Opened, the same pale summary is painted and fails.
+    await load(page, nested.replace("<details>", "<details open>"));
+    expect((await contrastPass(page)).violations.map(v => v.selector)).toEqual(["summary#t"]);
+  });
+
+  test("contrast: text and a control in a painted closed body are sampled", async ({ page }) => {
+    const body = `<main style="background:#fff;padding:12px"><details class="shown"><summary>more</summary><a id="t" href="#x" style="color:#ccc">pale painted link</a><br><input style="border:1px solid #e2e2e2;background:#fff;padding:6px"></details></main>`;
+    await load(page, body, SHOWN);
+    await paintedClosed(page, "#t");
+    expect((await contrastPass(page)).violations.map(v => v.selector)).toEqual(["a#t"]);
+    expect(await controlContrastPass(page)).toHaveLength(1);
+    await load(page, body);
+    expect((await contrastPass(page)).violations).toEqual([]);
+    expect(await controlContrastPass(page)).toEqual([]);
+  });
+
+  test("keyboard: a link in a painted closed body is owed a tab stop", async ({ page }) => {
+    // The second button sends focus back to the first, so the walk ends on a trap and lists what it never reached.
+    const pad = "padding:14px 20px";
+    const body = `<button id="f" class="r" style="${pad}">first</button><button class="r" style="${pad}" onfocus="f.focus()">bounce</button><details class="shown"><summary class="r" style="${pad}">group</summary><a id="t" class="r" href="#x" style="display:inline-block;${pad}">painted link</a></details>`;
+    await load(page, body, ring + SHOWN);
+    await paintedClosed(page, "#t");
+    const trap = (await keyboardWalk(page)).violations.filter(v => v.pass === "keyboard-trap").map(v => v.detail);
+    expect(trap).toHaveLength(1);
+    expect(trap[0]).toContain("a#t[painted link]");
+    await load(page, body, ring);
+    const plain = (await keyboardWalk(page)).violations.filter(v => v.pass === "keyboard-trap").map(v => v.detail);
+    expect(plain).toHaveLength(1);
+    expect(plain[0]).not.toContain("a#t[painted link]");
+  });
+});

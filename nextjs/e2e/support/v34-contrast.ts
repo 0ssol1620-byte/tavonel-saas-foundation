@@ -71,10 +71,17 @@ function collectTargets([max, scope]: [number, string | null]): Target[] {
     .filter(e => [...e.childNodes].some(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1))
     .sort((a, b) => priority(a) - priority(b));
   document.querySelectorAll(`[${"data-v34-contrast-idx"}]`).forEach(e => e.removeAttribute("data-v34-contrast-idx"));
+  // The predicate of v34-measure.ts (WO-CI-27): what the browser paints, e.g. not a closed <details> body unless the page shows it.
+  const painted = (e: Element): boolean => {
+    const opts = { contentVisibilityAuto: false, opacityProperty: false, visibilityProperty: false };
+    if (getComputedStyle(e).display !== "contents") return e.checkVisibility(opts);
+    const probe = e.appendChild(document.createElement("v34-paint-probe"));
+    try { return probe.checkVisibility(opts); } finally { probe.remove(); }
+  };
   for (const el of all) {
     if (el.closest("canvas, svg, [hidden], script, style")) continue;
-    // A closed <details> body is not painted: its box is a leftover layout rect, and what a screenshot finds there is whatever sits beneath it.
-    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
+    // An unpainted element's box is a leftover layout rect (a closed <details> body), and what a screenshot finds there is whatever sits beneath it.
+    if (!painted(el)) continue;
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
     if (s.display === "none" || s.visibility === "hidden" || r.width < 2 || r.height < 2) continue;
@@ -315,8 +322,8 @@ function collectControls([max, scope]: [number, string | null]): { index: number
     const s = getComputedStyle(el);
     const r = el.getBoundingClientRect();
     if (s.display === "none" || s.visibility === "hidden" || r.width < 8 || r.height < 8 || el.matches(":disabled, [aria-disabled='true']")) continue;
-    // The same rule as the text pass: a control in a closed <details> body is not painted, and its leftover rect samples whatever lies beneath. The matrix opens the details and measures it there.
-    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
+    // The same rule as the text pass: a control in an unpainted closed <details> body has a leftover rect that samples whatever lies beneath. The matrix opens the details and measures it there.
+    if (!el.checkVisibility({ contentVisibilityAuto: false, opacityProperty: false, visibilityProperty: false })) continue;
     const borderPx = parseFloat(s.borderTopWidth);
     if (s.borderTopStyle === "none" || borderPx <= 0) continue;
     const border = rgba(s.borderTopColor), fill = rgba(s.backgroundColor);

@@ -62,9 +62,19 @@ export function measureClippedText(): Violation[] {
     const cls = typeof el.className === "string" && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : "";
     return `${el.tagName.toLowerCase()}${id}${cls}`.slice(0, 120);
   };
-  // A closed <details> body keeps a layout rect it does not paint; its summary is painted.
-  const inClosedDetails = (el: Element) => !!el.closest("details:not([open])") && !el.closest("summary");
-  const exempt = (el: Element) => !!el.closest("[data-v34-scroll], [data-v34-overlay], canvas, svg, [hidden]") || inClosedDetails(el);
+  /*
+    Painted, as the browser decides it (WO-CI-27): a closed <details> body keeps a layout rect it does not
+    paint, unless the page shows it (the wide footer's ::details-content). Opacity, visibility and
+    content-visibility: auto are left out: the checks read opacity and visibility themselves, and an
+    auto-skipped section is painted once scrolled to. display: contents has no box, so a child probe answers.
+  */
+  const painted = (el: Element): boolean => {
+    const opts = { contentVisibilityAuto: false, opacityProperty: false, visibilityProperty: false };
+    if (getComputedStyle(el).display !== "contents") return el.checkVisibility(opts);
+    const probe = el.appendChild(document.createElement("v34-paint-probe"));
+    try { return probe.checkVisibility(opts); } finally { probe.remove(); }
+  };
+  const exempt = (el: Element) => !!el.closest("[data-v34-scroll], [data-v34-overlay], canvas, svg, [hidden]") || !painted(el);
   for (const el of document.querySelectorAll("body *")) {
     const own = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1);
     if (!own || exempt(el)) continue;
@@ -267,11 +277,18 @@ export function measureClippedRows(): Violation[] {
     const s = getComputedStyle(el);
     return s.display !== "none" && s.visibility !== "hidden" && Number(s.opacity) !== 0;
   };
+  // The predicate of measureClippedText (WO-CI-27): what the browser paints, e.g. not a closed <details> body unless the page shows it.
+  const painted = (el: Element): boolean => {
+    const opts = { contentVisibilityAuto: false, opacityProperty: false, visibilityProperty: false };
+    if (getComputedStyle(el).display !== "contents") return el.checkVisibility(opts);
+    const probe = el.appendChild(document.createElement("v34-paint-probe"));
+    try { return probe.checkVisibility(opts); } finally { probe.remove(); }
+  };
   for (const el of document.querySelectorAll("body *")) {
     if (out.length >= 40) break;
     if (el.closest("[data-v34-scroll], canvas, svg, [hidden]") || !live(el)) continue;
-    // Text in a closed <details> is not drawn, so nothing is clipped.
-    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
+    // Text that is not drawn is not clipped.
+    if (!painted(el)) continue;
     const own = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1);
     if (own) {
       const range = document.createRange();

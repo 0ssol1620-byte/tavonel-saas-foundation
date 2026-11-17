@@ -94,13 +94,20 @@ export async function keyboardWalk(page: Page, max = 250): Promise<KeyboardResul
       if (isFirst && visits === 2) {
         const sel = 'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable=""], [contenteditable="true"]';
         const groups = new Set<string>();
+        // The predicate of v34-measure.ts (WO-CI-27): what the browser paints, e.g. not a closed <details> body unless the page shows it.
+        const painted = (el: Element): boolean => {
+          const opts = { contentVisibilityAuto: false, opacityProperty: false, visibilityProperty: false };
+          if (getComputedStyle(el).display !== "contents") return el.checkVisibility(opts);
+          const probe = el.appendChild(document.createElement("v34-paint-probe"));
+          try { return probe.checkVisibility(opts); } finally { probe.remove(); }
+        };
         for (const x of document.querySelectorAll(sel)) {
           const xs = getComputedStyle(x);
           const xr = x.getBoundingClientRect();
           if ((x as HTMLInputElement).disabled || (x as HTMLInputElement).type === "hidden" || (x as HTMLElement).tabIndex < 0) continue;
           if (xs.display === "none" || xs.visibility === "hidden" || (xr.width === 0 && xr.height === 0) || x.closest("[inert], [hidden]")) continue;
-          // A closed <details> body is not in any engine's Tab order (the contrast pass skips it too); WebKit still gives it boxes.
-          if (x.closest("details:not([open])") && !x.closest("summary")) continue;
+          // An unpainted closed <details> body is not in any engine's Tab order (WebKit still gives it boxes); a painted one is (the wide footer).
+          if (!painted(x)) continue;
           if ((x as HTMLInputElement).type === "radio" && (x as HTMLInputElement).name) {
             // A radio group is one tab stop: any visited member counts.
             const key = (x as HTMLInputElement).name;
