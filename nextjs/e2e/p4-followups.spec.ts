@@ -65,15 +65,18 @@ test.describe("(a) /developers link targets", () => {
       expect(boxes.length).toBeGreaterThan(8);
       expect(overlaps(boxes)).toEqual([]);
 
-      // The two gate actions and the reference sentences are the rows that overlapped. The gate
-      // note (and its actions) renders only while customer data is closed; D-12 opened it 2026-11-09.
-      const rows = activationPolicy.customerData.enabled ? [".dev-refs a"] : [".dev-actions a", ".dev-refs a"];
-      if (activationPolicy.customerData.enabled) await expect(page.locator(".dev-actions")).toHaveCount(0);
-      for (const selector of rows) {
-        const heights = await page.locator(selector).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
-        expect(heights.length, selector).toBeGreaterThan(1);
-        for (const height of heights) expect(height, selector).toBeGreaterThanOrEqual(44);
-      }
+      // V34: the rows that overlapped are the published-file list and the reference links under it.
+      // The gate note renders only while customer data is closed; D-12 opened it 2026-11-09.
+      if (activationPolicy.customerData.enabled) await expect(page.locator('[data-capability-gate="customerData"]')).toHaveCount(0);
+      // A list of files is a list of block targets: the 44px floor. A link inside a sentence or a
+      // short row keeps the 24px floor of WCAG 2.5.8 (the 44px padding rule was tavonel.css's).
+      const heightsOf = (selector: string) => page.locator(selector).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+      const fileRows = await heightsOf("main ul[aria-label] a");
+      expect(fileRows.length, "the published-file list").toBeGreaterThan(1);
+      for (const height of fileRows) expect(height, "published-file link").toBeGreaterThanOrEqual(44);
+      const allLinks = await heightsOf("main a");
+      expect(allLinks.length).toBeGreaterThan(8);
+      for (const height of allLinks) expect(height, "link target").toBeGreaterThanOrEqual(24);
       const overflow = await page.evaluate(measureOverflow);
       expect(overflow.documentOverflow).toBeLessThanOrEqual(0);
       expect(overflow.offenders).toEqual([]);
@@ -83,11 +86,14 @@ test.describe("(a) /developers link targets", () => {
   test("the measurement finds an overlap when two targets are planted on adjacent lines", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/developers");
-    await page.locator(".dev-refs").first().evaluate((list) => {
+    await page.locator("main h2").first().evaluate((list) => {
       const p = document.createElement("p");
       p.className = "fine";
       p.style.width = "120px";
-      p.innerHTML = '<a href="/one">first planted link</a> <a href="/two">second planted link</a>';
+      // V34 links carry no tap-floor padding, so the overlap is planted by construction: two 30px
+      // targets on adjacent lines, the second pulled 10px into the first.
+      p.innerHTML = '<a href="/one" style="display:block;height:30px">first planted link</a>' +
+        '<a href="/two" style="display:block;height:30px;margin-top:-10px;position:relative">second planted link</a>';
       list.before(p);
     });
     expect(overlaps(await linkBoxes(page)).some((line) => line.includes("planted"))).toBe(true);

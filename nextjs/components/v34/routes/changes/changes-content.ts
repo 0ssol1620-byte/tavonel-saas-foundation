@@ -4,12 +4,15 @@ import { v34Route, type V34RouteKey } from "@/lib/v34/routes";
 
 /*
   The words of /changes that are not the shared pieces' own. Plain data, so the guard test reads every
-  sentence in one place. There is no number in this file: counts come from the corpus snapshot and the
-  compiled sample's version timeline at render time, and ordinals are counted from the list position.
+  sentence in one place. No count is typed in this file: counts come from the corpus snapshot and the
+  compiled sample's version timeline at render time, and ordinals are counted from list positions. The
+  two clause numbers the source-change note cites are the legacy page's own, and the route test checks
+  each against the position and grade of that clause in the rendered list.
 
-  What the page says a change review does is what the product does today: it compares two compiled
-  versions, lists what differs, leaves activation to a person and keeps the version it replaces. It
-  names no impact analysis, quarantine or notification, because none of them ships as a public path.
+  The page renders, in order: a change review as the product does it today (two compiled versions
+  compared, what differs listed, activation left to a person, the replaced version kept), then the
+  Compiler Contract, where every clause carries its grade from `lib/compiler-contract.ts` and the
+  source-change note says which stages of the contract's path run here and which are its direction.
   A destination is a registry key, except the compiled sample's change view, which is a retained page.
 */
 
@@ -93,3 +96,34 @@ export const CHANGES_DESTINATIONS: readonly Route[] = [BRIDGE.href];
 
 /** Retained (non-registry) destinations, each of which must be a page under `app/`. */
 export const CHANGES_RETAINED: readonly string[] = [EXPLORE_CTA.href];
+
+/*
+  The Compiler Contract, ported from the retired /product/continuous-knowledge page. The clauses, their
+  states, the standards and the package formats are read from `lib/compiler-contract.ts` at render time;
+  only the words around them are here. A clause is graded by what a reader can check here, and the state
+  key beside the list says what each word means. FLOW.note is the retired page's paragraph, changed only
+  where `lib/v34/routes-changes.test.ts` lists a substitution and why.
+*/
+export const CONTRACT = {
+  eyebrow: "The Compiler Contract",
+  title: "The clauses a compile is written to.",
+  lead: "Each clause is a promise about what a compile guarantees, graded by what can be checked today. The reference World shows the demonstrated ones; the rest are the direction of the compiler.",
+  action: { href: "#clauses", label: "Read the Compiler Contract" },
+  check: "Explanation and evidence",
+  where: "Where to check it",
+} as const;
+
+export const FLOW = {
+  title: "What a source change does",
+  summary: "Read the source-change contract and diagram",
+  lead: "The contract describes a single path. A revision arrives; the change is read for what it means rather than which bytes moved; the units standing on the changed region are resolved; the untouched half is carried over and the affected half rebuilt; and the result is compared against what a full rebuild would have produced, with a mismatch refusing to publish rather than shipping a world that looks finished. Only some stages of that path run in TAVONEL today. The drawing says which, and the solid line down its left side is what happens here instead.",
+  note: "Solid is what TAVONEL executes: a source revision arrives, and a compile rebuilds the whole collection it is given into a candidate version a person activates. Everything dashed — the semantic diff, the resolution of the units standing on the changed region, the preserve-and-rebuild split, the equivalence comparison and the pass or refuse it would end in — is the contract this compiler is written to rather than what it executes here, which is what clause 05 says in words. The kept previous World is dashed for that reason: there is no equivalence check here to refuse, and the version a candidate replaces stays intact and readable either way. That is clause 04, and it is demonstrated.",
+} as const;
+
+export const INTEROP = {
+  title: "Leaving the compiler",
+  summary: "Read the formats and interchange standards",
+  lead: "A compiled World that can only be read inside the tool that made it is no asset. The internal representation stays ours; what leaves is a signed package in formats other systems already read.",
+  note: "Every path above is written by the same function that compiles a customer's documents. The archive carries a signed file inventory, with every listed file checked by sha256 and those exact manifest bytes signed with Ed25519, and the public key the signature was made with, so the check runs offline against a key fingerprint taken from somewhere other than the archive. The verifier is yours to run: the archive names the algorithm and the files to compare.",
+  standards: "Interchange standards",
+} as const;
