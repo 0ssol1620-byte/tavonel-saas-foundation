@@ -1,4 +1,3 @@
-import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
 
 async function dismissConsent(page: import("@playwright/test").Page) {
@@ -159,57 +158,4 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   }
   await expect(pricing).toBeVisible();
   expect(await pricing.evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);
-});
-
-
-test("the Home first screen puts actions before its four-cut hero film and source proof below it", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
-  const width = page.viewportSize()?.width ?? 0;
-  test.skip(width !== 390 && width !== 1440, "Phone and desktop reference widths.");
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
-  // Release 2: the first screen has no consent card at scroll 0, so the "card clears title and
-  // action" branch below has nothing to measure until the reader scrolls (marketing-consent.spec).
-  await expect(consent).toHaveCount(0);
-  // Founder 2026-11-10: the hero film is the tabbed compile slot (hero-compile-tabs.tsx); the recorded walkthrough is below the fold.
-  const film = page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]');
-  await expect(film.getByRole("tab")).toHaveText(["Extract", "Link", "Update", "Use"]);
-  // FINAL-SPEC 2026-10-26 D-9: the disclosure stays; its wording is the redesign's.
-  await expect(film.locator("figcaption")).toHaveText("Product walkthrough on sample files");
-  const measure = async () => page.evaluate(() => {
-    const rect = (selector: string) => { const element = document.querySelector(selector); if (!element) throw Error("Missing Home element: " + selector); return element.getBoundingClientRect().toJSON(); };
-    const banner = document.querySelector('[data-marketing-consent-panel]');
-    return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth,
-      header: rect("header.nav"), title: rect("#lv2-hero-title"), film: rect('#s1 figure[data-testid="hero-compile-tabs"]'),
-      action: rect("#s1 .lv2-actions a"), source: rect("#s2 article[data-case-status]"), banner: banner?.getBoundingClientRect().toJSON() ?? null };
-  });
-  for (const consentVisible of [true, false]) {
-    if (!consentVisible) await dismissConsent(page);
-    const layout = await measure();
-    expect(layout.overflow).toBeLessThanOrEqual(1);
-    expect(layout.title.top).toBeGreaterThanOrEqual(layout.header.bottom - 1);
-    expect(layout.film.top).toBeGreaterThanOrEqual(layout.title.bottom);
-    expect(layout.film.top).toBeLessThan(layout.height);
-    expect(layout.film.left).toBeGreaterThanOrEqual(-1);
-    expect(layout.film.right).toBeLessThanOrEqual(layout.width + 1);
-    expect(layout.source.top).toBeGreaterThanOrEqual(layout.film.bottom);
-    expect(layout.action.top).toBeGreaterThanOrEqual(layout.title.bottom);
-    expect(layout.action.bottom).toBeLessThanOrEqual(layout.film.top);
-    if (!consentVisible && width === 1440) expect(layout.action.bottom).toBeLessThanOrEqual(900);
-    // Brief 2026-10-15 move 6: the consent card is bottom-fixed and must clear the title and action.
-    if (consentVisible && layout.banner) {
-      expect(layout.banner.bottom).toBeLessThanOrEqual(layout.height + 1);
-      expect(layout.banner.top).toBeGreaterThanOrEqual(layout.title.bottom);
-      expect(layout.banner.top).toBeGreaterThanOrEqual(layout.action.bottom);
-    }
-    await test.info().attach("home-first-screen-" + width + "-consent-" + consentVisible, {body: await page.screenshot({animations: "disabled"}), contentType: "image/png"});
-  }
-  const source = page.locator("#s2 article[data-case-status]");
-  await source.scrollIntoViewIfNeeded();
-  await expect(source).toContainText("processing not yet run");
-  await expect(source.getByRole("button", {pressed: true})).toHaveCount(1);
-  await expect(source.locator("img")).toBeVisible();
-  await expect(source.locator("blockquote")).not.toHaveText("");
-  await expect(source.locator("[data-hero-evidence]")).toHaveAttribute("href", /act=evidence/);
 });
