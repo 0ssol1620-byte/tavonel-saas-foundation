@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import EvaluationPage from "./evaluation-page";
-vi.mock("@/components/public-site-chrome", () => ({PublicSiteHeader: () => <header />, PublicSiteFooter: () => <footer />}));
+vi.mock("@/components/public-site-chrome", () => ({PublicSitePage: ({children}: {children: import("react").ReactNode}) => <main>{children}</main>}));
 describe("bounded evaluation funnel", () => {
   it("keeps only three required fields and discloses the processing boundary", () => {
     const html = renderToStaticMarkup(<EvaluationPage />);

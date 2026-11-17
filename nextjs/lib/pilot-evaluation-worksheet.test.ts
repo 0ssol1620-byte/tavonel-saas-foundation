@@ -2,14 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import EvaluationPage from "@/components/evaluation-page";
 import { activationPolicy } from "@/lib/activation-policy";
 
 // Only the public site chrome is replaced, as in components/evaluation-page.test.tsx; the page,
 // the contact form, the activation policy and the static worksheets are the real ones.
-vi.mock("@/components/public-site-chrome", () => ({ PublicSiteHeader: () => null, PublicSiteFooter: () => null }));
+vi.mock("@/components/public-site-chrome", () => ({ PublicSitePage: ({ children }: { children: ReactNode }) => createElement("main", null, children) }));
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicDir = path.join(packageRoot, "public");
