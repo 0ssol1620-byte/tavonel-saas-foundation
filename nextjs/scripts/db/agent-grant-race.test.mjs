@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
-  SCENARIOS, KNOWN_REFUSALS, checkI12A, checkI12B, checkI13, checkI8, checkKill, checkLeaf, mulberry32, parseOutcome, planIteration, validateEnvironment,
+  SCENARIOS, KNOWN_REFUSALS, BOUND_MS, LOCK_TIMEOUT_MS, checkBound, checkI12A, checkI12B, checkI13, checkI8, checkKill, checkLeaf, mulberry32,
+  parseOutcome, planIteration, validateEnvironment,
 } from "./agent-grant-race.mjs";
 
 const ok = (value) => ({ ok: true, value, error: null });
@@ -89,6 +91,35 @@ test("KILL: a creation after the kill switch that is revoked anyway, a refused c
   assert.deepEqual(rules(checkKill(after)), ["KILL"]);
   assert.deepEqual(rules(checkKill({ ...after, create: no("api_key_authorization_changed") })), ["ERR", "KILL"]);
   assert.deepEqual(rules(checkKill({ ...after, revoke: no("deadlock detected") })), ["ERR", "KILL"]);
+});
+
+test("BOUND: a waiter refused agent_grant_lock_timeout inside the bound, nothing changed, and a retry that took effect is clean", () => {
+  const clean = { waiter: no("agent_grant_lock_timeout"), elapsedMs: LOCK_TIMEOUT_MS + 40, unchanged: true, retry: ok({ grants: 2 }), retryTookEffect: true };
+  assert.deepEqual(checkBound(clean), []);
+  assert.ok(SCENARIOS.includes("BOUNDA") && SCENARIOS.includes("BOUNDB"));
+  assert.ok(KNOWN_REFUSALS.has("agent_grant_lock_timeout"));
+});
+
+test("BOUND: the mutant without lock_timeout -- still waiting at the bound, then going on to succeed -- is a violation", () => {
+  const hung = { waiter: ok({ grants: 2 }), elapsedMs: Infinity, unchanged: false, retry: ok({ grants: 0 }), retryTookEffect: true };
+  assert.deepEqual(rules(checkBound(hung)), ["BOUND"]);
+  assert.equal(checkBound(hung).length, 3, "past the bound, not the timeout token, and changed the store");
+});
+
+test("BOUND: a half state, a raw lock error, a late answer, a failed or ineffective retry are each a violation", () => {
+  const clean = { waiter: no("agent_grant_lock_timeout"), elapsedMs: 2100, unchanged: true, retry: ok({}), retryTookEffect: true };
+  assert.deepEqual(rules(checkBound({ ...clean, unchanged: false })), ["BOUND"]);
+  assert.deepEqual(rules(checkBound({ ...clean, waiter: no("canceling statement due to lock timeout") })), ["BOUND", "ERR"]);
+  assert.deepEqual(rules(checkBound({ ...clean, elapsedMs: BOUND_MS + 1 })), ["BOUND"]);
+  assert.deepEqual(rules(checkBound({ ...clean, retry: no("agent_grant_lock_timeout") })), ["BOUND"]);
+  assert.deepEqual(rules(checkBound({ ...clean, retryTookEffect: false })), ["BOUND"]);
+});
+
+test("LOCK_TIMEOUT_MS is the lock_timeout both functions of migration 20261117130300 set", () => {
+  const sql = readFileSync(new URL("../../../supabase/migrations/20261117130300_agent_grant_lock_timeout.sql", import.meta.url), "utf8");
+  const set = [...sql.matchAll(/security definer set search_path = '' set lock_timeout = '(\d+)ms' as \$\$/g)].map((m) => Number(m[1]));
+  assert.deepEqual(set, [LOCK_TIMEOUT_MS, LOCK_TIMEOUT_MS]);
+  assert.ok(BOUND_MS > LOCK_TIMEOUT_MS);
 });
 
 test("an unknown refusal (a deadlock, a typo) is flagged in every scenario", () => {

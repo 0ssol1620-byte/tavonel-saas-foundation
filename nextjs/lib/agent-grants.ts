@@ -23,6 +23,7 @@ export const AGENT_GRANT_CODES = [
   "AGENT_GRANT_INPUT_INVALID",
   "AGENT_GRANT_LIMIT_REACHED",
   "AUTHORIZATION_CHANGED_RETRY",
+  "AGENT_GRANTS_BUSY_RETRY",
   "AGENT_GRANT_CREATE_FAILED",
   "AGENT_GRANT_NOT_FOUND",
   "AGENT_GRANT_REVOKE_FAILED",
@@ -36,6 +37,7 @@ export const AGENT_GRANT_STATUS: Readonly<Record<AgentGrantCode, number>> = {
   AGENT_GRANT_INPUT_INVALID: 400,
   AGENT_GRANT_LIMIT_REACHED: 409,
   AUTHORIZATION_CHANGED_RETRY: 403,
+  AGENT_GRANTS_BUSY_RETRY: 503,
   AGENT_GRANT_CREATE_FAILED: 503,
   AGENT_GRANT_NOT_FOUND: 404,
   AGENT_GRANT_REVOKE_FAILED: 503,
@@ -99,6 +101,14 @@ function parseGrant(value: unknown): AgentGrant | null {
 
 type RpcAnswer = { ok: true; body: unknown } | { ok: false; message: string };
 
+/**
+ * The two RPCs that take the kill-switch lock (create_foundation_agent_grant, revoke_all_foundation_agent_grants;
+ * migration 20261117130300) refuse an expired lock wait with this token after rolling back everything they did.
+ * It is the one store failure known to have changed nothing, so it alone is reported as retryable as the same
+ * request; a raw lock or statement timeout or a lost response stays the caller's uncertain failure.
+ */
+const lockTimedOut = (message: string) => message.includes("agent_grant_lock_timeout");
+
 /** One RPC call. Every failure -- transport, timeout, non-JSON body -- comes back as a value, never a throw. */
 async function rpc(name: string, args: Record<string, unknown>, timeoutMs?: number): Promise<RpcAnswer | null> {
   const config = readSupabaseAdminConfig();
@@ -158,6 +168,7 @@ export async function createAgentGrant(input: {
   });
   if (answer === null) return fail("DEVELOPER_STORE_NOT_CONFIGURED");
   if (!answer.ok) {
+    if (lockTimedOut(answer.message)) return fail("AGENT_GRANTS_BUSY_RETRY");
     if (answer.message.includes("api_key_authorization_changed")) return fail("AUTHORIZATION_CHANGED_RETRY");
     if (answer.message.includes("foundation_active_api_key_limit")) return fail("AGENT_GRANT_LIMIT_REACHED");
     return fail("AGENT_GRANT_CREATE_FAILED");
@@ -226,11 +237,12 @@ export async function revokeAgentGrant(workspaceKey: string, userId: string, gra
  * The kill switch: every grant, every agent credential and every open agent proposal in every
  * workspace, one transaction; one api_key_revoked audit row per credential (migration 20261117130100).
  * Live and remote MCP keys are untouched. Irreversible by design (the reversible lever is the flag).
+ * AGENT_GRANTS_BUSY_RETRY: it waited past its lock bound (an open creation) and revoked nothing; send it again.
  */
 export async function revokeAllAgentGrants(): Promise<{ ok: true; grants: number; keys: number; proposals: number; byWorkspace: Record<string, Record<string, number>> } | Failure> {
   const answer = await rpc("revoke_all_foundation_agent_grants", {}, 30_000);
   if (answer === null) return fail("DEVELOPER_STORE_NOT_CONFIGURED");
-  if (!answer.ok) return fail("AGENT_GRANT_REVOKE_FAILED");
+  if (!answer.ok) return fail(lockTimedOut(answer.message) ? "AGENT_GRANTS_BUSY_RETRY" : "AGENT_GRANT_REVOKE_FAILED");
   const body = answer.body;
   if (!isRecord(body) || !isCount(body.grants) || !isCount(body.keys) || !isCount(body.proposals) || !isRecord(body.byWorkspace)
     || !Object.values(body.byWorkspace).every((counts) => isRecord(counts) && Object.values(counts).every(isCount))) {
