@@ -19,7 +19,7 @@
 -- source_fingerprints and document_relations (20261104090500).
 
 begin;
-select plan(74);
+select plan(76);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -65,6 +65,9 @@ select table_privs_are('public', 'foundation_developer_audit_events', 'service_r
 select table_privs_are('public', 'foundation_intake_admissions', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_job_events', 'service_role', array['SELECT', 'INSERT']::text[]);
 select table_privs_are('public', 'foundation_jobs', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
+-- The query meter's two tables (20261117150000): RPC-only, the server role holds nothing on either (WO-CAT-8).
+select table_privs_are('public', 'foundation_knowledge_query_holds', 'service_role', array[]::text[]);
+select table_privs_are('public', 'foundation_knowledge_query_windows', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_oauth_authorizations', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_oauth_connections', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_oauth_secret_envelopes', 'service_role', array['SELECT', 'INSERT', 'DELETE']::text[]);
