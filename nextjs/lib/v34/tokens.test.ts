@@ -213,6 +213,14 @@ describe("coverage", () => {
     const gutters = [...source.matchAll(/([^{}]*)\{[^{}]*--v34-gutter\s*:[^{}]*\}/g)].map((m) => m[1]!.trim());
     expect(gutters).toHaveLength(3);
     for (const selector of gutters) expect(selector).toBe(".site, .container");
+    // Every rule anywhere in the sheet, at-rules included, that names .container: the three gutter steps,
+    // the wide one with the six properties and each media step with the gutter alone.
+    const rules = [...source.matchAll(/([^{}]*)\{([^{}]*)\}/g)].filter((m) => /\.container(?![\w-])/.test(m[1]!));
+    expect(rules.map((m) => m[1]!.trim()), "rules that name .container").toEqual([".site, .container", ".site, .container", ".site, .container"]);
+    // Split on `;` rather than `declarations()`, which skips a last declaration written without one.
+    const keys = (body: string) => body.split(";").map((d) => d.trim()).filter(Boolean).map((d) => d.split(":")[0]!.trim()).sort();
+    expect(rules.map((m) => keys(m[2]!))).toEqual([
+      ["--chrome-edge", "--chrome-gutter", "--chrome-measure", "--v34-gutter", "--v34-max", "--v34-shell"], ["--v34-gutter"], ["--v34-gutter"]]);
   });
 });
 
@@ -353,13 +361,54 @@ describe("what the V34 sheets are not allowed to contain", () => {
     separator, and -- in the token sheet only, under the wrapper -- the legacy `.btn` a retained body
     still renders inside the V34 frame (WO-CI-19).
   */
+  /* The legacy button classes the token sheet paints, read off the sheet (D17). */
+  const WRAPPED_BTN = [".btn", ".btn-primary", ".btn-ghost", ".btn-secondary"];
+  const tokensFile = tokensPath.slice(root.length);
+
+  /** Splits a selector list at its top-level commas. */
+  const members = (list: string) => {
+    const out = [""];
+    let depth = 0;
+    for (const char of list) {
+      if (char === "(") depth += 1;
+      else if (char === ")") depth -= 1;
+      if (char === "," && depth === 0) out.push("");
+      else out[out.length - 1] += char;
+    }
+    return out;
+  };
+
+  /**
+    The classes a selector paints when it is exactly `.site[data-v34-site] :global(X)` and X is one compound
+    whose subject is a wrapped button class (or an `:is()` of them only), narrowed by nothing but more
+    simple selectors; otherwise null. No combinator, no second `:global`, nothing outside the wrapper.
+  */
+  const wrappedBtn = (selector: string): string[] | null => {
+    const inner = /^\.site\[data-v34-site\] :global\(([\s\S]*)\)$/.exec(selector.trim())?.[1];
+    if (inner === undefined) return null;
+    const subject = /^(?::is\(([^()]*)\)|(\.[\w-]+))/.exec(inner);
+    if (!subject) return null;
+    const names = subject[1] !== undefined ? subject[1].split(",").map((name) => name.trim()) : [subject[2]!];
+    if (!names.every((name) => WRAPPED_BTN.includes(name))) return null;
+    const tail = inner.slice(subject[0].length);
+    if (!/^(?:[.:[]|$)/.test(tail) || tail.includes(":global")) return null;
+    let depth = 0;
+    for (const char of tail) {
+      if (char === "(") depth += 1;
+      else if (char === ")" && --depth < 0) return null;
+      else if (depth === 0 && /[\s,>+~]/.test(char)) return null;
+    }
+    return depth === 0 ? names : null;
+  };
+
   const withoutNamedGlobals = (file: string, css: string) => {
-    let rest = css
+    const rest = css
       .replace(/:global\(html\):has\(\.site\)/g, "")
       .replace(/:global\(html\):has\(\.dialog\[open\]\)/g, "")
       .replace(/:global\(\.site-footer-legal-sep\)/g, "");
-    if (file.endsWith("tokens.module.css")) rest = rest.replace(/\.site\[data-v34-site\] :global\([^\n{]*\.btn[^\n{]*?\)(?=,\s|\s*\{)/g, "");
-    return rest;
+    if (file !== tokensFile) return rest;
+    // Each wrapped-button member of a selector list goes; every other member, and everything else, stays.
+    return rest.replace(/[^{}]+(?=\{)/g, (list) => members(list).filter((member) => !wrappedBtn(member)).join(","));
   };
 
   it("has no @import, no :root rule and no global selector beyond the four named ones", () => {
@@ -370,12 +419,48 @@ describe("what the V34 sheets are not allowed to contain", () => {
     }
   });
 
+  it("paints exactly the wrapped button classes the token sheet names, no other", () => {
+    const sheet = cssFiles().find(([file]) => file === tokensFile);
+    expect(sheet, "the token sheet is walked").toBeDefined();
+    const painted = [...sheet![1].matchAll(/[^{}]+(?=\{)/g)].flatMap((list) => members(list[0]).flatMap((member) => wrappedBtn(member) ?? []));
+    expect([...new Set(painted)].sort()).toEqual([...WRAPPED_BTN].sort());
+  });
+
   it("allows the legacy .btn global only under the wrapper and only in the token sheet", () => {
     const under = '.site[data-v34-site] :global(.btn-ghost:not(:disabled):hover),\n.site[data-v34-site] :global(:is(.btn, .btn-primary):not(.ghost)) { color: red; }';
-    expect(withoutNamedGlobals("tokens.module.css", under)).not.toContain(":global");
-    expect(withoutNamedGlobals("ui/other.module.css", under)).toContain(":global");
-    expect(withoutNamedGlobals("tokens.module.css", ":global(.btn) { color: red; }")).toContain(":global");
-    expect(withoutNamedGlobals("tokens.module.css", ".site[data-v34-site] :global(.nav a) { color: red; }")).toContain(":global");
+    expect(withoutNamedGlobals(tokensFile, under)).not.toContain(":global");
+    expect(withoutNamedGlobals("components/v34/ui/other.module.css", under)).toContain(":global");
+    // A file that only ends like the token sheet is another file.
+    expect(withoutNamedGlobals(tokensFile.replace("tokens.module.css", "x-tokens.module.css"), under)).toContain(":global");
+    const SLIPS = [
+      ":global(.btn) { color: red; }",
+      ".site[data-v34-site] :global(.nav a) { color: red; }",
+      // review of 94ddb866, B1
+      ".site[data-v34-site] :global(.a), :global(.btn) { color: red; }",
+      ".site[data-v34-site] :global(.nav a), :global(body .btn) { color: red; }",
+      ".site[data-v34-site] :global(.btn) :global(.x) { color: red; }",
+      ".site[data-v34-site] :global(.nav a):not(.btn) { color: red; }",
+      ".site[data-v34-site] :global(.nav .btn-x) { color: red; }",
+      ".site[data-v34-site] :global(.btnx) { color: red; }",
+      // one member of a list outside the wrapper, on the same line or the next
+      ".site[data-v34-site] :global(.btn), :global(.btn) { color: red; }",
+      ".site[data-v34-site] :global(.btn),\n:global(body) { color: red; }",
+      ":global(body),\n.site[data-v34-site] :global(.btn-ghost) { color: red; }",
+      ":global(body) .site[data-v34-site] :global(.btn) { color: red; }",
+      // a non-button member inside :is(), a nested :is(), a class outside the list, a combinator inside the global
+      ".site[data-v34-site] :global(:is(.btn, .nav a)) { color: red; }",
+      ".site[data-v34-site] :global(:is(.btn, :is(.nav))) { color: red; }",
+      ".site[data-v34-site] :global(.btn-danger) { color: red; }",
+      ".site[data-v34-site] :global(.btn .nav) { color: red; }",
+      ".site[data-v34-site] :global(.btn > a) { color: red; }",
+      ".site[data-v34-site] :global(.btn:not(.x) a) { color: red; }",
+      ".site[data-v34-site] :global(.btn:not(:global(.x))) { color: red; }",
+      // a different wrapper, or a descendant of the wrapper's own compound
+      ".site :global(.btn) { color: red; }",
+      ".site[data-v34-site]:global(.btn) { color: red; }",
+      "@media (max-width: 9px) { .site[data-v34-site] :global(.btn), :global(.nav) { color: red; } }",
+    ];
+    for (const css of SLIPS) expect(withoutNamedGlobals(tokensFile, css), css).toContain(":global");
   });
 
   it("has no font size under the 12px floor, in px or rem", () => {
