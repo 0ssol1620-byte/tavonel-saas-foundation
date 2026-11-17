@@ -163,7 +163,12 @@ for (const path of ["/", "/contact", "/research"]) {
 test("Research stays footer-reachable and is current in its drawer group", async ({ page }) => {
   await page.goto("/platform");
   const researchLink = page.locator('footer a[href="/research"]').first();
-  await researchLink.scrollIntoViewIfNeeded();
+  // WO-CI-22 (lead decision 7): at 390 each footer group is a native <details>; open Research's group, then the row.
+  const researchGroup = page.locator("footer nav[aria-label] > details").filter({ has: page.locator('a[href="/research"]') });
+  await researchGroup.locator(":scope > summary").scrollIntoViewIfNeeded();
+  await expect(researchLink).toBeHidden();
+  await researchGroup.locator(":scope > summary").click();
+  await expect(researchGroup).toHaveAttribute("open", "");
   await expect(researchLink).toBeVisible();
   await researchLink.click();
   await expect(page).toHaveURL(/\/research$/);
