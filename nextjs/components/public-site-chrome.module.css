@@ -209,21 +209,21 @@
     their own faces; the consent card is outside the page root and is not reached; the press
     feedback stays on the base rule.
   */
-  :global(*):has(> .header, > [data-v34-header]) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"])) {
+  :global(*):has(> .header) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"])) {
     border-color: var(--tv-action);
     background: var(--tv-action);
     color: #ffffff;
     box-shadow: var(--tv-shadow-action);
   }
   /* Direction C: an outlined pill is the quiet action -- a white sheet on the canvas, on the resting shadow. */
-  :global(*):has(> .header, > [data-v34-header]) :global(:is(.btn.ghost, .btn-ghost, .btn-secondary):not(:disabled, [aria-disabled="true"])) {
+  :global(*):has(> .header) :global(:is(.btn.ghost, .btn-ghost, .btn-secondary):not(:disabled, [aria-disabled="true"])) {
     border-color: transparent;
     background: var(--tv-sheet);
     color: var(--tv-ink);
     box-shadow: var(--tv-shadow-1);
   }
   @media (hover: hover) and (pointer: fine) {
-    :global(*):has(> .header, > [data-v34-header]) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"]):hover) {
+    :global(*):has(> .header) :global(:is(.btn, .btn-primary):not(.ghost, .btn-ghost, .btn-secondary, .btn-danger, :disabled, [aria-disabled="true"]):hover) {
       border-color: var(--tv-action-hover);
       background: var(--tv-action-hover);
     }
