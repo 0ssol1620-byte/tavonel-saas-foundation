@@ -12,8 +12,8 @@
  *     playwright test e2e/v34-matrix.spec.ts --project=v34-chromium
  *
  * Select subsets with --grep on the tags: @route:/world, @w:412, @pass:contrast. Env filters:
- * V34_ROUTE (comma list of paths), V34_WIDTHS (comma list), V34_SERVER_MODE (qa | production, for
- * the SEO pass). Violations are collected per route and per pass, never stopping at the first, and
+ * V34_ROUTE (comma list of paths), V34_RELEASE (live | held: only the registry rows in that state),
+ * V34_WIDTHS (comma list), V34_SERVER_MODE (qa | production, for the SEO pass). Violations are collected per route and per pass, never stopping at the first, and
  * written to <V34_QA_OUT>/receipt.json; full-page screenshots at 1440 and 412 go to
  * <V34_QA_OUT>/<engine>/<route-key>/<width>-<scheme>.png.
  */
@@ -34,6 +34,7 @@ import {
   type Violation,
 } from "./support/v34-passes";
 import { contrastPass, controlContrastPass, openContentDetails } from "./support/v34-contrast";
+import { DRAWER_MAX_WIDTH, DRAWER_TRIGGER, drawerPass, tapUntilOpen } from "./support/v34-drawer";
 import { keyboardWalk } from "./support/v34-keyboard";
 import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, WORLD_ROOT, type WorldMode, type WorldState } from "./support/v34-world";
 import { checkSeo, checkSeoUnique, fetchSeo, fetchSitemapPaths, type SeoFacts } from "./support/v34-seo";
@@ -69,6 +70,10 @@ const only = (name: string) => process.env[name]?.split(",").map(s => s.trim()).
 const routeFilter = only("V34_ROUTE");
 const widthFilter = only("V34_WIDTHS")?.map(Number);
 const serverMode = process.env.V34_SERVER_MODE === "production" ? "production" : "qa";
+const releaseFilter = process.env.V34_RELEASE?.trim() || null;
+if (releaseFilter !== null && releaseFilter !== "live" && releaseFilter !== "held") {
+  throw new Error(`V34_RELEASE must be "live" or "held", got ${JSON.stringify(releaseFilter)}`);
+}
 
 /*
   Pages that render a V34 body but are not one of the 43 targets, so the registry has no row for
@@ -83,7 +88,7 @@ const V34_BODIES_OUTSIDE_REGISTRY: RouteRow[] = [
 
 const registryRoutes = await loadRoutes();
 const allRoutes = registryRoutes.length > 0 ? [...registryRoutes, ...V34_BODIES_OUTSIDE_REGISTRY.filter(r => !registryRoutes.some(x => x.path === r.path))] : [];
-const routes = allRoutes.filter(r => !routeFilter || routeFilter.includes(r.path));
+const routes = allRoutes.filter(r => (!routeFilter || routeFilter.includes(r.path)) && (!releaseFilter || r.release === releaseFilter));
 
 /*
   A run checks every route it was asked for, or fails. A path V34_ROUTE names that has no row would
@@ -255,6 +260,35 @@ for (const { path: route, release } of routes) {
     });
   }
 
+  /*
+    The phone and tablet drawer (WO-CI-9), at every width of the run that it serves: it opens, its
+    contents hold contrast while open, Escape closes it and returns focus, a followed link closes it.
+    The page is opened at its first response byte, not settled, so taps lost before hydration are measured.
+  */
+  for (const width of widths.filter(w => w <= DRAWER_MAX_WIDTH)) {
+    test(`${route} ${width}px drawer`, tags(route, width, "drawer"), async ({ browser, browserName }) => {
+      test.skip(heldInProduction, "held in production");
+      // Up to 30 sampled lines and 30 controls in the drawer, an Escape round and two followed links.
+      test.setTimeout(120_000);
+      const ctx = await openContext(browser, width);
+      const page = await ctx.newPage();
+      try {
+        await page.goto(route, { waitUntil: "commit" });
+        const drawer = await drawerPass(page, route);
+        // A page outside the registry may carry another shell; every registry route must carry the V34 header.
+        const outsideRegistry = !registryRoutes.some(r => r.path === route);
+        if (!drawer.hasHeader && outsideRegistry) {
+          record({ route, width, engine: browserName, colorScheme: "light", pass: "drawer", state: "no V34 header: not a V34-shell page", violations: [] });
+          test.skip(true, `${route} renders no V34 header (outside the registry), so it has no V34 drawer`);
+        }
+        record({ route, width, engine: browserName, colorScheme: "light", pass: "drawer", violations: drawer.violations, reported: drawer.reported });
+        expect(drawer.violations, report(route, width, drawer.violations)).toEqual([]);
+      } finally {
+        await ctx.close();
+      }
+    });
+  }
+
   /* World: three modes forced, one digest. */
   if (WORLD_ROUTES.includes(route)) {
     for (const width of at(412, 1440)) {
@@ -297,6 +331,36 @@ for (const { path: route, release } of routes) {
         expect(violations, report(route, width, violations)).toEqual([]);
       });
     }
+  }
+}
+
+/*
+  The drawer before hydration, measured and reported, not judged: the trigger is a React button, so a
+  tap before the page's scripts run opens nothing. Locally the scripts land before the first tap can,
+  so the window a slow phone has is reproduced by holding every script chunk 1.5 s. One route: the
+  trigger is the same shell component on every page.
+*/
+if (routes.some(r => r.path === "/")) {
+  for (const width of widths.filter(w => w <= DRAWER_MAX_WIDTH)) {
+    test(`/ ${width}px drawer before hydration`, tags("/", width, "drawer"), async ({ browser, browserName }) => {
+      const ctx = await openContext(browser, width);
+      const page = await ctx.newPage();
+      try {
+        await page.route("**/_next/static/chunks/**", async r => {
+          await new Promise(done => setTimeout(done, 1500));
+          await r.continue().catch(() => undefined);
+        });
+        await page.goto("/", { waitUntil: "commit" });
+        await page.locator(DRAWER_TRIGGER).first().waitFor({ state: "visible", timeout: 10_000 });
+        const first = await tapUntilOpen(page, 20_000);
+        const violations: Violation[] = first ? [] : [{ pass: "drawer-open", selector: DRAWER_TRIGGER, detail: "tapping the trigger for 20 s with scripts held 1.5 s never opened the drawer" }];
+        const reported: Violation[] = first ? [{ pass: "drawer-hydration", selector: DRAWER_TRIGGER, detail: `scripts held 1.5 s: ${first.lost} tap(s) on the visible trigger opened nothing; the first open came ${first.ms} ms after the trigger showed` }] : [];
+        record({ route: "/", width, engine: browserName, colorScheme: "light", pass: "drawer-hydration", state: "script chunks held 1.5 s", violations, reported });
+        expect(violations, report("/ (before hydration)", width, violations)).toEqual([]);
+      } finally {
+        await ctx.close();
+      }
+    });
   }
 }
 

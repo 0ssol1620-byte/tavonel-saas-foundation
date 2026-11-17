@@ -266,10 +266,97 @@ jobs:
         if: failure()
         run: cat /tmp/tavonel-next.log
 
+  # The V34 route x width matrix (D33 section 5) and its harness self-test, with the drawer pass
+  # (WO-CI-9). Nothing else in this workflow runs the v34-* Playwright projects.
+  #
+  # Its own job, not steps appended to product-qa. That job's build is made by the Playwright webServer
+  # inside its one invocation and its server stops with it, so reusing the build means starting two more
+  # servers after a 45-minute job and adding this job's whole run to that job's wall clock; on its own
+  # runner it costs one build and runs beside product-qa instead. One build here serves both servers:
+  # V34_SHOW_HELD is read per request (lib/v34/release.ts), so the flag only goes on the QA server.
+  #
+  # Widths: layout at 390, 412 and 1440; contrast and keyboard at 412 and 1440; motion and 200% zoom at
+  # 1440; the drawer at 390 and 412 (it serves 1000px and below). Only the live registry rows run here.
+  # The held-route check runs against the second server, started without V34_SHOW_HELD.
+  #
+  # Timeout, from one measured local run on 2026-11-17 (Windows, 12 cores, two Playwright workers as on a
+  # 4-vCPU runner): build 7m21s, the self-test and matrix invocation 13m07s (391 tests), the held check 2s.
+  # About 21 minutes of work plus install; 50 is that doubled for a slower runner and a cold build, rounded
+  # up. It is not a budget to grow into: a run past it is a regression to find, not a number to raise.
+  v34-matrix:
+    needs: preflight
+    name: V34 matrix (chromium, drawer pass)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: nextjs
+    env:
+      # The playwright.config.ts webServer environment, for the build and both servers.
+      NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: foundation-browser-e2e-anon-key
+      PLAYWRIGHT_LOCAL_HTTP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # Every v34-* project run here is headless Chromium, which Playwright runs on chromium-headless-shell.
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Build once for both servers
+        run: V34_SHOW_HELD=1 pnpm exec next build
+      - name: Start the QA server (held routes shown) and the production-mode server (no flag)
+        run: |
+          V34_SHOW_HELD=1 pnpm start --hostname 127.0.0.1 --port 3117 > /tmp/v34-qa-server.log 2>&1 &
+          pnpm start --hostname 127.0.0.1 --port 3118 > /tmp/v34-production-server.log 2>&1 &
+          QA_HEALTH_URL=http://127.0.0.1:3117/api/healthz node scripts/launch-qa/wait-for-health.mjs
+          QA_HEALTH_URL=http://127.0.0.1:3118/api/healthz node scripts/launch-qa/wait-for-health.mjs
+      - name: Run the V34 harness self-test and the matrix over the live registry rows
+        env:
+          PLAYWRIGHT_EXTERNAL_SERVER: "1"
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3117
+          V34_RELEASE: live
+          V34_WIDTHS: 390,412,1440
+          V34_QA_OUT: v34-qa-out/qa
+        run: pnpm exec playwright test --project=v34-selftest --project=v34-chromium
+      # Runs even when the matrix failed, so a held route that renders in production is never hidden behind it.
+      # Its own output and report folders: a second invocation empties the first one's test-results.
+      - name: Held routes answer 404 on the server without V34_SHOW_HELD
+        if: ${{ !cancelled() }}
+        env:
+          PLAYWRIGHT_EXTERNAL_SERVER: "1"
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3118
+          PLAYWRIGHT_HTML_REPORT: playwright-report-held
+          V34_SERVER_MODE: production
+          V34_QA_OUT: v34-qa-out/production
+        run: pnpm exec playwright test --project=v34-chromium --grep "@pass:held" --output=test-results-held
+      - name: Show the server logs on failure
+        if: failure()
+        run: tail -n 200 /tmp/v34-qa-server.log /tmp/v34-production-server.log
+      - name: Preserve the V34 receipt and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v34-matrix
+          path: |
+            nextjs/v34-qa-out
+            nextjs/playwright-report
+            nextjs/test-results
+            nextjs/playwright-report-held
+            nextjs/test-results-held
+          if-no-files-found: ignore
+          retention-days: 14
+
   launch-gate:
     name: Launch gate
     if: always()
-    needs: [preflight, browser-qa, product-qa, lighthouse]
+    needs: [preflight, browser-qa, product-qa, lighthouse, v34-matrix]
     runs-on: ubuntu-latest
     steps:
       - name: Require every launch check
@@ -278,3 +365,4 @@ jobs:
           test "${{ needs.browser-qa.result }}" = "success"
           test "${{ needs.product-qa.result }}" = "success"
           test "${{ needs.lighthouse.result }}" = "success"
+          test "${{ needs.v34-matrix.result }}" = "success"
