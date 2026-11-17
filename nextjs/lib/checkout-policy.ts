@@ -1,5 +1,5 @@
 import type { CommercialState } from "./commercial-state";
-import { planAvailability, type BillingOffer, type PlanAvailability } from "./billing-catalog";
+import { BILLING_OFFERS, isBillingOfferCode, planAvailability, type BillingOffer, type PlanAvailability } from "./billing-catalog";
 
 export type CheckoutPolicyDecision =
   | { allowed: true; mode: "sandbox_qualification" | "production" }
@@ -28,27 +28,43 @@ export type SubscriptionChangeDecision =
   | { allowed: true }
   | {
       allowed: false;
-      code: "BILLING_PLAN_ALREADY_ACTIVE" | "BILLING_PLAN_CHANGE_REQUIRED" | "BILLING_SUBSCRIPTION_NEEDS_PORTAL" | "BILLING_RESUBSCRIBE_CONTACT";
+      code:
+        | "BILLING_OFFER_INVALID"
+        | "BILLING_PLAN_ALREADY_ACTIVE"
+        | "BILLING_PLAN_CHANGE_REQUIRED"
+        | "BILLING_SUBSCRIPTION_NEEDS_PORTAL"
+        | "BILLING_RESUBSCRIBE_CONTACT";
     };
 
 /*
-  2026-11-10, with Team self-serve. This mirrors what the billing projection accepts, so a checkout
-  is refused before Paddle can take a payment the projection would then refuse to apply.
+  2026-11-10, with Team self-serve; widened 2026-11-17 for catalog v2 (20261117140000). This mirrors
+  what the billing projection accepts, so a checkout is refused before Paddle can take a payment the
+  projection would then refuse to apply.
 
-  - 0005 (the v2 subscription branch, still the base of v3 to v6) writes a subscription event only
-    when the account has no `paddle_subscription_id` yet or the event carries the same one.
-  - Nothing ever clears that id. Cancellation, past due and pause only change the status.
-  - 0010/0011 admit exactly one replacement: a Team subscription over a Developer one that is
-    `active` or `trialing` with its cancellation scheduled, for the same Paddle customer.
+  - 0005 (the base under v3 to v6) writes a subscription event only when the account has no
+    `paddle_subscription_id` yet or the event carries the same one. Nothing ever clears that id.
+    Cancellation, past due and pause only change the status.
+  - v3 (0011, widened by 20261117140000) admits one kind of replacement, for the same Paddle customer,
+    over a subscription that is `active` or `trialing` with its cancellation scheduled
+    (`projectionAdmitsReplacement`).
 
   So once a workspace has held any subscription, the only checkout the projection can apply is that
   replacement. Past due and paused are fixed or cancelled in the customer portal. An ended
   subscription cannot be replaced by a new one, so re-subscribing is arranged with us.
 */
 export function decideSubscriptionChange(
-  account: { accessPlan: string | null; subscriptionStatus: string; subscriptionCancelAt: string | null; paddleSubscriptionId: string | null },
+  account: {
+    accessPlan: string | null;
+    /** Null or absent for a legacy plan, whose code is `accessPlan`. */
+    planCode?: string | null;
+    subscriptionStatus: string;
+    subscriptionCancelAt: string | null;
+    paddleSubscriptionId: string | null;
+  },
   offerCode: string,
 ): SubscriptionChangeDecision {
+  // The projection names six codes and raises for any other (foundation_offer_access_plan), so nothing else is sold.
+  if (!isBillingOfferCode(offerCode)) return { allowed: false, code: "BILLING_OFFER_INVALID" };
   if (!account.paddleSubscriptionId) return { allowed: true };
   if (account.subscriptionStatus === "past_due" || account.subscriptionStatus === "paused") {
     return { allowed: false, code: "BILLING_SUBSCRIPTION_NEEDS_PORTAL" };
@@ -56,9 +72,21 @@ export function decideSubscriptionChange(
   if (account.subscriptionStatus !== "active" && account.subscriptionStatus !== "trialing") {
     return { allowed: false, code: "BILLING_RESUBSCRIBE_CONTACT" };
   }
-  if (account.accessPlan === offerCode) return { allowed: false, code: "BILLING_PLAN_ALREADY_ACTIVE" };
-  if (offerCode === "studio_access" && account.accessPlan === "observer_access" && account.subscriptionCancelAt) return { allowed: true };
+  const held = account.planCode ?? account.accessPlan;
+  if (held === offerCode) return { allowed: false, code: "BILLING_PLAN_ALREADY_ACTIVE" };
+  if (account.subscriptionCancelAt && projectionAdmitsReplacement(held, offerCode)) return { allowed: true };
   return { allowed: false, code: "BILLING_PLAN_CHANGE_REQUIRED" };
+}
+
+/**
+ * The plan pairs v3's replacement admits (20261117140000), held plan first: a legacy Developer
+ * (`observer_access`, no plan code) to the legacy Team (`studio_access`), as 0010/0011 always did; and
+ * any held plan to a v2 plan it does not already hold. A retired code is never a target, and an unknown
+ * code is never admitted (the SQL mapping raises on it).
+ */
+export function projectionAdmitsReplacement(held: string | null, target: string): boolean {
+  if (held === "observer_access" && target === "studio_access") return true;
+  return isBillingOfferCode(target) && BILLING_OFFERS[target].status === "v2" && held !== target;
 }
 
 /** Keeps the money path aligned with the customer workflow advertised by public status. */
