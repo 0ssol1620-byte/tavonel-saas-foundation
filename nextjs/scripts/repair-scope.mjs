@@ -3254,9 +3254,13 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // v34-catalog (WO-CAT): the login client, the checkout quote and the catalog suites. cta-truth.test.ts imports the login client and
   // six more suites read its source; checkout-quote.test.ts and checkout-customer-data-gate.test.ts call the checkout route that uses
   // the quote; the two catalog suites run themselves; login-capability.spec.ts opens /login.
+  // Round 7 (WO-CAT-3 merged): the included-page expiry pin follows the newest definition of the billing projection, which the catalog's
+  // v2 offer-code migration now holds, so the catalog owns that suite and runs it. The migration, its rollback draft and its pgTAP file
+  // are SQL (database-contract, whose list now carries catalog_v2_offer_codes.sql); billing-store.ts and checkout-policy.ts keep
+  // pricing-one-step-buy-20261110 and billing-ledger-replay.ts keeps page-meter, each already selecting the suites that read them.
   'v34-catalog': Object.freeze({
-    paths: Object.freeze(['app/login/login-client.tsx', 'lib/billing-catalog.test.ts', 'lib/checkout-quote.test.ts', 'lib/checkout-quote.ts', 'lib/plan-limit-fit.test.ts']),
-    unitFiles: Object.freeze(['lib/billing-catalog.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-quote.test.ts', 'lib/cta-truth.test.ts', 'lib/funnel-events.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/recipe-intent.test.ts']),
+    paths: Object.freeze(['app/login/login-client.tsx', 'lib/billing-catalog.test.ts', 'lib/checkout-quote.test.ts', 'lib/checkout-quote.ts', 'lib/included-page-expiry-migration.test.ts', 'lib/plan-limit-fit.test.ts']),
+    unitFiles: Object.freeze(['lib/billing-catalog.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-quote.test.ts', 'lib/cta-truth.test.ts', 'lib/funnel-events.test.ts', 'lib/included-page-expiry-migration.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/recipe-intent.test.ts']),
     browserFiles: Object.freeze(['e2e/login-capability.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
@@ -3359,9 +3363,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
 // WO-AN-7B's migration 20261117130300 and its rollback draft (merged) need no entry: every supabase/{migrations,tests,drafts}/*.sql is
 // the database-contract group's.
 export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({});
-// D-4 and WO-AN-1: the program's four pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
-// rehearsal. Fixtures that build a SQL-bearing head take this list, never a copy of it.
-export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
+// D-4 and WO-AN-1: the program's pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
+// rehearsal (round 7: WO-CAT-3's catalog_v2_offer_codes.sql joins the four). Fixtures that build a SQL-bearing head take this list, never
+// a copy of it.
+export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/agent_proposals.sql', 'supabase/tests/catalog_v2_offer_codes.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3678,8 +3683,15 @@ export function parseAffectedRawDiff(output) {
 }
 
 // The workflow grammar (WO-CI-7 round 6). Every claim reader goes through readWorkflowYaml, which accepts a closed list of line shapes
-// and refuses everything else with its line number. Outside a block scalar, blank, whitespace-only and comment-only lines are skipped at
-// any indent; every other line is one of:
+// and refuses everything else with its line number.
+// One character rule comes first (round 7), before any line is measured or any scalar trimmed: once CRLF is read as LF, the only
+// whitespace a workflow may hold is U+0020 and U+000A. Every other code point JavaScript reads as whitespace (whatever trim strips: tab,
+// VT, FF, a lone CR, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF), every other C0 control, DEL and
+// every C1 control (U+0080-U+009F, NEL included) refuses the file at its line. YAML reads indentation and the edges of a scalar by
+// spaces alone, and a libyaml-family parser breaks lines at NEL, LS and PS; with the rule in front, the trim, trimStart and trimEnd
+// below can only ever remove U+0020, so they measure and cut exactly what YAML does. Other non-ASCII text (a dash in a name, a word
+// in a comment) is content, read as YAML reads it.
+// Outside a block scalar, blank, space-only and comment-only lines are skipped at any indent; every other line is one of:
 //   key:                    a plain key (a letter or `_`, then letters, digits, `_`, `.`, `-`) opening a mapping or a sequence
 //                           indented deeper, or null when nothing deeper follows
 //   key: scalar             a plain scalar (no `: `, no ` #`, no leading indicator) or a quoted one that opens and closes on the line
@@ -3690,13 +3702,15 @@ export function parseAffectedRawDiff(output) {
 //   key: >   key: >-        a folded block: the same lines, folded as YAML folds them
 //   - key: ...              a sequence entry opening a mapping (one space after the dash; its other keys align with the first)
 //   - scalar                a sequence entry holding a plain or quoted scalar
-// Anything else is refused: a tab or control character, a quoted or complex key, a key repeated in one mapping, an anchor, alias, tag or
+// Anything else is refused: a quoted or complex key, a key repeated in one mapping, an anchor, alias, tag or
 // merge key, a document marker or directive, a trailing comment, a quoted scalar left open, a plain scalar continued on the next line, a
 // line indented between two levels or another block scalar header (`|+`, `>2`, `| # c`).
 // The result is { value, notes }: every scalar a string (null for a `key:` with nothing under it), and notes that list, by path and line,
 // the shapes a claim reads with care (block scalars, flow mappings, single-quoted and non-string plain scalars). A file outside the
 // grammar is { error: 'line N: why' }. Linear in the text: every line is read once, each with indexOf and anchored, unambiguous patterns.
 class WorkflowShapeError extends Error {}
+// The character rule: any C0 control but LF, DEL, any C1 control, and any JavaScript whitespace but U+0020 and LF (\s follows the engine).
+export const WORKFLOW_UNREAD_CHARACTER = /[\x00-\x09\x0B-\x1F\x7F-\x9F]|[^\S \n]/u;
 const WORKFLOW_KEY = /^([A-Za-z_][A-Za-z0-9_.-]*):(?: |$)/;
 const WORKFLOW_FLOW_KEY = /([A-Za-z_][A-Za-z0-9_.-]*): +/y;
 // A plain scalar YAML (1.2 core, js-yaml's timestamps, 1.1 booleans) reads as something other than a string.
@@ -3848,7 +3862,7 @@ export function readWorkflowYaml(text) {
   };
   const node = (indent, path) => /^-(?: |$)/.test(lines[i].slice(indent)) ? sequence(indent, path) : mapping(indent, {}, path);
   try {
-    for (const [at, line] of lines.entries()) { const bad = /[\x00-\x09\x0B-\x1F\x7F﻿]/.exec(line); if (bad) fail(at, bad[0] === '\t' ? 'a tab' : 'a control character'); }
+    for (const [at, line] of lines.entries()) { const bad = WORKFLOW_UNREAD_CHARACTER.exec(line); if (bad) fail(at, bad[0] === '\t' ? 'a tab' : `whitespace other than a space or a line feed, or a control character (U+${bad[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`); }
     if (!nextContent()) fail(0, 'no content');
     if (indentOf(lines[i]) !== 0) fail(i, 'a document that does not start at column 0');
     return { value: mapping(0, {}, []), notes };

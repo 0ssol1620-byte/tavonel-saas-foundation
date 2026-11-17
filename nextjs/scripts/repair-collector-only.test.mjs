@@ -1467,8 +1467,8 @@ test('affected real Git map retains the original 43/48 inventories with exact cu
     assert.equal(all.length,43);
     const combined=[...all,...AFFECTED_ASK_ANSWER_PATHS].sort();
     assert.equal(combined.length,48);assert.equal(new Set(combined).size,48);
-    assert.equal(AFFECTED_DB_FIXTURE_SUPPORT_PATHS.length,4);
-    const supported=[...combined,...AFFECTED_CI_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS].sort();assert.equal(supported.length,57);assert.equal(new Set(supported).size,57);
+    assert.equal(AFFECTED_DB_FIXTURE_SUPPORT_PATHS.length,5);
+    const supported=[...combined,...AFFECTED_CI_SUPPORT_PATHS,...AFFECTED_DB_FIXTURE_SUPPORT_PATHS].sort();assert.equal(supported.length,58);assert.equal(new Set(supported).size,58);
     // The same SQL-bearing head without the program's pgTAP files refuses on the first of them instead of shrinking the DB selection.
     const fixtureless=map(commit(...[...new Set([...combined,...AFFECTED_CI_SUPPORT_PATHS])].map(p=>put(p,affectedLeafBytes(p),'100644',affectedActualBytesLeaf(p)))));
     assert.equal(fixtureless.eligible,false);assert.match(fixtureless.reason,new RegExp('selected database fixture is absent at head: '+AFFECTED_DB_FIXTURE_SUPPORT_PATHS[0].replace(/[.]/g,'\\.')));
@@ -1489,7 +1489,7 @@ test('affected real Git map retains the original 43/48 inventories with exact cu
     assert.deepEqual(full.map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
     for(const suite of AFFECTED_ASK_SUITES)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
-    assert.deepEqual(full.map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
+    assert.deepEqual(full.map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
       'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/foundation_page_meter.sql',
       'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
     assert.deepEqual(Object.keys(full.map.databaseDependencyReasons),['supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql',

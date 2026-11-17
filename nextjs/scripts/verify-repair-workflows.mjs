@@ -1125,15 +1125,15 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
 // V34 program owners (WO-CI-7, D-1, D-4, K1-K5 and round 3), restated independently: each owner exists once with exact paths and
 // selects at least one suite the Repair job itself executes (an external check never counts; a Node suite counts only when the Repair
 // Node runner registers it), and every external check is a claim that the named workflow job's exact step runs the file, read here
-// from that workflow, the Playwright config, the Vitest include and the spec itself at this head. The pending owners hold paths two
-// running lanes add (WO-AN-2, WO-AN-3): a suite they name that is absent at this head must be one of their own paths, so only the
-// change that adds it can select it.
+// from that workflow, the Playwright config, the Vitest include and the spec itself at this head. A pending owner holds paths a running
+// lane adds: a suite it names that is absent at this head must be one of its own paths, so only the change that adds it can select it.
+// None is pending at this head: every lane that had one has merged, and pendingPins stays empty until a running lane adds an owner.
 {
   const pins = [['v34-shell', 47, 23, 3, 0], ['v34-route-registry', 6, 55, 2, 0], ['v34-world', 18, 22, 2, 0], ['v34-route-bodies', 258, 60, 3, 0],
     ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 1, 0], ['proposals-library', 18, 11, 0, 1],
     ['workspace-journey', 8, 3, 0, 1], ['compile-pipeline', 15, 12, 0, 2], ['world-temporal-lens', 13, 6, 0, 2], ['control-plane', 5, 3, 0, 0],
     ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
-    ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 5, 11, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
+    ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 6, 12, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
     ['v34-qa-harness', 10, 0, 2, 2], ['db-harness', 15, 7, 0, 0], ['agent-proposals', 5, 2, 0, 0],
     ['proposals-decision-path', 3, 6, 0, 0], ['agent-grants', 6, 5, 0, 0], ['proposal-executors', 5, 4, 0, 0], ['agent-access-panel', 3, 1, 0, 1],
     ['agent-mcp-route', 6, 7, 0, 0], ['v34-retained-shell', 2, 1, 0, 1]];
@@ -1188,13 +1188,13 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     'the V34 harness must run in the Repair browser stage: the self-test without only its WebKit case, the matrix SEO and held passes in production mode');
   const pageMeter = AFFECTED_GROUPS.filter(owner => owner.group === 'page-meter');
   const database = AFFECTED_GROUPS.filter(owner => owner.group === 'database-contract');
-  const pgtap = ['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql'];
+  const pgtap = ['supabase/tests/agent_proposals.sql', 'supabase/tests/catalog_v2_offer_codes.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql'];
   assert(pageMeter.length === 1 && pageMeter[0].match.test('nextjs/lib/billing-ledger-replay.ts') && pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.test.ts')
     && !pageMeter[0].unitFiles.includes('lib/billing-ledger-replay.db.test.ts') && pageMeter[0].externalChecks === undefined
     && database.length === 1 && database[0].database === true && JSON.stringify([...database[0].databaseTests]) === JSON.stringify(pgtap) && JSON.stringify([...DATABASE_CONTRACT_DATABASE_TESTS]) === JSON.stringify(pgtap)
     && pgtap.every(file => existsSync(resolve(repo, file))) && database[0].match.test('supabase/drafts/rollback-20261117130000-agent-proposals.sql')
     && planner.includes('named external owner check is absent at head: ') && planner.includes('selects no check the Repair job executes: ')
     && planner.includes('name different runners for one external check: ') && planner.includes('externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource)'),
-    'page-meter must own the ledger replay without an unrun claim, database-contract must select the four program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
+    'page-meter must own the ledger replay without an unrun claim, database-contract must select the five program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
 }
 console.log('V34 program owners: twenty-seven exact owners (one binding the /explore paths to its checks, the /explore key spec a verified Product QA claim) and none pending, every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');

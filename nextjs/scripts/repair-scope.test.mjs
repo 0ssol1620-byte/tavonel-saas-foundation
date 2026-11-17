@@ -3293,11 +3293,11 @@ test('affected owner map covers all 26 requested product paths and their executi
     if (group==='ocr-worker') assert.equal(map.runCdrWorkerChecks,true,path);
   }
   const aclSql=select('supabase/tests/google_viewer_principal_boundary.sql');
-  assert.ok(aclSql.groups.includes('database-contract'));assert.equal(aclSql.databaseChanged,true);assert.deepEqual(aclSql.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
+  assert.ok(aclSql.groups.includes('database-contract'));assert.equal(aclSql.databaseChanged,true);assert.deepEqual(aclSql.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
   assert.deepEqual(aclSql.databaseDependencyReasons,{});
   const dropboxSql=select('supabase/migrations/20261007100000_dropbox_source_path_reconciliation.sql');
   assert.ok(dropboxSql.groups.includes('database-contract'));assert.equal(dropboxSql.databaseChanged,true);
-  assert.deepEqual(dropboxSql.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
+  assert.deepEqual(dropboxSql.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
     'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql',
     'supabase/tests/foundation_page_meter.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
   assert.equal(dropboxSql.nativeEvidence.disposition,'fresh-seven-case-native-run-required');
@@ -3318,7 +3318,7 @@ test('affected 43-path integrated map selects the Dropbox SQL dependency fixture
   assert.deepEqual(map.failures,[]);assert.equal(map.changedPaths.length,43);
   assert.deepEqual(map.groups,['acl','billing-access-plan-gates','ci-selector','database-contract','docs','dropbox-connector','grounded-ask','home-reader-heading-css','intake-triage','ocr-worker','repository-docs','review-queue','workspace-lifecycle']);
   assert.deepEqual([map.databaseChanged,map.runSelectorContracts,map.runCdrWorkerChecks,map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
-  assert.deepEqual(map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
+  assert.deepEqual(map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
     'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/foundation_page_meter.sql',
     'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
   assert.deepEqual(map.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
@@ -3331,7 +3331,7 @@ test('affected 43-path integrated map selects the Dropbox SQL dependency fixture
   assert.deepEqual([tsOnly.databaseChanged,tsOnly.databaseTests,tsOnly.databaseDependencyReasons],[false,[],{}]);
   // Any required DB lane carries the Dropbox owner's dependencies, even when the SQL change belongs to another owner.
   const aclSqlWithDropbox=affectedMap([affectedRecord('M',['nextjs/lib/source-import.ts']),affectedRecord('M',['supabase/tests/google_viewer_principal_boundary.sql'])]);
-  assert.deepEqual(aclSqlWithDropbox.databaseTests,[...Object.keys(AFFECTED_DROPBOX_DEPENDENCY_REASONS),'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/agent_proposals.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql'].sort());
+  assert.deepEqual(aclSqlWithDropbox.databaseTests,[...Object.keys(AFFECTED_DROPBOX_DEPENDENCY_REASONS),'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql'].sort());
   assert.deepEqual(aclSqlWithDropbox.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
   // Normal Auth/storage transport and the full pgTAP set are never part of the affected selection.
   assert.ok(!map.databaseTests.some(path=>/auth_|storage|tenant_rls/.test(path)));
@@ -3474,7 +3474,7 @@ test('affected real Git map binds the original 48 paths plus current CI contract
       .map(path=>put(path,affectedLeafBytes(path),'100644',AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)||AFFECTED_DB_FIXTURE_SUPPORT_PATHS.includes(path)));
     assert.equal(AFFECTED_INTEGRATED_PATHS.length,43);
     assert.equal(AFFECTED_COMBINED_PATHS.length,48);assert.equal(new Set(AFFECTED_COMBINED_PATHS).size,48);
-    assert.equal(AFFECTED_CI_CONTRACT_SUPPORT_PATHS.length,5);assert.equal(AFFECTED_DB_FIXTURE_SUPPORT_PATHS.length,4);assert.equal(AFFECTED_SUPPORTED_COMBINED_PATHS.length,57);
+    assert.equal(AFFECTED_CI_CONTRACT_SUPPORT_PATHS.length,5);assert.equal(AFFECTED_DB_FIXTURE_SUPPORT_PATHS.length,5);assert.equal(AFFECTED_SUPPORTED_COMBINED_PATHS.length,58);
     // The same SQL-bearing head without the program's pgTAP files refuses on the first of them instead of shrinking the DB selection.
     const fixtureless=source(commit(...[...new Set([...AFFECTED_COMBINED_PATHS,...AFFECTED_CI_CONTRACT_SUPPORT_PATHS])].map(path=>put(path,affectedLeafBytes(path),'100644',AFFECTED_CI_CONTRACT_SUPPORT_PATHS.includes(path)))));
     assert.equal(fixtureless.eligible,false);assert.match(fixtureless.reason,/selected database fixture is absent at head: supabase\/tests\/foundation_page_meter\.sql/);
@@ -3496,7 +3496,7 @@ test('affected real Git map binds the original 48 paths plus current CI contract
     // The page/ask-route-limits overlap selects every grounded-ask suite, and each one is present at the combined head.
     for(const suite of AFFECTED_GROUPS.find(owner=>owner.group==='grounded-ask').unitFiles)assert.ok(full.map.unitFiles.includes(suite),suite);
     assert.deepEqual([full.map.databaseChanged,full.map.runSelectorContracts,full.map.runCdrWorkerChecks,full.map.nativeEvidence.disposition],[true,true,true,'fresh-seven-case-native-run-required']);
-    assert.deepEqual(full.map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
+    assert.deepEqual(full.map.databaseTests,['supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/connector_checkpoints.sql','supabase/tests/connector_document_bindings.sql','supabase/tests/connector_source_suspensions.sql',
       'supabase/tests/connector_sync_page_snapshots.sql','supabase/tests/dropbox_source_reconciliation.sql','supabase/tests/foundation_jobs.sql','supabase/tests/foundation_page_meter.sql',
       'supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']);
     assert.deepEqual(full.map.databaseDependencyReasons,AFFECTED_DROPBOX_DEPENDENCY_REASONS);
@@ -3752,7 +3752,7 @@ test('affected grounded-ask admission: ask-route-limits.test.ts overlaps acl and
     assert.deepEqual([acl.failures,acl.groups,acl.unitFiles],[[],['acl'],AFFECTED_ACL_UNITS],path);
   }
   const aclSql=affectedMap([affectedRecord('M',['supabase/tests/google_viewer_principal_boundary.sql'])]);
-  assert.deepEqual([aclSql.groups,aclSql.databaseTests],[['acl','database-contract'],['supabase/tests/agent_proposals.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']]);
+  assert.deepEqual([aclSql.groups,aclSql.databaseTests],[['acl','database-contract'],['supabase/tests/agent_proposals.sql','supabase/tests/catalog_v2_offer_codes.sql','supabase/tests/foundation_page_meter.sql','supabase/tests/google_viewer_principal_boundary.sql','supabase/tests/library_label_decisions.sql','supabase/tests/world_change_proposals.sql']]);
 });
 test('affected grounded-ask admission: workspace page overlaps workspace-lifecycle, world-lifecycle.spec.ts is unchanged and the answer delta unions every selection', () => {
   const page=affectedMap([affectedRecord('M',['nextjs/app/workspace/page.tsx'])]);
@@ -8548,7 +8548,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['billing-reconciliation', 12, 'd98a2e522659cc4b', 7, '00d0f2f362aa3ea7', [], { 'scripts/billing/paddle-reconcile.test.mjs': V34_CI_VITEST }],
   ['v34-home', 2, '15569343b96c4a82', 1, '70918323898e7ed4', ['e2e/home-v34.spec.ts', 'e2e/upload-entry.spec.ts'], {}],
   ['v34-changes-contract', 1, '9d71180ae41799c5', 1, '56d56d274c9d96fa', ['e2e/compiler-contract.spec.ts'], {}],
-  ['v34-catalog', 5, 'fe2c24dffa44467e', 11, 'c671c8f1d488eb77', ['e2e/login-capability.spec.ts'], {}],
+  // Round 7: WO-CAT-3 merged; the catalog owns and runs the included-page expiry pin (6 paths, 12 suites, from 5 and 11).
+  ['v34-catalog', 6, 'bc20b2db315cb5cf', 12, 'c653ae00b13a7ef0', ['e2e/login-capability.spec.ts'], {}],
   ['v34-repointed-specs', 2, '5d4a583b1fe39ef9', 0, 'e3b0c44298fc1c14', ['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts'], {}],
   ['v34-qa-harness', 10, '0fc4323c29acf1c5', 0, 'e3b0c44298fc1c14', ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'],
     { 'e2e/v34-matrix.spec.ts': v34MatrixJob('v34-chromium'), 'e2e/v34-support.selftest.spec.ts': v34MatrixJob('v34-selftest') }],
@@ -8917,8 +8918,8 @@ test('affected v34 pending owners: a lane path absent at head is owned, selected
   // Nothing at this head selects a pending owner: the program delta stays exactly as it was.
   assert.ok(!v34AllPaths().some(path => Object.keys(V34_PROGRAM_PENDING_OWNERS).some(group => AFFECTED_GROUPS.find(o => o.group === group).match.test(path))));
 });
-test('affected database-contract owner: every SQL change selects the four program pgTAP files, each required at head', () => {
-  assert.deepEqual([...DATABASE_CONTRACT_DATABASE_TESTS], ['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
+test('affected database-contract owner: every SQL change selects the five program pgTAP files, each required at head', () => {
+  assert.deepEqual([...DATABASE_CONTRACT_DATABASE_TESTS], ['supabase/tests/agent_proposals.sql', 'supabase/tests/catalog_v2_offer_codes.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
   const [owner, ...rest] = AFFECTED_GROUPS.filter(o => o.group === 'database-contract');
   assert.deepEqual([rest, owner.database, [...owner.databaseTests], [...owner.unitFiles]], [[], true, [...DATABASE_CONTRACT_DATABASE_TESTS], ['lib/pgtap-fixtures.test.ts']]);
   for (const path of ['supabase/migrations/20261116130000_library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql', 'supabase/drafts/a.sql', 'supabase/drafts/rollback-20261117130000-agent-proposals.sql']) {
@@ -9129,6 +9130,18 @@ test('affected v34 claim grammar: no scalar hides a step or a key, a trigger fil
     ['a flow mapping in the claimed step', edits(['          V34_RELEASE: live\n', '          V34_EXTRA: { a: b }\n']), /a flow mapping at jobs\.v34-matrix\.steps\[\d+\]\.env\.V34_EXTRA,/],
     ['a document marker', edits(['permissions:\n', '---\npermissions:\n']), /a line that is not a plain `key:`/],
     ['a tab', edits(['          V34_RELEASE: live\n', '\t  V34_RELEASE: live\n']), /\(line \d+: a tab\)/],
+    // Round 7 (receipts/review-WO-CI-7/r20/r6/unicode-ws-probe, ls-probe): js-yaml reads each of these as a run or an env value that differs
+    // from the claim (an NBSP, U+3000 or EM SPACE is content to YAML), or a libyaml-family parser breaks the name at LS into `if: false`.
+    ...[
+      ['a trailing NBSP after the inline run', [`        run: ${V34_MATRIX_RUN}\n`, `        run: ${V34_MATRIX_RUN}\u00A0\n`], '00A0'],
+      ['a trailing ideographic space after the inline run', [`        run: ${V34_MATRIX_RUN}\n`, `        run: ${V34_MATRIX_RUN}\u3000\n`], '3000'],
+      ['a literal run whose first line is indented by 9 spaces and an NBSP', [`        run: ${V34_MATRIX_RUN}\n`, `        run: |\n         \u00A0${V34_MATRIX_RUN}\n`], '00A0'],
+      ['a literal run whose first line is indented by 9 spaces and an EM SPACE', [`        run: ${V34_MATRIX_RUN}\n`, `        run: |-\n         \u2003${V34_MATRIX_RUN}\n`], '2003'],
+      ['a step env value with a trailing NBSP', ['          V34_RELEASE: live\n', '          V34_RELEASE: live\u00A0\n'], '00A0'],
+      ['a step env value with a trailing NBSP (widths)', ['          V34_WIDTHS: 390,412,1440\n', '          V34_WIDTHS: 390,412,1440\u00A0\n'], '00A0'],
+      ['a step env value with a leading NBSP', ['          V34_RELEASE: live\n', '          V34_RELEASE: \u00A0live\n'], '00A0'],
+      ['a step name holding `if: false` behind LINE SEPARATORs', [stepName, '      - name: Run the V34 harness\u2028        if:\u2028          false\n'], '2028'],
+    ].map(([label, pair, code]) => [label, edits(pair), new RegExp(`\\(line \\d+: whitespace other than a space or a line feed, or a control character \\(U\\+${code}\\)\\)`)]),
   ];
   for (const [label, read, reason] of cases) {
     const failures = externalCheckClaimFailures(matrix, claim, read);
@@ -9139,6 +9152,45 @@ test('affected v34 claim grammar: no scalar hides a step or a key, a trigger fil
   const workflows = readdirSync(v34RepoPath('.github/workflows')).filter(name => name.endsWith('.yml'));
   assert.ok(workflows.length >= 16);
   for (const name of workflows) assert.equal(readWorkflowYaml(v34ReadHead(`.github/workflows/${name}`)).error, undefined, name);
+});
+// Round 7: the character rule, held by construction. The list is computed from the engine: every BMP code point trim strips, every C0
+// and C1 control and DEL, except U+0020 and U+000A. Each is refused at its line in every place it could move a level or a scalar's edge;
+// if the engine's whitespace grows, the list grows with it.
+test('affected v34 workflow grammar: no whitespace but a space or a line feed, and no control character, is read in any place', () => {
+  const unread = [];
+  for (let c = 0; c <= 0xffff; c++) {
+    if (c >= 0xd800 && c <= 0xdfff) continue;
+    const s = String.fromCodePoint(c);
+    if ((s.trim() === '' || c <= 0x1f || (c >= 0x7f && c <= 0x9f)) && c !== 0x20 && c !== 0x0a) unread.push(s);
+  }
+  for (const c of [0x00, 0x09, 0x0b, 0x0c, 0x0d, 0x1f, 0x7f, 0x80, 0x85, 0x9f, 0xa0, 0x1680, 0x2000, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff])
+    assert.ok(unread.includes(String.fromCodePoint(c)), c.toString(16));
+  const reason = c => c === '\t' ? 'a tab' : `whitespace other than a space or a line feed, or a control character (U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`;
+  const base = ['on:', '  pull_request:', 'jobs:', '  j:', '    steps:', '      - name: Step name', '        run: |', '          echo a', '        env:', '          K: v'];
+  const textWith = (at, line) => base.map((text, k) => k === at ? line : text).join('\n');
+  assert.deepEqual(readWorkflowYaml(base.join('\n')).value, { on: { pull_request: null }, jobs: { j: { steps: [{ name: 'Step name', run: 'echo a\n', env: { K: 'v' } }] } } });
+  // [place, line index, the line with the character there]; K: v is the last line with no break after it, so a CR after it is a lone CR.
+  const places = [
+    ['in indentation', 9, c => `         ${c}K: v`], ['before a key', 9, c => `          ${c}K: v`], ['before a scalar', 9, c => `          K: ${c}v`],
+    ['after a scalar', 9, c => `          K: v${c}`], ["as the first line's indentation of a run: | block", 7, c => `         ${c}echo a`],
+    ['inside a step name', 5, c => `      - name: Step${c}name`], ['in the indentation of a sequence entry', 5, c => `     ${c}- name: Step name`],
+    ['inside a comment', 8, c => `        # a${c}b`], ['on an otherwise blank line', 8, c => `${c} `],
+  ];
+  // (A CR right before a line break is CRLF, read as LF; every place above has text after the character or ends the file.)
+  for (const c of unread) for (const [place, at, line] of places)
+    assert.equal(readWorkflowYaml(textWith(at, line(c))).error, `line ${at + 1}: ${reason(c)}`, `U+${c.codePointAt(0).toString(16)} ${place}`);
+  // The same rule decides a claim on the real workflow: before the claimed run's value and inside the claimed step's name.
+  const launch = '.github/workflows/launch-qa.yml', claim = v34MatrixJob('v34-chromium'), text = v34ReadHead(launch).replace(/\r\n/g, '\n');
+  const runLine = `        run: ${V34_MATRIX_RUN}\n`, stepName = '      - name: Run the V34 harness self-test and the matrix over the live registry rows\n';
+  assert.ok(text.includes(runLine) && text.includes(stepName));
+  for (const c of unread) for (const [from, to] of [[runLine, `        run: ${c}${V34_MATRIX_RUN}\n`], [stepName, stepName.replace('V34 harness', `V34${c}harness`)]]) {
+    const failures = externalCheckClaimFailures('e2e/v34-matrix.spec.ts', claim, p => p === launch ? text.replace(from, to) : v34ReadHead(p));
+    assert.equal(failures.length, 1, `U+${c.codePointAt(0).toString(16)}`);
+    assert.ok(failures[0].endsWith(`: ${reason(c)})`), failures[0]);
+  }
+  // Text that is not whitespace stays content, read as YAML reads it: a dash in a name, a zero-width joiner, a word in a comment.
+  const named = readWorkflowYaml(textWith(5, '      - name: Step \u2013 name\u200d') + '\n# \ud55c\uae00 comment\n');
+  assert.deepEqual([named.error, named.value.jobs.j.steps[0].name], [undefined, 'Step \u2013 name\u200d']);
 });
 // A model is built beside each generated workflow from the allowed shapes (noise lines included), and the reader must return exactly it;
 // a shape from outside the list appended to the same workflow must be refused.
