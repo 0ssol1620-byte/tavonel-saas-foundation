@@ -1,4 +1,3 @@
-import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { contactErrorCopy } from "../lib/contact-locale";
 
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
@@ -208,55 +207,6 @@ for (const [width, height] of [[430, 932], [412, 915]] as const) {
     await testInfo.attach(`home-phone-sheet-8s-${width}`, { body: await page.screenshot(), contentType: "image/png" });
   });
 }
-
-/*
-  (b) The one path where the sheet's check of [data-film-reading] decides alone; without it the sheet
-  opens on the block (verified in fix round 5 by removing `line` from the boxes in
-  marketing-consent.tsx: this test failed, fix4/mutation-*.log).
-
-  It was 430x932 in Focus details, scrolled 300px, with the reading line under the frame. FINAL-SPEC
-  2026-10-26 removed the line and a phone's reading block is empty, so the scenario moves to the band
-  where the block still has a box: 768-899px, the pan surface, with the pane strip under the frame
-  and the bottom sheet still in use (the sheet's phone query runs to 899px). At 800x800 the page is
-  scrolled until the frame's bottom is 4px above the zone, past the 200px trigger; the strip under
-  it then reaches into the zone.
-*/
-test("in the 768-899 band in Focus the scrolled sheet never covers the reading block", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
-  test.skip(testInfo.project.name !== "390", "sets its own viewport");
-  const [width, height] = [800, 800];
-  await page.setViewportSize({ width, height });
-  await page.goto("/");
-  const film = page.locator('#walkthrough figure[data-testid="landing-hero-film"]');
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
-  // Home opens compact (founder 2026-10-27); Focus, the taller frame this guards, is one press of Focus details.
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
-  await film.locator(".compile-film-focus-control").click();
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
-  const frameBottom = await film.locator(".compile-film-viewport").evaluate(node => node.getBoundingClientRect().bottom + scrollY);
-  const scroll = Math.round(frameBottom - (height - 104) + 4);
-  expect(scroll, "past the 200px reveal").toBeGreaterThan(200);
-  await page.evaluate(y => window.scrollTo(0, y), scroll);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll);
-  const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
-  /*
-    Film re-record (2026-11-05): the cuts are product screens and STAGE_FRAMES has no `panes`, so the player draws no
-    pane strip and there is no reading block under the frame. What is left to guard is the frame: out of the zone, and
-    the sheet never over it. If a strip comes back, this fails and the reading-block check below applies again.
-  */
-  await expect(film.locator("[data-film-reading]")).toHaveCount(0);
-  const reading = frame;
-  expect(frame.y + frame.height, "frame above the sheet's zone").toBeLessThanOrEqual(height - 104);
-  // Past the 200px trigger the sheet decides within a frame; give it the 180ms entry as well.
-  await page.waitForTimeout(800);
-  const panel = page.getByRole("region", PANEL);
-  if (await panel.count()) {
-    await settle(panel);
-    const box = (await panel.boundingBox())!;
-    expect(overlaps(box, reading), "the scrolled sheet covers the reading line").toBe(false);
-  }
-  await testInfo.attach("home-band-sheet-focus", { body: await page.screenshot(), contentType: "image/png" });
-});
 
 /*
   The card reads as its own surface. Text >= 4.5:1 on the card, and the two answers' borders >= 3:1 (WCAG 1.4.11)

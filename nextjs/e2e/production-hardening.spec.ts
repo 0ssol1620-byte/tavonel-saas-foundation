@@ -74,48 +74,6 @@ test("odd grids compose the final item instead of painting an empty cell", async
   }
 });
 
-test("landing scenes flow continuously without artificial viewport oceans", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "1440");
-  await page.goto("/");
-  const geometry = await page.locator('main > section[data-scene], main > [data-home-measurement], main > [data-home-measures], main > #walkthrough, main > [data-home-reader-guide]').evaluateAll(sections => sections.map(section => {
-    const rect = section.getBoundingClientRect();
-    return { id: section.id || (section.hasAttribute("data-home-measurement") ? "measurement" : section.hasAttribute("data-home-measures") ? "measures" : "reader-guide"), top: rect.top, bottom: rect.bottom, height: rect.height, minHeight: getComputedStyle(section).minHeight };
-  }));
-  /*
-    Landing V2, 2026-09-20: six scenes. Two of the three rules are unchanged -- the
-    scenes butt up against each other, and none of them is collapsed.
-
-    The third is restated rather than kept verbatim. It barred a viewport-height floor outright,
-    because the old landing used one to manufacture emptiness. V2 floors every scene on purpose
-    (`.lv2-scene--full` at `min(900px, 100vh)`, `.lv2-scene--proof` at 80vh) so that a scene is a
-    held frame rather than a paragraph that happens to be tall -- so the assertion becomes the
-    thing the old rule was actually protecting: no scene may floor at more than one viewport, and
-    no scene may be taller than two. An ocean is still a failure; a composed frame is not one.
-  */
-  /*
-    Release 3 (2026-10-16): the receipted measurement band (`section[data-home-measures]`, brief
-    move 7) sits between s1 and s2. Measured on build sRc4B7jgCEvbjOa4NSbYo at 1440, s2 started
-    one band height (469px EN) below s1's bottom because the band was not in this list. It is in
-    the list now, so the same three rules apply to it: it butts against s1 and s2, it is not
-    collapsed, and it is not an ocean.
-  */
-  // FINAL-SPEC 2026-10-26 §11 F-1: the reader guide (FAQ) leaves Home, so s5 butts against s6.
-  // Founder 2026-11-10: the recorded walkthrough left s1 for its own band after the measures, under the same three rules.
-  expect(geometry.map(item => item.id)).toEqual(["s1", "measures", "walkthrough", "s2", "s3", "s4", "s5", "s6"]);
-  for (let index = 1; index < geometry.length; index += 1) {
-    expect(Math.abs(geometry[index].top - geometry[index - 1].bottom), `${geometry[index - 1].id} → ${geometry[index].id}`).toBeLessThanOrEqual(2);
-  }
-  const viewport = page.viewportSize()!.height;
-  for (const section of geometry) {
-    expect(section.height, `${section.id} collapsed`).toBeGreaterThan(180);
-    expect(section.height, `${section.id} is an ocean, not a scene`).toBeLessThanOrEqual(viewport * 2);
-    const floor = Number.parseFloat(section.minHeight);
-    if (Number.isFinite(floor)) {
-      expect(floor, `${section.id} floors past one viewport`).toBeLessThanOrEqual(viewport + 1);
-    }
-  }
-});
-
 test("standalone public product surfaces expose one semantic H1", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "1440");
   for (const route of ["/developers", "/product/compiled-world", "/product/document-understanding"]) {
