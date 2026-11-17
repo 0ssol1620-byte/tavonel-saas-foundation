@@ -1,21 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { PublicProposal, ProposalState } from "@/lib/change-proposals";
 import styles from "./change-proposals-panel.module.css";
 
 /*
-  Proposals in Changes (WO-D30-3): requests for a change to the World, waiting for a person.
+  Proposals in Changes (WO-D30-3, WO-AN-6): requests for a change to the World, waiting for a person.
   Creating a proposal changed nothing; the preview is the change it would make. Confirm and Reject
-  exist only while a proposal is Proposed, Undo only once it is Done. Every control is chosen from the
-  state the server last returned. A click never assumes its own outcome: the list is read again
-  afterwards, and a lost response says it could not be confirmed instead of announcing success.
+  exist only while a proposal is Proposed, Undo only once a label change is Done, Finish only on a row
+  this person confirmed that never completed. Every control is chosen from the state the server last
+  returned. A click never assumes its own outcome: the list is read again afterwards, and a lost
+  response says it could not be confirmed instead of announcing success.
+  The list is the workspace inbox, a page at a time; `?proposal=<id>` opens one row.
 */
 
-type Props = { collectionId: string | null };
-type Load = { state: "loading" } | { state: "unavailable" } | { state: "ready"; proposals: PublicProposal[] };
-type Action = "confirm" | "reject" | "undo";
+type Props = { collectionId?: string | null };
+type Load = { state: "loading" } | { state: "unavailable" } | { state: "ready"; proposals: PublicProposal[]; nextCursor: string | null };
+export type Action = "confirm" | "reject" | "undo" | "finish";
 
 const STATE_WORD: Record<ProposalState, string> = {
   proposed: "Proposed", confirmed: "Confirmed", executed: "Done", rejected: "Rejected",
@@ -25,12 +27,41 @@ const REFUSED: Record<number, string> = {
   403: "You can not decide on this proposal.",
   409: "This proposal can no longer be changed. The list now shows the latest.",
 };
+const PREVIEW_CHANGED = "This suggestion changed since it was shown. Review it again.";
+const NOT_AVAILABLE = "This suggestion is not available.";
 
-export function decisionProblem(status: number): string | null {
+export function decisionProblem(status: number, code?: string | null): string | null {
   if (status === 200) return null;
   if (status === 0 || status >= 500) return "The response could not be confirmed. The list below was read again and shows what was recorded.";
+  if (status === 409 && code === "PROPOSAL_PREVIEW_CHANGED") return PREVIEW_CHANGED;
   return REFUSED[status] ?? "The decision was not saved. Try again.";
 }
+
+/** The request body of one action, or null when it must not be sent (a confirm of a preview that was not shown). */
+export function actionBody(proposal: PublicProposal, action: Action): Record<string, unknown> | null {
+  const base = { collectionId: proposal.collectionId };
+  if (action === "undo") return base;
+  if (action === "reject") return { ...base, decision: "reject" };
+  if (action === "finish") return { ...base, decision: "confirm" };
+  // A confirmation carries the digest of the preview this row rendered; the server refuses any other.
+  return proposal.previewDigest === null ? null : { ...base, decision: "confirm", previewDigest: proposal.previewDigest };
+}
+
+/** The controls a row offers, chosen from its state alone. */
+export function rowActions(proposal: PublicProposal): Action[] {
+  if (proposal.state === "proposed") return actionBody(proposal, "confirm") ? ["confirm", "reject"] : ["reject"];
+  if (proposal.state === "confirmed") return proposal.resumable ? ["finish"] : [];
+  // Only a label change has an undo; the other types are not offered one the server would refuse.
+  if (proposal.state === "executed") return proposal.actionType === "library_label" ? ["undo"] : [];
+  return [];
+}
+
+/** Batch confirm is a loop of single confirms, offered for label rows only. */
+export const batchEligible = (proposals: readonly PublicProposal[]) =>
+  proposals.filter((p) => p.actionType === "library_label" && rowActions(p).includes("confirm"));
+
+export const agentBadge = (proposer: PublicProposal["proposer"]): string | null =>
+  proposer.kind === "agent" ? `Suggested by an agent connected by ${proposer.grantedBy} — client name “${proposer.clientLabel}” (not verified)` : null;
 
 async function api(path: string, init: RequestInit = {}) {
   const client = getSupabaseBrowserClient();
@@ -39,51 +70,191 @@ async function api(path: string, init: RequestInit = {}) {
     ...(init.body ? { "Content-Type": "application/json" } : {}) } });
 }
 
-async function fetchProposals(collectionId: string): Promise<Load> {
+const wellFormed = (p: PublicProposal) => Boolean(p) && p.state in STATE_WORD && typeof p.proposalId === "string" && Array.isArray(p.evidenceIds)
+  && Boolean(p.proposer) && typeof p.createdAt === "string";
+
+async function fetchPage(cursor: string | null): Promise<{ proposals: PublicProposal[]; nextCursor: string | null } | null> {
   try {
-    const response = await api(`/api/proposals?collectionId=${encodeURIComponent(collectionId)}`);
-    const body = await response.json().catch(() => null) as { proposals?: PublicProposal[] } | null;
-    if (!response.ok || !body || !Array.isArray(body.proposals)
-      || !body.proposals.every((p) => p && p.state in STATE_WORD && typeof p.proposalId === "string" && Array.isArray(p.evidenceIds))) return { state: "unavailable" };
-    return { state: "ready", proposals: [...body.proposals].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) };
+    const response = await api(cursor ? `/api/proposals?cursor=${encodeURIComponent(cursor)}` : "/api/proposals");
+    const body = await response.json().catch(() => null) as { proposals?: PublicProposal[]; nextCursor?: string | null } | null;
+    if (!response.ok || !body || !Array.isArray(body.proposals) || !body.proposals.every(wellFormed)) return null;
+    return { proposals: body.proposals, nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null };
   } catch {
-    return { state: "unavailable" };
+    return null;
   }
 }
 
-export default function ChangeProposalsPanel({ collectionId }: Props) {
+/** The first `pages` pages, so a re-read after a click keeps what "Show more" had loaded. */
+async function fetchPages(pages: number): Promise<Load> {
+  const all: PublicProposal[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < pages; page += 1) {
+    const read = await fetchPage(cursor);
+    if (!read) return { state: "unavailable" };
+    all.push(...read.proposals);
+    cursor = read.nextCursor;
+    if (!cursor) break;
+  }
+  return { state: "ready", proposals: all, nextCursor: cursor };
+}
+
+/** One proposal by id: the row, or the HTTP status that refused it. */
+async function fetchOne(id: string): Promise<{ proposal: PublicProposal } | { status: number }> {
+  try {
+    const response = await api(`/api/proposals/${encodeURIComponent(id)}`);
+    const body = await response.json().catch(() => null) as { proposal?: PublicProposal } | null;
+    return response.ok && body?.proposal && wellFormed(body.proposal) ? { proposal: body.proposal } : { status: response.ok ? 503 : response.status };
+  } catch {
+    return { status: 0 };
+  }
+}
+
+const rowDomId = (proposalId: string) => `proposal-${proposalId}`;
+
+function Preview({ proposal }: { proposal: PublicProposal }) {
+  if (proposal.preview === null) return <p className={styles.note}>The change is not shown for this proposal.</p>;
+  if (proposal.actionType === "library_label") {
+    const preview = proposal.preview;
+    return (
+      <p className={styles.preview}>
+        {preview.decision === "confirmed" ? "Confirm" : "Reject"} {preview.labelKind === "doc_type" ? "type" : "topic"}{" "}
+        <strong>{preview.labelKey.replace(/_/g, " ")}</strong> on <span className={styles.id}>{preview.documentId}</span>
+      </p>
+    );
+  }
+  if (proposal.actionType === "compile_plan") {
+    const { documentIds, documentsTotal, parts, quote } = proposal.preview;
+    return (
+      <div className={styles.detail}>
+        <p className={styles.preview}>Compile {documentsTotal} {documentsTotal === 1 ? "document" : "documents"} in {parts} {parts === 1 ? "part" : "parts"}.</p>
+        <div className={styles.ids} role="group" aria-label="Documents">
+          {documentIds.map((id) => <span key={id} className={styles.id}>{id}</span>)}
+        </div>
+        <p className={styles.note}>
+          Re-charges up to {quote.rechargeCredits} credits{quote.overageCredits > 0 ? `, of which up to ${quote.overageCredits} as overage` : ""}.
+        </p>
+        {proposal.notes.includes("approver_only")
+          ? <p className={styles.note}>Only the person who approved these files at upload can start this compile.</p> : null}
+      </div>
+    );
+  }
+  const { kind, before, after, baseManifestDigest } = proposal.preview;
+  return (
+    <p className={styles.preview}>
+      Correct {kind.toLowerCase()} label: <q>{before}</q> → <q>{after}</q>{" "}
+      <span className={styles.id}>base {baseManifestDigest.replace(/^sha256:/, "").slice(0, 12)}</span>
+    </p>
+  );
+}
+
+/** One row. Presentational: what it offers comes from `rowActions`, what a click does from the parent. */
+export function ProposalItem({ proposal, disabled, onAct }: { proposal: PublicProposal; disabled: boolean; onAct: (action: Action) => void }) {
+  const badge = agentBadge(proposal.proposer);
+  const label: Record<Action, string> = { confirm: "Confirm", reject: "Reject", undo: "Undo", finish: "Finish" };
+  return (
+    <li id={rowDomId(proposal.proposalId)} tabIndex={-1} className={styles.row} data-state={proposal.state}>
+      <span className={styles.state}>{STATE_WORD[proposal.state]}</span>
+      {badge ? <p className={styles.note}>{badge}</p> : null}
+      <Preview proposal={proposal} />
+      {proposal.evidenceIds.length > 0 ? <p className={styles.note}>Evidence: <span className={styles.id}>{proposal.evidenceIds.join(", ")}</span></p> : null}
+      <div className={styles.actions}>
+        {rowActions(proposal).map((action) => (
+          <button key={action} type="button" className={styles.action} disabled={disabled} onClick={() => onAct(action)}>{label[action]}</button>
+        ))}
+      </div>
+    </li>
+  );
+}
+
+export default function ChangeProposalsPanel(_props: Props) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [extra, setExtra] = useState<PublicProposal | null>(null);
+  const tried = useRef<string | null>(null); // the deep-linked id already read by id
+  const focusedId = useRef<string | null>(null);
+  const extraId = useRef<string | null>(null);
+  const pages = useRef(1);
 
   const refresh = useCallback(async () => {
-    if (collectionId) setLoad(await fetchProposals(collectionId));
-  }, [collectionId]);
+    setLoad(await fetchPages(pages.current));
+    // A deep-linked row that is not on a loaded page is read again by id, so it never shows a stale state.
+    if (extraId.current) {
+      const one = await fetchOne(extraId.current);
+      if ("proposal" in one) setExtra(one.proposal);
+    }
+  }, []);
   useEffect(() => { void refresh(); }, [refresh]);
 
+  async function post(proposal: PublicProposal, action: Action): Promise<{ status: number; code: string | null }> {
+    const body = actionBody(proposal, action);
+    if (!body) return { status: 400, code: null };
+    try {
+      const response = await api(`/api/proposals/${proposal.proposalId}/${action === "undo" ? "undo" : "decision"}`, { method: "POST", body: JSON.stringify(body) });
+      const reply = await response.json().catch(() => null) as { code?: string } | null;
+      return { status: response.ok ? 200 : response.status, code: typeof reply?.code === "string" ? reply.code : null };
+    } catch {
+      return { status: 0, code: null };
+    }
+  }
+
   async function act(proposal: PublicProposal, action: Action) {
-    const { proposalId } = proposal;
-    setBusy(proposalId);
+    setBusy(proposal.proposalId);
     setProblem(null);
     try {
-      let status: number;
-      try {
-        // A confirmation carries the digest of the preview this row rendered; the server refuses any other.
-        const decision = action === "confirm" ? { collectionId, decision: action, previewDigest: proposal.previewDigest } : { collectionId, decision: action };
-        const response = await api(`/api/proposals/${proposalId}/${action === "undo" ? "undo" : "decision"}`, { method: "POST",
-          body: JSON.stringify(action === "undo" ? { collectionId } : decision) });
-        status = response.ok ? 200 : response.status;
-      } catch {
-        status = 0;
-      }
-      setProblem(decisionProblem(status));
+      const { status, code } = await post(proposal, action);
+      setProblem(decisionProblem(status, code));
       await refresh();
     } finally {
       setBusy(null);
     }
   }
 
-  if (!collectionId) return null;
+  // A loop of single confirms; it stops at the first one that did not go through.
+  async function confirmAll(rows: PublicProposal[]) {
+    setBusy("batch");
+    setProblem(null);
+    try {
+      for (const row of rows) {
+        const { status, code } = await post(row, "confirm");
+        if (status !== 200) { setProblem(decisionProblem(status, code)); break; }
+      }
+      await refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function showMore() {
+    if (load.state !== "ready" || !load.nextCursor) return;
+    const read = await fetchPage(load.nextCursor);
+    if (!read) { setProblem("More could not be read."); return; }
+    pages.current += 1;
+    setLoad({ state: "ready", proposals: [...load.proposals, ...read.proposals], nextCursor: read.nextCursor });
+  }
+
+  // Deep link: ?proposal=<id>. On a loaded page the row is focused; otherwise it is read by id.
+  const ready = load.state === "ready";
+  useEffect(() => {
+    if (!ready) return;
+    const id = new URLSearchParams(window.location.search).get("proposal");
+    if (!id) return;
+    const target = document.getElementById(rowDomId(id));
+    if (target) {
+      if (focusedId.current === id) return;
+      focusedId.current = id;
+      target.scrollIntoView({ block: "center" });
+      target.focus();
+      return;
+    }
+    if (tried.current === id) return;
+    tried.current = id;
+    void fetchOne(id).then((one) => {
+      if ("proposal" in one) { extraId.current = id; setExtra(one.proposal); }
+      else setProblem(one.status === 404 ? NOT_AVAILABLE : "The suggestion could not be read.");
+    });
+  }, [ready, extra]);
+
   if (load.state === "loading") return <section className={styles.surface} aria-busy="true"><p className={styles.note}>Reading proposals…</p></section>;
   if (load.state === "unavailable") {
     return (
@@ -95,44 +266,30 @@ export default function ChangeProposalsPanel({ collectionId }: Props) {
     );
   }
 
+  const listed = new Set(load.proposals.map((p) => p.proposalId));
+  const rows = extra && !listed.has(extra.proposalId) ? [extra, ...load.proposals] : load.proposals;
+  const batch = batchEligible(rows);
+  const disabled = busy !== null;
   return (
     <section className={styles.surface} aria-labelledby="change-proposals-title">
       <div className={styles.intro}>
         <h2 id="change-proposals-title">Proposals</h2>
-        <p>A proposal changes nothing until a person confirms it. Confirm or reject each one; a confirmed change can be undone.</p>
+        <p>A proposal changes nothing until a person confirms it in a signed-in session. Confirm or reject each one; a confirmed label change can be undone.</p>
       </div>
       {problem ? <p className={styles.problem} role="status">{problem}</p> : null}
-      {load.proposals.length === 0 ? <p className={styles.empty}>No proposals.</p> : (
+      {batch.length > 1 ? (
+        <div className={styles.actions}>
+          <button type="button" className={styles.action} disabled={disabled} onClick={() => void confirmAll(batch)}>Confirm all label suggestions ({batch.length})</button>
+        </div>
+      ) : null}
+      {rows.length === 0 ? <p className={styles.empty}>No proposals.</p> : (
         <ul className={styles.list}>
-          {load.proposals.map((proposal) => {
-            // Only a label row is drawn here until WO-AN-6; every other type says its change is not shown.
-            const preview = proposal.actionType === "library_label" ? proposal.preview : null;
-            const disabled = busy !== null;
-            return (
-              <li key={proposal.proposalId} className={styles.row} data-state={proposal.state}>
-                <span className={styles.state}>{STATE_WORD[proposal.state]}</span>
-                {preview ? (
-                  <p className={styles.preview}>
-                    {preview.decision === "confirmed" ? "Confirm" : "Reject"} {preview.labelKind === "doc_type" ? "type" : "topic"}{" "}
-                    <strong>{preview.labelKey.replace(/_/g, " ")}</strong> on <span className={styles.id}>{preview.documentId}</span>
-                  </p>
-                ) : <p className={styles.note}>The change is not shown for this proposal.</p>}
-                {proposal.evidenceIds.length > 0 ? <p className={styles.note}>Evidence: <span className={styles.id}>{proposal.evidenceIds.join(", ")}</span></p> : null}
-                <div className={styles.actions}>
-                  {proposal.state === "proposed" ? (["confirm", "reject"] as const).map((action) => (
-                    <button key={action} type="button" className={styles.action} disabled={disabled} onClick={() => void act(proposal, action)}>
-                      {action === "confirm" ? "Confirm" : "Reject"}
-                    </button>
-                  )) : null}
-                  {proposal.state === "executed" ? (
-                    <button type="button" className={styles.action} disabled={disabled} onClick={() => void act(proposal, "undo")}>Undo</button>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
+          {rows.map((proposal) => (
+            <ProposalItem key={proposal.proposalId} proposal={proposal} disabled={disabled} onAct={(action) => void act(proposal, action)} />
+          ))}
         </ul>
       )}
+      {load.nextCursor ? <div className={styles.actions}><button type="button" className={styles.action} disabled={disabled} onClick={() => void showMore()}>Show more</button></div> : null}
     </section>
   );
 }
