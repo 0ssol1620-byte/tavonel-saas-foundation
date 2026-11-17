@@ -201,24 +201,26 @@ describe("the limits are read from the product, and sit above the calls to actio
     Both plans that reach activation, and the one that does not.
 
     This pinned `saleChannel === "contact"` alone while Team was the only plan that could
-    activate. FD-02 made the Developer plan reach it for the workspace owner, so the pin is now
-    on both channels -- Team's `contact` and Developer's `self_serve` -- because either one
-    flipping makes a different half of the sentence wrong. The owner condition and the
-    evaluation's refusal are asserted too: those are the two ways this copy could over-sell,
-    and the old assertion could not see either.
+    activate. FD-02 made the `observer_access` level reach it for the workspace owner. Catalog v2
+    names Personal and Developer at that level and Team and Business at `studio_access`; the copy
+    names all four from the catalog and states no sale path, which is /pricing's server-computed
+    availability. The owner condition and the evaluation's refusal are asserted too: those are the
+    two ways this copy could over-sell, and the old assertion could not see either.
   */
-  it("names the plans that activation needs, how each is sold, and who is refused", () => {
-    const team = BILLING_OFFERS.studio_access;
-    const developer = BILLING_OFFERS.observer_access;
-    // Pro stays "contact" (CAT-D4, 2026-11-16): the sentence says conversation, not checkout.
-    expect(team.saleChannel, "if Pro becomes self-serve the activation sentence must be re-read").toBe("contact");
-    expect(developer.saleChannel, "if Developer stops being self-serve the same sentence must be re-read").toBe("self_serve");
+  it("names the plans that activation needs, who it is conditional on, and who is refused", () => {
+    expect(BILLING_OFFERS.personal.accessLevel).toBe("observer_access");
+    expect(BILLING_OFFERS.developer.accessLevel).toBe("observer_access");
+    expect(BILLING_OFFERS.team.accessLevel).toBe("studio_access");
+    expect(BILLING_OFFERS.business.accessLevel).toBe("studio_access");
     for (const record of COOKBOOKS) {
       const prerequisites = record.sections.find((section) => section.key === "prerequisites")!;
-      expect(prerequisites.body, `${record.slug}: the activation plan is not named`).toContain(team.label);
-      expect(prerequisites.body, `${record.slug}: the self-serve activation plan is not named`).toContain(developer.label);
-      expect(prerequisites.body).toContain("rather than self-serve checkout");
-      expect(prerequisites.body, `${record.slug}: Developer activation is the owner's, not any member's`)
+      for (const code of ["personal", "developer", "team", "business"] as const) {
+        expect(prerequisites.body, `${record.slug}: the activation plan ${code} is not named`).toContain(BILLING_OFFERS[code].label);
+      }
+      expect(prerequisites.body, `${record.slug}: no sale path is stated for a plan the server has not opened`)
+        .not.toMatch(/rather than self-serve checkout|available on self-serve checkout|arranged it with us/);
+      expect(prerequisites.body, `${record.slug}: a retired plan is not named on a public page`).not.toMatch(/2026-09/);
+      expect(prerequisites.body, `${record.slug}: activation is the owner's, not any member's`)
         .toContain("if you are the workspace owner");
       expect(prerequisites.body, `${record.slug}: the free evaluation activates one World and no more`)
         .toContain("A free evaluation activates one World, as its owner.");

@@ -116,6 +116,12 @@ html:has(.evaluation-page) { color-scheme: light; }
 .pricing-page .paper-purchase-boundary p { font-size: 14px; line-height: 1.5; }
 .pricing-page .pricing-utility-links { display: flex; flex-wrap: wrap; gap: 0 16px; margin-top: 4px; font-size: 14px; }
 .pricing-page .pricing-utility-links a { min-height: 44px; text-underline-offset: 4px; }
+/* A link answers the pointer (v34 matrix state-hover): the underlined utility links drop the underline, and the
+   evaluation card's plain secondary link takes one, as body links do on /evaluation. */
+@media (hover: hover) and (pointer: fine) {
+  .pricing-page .pricing-utility-links a:hover { text-decoration-line: none; }
+  .pricing-page .plan-action .pricing-secondary-link:hover { text-decoration-line: underline; }
+}
 /* Direction C (2026-11-04): the four plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
 .pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
 .pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 32px 28px 28px; border: 0; border-right: 1px solid var(--tv-rule); border-radius: 0; background: transparent; box-shadow: none; }

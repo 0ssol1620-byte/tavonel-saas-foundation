@@ -13,7 +13,7 @@ select plan(26);
 create temp table keep (k text primary key, v jsonb);
 grant all on keep to service_role;
 
-select ok(has_function_privilege('service_role', 'public.create_world_change_proposal(text, text, text, jsonb, text, text[], text, integer, text, uuid, text, timestamptz)', 'execute'),
+select ok(has_function_privilege('service_role', 'public.create_world_change_proposal(text, text, text, jsonb, text, text[], text, integer, text, uuid, text, timestamptz, text, uuid, integer, integer)', 'execute'),
   'the server may create');
 select ok(not has_function_privilege('authenticated', 'public.decide_world_change_proposal(text, uuid, text, uuid, text, timestamptz)', 'execute'),
   'a signed-in client may not decide');
@@ -80,8 +80,14 @@ select throws_ok($$select public.record_world_change_proposal_outcome('pilot-a1a
 insert into keep select 'exp', public.create_world_change_proposal('pilot-a1a1', 'collection-' || repeat('a', 32), 'library_label',
   '{"labelKey":"report"}', 'sha256:' || repeat('3', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'steward',
   'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'key-expired1', now() + interval '1 day');
+-- 20261117130000: expiry is the database clock's and p_now is ignored, so the row's expiry is moved
+-- into the past (as the test owner: service_role has no table grant) instead of passing a later p_now.
+reset role;
+update public.world_change_proposals set expires_at = now() - interval '1 second'
+  where proposal_id = (select (v->'proposal'->>'proposal_id')::uuid from keep where k = 'exp');
+set local role service_role;
 select is((public.decide_world_change_proposal('pilot-a1a1', (select (v->'proposal'->>'proposal_id')::uuid from keep where k = 'exp'),
-  'confirm', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'sha256:' || repeat('d', 64), now() + interval '2 days'))->>'state', 'expired',
+  'confirm', 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', 'sha256:' || repeat('d', 64), now()))->>'state', 'expired',
   'a decision past expiry turns it expired');
 
 insert into keep select 'stale', public.create_world_change_proposal('pilot-a1a1', 'collection-' || repeat('a', 32), 'library_label',

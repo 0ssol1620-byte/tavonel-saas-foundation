@@ -331,7 +331,8 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
     const back = page.getByRole("link", { name: "Back to the recipe" });
     await expect(back).toHaveAttribute("href", "/resources");
     await back.click();
-    await expect(page).toHaveURL((url) => url.pathname === "/resources");
+    // V34 (D33 1.1): /resources answers 308 to /journal. The closed list still carries /resources.
+    await expect(page).toHaveURL((url) => url.pathname === "/journal");
     expect(await stored(page, INTENT_KEY)).toBeNull();
   });
 
@@ -572,7 +573,7 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
 
     await page.getByRole("link", { name: "Back to the site" }).click();
     await expect(page).toHaveURL((url) => url.pathname === "/");
-    await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
+    await expect(page.locator("main h1")).toHaveCount(1); // the V34 Home heading, not the callback's
     await expect(page.getByRole("heading", { level: 1, name: "Workspace access needs attention." })).toHaveCount(0);
 
     // Release the held success, and wait until the callback's code has read it on this page.
@@ -580,7 +581,7 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
     await page.waitForFunction(() => (window as unknown as { __bootstrapBodiesRead: number }).__bootstrapBodiesRead === 2);
 
     expect(new URL(page.url()).pathname, "the late answer redirects nowhere").toBe("/");
-    await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
+    await expect(page.locator("main h1")).toHaveCount(1); // the V34 Home heading, not the callback's
     expect(await stored(page, CHECKOUT_KEY), "the late answer consumes nothing").toBe("observer_access");
     expect(await stored(page, INTENT_KEY)).toBe(intentJson(RECIPE));
     expect((await funnelLog(page)).filter((entry) => entry.event === "signed_in")).toEqual([]);

@@ -142,7 +142,9 @@ describe("the /pricing comparison matrix has three states, not a column of ticks
   it("stops rendering a row the day its capability ships", () => {
     // `notYetSold` is the only thing that puts a row in the unsold half, so shipping the
     // capability -- which is what empties that list -- removes the row with no edit to the page.
-    const shipped = { ...BILLING_OFFERS, studio_access: { ...BILLING_OFFERS.studio_access, notYetSold: [] } };
+    const shipped = Object.fromEntries(
+      (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).map((code) => [code, { ...BILLING_OFFERS[code], notYetSold: [] }]),
+    ) as unknown as typeof BILLING_OFFERS;
     const remaining = new Set(
       (Object.keys(shipped) as BillingOfferCode[]).flatMap((code) => shipped[code].notYetSold as readonly string[]),
     );

@@ -9,6 +9,7 @@
  */
 
 import type { BrowserContext, Page } from "@playwright/test";
+import { BILLING_OFFERS } from "../../lib/billing-catalog";
 
 /** The script `lib/paddle-browser.ts` appends. Same URL, so the shipped CSP is what is exercised. */
 export const PADDLE_SCRIPT_URL = "https://cdn.paddle.com/paddle/v2/paddle.js";
@@ -126,14 +127,29 @@ export function emitPaddleEvent(page: Page, name: string): Promise<boolean> {
   }, name);
 }
 
-/** A labelled sandbox `CHECKOUT_READY`, in the shape `app/api/billing/checkout/route.ts` returns. */
+/*
+  A labelled sandbox `CHECKOUT_READY`, in the shape `app/api/billing/checkout/route.ts` returns, for the v2 `personal` plan
+  (catalog v2: the retired 2026-09 offers are never sold). It carries the route's `quote`, because `use-checkout` opens no
+  overlay without a quote naming the offer and its catalog price (WO-D28-2); the figures are read from the catalog.
+*/
+const PERSONAL = BILLING_OFFERS.personal;
 export const SANDBOX_CHECKOUT_READY = {
   code: "CHECKOUT_READY",
   environment: "sandbox",
   clientToken: "test_fixture_journey_client_token",
-  offer: { code: "observer_access", kind: "subscription", label: "Starter", priceId: "pri_01journeyfixture0000000000", credits: 2_000 },
+  offer: { code: "personal", kind: PERSONAL.kind, label: PERSONAL.label, priceId: "pri_01journeyfixture0000000000", credits: PERSONAL.credits },
+  quote: {
+    offerCode: "personal",
+    label: PERSONAL.label,
+    priceUsd: PERSONAL.priceUsd,
+    currency: "USD",
+    interval: "month",
+    includedPages: PERSONAL.includedPages,
+    included: PERSONAL.included,
+    overage: "stops_at_limit",
+  },
   customer: { email: "audit-e2e@example.invalid" },
-  customData: { tavonel_binding: "fixture-binding-not-signed", tavonel_offer: "observer_access" },
+  customData: { tavonel_binding: "fixture-binding-not-signed", tavonel_offer: "personal" },
 } as const;
 
 /** The billing portal stub page a `PORTAL_READY` URL lands on. */

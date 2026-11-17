@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createWorldAction, CREATE_WORLD_LABEL } from "@/components/v34/ui/create-world";
 import { primaryCallToAction } from "@/lib/commercial-state";
 import {
+  current,
   resolveEntries,
   resolveGroups,
   V34_FOOTER_GROUPS,
@@ -126,5 +127,19 @@ describe("the primary action", () => {
   it('is labelled "Create your World" and goes where primaryCallToAction() says', () => {
     expect(CREATE_WORLD_LABEL).toBe("Create your World");
     expect(createWorldAction()).toEqual({ href: primaryCallToAction().href, label: "Create your World" });
+  });
+});
+
+describe("current", () => {
+  it("marks the exact page, a section page, and nothing else", () => {
+    expect(current("/pricing", "/pricing")).toBe("page");
+    expect(current("/research", "/research/notes")).toBe("true");
+    expect(current("/research", "/researcher")).toBeUndefined();
+    expect(current("/pricing", "/platform")).toBeUndefined();
+    expect(current("/pricing", null)).toBeUndefined();
+  });
+  it("treats the root as current only on the root", () => {
+    expect(current("/", "/")).toBe("page");
+    expect(current("/", "/pricing")).toBeUndefined();
   });
 });

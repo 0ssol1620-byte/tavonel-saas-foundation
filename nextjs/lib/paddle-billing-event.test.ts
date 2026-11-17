@@ -322,3 +322,51 @@ describe("Paddle billing events across a binding key rotation", () => {
     })).toMatchObject({ action: "ignored", reason: "binding_invalid" });
   });
 });
+
+describe("catalog v2 leaves the retired offers' webhooks resolvable", () => {
+  const v2Env = {
+    ...env,
+    PADDLE_PRICE_STUDIO_ACCESS: `pri_${"s".repeat(26)}`,
+    PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`,
+    PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}`,
+    PADDLE_PRICE_TEAM: `pri_${"t".repeat(26)}`,
+    PADDLE_PRICE_BUSINESS: `pri_${"b".repeat(26)}`,
+  };
+  const renewal = (custom_data: unknown, priceId = OBSERVER_PRICE) => body("transaction.completed", {
+    id: `txn_${"t".repeat(26)}`,
+    customer_id: `ctm_${"c".repeat(26)}`,
+    subscription_id: `sub_${"s".repeat(26)}`,
+    custom_data,
+    items: [{ quantity: 1, price: { id: priceId } }],
+  });
+
+  it("parses an observer_access renewal (checkout-v1 and legacy-v2) to allowance with the v2 env set", () => {
+    expect(parsePaddleBillingAction(renewal(checkoutBinding()), v2Env)).toMatchObject({
+      action: "allowance", offerCode: "observer_access", priceId: OBSERVER_PRICE, configuredCreditDelta: 2_000,
+      checkoutBindingPolicyVersion: "checkout-v1",
+    });
+    expect(parsePaddleBillingAction(renewal(legacyCheckoutBinding()), v2Env)).toMatchObject({
+      action: "allowance", offerCode: "observer_access", priceId: OBSERVER_PRICE, configuredCreditDelta: 2_000,
+      checkoutBindingPolicyVersion: "legacy-v2",
+    });
+  });
+
+  it("does not let PADDLE_PRICE_PERSONAL pointed at the legacy price re-label that renewal (failure path)", () => {
+    const pointed = { ...v2Env, PADDLE_PRICE_PERSONAL: OBSERVER_PRICE };
+    expect(parsePaddleBillingAction(renewal(legacyCheckoutBinding()), pointed)).toMatchObject({
+      offerCode: "observer_access", configuredCreditDelta: 2_000,
+    });
+  });
+
+  it("still parses a subscription.updated for studio_access", () => {
+    const studioPrice = `pri_${"s".repeat(26)}`;
+    const binding = createCheckoutBinding({ ...bindingInput, offerCode: "studio_access" }, SECRET, new Date(EVENT_AT));
+    expect(parsePaddleBillingAction(body("subscription.updated", {
+      id: `sub_${"s".repeat(26)}`,
+      customer_id: `ctm_${"c".repeat(26)}`,
+      status: "active",
+      custom_data: binding,
+      items: [{ quantity: 1, price: { id: studioPrice } }],
+    }), v2Env)).toMatchObject({ action: "subscription", offerCode: "studio_access", configuredCreditDelta: 10_000 });
+  });
+});

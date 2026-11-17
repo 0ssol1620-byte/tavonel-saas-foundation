@@ -124,13 +124,14 @@ test("command palette is keyboard reachable and closes with Escape", async ({ pa
 
 test("captures public architecture and authenticated run evidence", async ({ page }, testInfo) => {
   await page.goto("/enterprise");
-  // The page leads with the buyer's control outcome and carries identity, data handling,
-  // retention, audit, deployment review and support as the named sections beneath it.
-  await expect(page.getByRole("heading", { name: "Keep control of the knowledge your AI uses." })).toBeVisible();
+  // V34: the page leads with the organization it is for and carries scope, operation, activation and
+  // the security-review boundary as the named sections beneath it.
+  await expect(page.getByRole("heading", { level: 1, name: "Knowledge compiled for large organizations" })).toBeVisible();
   await testInfo.attach(`enterprise-${testInfo.project.name}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 
+  // V34 (D33 1.1): /knowledge-compiler answers 308 to /journal/compiler.
   await page.goto("/knowledge-compiler");
-  await expect(page.getByRole("heading", { name: "What is a Knowledge Compiler?" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What a knowledge compiler is and why it matters" })).toBeVisible();
   await testInfo.attach(`category-${testInfo.project.name}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 
   await installWorkspace(page);

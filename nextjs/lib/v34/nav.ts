@@ -210,3 +210,11 @@ export function resolveGroups(groups: readonly NavGroup[], deps?: NavDeps): NavG
     .map((group) => ({ title: group.title, links: resolveEntries(group.entries, deps) }))
     .filter((group) => group.links.length > 0);
 }
+
+/** The exact page is current; a page inside the item's section is a location within it. */
+export function current(href: string, currentPath: string | null): "page" | "true" | undefined {
+  // usePathname() is null when the shell renders outside a router (a static render).
+  if (currentPath === null) return undefined;
+  if (currentPath === href) return "page";
+  return href !== "/" && currentPath.startsWith(`${href}/`) ? "true" : undefined;
+}

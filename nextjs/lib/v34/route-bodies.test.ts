@@ -138,8 +138,14 @@ describe("every V34 route body", () => {
     expect(h1s[0]).not.toMatch(/—\s*TAVONEL/);
   });
 
-  // A named legacy exception, next to the home's: the pricing surface is replaced by WO-CAT-2, which retires this line.
+  /*
+    A named legacy exception, next to the home's. WO-CAT-2 rewrote the pricing client for catalog v2 and kept this
+    line; the joint build renders it as /pricing's one h1 (receipts/fnd-joint2). The route must still render this
+    client, or the pin reads a file /pricing no longer shows.
+  */
   it("and its h1 is a named legacy exception: the client's own line, not the registry heading", () => {
+    const route = readFileSync(join(import.meta.dirname, "../../app/pricing/page.tsx"), "utf8");
+    expect(route).toMatch(/<PricingPageClient\b/);
     const source = readFileSync(join(import.meta.dirname, "../../components/pricing-page-client.tsx"), "utf8");
     const h1 = source.match(/<h1\b[^>]*>([^<]*)<\/h1>/)![1]!.trim();
     expect(h1).toBe("Pages and dollars.");
@@ -154,7 +160,11 @@ describe("every V34 route body", () => {
   that opens on "Team members" do not trip it. Enterprise is sold by contact and has no catalog offer,
   so its label is added by hand.
 */
-const LABELS = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), "Enterprise"].join("|");
+// A retired offer keeps its label with parentheses, so labels are regex-escaped before they join a pattern.
+const RETIRED_LABEL = "Developer (2026-09 plan)";
+const NAMED_LABELS = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), RETIRED_LABEL, "Enterprise"];
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const LABELS = NAMED_LABELS.map(escapeRe).join("|");
 const LIST = String.raw`\s*(?:,|and|or|&)\s*(?:the\s+)?`;
 const PLAN_NAME = new RegExp(
   String.raw`\b(?:${LABELS})\s+(?:plans?|tiers?|subscriptions?)\b|\b(?:${LABELS})${LIST}[A-Z][a-z]+\b|\b[A-Z][a-z]+${LIST}(?:${LABELS})\b`,
@@ -162,15 +172,15 @@ const PLAN_NAME = new RegExp(
 
 describe("plan names stay on /pricing", () => {
   it("the pattern finds a plan named as a plan, and leaves the word team alone", () => {
-    for (const named of [
-      "Once it is open, the Developer plan can be bought online.",
-      "Team and Enterprise are arranged with us.",
-      "Choose Developer, Team or Enterprise.",
-      "On the Team plan you get more pages.",
-      "Upgrade to the Team subscription.",
-      "Enterprise or Team, scoped with you.",
-      "Talk to us about the Enterprise plan.",
-      "The Enterprise tier adds review.",
+    // Fixtures come from the catalog, so a renamed plan changes what the guard is shown, not whether it is tested.
+    for (const label of NAMED_LABELS) for (const named of [
+      `On the ${label} plan you get more pages.`,
+      `Upgrade to the ${label} subscription.`,
+      `The ${label} tier adds review.`,
+      `Talk to us about the ${label} plan.`,
+      `${label} and Enterprise are arranged with us.`,
+      `Choose ${label}, Team or Enterprise.`,
+      `Enterprise or ${label}, scoped with you.`,
     ]) expect(named).toMatch(PLAN_NAME);
     for (const plain of [
       "Shared Worlds for groups that work together",

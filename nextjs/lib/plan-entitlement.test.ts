@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BILLING_OFFERS, type BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, DELIVERED, type BillingOfferCode, type Capability } from "./billing-catalog";
 import { billingProductDecision } from "./billing-product-access";
 import type { FoundationBillingAccount } from "./billing-store";
 
@@ -100,9 +100,32 @@ describe("plan entitlement", () => {
       .flatMap((offer) => offer.features as readonly string[])
       .join(" ")
       .toLowerCase();
-    for (const unenforced of ["seat", "sso", "scim", "when qualified", "coming soon"]) {
+    for (const unenforced of ["sso", "scim", "when qualified", "coming soon"]) {
       expect(bullets, `no plan may advertise "${unenforced}" yet`).not.toContain(unenforced);
     }
+  });
+
+  /*
+    Seats, KQU and storage are metered by capabilities that are not delivered. A bullet for one is
+    allowed the day its capability is in DELIVERED (the release commit that proves it), and not before.
+  */
+  const METERED: Array<[Capability, RegExp]> = [
+    ["seat_cap", /\bseats?\b/i],
+    ["kqu_meter", /\bKQU\b|\bqueries\b/i],
+    ["storage_meter", /\bGB\b|\bstorage\b/i],
+  ];
+  const meteredBullets = (bullets: readonly string[], delivered: ReadonlySet<Capability>) =>
+    bullets.flatMap((bullet) => METERED.filter(([capability, pattern]) => pattern.test(bullet) && !delivered.has(capability)).map(([c]) => `${c}: ${bullet}`));
+
+  it("allows a seat, KQU or storage bullet only when its capability is delivered", () => {
+    for (const [code, offer] of Object.entries(BILLING_OFFERS)) {
+      expect(meteredBullets(offer.features as readonly string[], DELIVERED), code).toEqual([]);
+    }
+  });
+
+  it("catches a metered bullet whose capability is not delivered (failure path)", () => {
+    expect(meteredBullets(["Up to 5 seats", "100 GB of storage", "10,000 KQU"], new Set<Capability>())).toHaveLength(3);
+    expect(meteredBullets(["Up to 5 seats"], new Set<Capability>(["seat_cap"]))).toEqual([]);
   });
 
   it("states included pages on the card and in the ledger as one number", () => {
@@ -122,9 +145,12 @@ describe("plan entitlement", () => {
     -- would start taking cards. The gate therefore lives on the offer, not on the mode.
   */
   it("keeps a plan whose product is unfinished off self-serve checkout", () => {
-    // Pro stays "contact" (CAT-D4, 2026-11-16). The derivation from saleChannel below is unchanged.
+    // The gate is `planAvailability` (capabilities delivered and a configured price), not the commercial mode:
+    // no V22 plan is purchasable while DELIVERED is empty, and the retired plans never are.
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
-    expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
+    expect(BILLING_OFFERS.observer_access.status).toBe("retired");
+    expect(BILLING_OFFERS.studio_access.status).toBe("retired");
+    expect(DELIVERED.size).toBe(0);
     const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
     expect(pricing, "the pricing card must derive checkout from saleChannel")
       .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');

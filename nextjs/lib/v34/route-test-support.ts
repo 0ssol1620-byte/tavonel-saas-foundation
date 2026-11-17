@@ -65,3 +65,30 @@ export function typedCounts(folder: string, options: CountOptions = {}): string[
 export function typedCountsInFile(file: string, options: CountOptions = {}): string[] {
   return countsIn(join(import.meta.dirname, "../..", file), file, options);
 }
+
+/*
+  Words that are a plan label (lib/billing-catalog.ts) but are not used as one, each named with the file under
+  components/v34 that writes it. Catalog v2 made Personal and Business plan labels. The /personal route carries its
+  own name, the exemption the registry strings get in routes.test.ts, and the operator disclosure on /company labels
+  the legal business rows. The plan-name guards remove exactly these strings before they look, so every other
+  occurrence still fails, and an exemption whose text is gone fails too.
+*/
+const NOT_A_PLAN: ReadonlyArray<readonly [file: string, text: string]> = [
+  ["routes/personal/personal.tsx", "export default function Personal("],
+  ["routes/personal/personal.module.css", "Personal page only."],
+  ["routes/company/company.tsx", '["Business", operator.businessName]'],
+  ["routes/company/company.tsx", '["Business registration", operator.businessNumber]'],
+  ["routes/company/company.tsx", '["Business address", operator.address]'],
+];
+
+/** A source's text with the named non-plan uses of a plan label removed; throws when a named use is gone. */
+export function withoutNonPlanWords(file: string, text: string): string {
+  const path = file.replaceAll("\\", "/");
+  let out = text;
+  for (const [suffix, words] of NOT_A_PLAN) {
+    if (!path.endsWith(suffix)) continue;
+    if (!out.includes(words)) throw new Error(`${suffix}: the plan-label exemption "${words}" is stale`);
+    out = out.replaceAll(words, "");
+  }
+  return out;
+}

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { BILLING_OFFERS } from "../../lib/billing-catalog.ts";
 import { getPaddlePrice, listPaddleAdjustments, listPaddleTransactions, readPaddleApiConfig } from "../../lib/paddle-api.ts";
-import { priceBookDelta, processorDelta } from "../../lib/paddle-reconciliation.ts";
+import { priceBookDelta, priceBookNotConfigured, processorDelta } from "../../lib/paddle-reconciliation.ts";
 import { environmentRefusal, parseArgs, run } from "./paddle-reconcile.mjs";
 
 const KEY = `pdl_sdbx_${"k".repeat(30)}`;
@@ -16,6 +16,7 @@ const ONE_OFFER = { observer_access: OBSERVER };
 const deps = (over = {}) => ({
   readPaddleApiConfig,
   priceBookDelta,
+  priceBookNotConfigured,
   processorDelta,
   BILLING_OFFERS,
   getPaddlePrice,
@@ -128,6 +129,30 @@ describe("paddle-reconcile", () => {
     expect(JSON.parse(bad.out).delta).toEqual([{ offerCode: "observer_access", priceId: PRICE, problems: ["amount_mismatch"] }]);
     const none = await run(["prices", "--json"], SANDBOX, d);
     expect(JSON.parse(none.out).delta[0].problems).toEqual(["price_id_not_configured"]);
+  });
+
+  it("prices: a v2 offer with no price id is listed and counted apart from offersChecked, and is not a delta", async () => {
+    const env = { ...SANDBOX, [OBSERVER.priceEnv]: PRICE };
+    const price = async () =>
+      new Response(
+        JSON.stringify({
+          data: { id: PRICE, status: "active", unit_price: { amount: String(OBSERVER.priceUsd * 100), currency_code: "USD" }, billing_cycle: { interval: "month", frequency: 1 } },
+        }),
+      );
+    const d = deps({ BILLING_OFFERS: { observer_access: OBSERVER, personal: BILLING_OFFERS.personal, team: BILLING_OFFERS.team } });
+    const r = await withFetch(price, () => run(["prices", "--json"], env, d));
+    const report = JSON.parse(r.out);
+    expect(report.notConfigured).toEqual(["personal", "team"]);
+    expect(report.notConfiguredCount).toBe(2);
+    expect(report.offersChecked, "only the configured retired offer was checked").toBe(1);
+    expect(report.delta).toEqual([]);
+    expect(r.exit).toBe(0);
+    // Failure path: a retired offer with no env is a renewal incident, a delta, and is never listed as "not configured".
+    const missing = await run(["prices", "--json"], SANDBOX, d);
+    const bad = JSON.parse(missing.out);
+    expect(bad.delta.map((entry) => entry.offerCode)).toEqual(["observer_access"]);
+    expect(bad.notConfigured).toEqual(["personal", "team"]);
+    expect(missing.exit).toBe(1);
   });
 });
 

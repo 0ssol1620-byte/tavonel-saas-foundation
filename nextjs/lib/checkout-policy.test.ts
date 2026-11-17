@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BILLING_OFFERS } from "./billing-catalog";
+import { BILLING_OFFERS, type BillingOfferCode } from "./billing-catalog";
 import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChange } from "./checkout-policy";
 import type { CommercialState } from "./commercial-state";
 
@@ -34,10 +34,27 @@ describe("checkout deployment policy", () => {
     }), false)).toEqual({ allowed: true, mode: "sandbox_qualification" });
   });
 
-  it("keeps contact-only offers out of both sandbox and production self-service checkout", () => {
-    expect(decideOfferCheckoutPolicy(BILLING_OFFERS.observer_access)).toEqual({ allowed: true });
-    // Pro stays "contact" (CAT-D4, 2026-11-16).
-    expect(decideOfferCheckoutPolicy(BILLING_OFFERS.studio_access)).toEqual({
+  it("opens an offer only when it is purchasable and self-serve", () => {
+    const personal = { code: "personal" as const, saleChannel: BILLING_OFFERS.personal.saleChannel };
+    expect(decideOfferCheckoutPolicy(personal, "purchasable")).toEqual({ allowed: true });
+  });
+
+  it("refuses every offer that is not purchasable, before any intent exists (failure path)", () => {
+    for (const code of Object.keys(BILLING_OFFERS) as BillingOfferCode[]) {
+      const offer = { code, saleChannel: BILLING_OFFERS[code].saleChannel };
+      for (const availability of ["request_access", "retired"] as const) {
+        expect(decideOfferCheckoutPolicy(offer, availability), `${code} ${availability}`).toEqual({
+          allowed: false,
+          code: "BILLING_OFFER_CONTACT_REQUIRED",
+        });
+      }
+      // With nothing delivered, the default reads the catalog and refuses every offer too.
+      expect(decideOfferCheckoutPolicy(offer).allowed, code).toBe(false);
+    }
+  });
+
+  it("still keeps a contact-channel offer out of checkout when it is otherwise purchasable", () => {
+    expect(decideOfferCheckoutPolicy({ code: "team", saleChannel: "contact" }, "purchasable")).toEqual({
       allowed: false,
       code: "BILLING_OFFER_CONTACT_REQUIRED",
     });

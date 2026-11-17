@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BILLING_OFFERS } from "../billing-catalog";
+import { BILLING_OFFERS, planAvailability } from "../billing-catalog";
 import { BRAND_LINE } from "../site-navigation";
+import { withoutNonPlanWords } from "./route-test-support";
 import {
   V34_HELD_PATHS,
   V34_LIVE_PATHS,
@@ -80,12 +81,23 @@ describe("V34 route registry", () => {
 
   it("keeps internal ids, roadmap wording and plan names out of every string", () => {
     const labels = Object.values(BILLING_OFFERS).map((o) => o.label);
+    // A route may carry its own name: the registry's `/personal` route is titled exactly "Personal", which is a place
+    // on the site and not a plan claim. Any longer string that names a plan label is still refused.
+    const routeNames = new Set(V34_ROUTES.flatMap((r) => [r.nav?.label, r.ogLabel].filter((name): name is string => Boolean(name))));
     for (const text of V34_ROUTES.flatMap(strings)) {
       expect(text).not.toMatch(/\b[DU]\d{2}\b|\bEG-?\d+\b/);
       expect(text).not.toMatch(/roadmap|coming soon|\bflip\b/i);
       expect(text).not.toMatch(/\$\d/);
+      if (routeNames.has(text)) continue;
       for (const label of labels) expect(text).not.toMatch(new RegExp(`\\b${label}\\b`));
     }
+  });
+
+  it("names a plan label nowhere but as a route's own name, and the guard sees a plan name when one is written", () => {
+    const labels = Object.values(BILLING_OFFERS).map((o) => o.label);
+    const carriers = V34_ROUTES.flatMap(strings).filter((text) => labels.some((label) => new RegExp(`\\b${label}\\b`).test(text)));
+    expect([...new Set(carriers)]).toEqual(["Personal"]);
+    expect("Choose the Team plan", "the pattern is live").toMatch(new RegExp(`\\b${BILLING_OFFERS.team.label}\\b`));
   });
 
   it("derives sitemap and analytics from release, and leaves held routes out", () => {
@@ -128,15 +140,18 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe("V34 unshipped-capability gates", () => {
-  it("holds /teams exactly while the catalog still lists shared members as not sold", () => {
-    const notSold = BILLING_OFFERS.studio_access.notYetSold.includes("Shared members and roles");
-    expect(v34Route("teams").release === "held").toBe(notSold);
+  it("holds /teams exactly while the Team plan is not purchasable", () => {
+    // Catalog v2: the hold binds to the server's availability for the plan the page is about.
+    expect(planAvailability("team")).not.toBe("purchasable");
+    expect(v34Route("teams").release === "held").toBe(planAvailability("team") !== "purchasable");
   });
 
+  // The named non-plan uses of a label (Personal, Business) are removed first: route-test-support.ts lists them.
   it("keeps plan prices and plan names out of components/v34 (vacuous while absent)", () => {
     const root = join(import.meta.dirname, "../../components/v34");
     for (const path of sourceFiles(root)) {
-      expect(readFileSync(path, "utf8"), path).not.toMatch(/\$29\b|\$99\b|\bDeveloper\b|\bTeam\b/);
+      const source = withoutNonPlanWords(path, readFileSync(path, "utf8"));
+      expect(source, path).not.toMatch(/\$29\b|\$49\b|\$99\b|\$199\b|\$799\b|\bPersonal\b|\bDeveloper\b|\bTeam\b|\bBusiness\b/);
     }
   });
 });

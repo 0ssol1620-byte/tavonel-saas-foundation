@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { h1Text, typedCount, typedCounts } from "./route-test-support";
+import { h1Text, typedCount, typedCounts, withoutNonPlanWords } from "./route-test-support";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { MCP_TOOL_NAMES } from "@/lib/mcp-tools";
 import { PersonalBody } from "@/components/v34/routes/personal/personal";
@@ -46,7 +46,13 @@ describe("personal route", () => {
 
   it("types no price, plan, tool name or figure", () => {
     expect(all).not.toMatch(/[$€£₩]\s?\d/);
-    for (const offer of Object.values(BILLING_OFFERS)) expect(all).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
+    // The page component's own name is not a plan: route-test-support.ts names that one use, and only it.
+    const named = code.filter((x) => !x.f.endsWith("-art.tsx")).map((x) => withoutNonPlanWords(`routes/personal/${x.f}`, x.text)).join("\n");
+    for (const offer of Object.values(BILLING_OFFERS)) expect(named).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
+    // and what a reader reads: the rendered body names no plan, not even its own route name (the breadcrumb
+    // JSON-LD carries that name, as the registry allows, and is not read on the page)
+    const body = renderToStaticMarkup(createElement(PersonalBody)).replace(/<script\b[\s\S]*?<\/script>/g, " ").replace(/<[^>]*>/g, " ");
+    for (const offer of Object.values(BILLING_OFFERS)) expect(body).not.toMatch(new RegExp(`\\b${offer.label}\\b`));
     for (const name of MCP_TOOL_NAMES) expect(all).not.toContain(name);
     expect(all).not.toMatch(/\b\d{3,}\b|\b\d+\.\d+\b|\d\s?%/);
     expect(all).not.toMatch(/\b\d+\s+(?:files?|days?|pages?|tools?|documents?)\b/i);

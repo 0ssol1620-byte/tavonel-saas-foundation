@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import PricingPlanOverview, { pricingPlanId } from "../components/pricing-plan-overview";
 import { BILLING_OFFERS } from "./billing-catalog";
 
-const summaries = Object.values(BILLING_OFFERS).map(offer => ({
+// Catalog v2: the page's plans are the current offers. A retired offer is never rendered on a public page.
+const current = Object.values(BILLING_OFFERS).filter(offer => offer.status !== "retired");
+const summaries = current.map(offer => ({
   name: offer.label, price: `$${offer.priceUsd} USD`, unit: "per month",
 }));
 const english = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
@@ -28,7 +30,8 @@ describe("pricing plan overview", () => {
   it("renders catalog prices as navigation to the corresponding detail sections", () => {
     const html = renderToStaticMarkup(createElement(PricingPlanOverview, { plans: summaries }));
     expect(html).toContain('aria-label="Compare plans and jump to details"');
-    for (const [index, offer] of Object.values(BILLING_OFFERS).entries()) {
+    expect(current.map(offer => offer.label)).toEqual(["Personal", "Developer", "Team", "Business"]);
+    for (const [index, offer] of current.entries()) {
       expect(html).toContain(`href="#${pricingPlanId(index)}"`);
       expect(html).toContain(`${offer.label}, $${offer.priceUsd} USD, per month — View plan details`);
       expect(html).toContain(`>${offer.label}</span>`);
@@ -50,11 +53,11 @@ describe("pricing plan overview", () => {
   });
 
   it("keeps the gated evaluation wording before the overview and ships no unapproved plan-scope wording", () => {
-    expect(english).toContain('unit: plan.name === EVALUATION.name && !selfService ? "to explore the public World" : plan.unit');
+    expect(english).toContain('unit: plan.kind === "evaluation" && !selfService ? "to explore the public World" : plan.unit');
     // SEC-2 / FE-B2 (review 2): plan-scope wording is pricing wording and is founder-only. main's
     // card line stays; the proposed sentence is listed for founder approval, not shipped.
     expect(english).not.toContain("single-member workspaces. The Team name does not include");
-    // Starter/Pro rename (2026-11-10, founder, intended): the Pro card names what it delivers and no membership line.
+    // The plan cards name what each plan delivers and carry no membership line.
     expect(english).not.toContain("<b>Single-member workspace</b>");
     expectDisclosureBefore(english, 'gates.find(gate => gate.id === "customerData")?.reason', "<PricingPlanOverview");
     expect(english).toContain("plans={PLANS.map(plan => ({");
@@ -66,4 +69,24 @@ describe("pricing plan overview", () => {
     const config = readFileSync(new URL("../next.config.mjs", import.meta.url), "utf8");
     expect(config).toContain('{ source: "/ko/:path*", destination: "/:path*", permanent: true }');
   });
+});
+
+describe("evaluation figures are read from TRIAL_ALLOWANCE, never typed (lead note, CAT-D2)", () => {
+  const login = readFileSync(new URL("../app/login/login-client.tsx", import.meta.url), "utf8");
+  // Strip comments so prose about the rule does not trip it; what is left is rendered copy and code.
+  const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  for (const [name, source] of [["pricing page", english], ["sign-in page", login]] as const) {
+    it(`${name} types no evaluation day, file or page count`, () => {
+      const rendered = code(source);
+      expect(rendered, "3 files").not.toMatch(/\b3 files\b/);
+      expect(rendered, "50 pages").not.toMatch(/\b50 (standard )?pages\b/);
+      expect(rendered, "seven-day").not.toMatch(/seven-day/i);
+      expect(rendered, "for 7 days").not.toMatch(/for 7\s+days/);
+    });
+    it(`${name} interpolates the allowance`, () => {
+      expect(source).toContain("TRIAL_ALLOWANCE.files");
+      expect(source).toContain("TRIAL_ALLOWANCE.pages");
+    });
+  }
 });
