@@ -347,6 +347,14 @@
       "credential": "bearer:supabase-jwt",
       "note": "Session only: an API key is refused with 403. POST creates a proposal and mutates nothing else; needs an Idempotency-Key header."
     },
+    "app/api/proposals/[id]/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Session only: the inbox deep link. Unreadable, foreign, absent, malformed and unknown-type ids are the same 404 body."
+    },
     "app/api/proposals/[id]/decision/route.ts": {
       "type": "A-bearer",
       "methods": [
