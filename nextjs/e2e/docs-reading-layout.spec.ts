@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { ROUTE_TEMPLATES } from "../lib/v34/route-templates";
+import { v34Route, type V34RouteKey } from "../lib/v34/routes";
 
 for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli", "/docs/mcp"]) {
   test(`${route} places the title above a readable article instead of an empty middle column`, async ({ page }) => {
@@ -335,5 +337,96 @@ test.describe("R1 on the docs routes: wordmark, H1 and content on the container 
     await page.locator("main h1").first().evaluate((h1) => { (h1 as HTMLElement).style.marginLeft = "24px"; });
     const m = await page.evaluate(docsEdges);
     expect(Math.abs(m.h1! - m.wordmark!)).toBeGreaterThan(1);
+  });
+});
+
+/*
+  WO-CI-28 (lead decision 18): retained T5 bodies inside the V34 frame set their H1 where a V34-native T5
+  page does. The V34 header is sticky and in flow; the policy document's and the /reproducibility hero's
+  top padding were sized for a fixed header over them, and put the H1 174px (policies) and 242px
+  (/reproducibility) under the header at 1440, 110 and 123 at 390, where the V34 T5 pages set it at 76-124.
+
+  The reference is measured in the same run, never typed: every live registry route the inventory gives
+  T5 (`ROUTE_TEMPLATES`, lib/v34/route-templates.ts). Their header-to-H1 distance is the hero's top padding
+  plus its eyebrow line, and at desktop the split hero also centres its copy column against a taller art
+  column, by an amount that depends on the art (/evidence 0, /security about 7px, /enterprise about 21px at
+  1440). So the template's distance is each reference's distance less its own copy column's centring; the
+  references must agree on it to 1px, and each retained route's distance must equal it to 1px (sub-pixel
+  rounding of the vw clamps). Driven at the decision's four widths from the 1440 project.
+*/
+const T5_RETAINED = ["/status", "/privacy", "/terms", "/refunds", "/subprocessors", "/reproducibility"] as const;
+const T5_V34 = (Object.keys(ROUTE_TEMPLATES) as V34RouteKey[])
+  .filter((key) => ROUTE_TEMPLATES[key] === "T5" && v34Route(key).release === "live")
+  .map((key) => v34Route(key).path);
+const OPENING_WIDTHS = [1440, 768, 390, 360] as const;
+
+/** Runs in the page; self-contained because Playwright serialises it. */
+function openingDistance() {
+  const header = [...document.querySelectorAll<HTMLElement>("[data-v34-header]")]
+    .find((el) => !el.closest("footer") && el.getBoundingClientRect().height > 0);
+  const titles = [...document.querySelectorAll<HTMLElement>("main h1")];
+  if (!header || titles.length !== 1) throw new Error(`expected the V34 header and one main h1, got header ${Boolean(header)} and ${titles.length} h1`);
+  const h1 = titles[0];
+  // A V34 Hero's H1 sits in its copy column (`.copy`), a cell of the hero's grid (`.shell`, no padding).
+  const column = h1.parentElement!;
+  const row = column.parentElement!;
+  return {
+    inFrame: Boolean(h1.closest("[data-v34-site]")),
+    v34Hero: h1.id === "v34-title",
+    distance: h1.getBoundingClientRect().top - header.getBoundingClientRect().bottom,
+    centring: column.getBoundingClientRect().top - row.getBoundingClientRect().top,
+  };
+}
+
+async function openingAt(page: Page, route: string) {
+  const response = await page.goto(route);
+  expect(response?.status(), `${route} answers`).toBeLessThan(400);
+  await page.evaluate(() => document.fonts.ready);
+  return page.evaluate(openingDistance);
+}
+
+/** The V34 T5 template's header-to-H1 distance at the current width, from every V34-native T5 page. */
+async function t5TemplateDistance(page: Page) {
+  expect(T5_V34.length, "no live V34 route is T5 in ROUTE_TEMPLATES").toBeGreaterThan(0);
+  const readings: string[] = [];
+  const flows: number[] = [];
+  for (const route of T5_V34) {
+    const m = await openingAt(page, route);
+    expect(m.v34Hero, `${route} opens with the V34 Hero`).toBe(true);
+    expect(m.centring, `${route}: a copy column above its row`).toBeGreaterThanOrEqual(-1);
+    flows.push(m.distance - m.centring);
+    readings.push(`${route} distance ${m.distance.toFixed(2)} centring ${m.centring.toFixed(2)}`);
+  }
+  const template = flows[0];
+  for (const flow of flows) expect(Math.abs(flow - template), `the V34 T5 pages disagree: ${readings.join("; ")}`).toBeLessThanOrEqual(1);
+  return { template, readings };
+}
+
+test.describe("T5 openings: a retained body sets its H1 where the V34 T5 template does", () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(testInfo.project.name !== "1440", "drives the four widths from the 1440 project");
+  });
+  for (const width of OPENING_WIDTHS) {
+    test(`header to H1 at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width <= 390 ? 844 : 900 });
+      const { template, readings } = await t5TemplateDistance(page);
+      for (const route of T5_RETAINED) {
+        const m = await openingAt(page, route);
+        readings.push(`${route} distance ${m.distance.toFixed(2)}`);
+        expect(m.inFrame, `${route} renders inside the V34 frame`).toBe(true);
+        expect.soft(Math.abs(m.distance - template), `${route} @${width}: H1 ${m.distance.toFixed(2)}px under the header, T5 template ${template.toFixed(2)}px`).toBeLessThanOrEqual(1);
+      }
+      await test.info().attach(`t5-openings-${width}`, { body: readings.join("\n"), contentType: "text/plain" });
+    });
+  }
+
+  test("the measurement catches a title moved off the template's distance", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const { template } = await t5TemplateDistance(page);
+    await page.goto("/privacy");
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator("main h1").first().evaluate((h1) => { (h1 as HTMLElement).style.marginTop = "24px"; });
+    const m = await page.evaluate(openingDistance);
+    expect(Math.abs(m.distance - template)).toBeGreaterThan(1);
   });
 });
