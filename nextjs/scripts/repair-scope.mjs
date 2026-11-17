@@ -3086,26 +3086,20 @@ export const REVOKE_NOT_PLAN_GATED_AFFECTED_UNIT_FILES = Object.freeze(['lib/con
 // V34 program owners (WO-CI-7, lead decisions D-1 and D-4). Every path the program branch changed since the verified baseline,
 // by what owns it. Exact paths, no glob: a new V34 file is a new review, and the map fails closed on it until it is owned.
 // Each owner selects the real suites the Repair job executes: Vitest files and Playwright specs with a reviewed project row
-// in run-repair-check.mjs. Every owner is built with requireExecutedCheck, so an owner whose executed lists are empty fails the
-// map closed for each of its paths; a suite another workflow runs never counts toward that.
+// in run-repair-check.mjs, or node:test files its Node runner registers. Every owner is built with requireExecutedCheck, so an owner
+// whose executed lists are empty fails the map closed for each of its paths; a suite another workflow runs never counts toward that.
 // externalChecks name the suites another workflow runs, as a structured claim (workflow, job, exact step command, project).
 // buildAffectedMap reads those files at head and refuses a claim whose job/step does not run the file, and two owners naming
 // different runners for one file fail the map. Product code, so never nativeReuse.
-// Pending (lane review): app/login/login-client.tsx lands with the catalog lane and is not in this tree, so it is not listed
-// here; until an owner names it, the map reports it unmapped at the head that adds it.
 // The Launch QA Product QA step at this head: no file filter, no grep, so each project runs every spec playwright.config.ts admits to it.
 const LAUNCH_QA_PRODUCT_STEP = 'pnpm exec playwright test --project=1440 --project=390 --project=360 --project=reduced-motion --project=audit --project=audit-768 --project=audit-1280';
 const productQaClaim = project => Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, project });
 // ci.yml's nextjs job: `pnpm test` is `vitest run && pnpm test:scripts`, so it runs every file the shared Vitest include admits.
 const CI_NEXTJS_VITEST_CLAIM = Object.freeze({ kind: 'vitest', workflow: '.github/workflows/ci.yml', job: 'nextjs', run: 'pnpm test' });
-// Program paths no owner takes, so each fails the map as unmapped: nothing the Repair job executes exercises them at this head.
-// A red gate with a true reason, not a green one that runs nothing (lead decision K3). Each needs a run-repair-check.mjs change.
-const V34_HARNESS_UNEXECUTED = 'checked only by the v34-selftest and v34-chromium Playwright projects; run-repair-check.mjs has no reviewed project row or project-loop entry for either, and no workflow at this head runs them';
-const DB_HARNESS_UNEXECUTED = 'checked only by the scripts/db/*.test.mjs node:test suites, which the Repair Node runner does not register; the affected SQL lane runs pgTAP through the Supabase CLI, never through this harness';
-export const V34_PROGRAM_UNEXECUTED_PATHS = Object.freeze({
-  ...Object.fromEntries(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'].map(path => [path, V34_HARNESS_UNEXECUTED])),
-  ...Object.fromEntries(['scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs'].map(path => [path, DB_HARNESS_UNEXECUTED])),
-});
+// Program paths no owner takes, so each fails the map as unmapped with its reason: a red gate with a true reason, not a green one that
+// runs nothing (lead decision K3). Empty at this head: the V34 QA harness and the local database harness are run by the Repair job
+// (WO-CI-7 round 3, L5/L6), so they have owners below.
+export const V34_PROGRAM_UNEXECUTED_PATHS = Object.freeze({});
 export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // v34-shell: header, drawer, More menu, footer, page frame, JSON-LD, tokens and the shared UI parts: the nav, token and containment suites, every
   // suite that renders them, and the two audits that walk every V34 live route at ten widths, plus contrast over the core routes.
@@ -3125,8 +3119,8 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   }),
   // v34-world: the World instrument, the walkthrough, the public reference corpus and its SVG projection route: their suites and their importers.
   'v34-world': Object.freeze({
-    paths: Object.freeze(['app/v34/world-layers.svg/route.ts', 'components/v34/walkthrough/identifiers.ts', 'components/v34/walkthrough/walkthrough.module.css', 'components/v34/walkthrough/walkthrough.tsx', 'components/v34/world/canvas2d-renderer.ts', 'components/v34/world/renderer-types.ts', 'components/v34/world/webgl-renderer.ts', 'components/v34/world/world-instrument.tsx', 'components/v34/world/world-island.tsx', 'components/v34/world/world.module.css', 'lib/v34/public-corpus.test.ts', 'lib/v34/public-corpus.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/walkthrough.ts', 'lib/v34/world-geometry.test.ts', 'lib/v34/world-geometry.ts', 'public/v34/corpus-d630a531e460.json']),
-    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/product-claims-sync.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/public-corpus.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/world-geometry.test.ts']),
+    paths: Object.freeze(['app/v34/world-layers.svg/route.ts', 'components/v34/walkthrough/identifiers.ts', 'components/v34/walkthrough/walkthrough.module.css', 'components/v34/walkthrough/walkthrough.tsx', 'components/v34/world/canvas2d-renderer.ts', 'components/v34/world/renderer-types.ts', 'components/v34/world/webgl-renderer.ts', 'components/v34/world/world-instrument.tsx', 'components/v34/world/world-island.tsx', 'components/v34/world/world.module.css', 'lib/v34/home-world-edges.test.ts', 'lib/v34/public-corpus.test.ts', 'lib/v34/public-corpus.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/walkthrough.ts', 'lib/v34/world-geometry.test.ts', 'lib/v34/world-geometry.ts', 'public/v34/corpus-d630a531e460.json']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/product-claims-sync.test.ts', 'lib/v34/home-page.test.ts', 'lib/v34/home-world-edges.test.ts', 'lib/v34/integration.test.ts', 'lib/v34/public-corpus.test.ts', 'lib/v34/routes-autopilot.test.ts', 'lib/v34/routes-changes.test.ts', 'lib/v34/routes-compiler.test.ts', 'lib/v34/routes-creators.test.ts', 'lib/v34/routes-engineering.test.ts', 'lib/v34/routes-evidence.test.ts', 'lib/v34/routes-realestate.test.ts', 'lib/v34/routes-research.test.ts', 'lib/v34/routes-skills.test.ts', 'lib/v34/routes-steward.test.ts', 'lib/v34/routes-studio.test.ts', 'lib/v34/routes-trading.test.ts', 'lib/v34/routes-world.test.ts', 'lib/v34/walkthrough.test.ts', 'lib/v34/world-geometry.test.ts']),
     browserFiles: Object.freeze(['e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
@@ -3179,7 +3173,7 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/collection-compile-run.test.ts', 'lib/collection-compile-v2-only.test.ts', 'lib/compile-input-manifest.test.ts', 'lib/compile-queue-timing.test.ts', 'lib/compile-receipt-signing.test.ts', 'lib/operational-sli-alert-route.test.ts', 'lib/promotion-receipt-check.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/world-promotion-current-source.test.ts', 'lib/world-rollback-source-access.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({
-      'e2e/compile-job-states-mobile.spec.ts': productQaClaim('1440'),
+      'e2e/compile-job-states-mobile.spec.ts': productQaClaim('390'),
       'e2e/compile-resume.spec.ts': productQaClaim('audit'),
     }),
   }),
@@ -3226,9 +3220,88 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
       'scripts/billing/paddle-reconcile.test.mjs': CI_NEXTJS_VITEST_CLAIM,
     }),
   }),
+  // v34-home (WO-CI-2, WO-CI-5b): the Home drop guard and the V34 Home spec. home-page.test.ts renders home.tsx, which mounts the guard;
+  // upload-entry.spec.ts drops a file on the hero and outside it; home-v34.spec.ts runs itself.
+  'v34-home': Object.freeze({
+    paths: Object.freeze(['components/v34/routes/home/home-drop-guard.tsx', 'e2e/home-v34.spec.ts']),
+    unitFiles: Object.freeze(['lib/v34/home-page.test.ts']),
+    browserFiles: Object.freeze(['e2e/home-v34.spec.ts', 'e2e/upload-entry.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-changes-contract (WO-CI-11): the compiler contract section of /changes. routes-changes.test.ts renders ChangesBody, which
+  // imports it; compiler-contract.spec.ts asserts its eight clauses on /changes.
+  'v34-changes-contract': Object.freeze({
+    paths: Object.freeze(['components/v34/routes/changes/changes-contract.tsx']),
+    unitFiles: Object.freeze(['lib/v34/routes-changes.test.ts']),
+    browserFiles: Object.freeze(['e2e/compiler-contract.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-catalog (WO-CAT): the login client, the checkout quote and the catalog suites. cta-truth.test.ts imports the login client and
+  // six more suites read its source; checkout-quote.test.ts and checkout-customer-data-gate.test.ts call the checkout route that uses
+  // the quote; the two catalog suites run themselves; login-capability.spec.ts opens /login.
+  'v34-catalog': Object.freeze({
+    paths: Object.freeze(['app/login/login-client.tsx', 'lib/billing-catalog.test.ts', 'lib/checkout-quote.test.ts', 'lib/checkout-quote.ts', 'lib/plan-limit-fit.test.ts']),
+    unitFiles: Object.freeze(['lib/billing-catalog.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-quote.test.ts', 'lib/cta-truth.test.ts', 'lib/funnel-events.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/plan-limit-fit.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/recipe-intent.test.ts']),
+    browserFiles: Object.freeze(['e2e/login-capability.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-repointed-specs (WO-CI-5c): two legacy specs repointed onto V34 routes; each runs itself, on the project its skips allow.
+  'v34-repointed-specs': Object.freeze({
+    paths: Object.freeze(['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze(['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-qa-harness (lane F-qa, L6): the V34 matrix helpers, the matrix and the harness's self-test. The self-test imports every helper
+  // and runs in the Repair browser stage under v34-selftest; the matrix runs under v34-chromium in production mode, its SEO and
+  // held-route passes (run-repair-check.mjs browserRunOptionsByProject).
+  'v34-qa-harness': Object.freeze({
+    paths: Object.freeze(['e2e/support/v34-contrast.ts', 'e2e/support/v34-keyboard.ts', 'e2e/support/v34-measure.ts', 'e2e/support/v34-passes.ts', 'e2e/support/v34-receipt.ts', 'e2e/support/v34-seo.ts', 'e2e/support/v34-world.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze(['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // db-harness (L5, L7): the local database harness and the race harnesses. Their seven node:test suites run without a DSN and with
+  // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script.
+  'db-harness': Object.freeze({
+    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-proposals (WO-AN-1): the agent access contract, its import-free consent module and the read-MCP isolation tripwire.
+  // agent-access.test.ts imports both modules; agent-mcp-isolation.test.ts imports the tripwire script.
+  'agent-proposals': Object.freeze({
+    paths: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-access.ts', 'lib/agent-consent.ts', 'lib/agent-mcp-isolation.test.ts', 'scripts/agent-mcp-isolation.mjs']),
+    unitFiles: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-mcp-isolation.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
-// D-4: the program's three pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full rehearsal.
-export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
+// Owners for paths two running lanes add, fixed by their work orders (agent-native.md, WO-AN-2 and WO-AN-3 "Repair-scope request").
+// None of these paths exists at this head. Each owner is its own group, selected only by a change to its own paths, so a suite it
+// names that is absent today can only be selected by the change that adds it; until then the map is unchanged. The suites the work
+// orders ask existing owners to add (lib/agent-grants.test.ts for the remote-mcp group) wait for the refresh after those lanes merge:
+// naming an absent suite in an existing owner would fail every change to that owner now.
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
+  // proposals-decision-path (WO-AN-2): lookup by id and the signed action receipt, with the proposals suites and the route matrices.
+  'proposals-decision-path': Object.freeze({
+    paths: Object.freeze(['app/api/proposals/[id]/route.ts', 'lib/action-receipt-signing.test.ts', 'lib/action-receipt-signing.ts']),
+    unitFiles: Object.freeze(['lib/action-receipt-signing.test.ts', 'lib/change-proposals-panel.test.ts', 'lib/change-proposals-routes.test.ts', 'lib/change-proposals.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-grants (WO-AN-3): the agent grant, its credential routes and the agent dispatch scope, with the agent proposals suites.
+  'agent-grants': Object.freeze({
+    paths: Object.freeze(['app/api/agent-grants/[id]/route.ts', 'app/api/agent-grants/route.ts', 'app/api/internal/agent-grants/revoke-all/route.ts', 'lib/agent-grants.test.ts', 'lib/agent-grants.ts', 'lib/agent-mcp-dispatch.ts']),
+    unitFiles: Object.freeze(['lib/agent-access.test.ts', 'lib/agent-grants.test.ts', 'lib/agent-mcp-isolation.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+});
+// D-4 and WO-AN-1: the program's four pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
+// rehearsal. Fixtures that build a SQL-bearing head take this list, never a copy of it.
+export const DATABASE_CONTRACT_DATABASE_TESTS = Object.freeze(['supabase/tests/agent_proposals.sql', 'supabase/tests/foundation_page_meter.sql', 'supabase/tests/library_label_decisions.sql', 'supabase/tests/world_change_proposals.sql']);
 export const AFFECTED_GROUPS = Object.freeze([
   affectedGroup('public-marketing-surface', new RegExp(`^(?:${exactPathAlternation(PUBLIC_MARKETING_AFFECTED_PATHS)})$`),
     { unitFiles: PUBLIC_MARKETING_AFFECTED_UNIT_FILES, browserFiles: PUBLIC_MARKETING_AFFECTED_BROWSER_FILES }),
@@ -3522,7 +3595,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // large-source-intake-copy (ADR-0006): the 4 exact paths above select 4 direct suites and no browser suite.
   affectedGroup('large-source-intake-copy', new RegExp(`^(?:${exactPathAlternation(LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS)})$`),
     { unitFiles: LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES }),
-  ...Object.entries(V34_PROGRAM_AFFECTED_OWNERS).map(([group, { paths, unitFiles, browserFiles, externalChecks }]) =>
+  ...Object.entries({ ...V34_PROGRAM_AFFECTED_OWNERS, ...V34_PROGRAM_PENDING_OWNERS }).map(([group, { paths, unitFiles, browserFiles, externalChecks }]) =>
     affectedGroup(group, new RegExp(`^nextjs/(?:${exactPathAlternation(paths)})$`), { unitFiles, browserFiles, externalChecks, requireExecutedCheck: true })),
 ]);const regularModes = ['100644', '100755'];
 
@@ -3544,8 +3617,9 @@ export function parseAffectedRawDiff(output) {
   return records;
 }
 
-// One job's steps from a workflow file, read as text: { steps: [{ run, conditional }], conditional, nextjsDefault }, with each run
-// command folded to one line, or null when the job is absent. Only the shapes this repository's workflows use are read (an inline
+// One job's steps from a workflow file, read as text: { steps: [{ run, conditional, rebound }], conditional, nextjsDefault, needs }, with
+// each run command folded to one line, or null when the job is absent. needs is null when the job's needs list is not an inline name or
+// [a, b] list. Only the shapes this repository's workflows use are read (an inline
 // run, a `>-`/`>` folded block, a `|` literal block); any other shape yields a run that matches no claim, so the claim is refused.
 function workflowJobSteps(text, job) {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
@@ -3568,14 +3642,26 @@ function workflowJobSteps(text, job) {
         run = block.join(inline.startsWith('|') ? '\n' : ' ');
       }
     }
-    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)) });
+    steps.push({ run, conditional: step.some(candidate => /^ {8}(?:if|continue-on-error):/.test(candidate)), rebound: step.some(candidate => /^ {8}(?:working-directory|shell|env):/.test(candidate)) });
   }
-  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault: /^ {4}defaults:\n {6}run:\n {8}working-directory: nextjs$/m.test(jobText) };
+  const needsAt = /^ {4}needs:(.*)$/m.exec(jobText)?.[1].trim(), needsList = needsAt === undefined ? '' : /^\[([A-Za-z0-9_, -]*)\]$/.exec(needsAt)?.[1] ?? (/^[A-Za-z0-9_-]+$/.test(needsAt) ? needsAt : null);
+  const needs = needsList === null ? null : needsList.split(',').map(name => name.trim()).filter(Boolean);
+  return { steps, conditional: /^ {4}(?:if|continue-on-error):/m.test(jobText), nextjsDefault: /^ {4}defaults:\n {6}run:\n {8}working-directory: nextjs$/m.test(jobText), needs };
 }
 const globSource = glob => '^' + glob.split('**/').map(part => part.split('*').map(text => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('(?:[^/]+/)*') + '$';
+// Two claims are one claim when they hold the same keys and values, in any key order.
+const canonicalClaim = claim => JSON.stringify(claim && typeof claim === 'object' && !Array.isArray(claim) ? Object.fromEntries(Object.keys(claim).sort().map(key => [key, claim[key]])) : claim);
+// A spec that skips itself unless the project is in a literal list runs nothing in any other project. Only this literal form is read:
+// test.skip(![...].includes(testInfo.project.name)). Any other skip condition (a variable list, ===/!==, a helper) is not detected.
+const SELF_SKIP_PROJECTS = /test\.skip\(\s*!\s*\[([^\]]*)\]\.includes\(\s*testInfo\.project\.name\s*\)/g;
 // Why a claim that another workflow runs `file` (a path under nextjs/) is refused at head; [] when the named job and its exact,
-// unconditional step do run it. `read` returns a repository-root path's head text, or null when it is absent.
+// unconditional step do run it. `read` returns a repository-root path's head text, or null when it is absent. Every shape this reader
+// has not reviewed is refused, and whatever the head text holds, the answer is a refusal with this prefix, never an exception.
 export function externalCheckClaimFailures(file, claim, read) {
+  try { return claimFailures(file, claim, read); }
+  catch (error) { return [`external check claim refused for ${file}: the claim could not be read at head (${error instanceof Error ? error.message : String(error)})`]; }
+}
+function claimFailures(file, claim, read) {
   const failures = [], refuse = reason => { failures.push(`external check claim refused for ${file}: ${reason}`); return failures; };
   if (!claim || typeof claim !== 'object' || !['playwright', 'vitest'].includes(claim.kind) || !/^\.github\/workflows\/[A-Za-z0-9_.-]+\.yml$/.test(claim.workflow ?? '')
     || typeof claim.job !== 'string' || typeof claim.run !== 'string' || !claim.run) return refuse('not a structured workflow claim');
@@ -3583,11 +3669,17 @@ export function externalCheckClaimFailures(file, claim, read) {
   if (typeof workflow !== 'string') return refuse(`${claim.workflow} is absent or unreadable at head`);
   const lf = workflow.replace(/\r\n/g, '\n');
   if (!/^on:\s*$/m.test(lf) || !/^ {2}pull_request:/m.test(lf)) return refuse(`${claim.workflow} does not run on pull_request`);
+  // A bare `pull_request:` with nothing under it: a paths, branches or types filter can keep the job from running on a PR.
+  if (!/^ {2}pull_request:[ \t]*\n(?! {3})/m.test(lf)) return refuse(`${claim.workflow} narrows its pull_request trigger`);
   const job = workflowJobSteps(lf, claim.job);
   if (!job) return refuse(`${claim.workflow} has no job ${claim.job}`);
   if (job.conditional || !job.nextjsDefault) return refuse(`job ${claim.job} is conditional or does not run in nextjs/`);
+  if (job.needs === null) return refuse(`job ${claim.job} has a needs list this check cannot read`);
+  // ponytail: one level of needs is read; a needed job's own needs are not followed.
+  for (const need of job.needs) { const needed = workflowJobSteps(lf, need); if (!needed || needed.conditional) return refuse(`job ${claim.job} needs ${need}, which is absent or conditional`); }
   const steps = job.steps.filter(step => step.run === claim.run);
   if (steps.length !== 1 || steps[0].conditional) return refuse(`job ${claim.job} has no single unconditional step running: ${claim.run}`);
+  if (steps[0].rebound) return refuse(`the step running ${claim.run} sets its own directory, shell or environment`);
   const tokens = claim.run.split(/\s+/);
   if (claim.kind === 'playwright') {
     if (tokens.slice(0, 4).join(' ') !== 'pnpm exec playwright test' || !tokens.includes(`--project=${claim.project}`)) return refuse(`the step does not run Playwright project ${claim.project}`);
@@ -3595,10 +3687,20 @@ export function externalCheckClaimFailures(file, claim, read) {
     const source = read('nextjs/playwright.config.ts');
     if (typeof source !== 'string') return refuse('nextjs/playwright.config.ts is absent or unreadable at head');
     const config = source.replace(/\r\n/g, '\n'), name = file.split('/').at(-1);
-    const literal = constant => { const found = new RegExp(`^const ${constant} = /(.+)/;$`, 'm').exec(config); return found ? new RegExp(found[1]) : null; };
+    if ((config.match(/\btestDir\s*:/g) ?? []).length !== 1 || !/^ {2}testDir: "\.\/e2e",$/m.test(config)) return refuse('playwright.config.ts no longer reads its specs from ./e2e alone');
+    if (/\b(?:grep|grepInvert|shard)\s*:/.test(config)) return refuse('playwright.config.ts filters tests by grep or shard');
+    // undefined: declared, but not a valid regex literal; null: not declared in the reviewed form.
+    const literal = constant => { const found = new RegExp(`^const ${constant} = /(.+)/;$`, 'm').exec(config); if (!found) return null; try { return new RegExp(found[1]); } catch { return undefined; } };
     const auditSpecs = literal('auditSpecs'), v34Specs = literal('v34Specs');
     const widths = /^const widths = \[([0-9, ]+)\] as const;$/m.exec(config)?.[1].split(',').map(width => width.trim()) ?? [];
+    if (auditSpecs === undefined || v34Specs === undefined) return refuse('playwright.config.ts declares auditSpecs or v34Specs as a regex literal that is not a valid regex literal');
     if (!auditSpecs || !v34Specs) return refuse('playwright.config.ts no longer declares auditSpecs and v34Specs as regex literals');
+    const spec = read(`nextjs/${file}`);
+    if (typeof spec !== 'string') return refuse(`nextjs/${file} is absent or unreadable at head`);
+    for (const [, list] of spec.matchAll(SELF_SKIP_PROJECTS)) {
+      const allowed = [...list.matchAll(/(["'])([^"'\\]*)\1/g)].map(match => match[2]);
+      if (!allowed.includes(claim.project)) return refuse(`the spec skips itself outside projects ${allowed.join(', ')}, so project ${claim.project} runs none of it`);
+    }
     if ([...widths, 'reduced-motion'].includes(claim.project)) {
       if ((config.match(/testIgnore: \[\/launch-qa\.\*\\\.spec\\\.ts\/, auditSpecs, v34Specs\],/g) ?? []).length !== 2) return refuse('the width and reduced-motion projects no longer share the reviewed testIgnore');
       if (/launch-qa.*\.spec\.ts/.test(name) || auditSpecs.test(name) || v34Specs.test(name)) return refuse(`project ${claim.project} ignores it`);
@@ -3611,7 +3713,10 @@ export function externalCheckClaimFailures(file, claim, read) {
     try { test = JSON.parse(read('nextjs/package.json') ?? 'null')?.scripts?.test; } catch { test = undefined; }
     if (typeof test !== 'string' || !/^vitest run(?: &&|$)/.test(test)) return refuse('nextjs/package.json test no longer starts with a bare `vitest run`');
     const vitest = read('nextjs/vitest.config.ts');
-    const include = typeof vitest === 'string' ? /include: \[([^\]]*)\]/.exec(vitest)?.[1] : null;
+    if (typeof vitest === 'string' && /\bexclude\s*:/.test(vitest)) return refuse('nextjs/vitest.config.ts excludes files from the shared include');
+    // The include directly under `test: {`, never an earlier or nested one (a coverage include admits nothing to the run).
+    const testBlock = typeof vitest === 'string' ? vitest.replace(/\r\n/g, '\n').split('\n  test: {\n')[1] : undefined;
+    const include = typeof testBlock === 'string' ? /^ {4}include: \[([^\]]*)\]/m.exec(testBlock)?.[1] : null;
     const globs = include ? [...include.matchAll(/"([^"]+)"/g)].map(match => match[1]) : [];
     if (!globs.some(glob => new RegExp(globSource(glob)).test(file))) return refuse('the shared Vitest include does not admit it');
   }
@@ -3649,7 +3754,7 @@ export function buildAffectedMap({ headSha, records, headHasFile = () => true, r
         for (const [file, reason] of Object.entries(owner.databaseDependencies ?? {})) dependencyReasons.set(file, new Set([...(dependencyReasons.get(file) ?? []), reason]));
         for (const [file, claim] of Object.entries(owner.externalChecks ?? {})) {
           const known = externalChecks.get(file);
-          if (known && JSON.stringify(known.claim) !== JSON.stringify(claim)) externalConflicts.add(`owners ${known.group} and ${owner.group} name different runners for one external check: ${file}`);
+          if (known && canonicalClaim(known.claim) !== canonicalClaim(claim)) externalConflicts.add(`owners ${known.group} and ${owner.group} name different runners for one external check: ${file}`);
           else if (!known) externalChecks.set(file, { group: owner.group, claim });
         }
         // An owner that must execute something and selects nothing executable fails closed; an external check never counts.
