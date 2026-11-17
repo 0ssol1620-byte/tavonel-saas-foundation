@@ -24,9 +24,18 @@
   the compile-job triggers (failed-compile reversal, OC-3 recharge on `ready`); `"v3"` is the ledger
   before the meter. `shadowCompare` runs both from the same state on every op and names the page-meter
   rule behind each difference; a difference no rule explains is reported, never absorbed.
+
+  Catalog v2 (WO-CAT-3, migration 20261117140000). `generateOps(seed, n, { catalog: "v2" })` draws the
+  six offer codes the database names (four v2 plans, two retired) instead of the legacy pair, adds
+  offer codes nobody names (refused at the intent and rejected at the event), scheduled cancellations
+  (`apply_foundation_subscription_schedule`, as the webhook route sends it after each subscription
+  event) and plan changes (a new intent and subscription that replace a held one through v3). The
+  oracle writes `access_plan` / `plan_code` from the catalog's `accessLevel`, never from SQL, so a
+  mapping the database gets wrong is a mismatch. A stream without `catalog` draws exactly what it drew before.
 */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { BILLING_OFFERS, isBillingOfferCode } from "./billing-catalog";
 import { MAX_UNITS_PER_PAGE, STANDARD_UNITS_PER_PAGE } from "./usage-pricing";
 
 // ---------------------------------------------------------------------------------------------
@@ -45,6 +54,10 @@ const STALE = "stale_or_mismatched_subscription";
 const CREDITS = [900, 600, 1500, 400, 700, 1000, 800, 1200, 500, 1100, 650, 950] as const;
 const OTHER_PRICE = 99; // a price no intent carries
 const OFFERS = ["observer_access", "studio_access"] as const;
+// Catalog v2: every code the database names. Intent 0 (the bootstrap) is a v2 plan.
+const V2_OFFERS = ["personal", "team", "developer", "business", "observer_access", "studio_access"] as const;
+// Codes nobody names: a plan that is not an offer, a label, a case variant, a level prefix, empty.
+const UNKNOWN_OFFERS = ["enterprise", "free", "Personal", "Team ", "observer", "credit_starter", ""] as const;
 
 // ---------------------------------------------------------------------------------------------
 // Ops
@@ -117,7 +130,15 @@ export interface ExpireOp extends OpBase {
 export interface ClearHoldOp extends OpBase {
   k: "clear_hold";
 }
-export type Op = IntentOp | EventOp | ReserveOp | SettleOp | ExpireOp | ClearHoldOp | CompileOp;
+/** What the webhook route sends after a subscription event: the event's scheduled cancellation, or null when none. */
+export interface ScheduleOp extends OpBase {
+  k: "schedule";
+  eventId: string;
+  sub: string | null;
+  /** Seconds after the transaction start; null clears a schedule. */
+  cancelAt: number | null;
+}
+export type Op = IntentOp | EventOp | ReserveOp | SettleOp | ExpireOp | ClearHoldOp | CompileOp | ScheduleOp;
 /** Which settlement the route sends a finished or failed read to: per document (v3) or by pages (v4). */
 export type Meter = "v3" | "v4";
 
@@ -159,6 +180,10 @@ const METER_WEIGHTS: ReadonlyArray<readonly [string, number]> = [
   ["compile", 70], ["recompile_refunded", 35], ["settle_meter_invalid", 10], ["settle_no_pages", 8],
   ["twin_resettle", 15],
 ];
+// A catalog v2 stream (WO-CAT-3) adds these. A stream without `catalog` draws exactly what it drew before.
+const CATALOG_V2_WEIGHTS: ReadonlyArray<readonly [string, number]> = [
+  ["schedule", 90], ["plan_change", 70], ["intent_unknown_offer", 12], ["event_unknown_offer", 8],
+];
 const COMPILE_STATE: ReadonlyArray<readonly [CompileOp["state"], number]> = [
   ["failed", 45], ["ready", 30], ["cancelled", 10], ["review_required", 15],
 ];
@@ -166,8 +191,10 @@ const RECOMPILE_STATE: ReadonlyArray<readonly [CompileOp["state"], number]> = [
   ["ready", 65], ["failed", 15], ["review_required", 10], ["cancelled", 10],
 ];
 
-export function generateOps(seed: number, count = 1000, options: { meter?: boolean } = {}): Op[] {
+export function generateOps(seed: number, count = 1000, options: { meter?: boolean; catalog?: "v2" } = {}): Op[] {
   const meter = options.meter === true;
+  const v2 = options.catalog === "v2";
+  const offers: readonly string[] = v2 ? V2_OFFERS : OFFERS;
   const rnd = mulberry32(seed);
   const int = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
   const pick = <T>(xs: readonly T[]): T => xs[int(0, xs.length - 1)];
@@ -185,7 +212,7 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
   const price = (k: number) => base36("pri", 500 + k);
   const sub = (k: number) => base36("sub", 600 + k);
   const intentOp = (k: number): IntentOp => ({
-    k: "intent", retry: false, tag: "intent", nonce: nonce(k), offer: OFFERS[k % 2], price: price(k), credit: CREDITS[k],
+    k: "intent", retry: false, tag: "intent", nonce: nonce(k), offer: offers[k % offers.length], price: price(k), credit: CREDITS[k],
   });
 
   const ops: Op[] = [];
@@ -213,10 +240,17 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
     return { ...op, pages, complex, src };
   };
   const live: ReserveOp[] = [];
+  // Catalog v2: the subscription event the account holds now (the one a schedule binds to), and every subscription event.
+  let held = null as EventOp | null; // assigned inside `push`; the cast keeps TS from narrowing it to null
+  const subscriptionEvents: EventOp[] = [];
   const push = (op: Op) => {
     if (ops.length >= count) return;
     ops.push(op);
     const out = tracker.apply(op);
+    if (op.k === "event" && op.action === "subscription") {
+      subscriptionEvents.push(op);
+      if (out.ok?.status === "processed" || out.ok?.status === "processed_subscription_upgrade") held = op;
+    }
     if (op.k === "reserve" && out.ok?.idempotentReplay === false) live.push(op);
     if (op.k === "settle" && (out.ok?.status === "processed" || out.error === "foundation_compute_settlement_expired")) {
       live.splice(live.findIndex((r) => r.doc === op.doc), 1);
@@ -228,14 +262,14 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
   };
   const event = (tag: string, e: Partial<EventOp> & Pick<EventOp, "action" | "eventType">, retry = false): EventOp => {
     const body: Omit<EventOp, "sha"> = {
-      k: "event", retry, tag, eventId: base36("evt", next()), t: clock, offer: OFFERS[0], txn: null,
+      k: "event", retry, tag, eventId: base36("evt", next()), t: clock, offer: offers[0], txn: null,
       sub: null, status: null, adjustment: null, nonce: nonce(0), price: null, configured: null, ...e,
     };
     return { ...body, sha: sha(JSON.stringify({ ...body, eventId: undefined })) };
   };
   // The common shape: an event bound to intent `k` exactly as the runtime route would send it.
   const bound = (tag: string, k: number, e: Partial<EventOp> & Pick<EventOp, "action" | "eventType">): EventOp =>
-    event(tag, { nonce: nonce(k), offer: OFFERS[k % 2], price: price(k), sub: sub(k), ...e });
+    event(tag, { nonce: nonce(k), offer: offers[k % offers.length], price: price(k), sub: sub(k), ...e });
   const issuedIntent = () => int(0, issued - 1);
   const freshTxn = () => base36("txn", next());
 
@@ -258,7 +292,7 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
   push(bound("bootstrap_subscription", 0, { action: "subscription", eventType: "subscription.created", status: "active" }));
   allowance("bootstrap_allowance", 0);
 
-  const table = meter ? [...WEIGHTS, ...METER_WEIGHTS] : WEIGHTS;
+  const table = [...WEIGHTS, ...(meter ? METER_WEIGHTS : []), ...(v2 ? CATALOG_V2_WEIGHTS : [])];
   while (ops.length < count) {
     clock += int(1, 20);
     const variant = weighted(table);
@@ -269,7 +303,7 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
       case "allowance_bad_price": allowance(variant, k, { price: price(OTHER_PRICE) }); break;
       case "allowance_unknown_nonce": {
         const u = int(issued, CREDITS.length - 1);
-        push(event(variant, { action: "allowance", eventType: "transaction.completed", nonce: nonce(u), offer: OFFERS[u % 2], price: price(u), sub: sub(u), txn: freshTxn() }));
+        push(event(variant, { action: "allowance", eventType: "transaction.completed", nonce: nonce(u), offer: offers[u % offers.length], price: price(u), sub: sub(u), txn: freshTxn() }));
         break;
       }
       case "allowance_expired": allowance(variant, issued > 4 ? int(4, issued - 1) : k, { t: INTENT_LIFETIME_SECONDS + 3600 }); break;
@@ -280,7 +314,7 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
         allowance(variant, target, { sub: sub(target < 4 ? (target + 1 + int(0, 2)) % 4 : int(0, 3)) });
         break;
       }
-      case "allowance_wrong_offer": allowance(variant, k, { offer: OFFERS[(k + 1) % 2] }); break;
+      case "allowance_wrong_offer": allowance(variant, k, { offer: offers[(k + 1) % offers.length] }); break;
       case "allowance_bad_type": allowance(variant, k, { eventType: "transaction.updated" }); break;
       case "purchase":
         push(bound(variant, k, { action: "purchase", eventType: "transaction.completed", txn: freshTxn() }));
@@ -429,6 +463,50 @@ export function generateOps(seed: number, count = 1000, options: { meter?: boole
       case "settle_no_pages":
         if (live.length) push({ ...metered({ k: "settle", retry: false, tag: variant, doc: pick(live).doc, outcome: "settled", actual: 1, reason: "OCR_COMPLETED" }), pages: null, complex: null });
         break;
+      // Catalog v2 stream only (CATALOG_V2_WEIGHTS).
+      case "schedule": {
+        // Mostly the held subscription's own event; sometimes an old one (stale) or a subscription it never named (refused).
+        const e = held && rnd() < 0.75 ? held : subscriptionEvents.length ? pick(subscriptionEvents) : null;
+        if (e) {
+          push({
+            k: "schedule", retry: false, tag: variant, eventId: e.eventId, sub: rnd() < 0.08 ? base36("sub", 800 + next()) : e.sub,
+            cancelAt: rnd() < 0.8 ? clock + int(100, 5000) : null,
+          });
+        }
+        break;
+      }
+      case "plan_change": {
+        // A new checkout for any named plan (retired ones included, which v3 never admits), then its subscription
+        // and usually its first payment. Whether it replaces the held plan is the projection's answer.
+        const n = next();
+        const change: IntentOp = {
+          k: "intent", retry: false, tag: variant, nonce: uuid("5555", n), offer: pick(V2_OFFERS),
+          price: base36("pri", 900 + n), credit: pick(CREDITS),
+        };
+        push(change);
+        const bind = { nonce: change.nonce, offer: change.offer, price: change.price, sub: base36("sub", 900 + n) };
+        push(event(variant, {
+          ...bind, action: "subscription", eventType: pick(["subscription.created", "subscription.activated"]),
+          status: rnd() < 0.85 ? "active" : "trialing",
+        }));
+        if (rnd() < 0.7) {
+          const op = event(variant, { ...bind, action: "allowance", eventType: "transaction.completed", txn: freshTxn() });
+          allowances.push(op);
+          push(op);
+        }
+        break;
+      }
+      case "intent_unknown_offer":
+        push({
+          k: "intent", retry: false, tag: variant, nonce: uuid("6666", next()), offer: pick(UNKNOWN_OFFERS),
+          price: price(k), credit: CREDITS[k],
+        });
+        break;
+      case "event_unknown_offer":
+        push(bound(variant, k, rnd() < 0.5
+          ? { action: "allowance", eventType: "transaction.completed", txn: freshTxn(), offer: pick(UNKNOWN_OFFERS) }
+          : { action: "subscription", eventType: "subscription.created", status: "active", offer: pick(UNKNOWN_OFFERS) }));
+        break;
     }
   }
   return ops;
@@ -446,13 +524,22 @@ export interface Outcome {
   error?: string;
 }
 
-interface Ev { sha: string; action: string; txn: string | null; result: string }
+interface Ev { sha: string; action: string; txn: string | null; result: string; sub?: string | null; t?: number }
 interface Led { eventId: string; kind: "allowance" | "reversed" | "allowance_expired"; offer: string; txn: string | null; reversalOf: string | null; delta: number }
 interface Acct {
   balance: number; hold: boolean; overageEnabled: boolean; overageUnits: number; lifetimeOverage: number;
   lifetimeAllowance: number; lifetimeReversed: number; accessPlan: string | null; status: string;
   subscriptionId: string | null; lastSubAt: number | null;
+  /** Catalog v2: the v2 plan held (null = a legacy plan, whose code is `accessPlan`), and the scheduled cancellation. */
+  planCode: string | null; cancelAt: number | null;
 }
+
+/**
+ * The entitlement level of a named offer, read from the catalog (never from SQL); a v2 code is one whose level is not
+ * itself. The SQL mapping must agree with this for every code, which the replay checks on every subscription event.
+ */
+const levelOf = (code: string): string => (isBillingOfferCode(code) ? BILLING_OFFERS[code].accessLevel : refuse("foundation_offer_code_unknown"));
+const planCodeOf = (code: string): string | null => (levelOf(code) === code ? null : code);
 interface Res {
   state: string; reserved: number; max: number; settled: number | null; reason: string | null; aged: boolean;
   /** Page meter (absent = null): the facts v4 settled with, its charge basis, the failed-compile reversal and the OC-3 recharge. */
@@ -567,6 +654,7 @@ export class LedgerOracle {
         case "expire": return { ok: this.expire(op) };
         case "clear_hold": return { ok: this.clearHold() };
         case "compile": return { ok: this.compile(op) };
+        case "schedule": return { ok: this.schedule(op) };
       }
     } catch (e) {
       if (!(e instanceof Refusal)) throw e;
@@ -577,6 +665,8 @@ export class LedgerOracle {
 
   // issue_foundation_checkout_intent: issued at `now()`, so the clock-skew guard never fires.
   private intent(op: IntentOp): Rec {
+    // The offer_code check calls foundation_offer_access_plan, which raises invalid_parameter_value for a code it does not name.
+    if (!isBillingOfferCode(op.offer)) refuse("sqlstate:22023");
     if (this.s.intents.has(op.nonce)) refuse("sqlstate:23505");
     this.s.intents.set(op.nonce, { offer: op.offer, price: op.price, credit: op.credit });
     return { status: "issued" };
@@ -586,6 +676,7 @@ export class LedgerOracle {
     return (this.s.acct ??= {
       balance: 0, hold: false, overageEnabled: false, overageUnits: 0, lifetimeOverage: 0, lifetimeAllowance: 0,
       lifetimeReversed: 0, accessPlan: null, status: "inactive", subscriptionId: null, lastSubAt: null,
+      planCode: null, cancelAt: null,
     });
   }
 
@@ -601,6 +692,11 @@ export class LedgerOracle {
         if (previous.sha !== op.sha || previous.action !== op.action) refuse("foundation_billing_event_id_conflict");
         return { status: "duplicate" };
       }
+    }
+    // The contract check (20261117140000): a code foundation_offer_access_plan does not name is a durable rejection.
+    if (!isBillingOfferCode(op.offer)) {
+      s.rejections.add(op.eventId);
+      return { status: "binding_rejected", reason: "checkout_binding_contract_invalid" };
     }
     const entitling = op.action !== "subscription" || op.status === "active" || op.status === "trialing";
     let reason: string | null = null;
@@ -643,7 +739,7 @@ export class LedgerOracle {
       return { status: "binding_rejected", reason };
     }
     if (op.action === "allowance") return this.allowance(op, credit);
-    if (staleRetry) return { status: STALE };
+    if (staleRetry) return this.replace(op);
     if (op.action === "purchase") {
       // v3 -> v2 -> base: the offers this gate admits are not purchase offers, so base refuses.
       return refuse("billing_purchase_contract_invalid");
@@ -718,19 +814,57 @@ export class LedgerOracle {
   // v3 -> v2 -> base, subscription branch
   private subscription(op: EventOp): Rec {
     const s = this.s;
-    s.events.set(op.eventId, { sha: op.sha, action: "subscription", txn: null, result: "received" });
+    s.events.set(op.eventId, { sha: op.sha, action: "subscription", txn: null, result: "received", sub: op.sub, t: op.t });
     const a = this.account();
     const accepted =
       (a.lastSubAt === null || op.t >= a.lastSubAt) && (a.subscriptionId === null || a.subscriptionId === op.sub);
     if (accepted) {
-      a.accessPlan = op.offer;
+      a.accessPlan = levelOf(op.offer);
+      a.planCode = planCodeOf(op.offer);
       a.status = op.status as string;
       a.subscriptionId = op.sub;
       a.lastSubAt = op.t;
     }
-    const status = accepted ? "processed" : STALE;
-    (s.events.get(op.eventId) as Ev).result = status;
-    return { status };
+    (s.events.get(op.eventId) as Ev).result = accepted ? "processed" : STALE;
+    return accepted ? { status: "processed" } : this.replace(op);
+  }
+
+  /*
+    v3 after a stale base projection (0010/0011, widened by 20261117140000): the replacement of a held subscription
+    whose cancellation is scheduled. Written from the SQL, and deliberately not from `decideSubscriptionChange`, which
+    the checkout-policy test holds to this.
+  */
+  private replace(op: EventOp): Rec {
+    const s = this.s;
+    const a = s.acct;
+    const target = op.offer;
+    const admitted = a !== null
+      && ((target === "studio_access" && a.accessPlan === "observer_access" && a.planCode === null)
+        || (levelOf(target) !== target && target !== (a.planCode ?? a.accessPlan)));
+    if (
+      !["subscription.created", "subscription.activated", "subscription.updated", "subscription.trialing"].includes(op.eventType)
+      || (op.status !== "active" && op.status !== "trialing") || op.sub === null || a === null
+      || (a.status !== "active" && a.status !== "trialing") || a.cancelAt === null || a.subscriptionId === op.sub
+      || (a.lastSubAt !== null && op.t < a.lastSubAt) || !admitted
+    ) return { status: STALE };
+    a.accessPlan = levelOf(target);
+    a.planCode = planCodeOf(target);
+    a.status = op.status;
+    a.subscriptionId = op.sub;
+    a.cancelAt = null;
+    a.lastSubAt = op.t;
+    (s.events.get(op.eventId) as Ev).result = "processed_subscription_upgrade";
+    return { status: "processed_subscription_upgrade" };
+  }
+
+  // apply_foundation_subscription_schedule (0006), as the webhook route calls it after a subscription event
+  private schedule(op: ScheduleOp): Rec {
+    const e = this.s.events.get(op.eventId);
+    if (!e || e.action !== "subscription" || op.sub === null || e.sub !== op.sub) return refuse("billing_subscription_event_binding_invalid");
+    const a = this.s.acct;
+    if (!a || a.subscriptionId !== op.sub || a.lastSubAt !== e.t) return { status: "stale_subscription_schedule" };
+    a.cancelAt = op.cancelAt;
+    return { status: "processed" };
   }
 
   // reserve_foundation_compute_v3, billing_source = 'paid'
@@ -936,6 +1070,17 @@ export class LedgerOracle {
         }
         : {}),
     };
+  }
+
+  /**
+   * `snapshot` plus the account's plan identity and scheduled cancellation (catalog v2, WO-CAT-3). `replayOps` compares
+   * this one when asked (`planIdentity`); `snapshot` keeps its earlier shape for the webhook replay and the unit test's
+   * fake session, whose reads do not carry those columns.
+   */
+  snapshotWithPlan(op: Op): Snapshot {
+    const snap = this.snapshot(op);
+    const a = this.s.acct;
+    return snap.account && a ? { ...snap, account: { ...snap.account, planCode: a.planCode, cancelAt: a.cancelAt } } : snap;
   }
 
   /**
@@ -1283,7 +1428,10 @@ select jsonb_build_object(
       'lifetimeAllowance', lifetime_allowance_units, 'lifetimeReversed', lifetime_credits_reversed,
       'accessPlan', access_plan, 'status', subscription_status, 'subscriptionId', paddle_subscription_id,
       'lastSubAt', case when last_subscription_event_at is null then null
-        else round(extract(epoch from last_subscription_event_at - now()))::int end)
+        else round(extract(epoch from last_subscription_event_at - now()))::int end,
+      'planCode', plan_code,
+      'cancelAt', case when subscription_cancel_at is null then null
+        else round(extract(epoch from subscription_cancel_at - now()))::int end)
     from public.foundation_billing_accounts where workspace_key = ${lit(REPLAY_WORKSPACE)}),
   'ledger', coalesce((select jsonb_agg(jsonb_build_object('kind', kind, 'offer', offer_code,
       'txn', transaction_id, 'reversalOf', reversal_of_transaction_id, 'delta', credit_delta, 'eventId', event_id)
@@ -1382,6 +1530,8 @@ export function opSql(op: Op, meter: Meter = "v3"): string {
       return `with u as (update public.foundation_billing_accounts set billing_hold = false where workspace_key = ${lit(REPLAY_WORKSPACE)} returning 1) select jsonb_build_object('updated', count(*)) from u`;
     case "compile":
       return `select pg_temp.compile(${lit(op.job)}, array[${op.docs.map(lit).join(", ")}]::text[], ${lit(op.state)})`;
+    case "schedule":
+      return `select to_jsonb(public.apply_foundation_subscription_schedule(${lit(op.eventId)}, ${lit(REPLAY_WORKSPACE)}, ${lit(op.sub)}, ${op.cancelAt === null ? "null" : `now() + make_interval(secs => ${op.cancelAt})`}))`;
     case "expire":
       return `with u as (update public.foundation_compute_reservations set created_at = clock_timestamp() - interval '20 minutes', expires_at = clock_timestamp() - interval '10 minutes' where document_id = ${lit(op.doc)}::uuid and state = 'reserved' returning 1) select jsonb_build_object('updated', count(*)) from u`;
   }
@@ -1417,8 +1567,11 @@ export interface Mismatch {
   actual: { outcome: Outcome; snapshot: ActualSnapshot };
 }
 
+/** What a replay compares beyond the earlier snapshot: `planIdentity` adds the account's plan_code and subscription_cancel_at. */
+export interface ReplayOptions { planIdentity?: boolean }
+
 /** One seed inside begin ... rollback. Returns the first mismatch, or null when oracle and database agree throughout. */
-export async function replayOps(session: PsqlSession, seed: number, ops: readonly Op[], meter: Meter = "v3"): Promise<Mismatch | null> {
+export async function replayOps(session: PsqlSession, seed: number, ops: readonly Op[], meter: Meter = "v3", options: ReplayOptions = {}): Promise<Mismatch | null> {
   await session.query(SETUP_SQL);
   try {
     const oracle = new LedgerOracle(meter);
@@ -1426,7 +1579,7 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
     for (let index = 0; index < ops.length; index++) {
       const op = ops[index];
       const expectedOutcome = oracle.apply(op);
-      const expectedSnapshot = oracle.snapshot(op);
+      const expectedSnapshot = options.planIdentity ? oracle.snapshotWithPlan(op) : oracle.snapshot(op);
       const txn = op.k === "event" ? op.txn : null;
       const evt = op.k === "event" ? op.eventId : null;
       const doc = op.k === "reserve" || op.k === "settle" || op.k === "expire" ? op.doc : null;
@@ -1456,12 +1609,12 @@ export async function replayOps(session: PsqlSession, seed: number, ops: readonl
  * Shortest failing prefix, then (for short prefixes) a single backward pass dropping every op the
  * failure does not need. Ops are self-contained, so any subsequence is a valid stream.
  */
-export async function shrinkFailure(session: PsqlSession, seed: number, ops: readonly Op[], failure: Mismatch, meter: Meter = "v3"): Promise<Op[]> {
+export async function shrinkFailure(session: PsqlSession, seed: number, ops: readonly Op[], failure: Mismatch, meter: Meter = "v3", options: ReplayOptions = {}): Promise<Op[]> {
   let kept = ops.slice(0, failure.index + 1);
   if (kept.length > 150) return kept;
   for (let i = kept.length - 2; i >= 0; i--) {
     const candidate = kept.filter((_, j) => j !== i);
-    if (await replayOps(session, seed, candidate, meter)) kept = candidate;
+    if (await replayOps(session, seed, candidate, meter, options)) kept = candidate;
   }
   return kept;
 }
