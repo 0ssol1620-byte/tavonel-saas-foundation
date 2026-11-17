@@ -55,16 +55,37 @@ export function ConsentText({ label }: { label: string }) {
   );
 }
 
-/** The credential, shown once. Renders nothing when there is none. */
+/** What a create answered: a credential, a 2xx that carried none (unconfirmed, the list is read again), or a refusal. */
+export function createOutcome(ok: boolean, status: number, body: { code?: string; token?: string } | null): { kind: "created"; token: string } | { kind: "unconfirmed" } | { kind: "refused"; notice: string } {
+  if (ok && typeof body?.token === "string") return { kind: "created", token: body.token };
+  if (ok) return { kind: "unconfirmed" };
+  return { kind: "refused", notice: CREATE_REFUSED[status] ?? `The connection was not created. ${failureSentence(body?.code, status)}` };
+}
+
+const UNCONFIRMED = "The connection could not be confirmed. The list was read again and shows what was recorded.";
+
+/** Copies to the clipboard; a browser without one, or a refusal, is "failed" and never throws. */
+export async function copyCredential(text: string): Promise<"done" | "failed"> {
+  try {
+    if (!navigator.clipboard?.writeText) return "failed";
+    await navigator.clipboard.writeText(text);
+    return "done";
+  } catch {
+    return "failed";
+  }
+}
+
+/** The credential, shown once. Renders nothing when there is none. Only the notice that one was created is announced; the token is outside every live region. */
 export function TokenReveal({ token, onClose }: { token: Reveal; onClose: () => void }) {
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   if (token === null) return null;
   return (
-    <div className={styles.reveal} role="status">
+    <div className={styles.reveal}>
+      <p role="status">A credential was created.</p>
       <strong>Copy this credential now. It will not be shown again.</strong>
       <code className={styles.token}>{token}</code>
       <div className={styles.actions}>
-        <button type="button" className={styles.action} onClick={() => { navigator.clipboard.writeText(token).then(() => setCopied("done"), () => setCopied("failed")); }}>
+        <button type="button" className={styles.action} onClick={() => { void copyCredential(token).then(setCopied); }}>
           {copied === "done" ? "Copied" : "Copy credential"}
         </button>
         <button type="button" className={styles.action} onClick={onClose}>Close</button>
@@ -101,15 +122,14 @@ export default function AgentAccessPanel() {
     try {
       const response = await api("/api/agent-grants", { method: "POST", body: JSON.stringify({ clientLabel: label }) });
       const body = await response.json().catch(() => null) as { code?: string; token?: string } | null;
-      if (!response.ok || typeof body?.token !== "string") {
-        setNotice(CREATE_REFUSED[response.status] ?? `The connection was not created. ${failureSentence(body?.code, response.status)}`);
-        return;
-      }
-      dispatch({ type: "created", token: body.token });
+      const outcome = createOutcome(response.ok, response.status, body);
+      if (outcome.kind === "refused") { setNotice(outcome.notice); return; }
+      if (outcome.kind === "unconfirmed") { setNotice(UNCONFIRMED); await refresh(); return; }
+      dispatch({ type: "created", token: outcome.token });
       setLabel("");
       await refresh();
     } catch {
-      setNotice("The connection could not be confirmed. The list was read again and shows what was recorded.");
+      setNotice(UNCONFIRMED);
       await refresh();
     } finally {
       setBusy(false);

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { ConsentText, revealAfter, TokenReveal } from "../components/workspace/agent-access-panel";
+import { describe, expect, it, vi } from "vitest";
+import { ConsentText, copyCredential, createOutcome, revealAfter, TokenReveal } from "../components/workspace/agent-access-panel";
 import { AGENT_PROPOSAL_CONSENT } from "./agent-consent";
 
 // A made-up value that only has the shape of a credential; no real one is used anywhere.
@@ -18,6 +18,33 @@ describe("Agent access panel (WO-AN-6)", () => {
     const closed = revealAfter(shown, { type: "close" });
     expect(closed).toBeNull();
     expect(renderToStaticMarkup(createElement(TokenReveal, { token: closed, onClose: () => undefined }))).toBe("");
+  });
+
+  it("the credential is outside every live region; only the notice that one was created is announced (WO-AN-6B)", () => {
+    const markup = renderToStaticMarkup(createElement(TokenReveal, { token: FAKE, onClose: () => undefined }));
+    const announced = [...markup.matchAll(/<(\w+)[^>]*(?:role="(?:status|alert|log)"|aria-live=)[^>]*>(.*?)<\/\1>/g)];
+    expect(announced.map((m) => m[2])).toEqual(["A credential was created."]);
+    const outside = markup.replace(announced[0][0], "");
+    expect(outside).toContain(FAKE);
+    expect(outside).not.toMatch(/role="(?:status|alert|log)"|aria-live=/);
+  });
+
+  it("a browser without a clipboard, or one that refuses, reports a failed copy and never throws (WO-AN-6B)", async () => {
+    expect(await copyCredential(FAKE)).toBe("failed");
+    const write = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText: write } });
+    expect(await copyCredential(FAKE)).toBe("done");
+    expect(write).toHaveBeenCalledWith(FAKE);
+    vi.stubGlobal("navigator", { clipboard: { writeText: () => Promise.reject(new Error("denied")) } });
+    expect(await copyCredential(FAKE)).toBe("failed");
+    vi.unstubAllGlobals();
+  });
+
+  it("a 2xx without a token is unconfirmed, never shown as created and never as refused (WO-AN-6B)", () => {
+    expect(createOutcome(true, 201, { code: "CREATED" })).toEqual({ kind: "unconfirmed" });
+    expect(createOutcome(true, 201, null)).toEqual({ kind: "unconfirmed" });
+    expect(createOutcome(true, 201, { token: FAKE })).toEqual({ kind: "created", token: FAKE });
+    expect(createOutcome(false, 402, { token: FAKE })).toEqual({ kind: "refused", notice: "Agent access is not part of a free evaluation." });
   });
 
   it("the consent text is exactly the sentences of lib/agent-consent, with the label in quotes and marked unverified", () => {
