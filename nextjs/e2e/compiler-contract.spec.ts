@@ -61,9 +61,10 @@ test("publishes the eight clauses, each with a state a reader can see", async ({
 /*
   The claim this page must never make by accident.
 
-  "Qualified" means a receipt exists. None does on this deployment, and the page says so in its
-  own copy -- but copy can be edited without editing the data, so the rendered document is
-  checked for the word rather than the module that produces it.
+  "Qualified" is the grade `lib/compiler-contract.ts` reserves for a clause with an attached
+  artifact, and its clause list grades every clause demonstrated or direction. Copy can be edited
+  without editing the data, so the rendered document is checked for the grade rather than the
+  module that produces it.
 */
 test("grades no clause as qualified, because no receipt is published here", async ({ page }: { page: Page }) => {
   await page.goto(ROUTE);
@@ -118,7 +119,7 @@ test("draws the whole source-change flow, and says which half of it runs here", 
 
     An earlier version listed the five stages that had to stay dashed, which pinned the other
     five as built without ever saying so -- and two of them (the semantic diff of a source change,
-    and the dependency impact resolved from it) are not implemented anywhere in this deployment.
+    and the dependency impact resolved from it) are not implemented anywhere in this compiler.
     Asserting the built set instead means adding a stage cannot silently promote it.
   */
   expect(stages.filter((stage) => stage.state === "built").map((stage) => stage.id))
@@ -246,6 +247,14 @@ test("leads with version comparison and keeps technical explanations optional", 
   expect(await page.locator("[data-changes-timeline]").isVisible()).toBe(true);
   const overview = page.locator('[aria-labelledby="v34-title"]');
   expect(await page.locator("main").innerText()).toContain("A compile rebuilds the collection you give it into a new candidate World.");
+  // The section that says what a compile does is read before the clauses, not after them.
+  const behaviourFirst = await page.evaluate(() => {
+    const sentence = "A compile rebuilds the collection you give it into a new candidate World.";
+    const section = [...document.querySelectorAll("main section")].find((node) => node.textContent?.includes(sentence));
+    const clauses = document.querySelector("#clauses");
+    return Boolean(section && clauses && section !== clauses && section.compareDocumentPosition(clauses) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  expect(behaviourFirst).toBe(true);
   const change = overview.locator('a[href="/explore?act=change"]');
   expect(await change.isVisible()).toBe(true);
   expect(await overview.locator('a[href="#clauses"]').isVisible()).toBe(true);

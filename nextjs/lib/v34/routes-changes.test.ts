@@ -6,7 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { h1Text, typedCounts } from "./route-test-support";
 import { ChangesBody } from "@/components/v34/routes/changes/changes";
-import { CHANGES_DESTINATIONS, CHANGES_RETAINED, FLOW } from "@/components/v34/routes/changes/changes-content";
+import * as CONTENT from "@/components/v34/routes/changes/changes-content";
+import { ACTIVATE, CHANGES_DESTINATIONS, CHANGES_RETAINED, FLOW } from "@/components/v34/routes/changes/changes-content";
 import { CONTRACT_CLAUSES } from "@/lib/compiler-contract";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { DOCS_SECTIONS } from "@/lib/docs-content";
@@ -163,11 +164,83 @@ describe("tokens and explicit pairs", () => {
   });
 });
 
-describe("the source-change note keeps its meaning", () => {
-  it("says the dashed stages run outside this deployment, not that a receipt is missing", () => {
-    expect(FLOW.note).toContain("run outside this deployment");
-    expect(FLOW.note).toContain("the equivalence check that would keep it has nothing to refuse here");
-    expect(FLOW.note).not.toMatch(/receipt/i);
+/*
+  The source-change note is the retired /product/continuous-knowledge paragraph, ported. It is read from
+  that page's source and compared character by character after the substitutions below, so a re-wording
+  of the note fails here rather than in review. Each substitution is forced by a guard in this file and
+  takes its replacement from words the legacy page or the drawing beside the note already used.
+*/
+const LEGACY_PAGE = "app/product/continuous-knowledge/page.tsx";
+const NOTE_SUBSTITUTIONS: ReadonlyArray<{ legacy: string; ported: string; why: string }> = [
+  {
+    legacy: "the dependency impact",
+    ported: "the resolution of the units standing on the changed region",
+    why: "\"dependency impact\" is a phrase the copy guard below bars; the legacy lede names the stage as \"the units standing on the changed region are resolved\"",
+  },
+  {
+    legacy: "and does not run here",
+    ported: "rather than what it executes here",
+    why: "the copy guard below bars \"not\" in the content file; the drawing's own description ends \"the contract this compiler is written to rather than what it executes here\"",
+  },
+  {
+    legacy: " and not because a version is discarded:",
+    ported: ":",
+    why: "the copy guard below bars \"not\"; dropped, because the same sentence goes on to say the replaced version \"stays intact and readable either way\"",
+  },
+];
+
+function legacyNote(): string {
+  const source = readFileSync(join(root, LEGACY_PAGE), "utf8");
+  const paragraph = source.match(/<CompilerContractDiagram \/>\s*<p className="fine">([\s\S]*?)<\/p>/)?.[1];
+  if (!paragraph) throw new Error(`${LEGACY_PAGE} no longer carries the source-change note this test ports from.`);
+  return paragraph.replace(/\s+/g, " ").trim();
+}
+
+/** Every string the content file exports, however deep, so a guard on the route's words misses none. */
+function contentStrings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(contentStrings);
+  if (value && typeof value === "object") return Object.values(value).flatMap(contentStrings);
+  return [];
+}
+
+describe("the source-change note is the legacy note", () => {
+  it("equals the retired page's paragraph after the declared substitutions, and nothing else", () => {
+    let expected = legacyNote();
+    for (const { legacy, ported } of NOTE_SUBSTITUTIONS) {
+      expect(expected.split(legacy), `"${legacy}" occurs exactly once in the legacy note`).toHaveLength(2);
+      expected = expected.replace(legacy, ported);
+    }
+    expect(FLOW.note).toBe(expected);
+  });
+
+  it("keeps the legacy meaning in the legacy words", () => {
+    expect(FLOW.note).toContain("is the contract this compiler is written to");
+    expect(FLOW.note).toContain("there is no equivalence check here to refuse");
+    expect(FLOW.note).not.toMatch(/receipt|this deployment|run outside|elsewhere/i);
+  });
+
+  it("cites the clauses by the number a reader sees, and each says what the note says it does", () => {
+    const cited = [...FLOW.note.matchAll(/clause (\d+)/g)].map(([, n]) => CONTRACT_CLAUSES[Number(n) - 1]);
+    expect(cited.map((entry) => [entry?.id, entry?.state])).toEqual([
+      ["selective-recompilation", "direction"],
+      ["temporal-integrity", "demonstrated"],
+    ]);
+  });
+
+  it("uses none of the barred phrasings anywhere in the route's words", () => {
+    const words = contentStrings(CONTENT);
+    expect(words.length).toBeGreaterThan(0);
+    for (const text of words) expect(text).not.toMatch(/receipt|this deployment|run outside|elsewhere/i);
+  });
+});
+
+describe("product behaviour comes before the optional contract detail", () => {
+  it("renders the section that says what a compile does before #clauses", () => {
+    const sentence = ACTIVATE.steps[0].text;
+    expect(sentence).toBe("A compile rebuilds the collection you give it into a new candidate World.");
+    expect(html.indexOf(sentence)).toBeGreaterThan(-1);
+    expect(html.indexOf(sentence)).toBeLessThan(html.indexOf('id="clauses"'));
   });
 });
 
