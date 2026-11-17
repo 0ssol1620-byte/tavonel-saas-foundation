@@ -30,7 +30,7 @@
 .filingLink {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 44px;
   color: var(--v34-fg-link);
   text-underline-offset: 3px;
 }

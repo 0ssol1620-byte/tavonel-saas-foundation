@@ -58,7 +58,7 @@
 .inlineLink {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 44px;
   color: var(--v34-fg-link);
   font-weight: 650;
   text-decoration: underline;

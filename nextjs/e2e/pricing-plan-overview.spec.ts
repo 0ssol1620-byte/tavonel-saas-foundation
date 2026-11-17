@@ -4,7 +4,7 @@ const ROUTES = ["/pricing"] as const;
 /*
   The plans /pricing shows. Six since catalog v2 (price book PB-2026-11-V22: Free, Personal, Developer,
   Team, Business, Enterprise; lib/billing-catalog.ts), merged before WO-CI-5a; it was four. The count
-  is pinned, not floored, as before. The 280px compact-comparison budget below is unchanged.
+  is pinned, not floored, as before. The compact-comparison budget below was re-derived for six (WO-CI-23).
 */
 const PLANS = 6;
 
@@ -100,7 +100,15 @@ test("all plan prices fit in the compact phone comparison before detailed plan c
             return { top: bounds.top, bottom: bounds.bottom, height: bounds.height, firstPlanTop: firstPlan.top, viewportWidth: innerWidth, viewportHeight: innerHeight, links };
           });
           expect(layout.links).toHaveLength(PLANS);
-          expect(layout.height, "all plan prices form a compact comparison").toBeLessThanOrEqual(280);
+          /*
+            Re-derived from a measurement, not raised to go green (WO-CI-23, lead decision 8, 2026-11-17).
+            280px was set in 203d14c6 for four plans in two rows of two. Catalog v2 (PB-2026-11-V22,
+            245f05cb) shows six, three rows of two. Measured on the WO-CI-23 Product QA build (head 94ddb866
+            plus this lane's CSS; receipts/WO-CI-23/pricing-measure.json): 347.4px at 320x844, 327.9px at
+            360 and 390, 308.4px at 640 (DPR 2); hidden at 768 and 1440. Budget = the measured maximum x 1.04,
+            rounded up (the footer's Release 2 margin): 362px, so a fourth row of plans still fails here.
+          */
+          expect(layout.height, "all plan prices form a compact comparison").toBeLessThanOrEqual(362);
           expect(layout.bottom).toBeLessThanOrEqual(layout.firstPlanTop);
           for (const link of layout.links) {
             expect(link.width).toBeGreaterThanOrEqual(44);

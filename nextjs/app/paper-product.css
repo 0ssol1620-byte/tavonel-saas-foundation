@@ -134,6 +134,8 @@ html:has(.evaluation-page) { color-scheme: light; }
 @media (pointer: coarse), (max-width: 1079px) {
   .pricing-page .fine:has(> a ~ a) > a { display: inline-flex; align-items: center; min-height: 44px; padding-block: 0; margin-block: 0; }
 }
+/* WO-CI-23: the overage table's "Request access" links are controls, 44px at every width (lead decision 14). */
+.pricing-page table[aria-labelledby="pricing-overage-title"] td a { display: inline-flex; align-items: center; min-height: 44px; }
 /* Direction C (2026-11-04): the four plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
 .pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
 .pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 32px 28px 28px; border: 0; border-right: 1px solid var(--tv-rule); border-radius: 0; background: transparent; box-shadow: none; }
