@@ -14,31 +14,24 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
   stacked phone flow and the drawer's coordinates are checked in the new file, against the new
   page, rather than restated here against a page that no longer exists.
 */
-test("the homepage Verify frame opens the no-login Compiled World sample on its real evidence", async ({ page }) => {
+test("the homepage opens the no-login public World on its real evidence", async ({ page }) => {
   /*
-    Landing V2, round 4. Same claim, current scene -- and this is the second time the selector has
-    had to move, so it is worth writing down where the claim actually lives now.
-
-    The Verify frame lived in `#compile`, then in Scene 04. Scene 04's next action is not an
-    /explore deep link any more: D12 allows "the committed PDF or the explore deep link" and the
-    Evidence inspector chose the PDF (`record.hrefs.original`, opened at the page the region is
-    on), because the point of that scene is that the bytes are there to check. The landing still
-    reaches the Evidence ACT, from Scene 02: every proof tab carries "Open the source region" to
-    `/explore?act=evidence&evidence=<regionId>`. That link is what this test is about -- the
-    homepage's proof opens the sample on the real record behind it -- so it is asserted there.
+    V34 Home (WO-CI-5b). The Verify frame and its "Open in Explore" link are gone with the workbench. The hero's own link
+    ("Inspect the World", components/v34/routes/home/home-content.ts) opens the public reference World: no sign-in, the
+    instrument on its real corpus, drawn from the hash-verified file.
   */
   await page.goto("/");
-  // FINAL-SPEC 2026-10-26 §2.3-2.4: the record (s3) has no links; the workbench's "Open in Explore" (s2) is the link.
-  const cta = page.locator("#s2 a[data-analytics=\"source-open\"]").first();
+  const cta = page.locator('main a[href="/world"]').first();
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   await cta.click();
-  await expect(page).toHaveURL(url => url.pathname === "/explore" && url.searchParams.get("act") === "evidence");
-  await expect(page.locator('[data-visual-world="explore"]')).toHaveAttribute("data-world-act", "evidence");
-  // The sample declares itself once, in the header badge. It used to say "DETERMINISTIC
-  // PRODUCT SAMPLE" here and "not customer proof" further down, which is two answers to an
-  // accusation nobody browsing a demo has made. The label has to survive; the arguing does not.
-  await expect(page.getByText("INTERACTIVE SAMPLE")).toBeVisible();
+  await expect(page).toHaveURL(url => url.pathname === "/world");
+  await expect(page.locator("h1")).toHaveCount(1);
+  const instrument = page.locator('[data-world-instrument][data-variant="full"]');
+  await expect(instrument).toBeVisible();
+  await expect(instrument).toHaveAttribute("aria-label", "Public reference corpus");
+  await expect(instrument).toContainText(/\d[\d,]* records · \d[\d,]* relationships/);
+  await expect(page.locator("html")).not.toContainText(/trusted by|customer success|certified/i);
 });
 
 test("the sample opens onto real provenance and claims nothing it has not compiled", async ({ page }) => {
@@ -98,7 +91,8 @@ test("the sample opens onto real provenance and claims nothing it has not compil
 
 test("Security record exposes fail-closed controls without certification claims", async ({ page }) => {
   await page.goto("/security");
-  await expect(page.getByRole("heading", { name: "How document processing is controlled." })).toBeVisible();
+  await expect(page.locator("h1")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Fail-closed operation" })).toBeVisible();
   await expect(page.getByText(/protected action is refused rather than treated as successful/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Assurance and review" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SOC 2 certified|ISO 27001 certified/i);

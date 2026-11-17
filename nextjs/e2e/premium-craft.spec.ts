@@ -14,25 +14,23 @@ async function dismissConsent(page: import("@playwright/test").Page) {
 }
 
 /*
-  Landing V2, 2026-09-19. The in/out grid is Scene 07's, and its rows are a P2 visual.
-
-  This has measured the same thing through three layouts: three Connect cards, then three rows of
-  one list, and now a scene whose list has not been built. What a reader is owed is unchanged --
-  a real destination at a target a thumb can hit -- so the assertion is made against the next
-  action Scene 07 does carry, and the row-level geometry comes back here with the rows.
+  V34 Home (WO-CI-5b). Home ends on the shared closing strip (`section[aria-labelledby="v34-final-title"]`): one heading,
+  the primary action and one more link. What a reader is owed is unchanged -- a real destination at a target a thumb can hit.
 */
 test("the closing scene ends on usable next actions", async ({ page }) => {
   await page.goto("/");
   await dismissConsent(page);
-  const scene = page.locator("section#s6");
+  const scene = page.locator('section[aria-labelledby="v34-final-title"]');
   await expect(scene).toHaveCount(1);
   await scene.scrollIntoViewIfNeeded();
-  const action = scene.locator("a.lv2-text-link");
-  await expect(action).toHaveCount(1);
-  // Reveal transforms can produce 43.999969 for a CSS 44px target; keep the threshold at
-  // hundredth-pixel precision rather than loosening it.
-  expect(Math.round((await action.boundingBox())!.height * 100) / 100).toBeGreaterThanOrEqual(44);
-  expect(await action.getAttribute("href"), "a scene that ends nowhere is not a route").toMatch(/^\//);
+  const links = scene.locator("a");
+  await expect(links).toHaveCount(2);
+  for (const link of await links.all()) {
+    // Reveal transforms can produce 43.999969 for a CSS 44px target; keep the threshold at
+    // hundredth-pixel precision rather than loosening it.
+    expect(Math.round((await link.boundingBox())!.height * 100) / 100, await link.innerText()).toBeGreaterThanOrEqual(44);
+    expect(await link.getAttribute("href"), "a scene that ends nowhere is not a route").toMatch(/^\//);
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -99,19 +97,18 @@ test("pricing puts catalog-backed choices before detailed explanations", async (
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+/* V34 shell: from 1000px down the bar gives way to a modal <dialog> drawer (components/v34/shell/mobile-drawer.tsx). */
+const DRAWER_MAX = 1000;
+
 test("phone and tablet use real navigation targets instead of clickable decorative scene marks", async ({ page }) => {
-  test.skip((page.viewportSize()?.width ?? 1440) > 900, "Desktop uses the named scene rail.");
+  test.skip((page.viewportSize()?.width ?? 1440) > DRAWER_MAX, "Desktop uses the bar.");
   await page.goto("/");
   await dismissConsent(page);
-  await expect(page.locator(".bar-ticks button.bt")).toHaveCount(0);
-  const pricingAction = page.locator('header.nav .nav-actions > a[href="/pricing"]');
-  await expect(pricingAction).toHaveCount(1);
-  await expect(pricingAction).toHaveText("Pricing");
-  await expect(pricingAction).toHaveAttribute("href", "/pricing");
-  const menu = page.locator("header.nav details.mobile-primary-nav");
-  await menu.locator(":scope > summary").click();
-  // The sheet's rows; an open group's links are its own targets (NAV PANELS 2026-11-09).
-  const targets = await menu.locator(":scope > nav :is(a.mobile-nav-direct, a.mobile-nav-signin)").evaluateAll(elements => elements.map(e => {
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  const drawer = page.getByRole("dialog", { name: "Site navigation" });
+  await expect(drawer).toBeVisible();
+  // The sheet's rows: the five primary destinations, then Sign in and the start action. A group's links are its own targets.
+  const targets = await drawer.locator('nav[aria-label="Site"] > ul a, a[href="/login"], a[data-analytics="header-start"]').evaluateAll(elements => elements.map(e => {
     const r = e.getBoundingClientRect();
     const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
     return {
@@ -123,27 +120,22 @@ test("phone and tablet use real navigation targets instead of clickable decorati
     };
   }));
   /*
-    The exact sheet contract is four section destinations, Pricing and Sign in. Release 2 (brief
-    2026-10-15 move 6) hides the header actions below the desktop switch, so Pricing is the
-    sheet's last section row there; its header link stays in the DOM for the desktop row. Pinning
-    both names and hrefs makes this assertion catch an omitted section, an invented menu
-    destination, or Pricing appearing twice in the disclosure. Geometry still proves each
-    rendered row is a usable target and that its centre hit-tests to the row itself.
+    Pinning names and hrefs makes this catch an omitted destination, an invented one, or Pricing appearing twice.
+    The five are the bar's own list (lib/v34/nav.ts, rendered into the page whatever the width), not typed here; Sign in
+    and the start action follow.
   */
-  // Brief 2026-10-15 move 6: four sections, Pricing, then Sign in.
-  expect(targets.map(({ text, href }) => ({ text, href }))).toEqual([
-    { text: "Product", href: "/product" },
-    { text: "How it works", href: "/how-it-works" },
-    { text: "Resources", href: "/resources" },
-    { text: "Docs", href: "/docs" },
-    { text: "Pricing", href: "/pricing" },
-    { text: "Sign in", href: "/login" },
-  ]);
-  expect(targets).toHaveLength(6);
+  const primary = await page.locator('[data-v34-header] nav[aria-label="Primary"] a').evaluateAll(links =>
+    links.map(link => ({ text: link.textContent?.trim() ?? "", href: link.getAttribute("href") })),
+  );
+  expect(primary.length, "the bar names its primary destinations").toBeGreaterThanOrEqual(5);
+  expect(targets.slice(0, primary.length).map(({ text, href }) => ({ text, href }))).toEqual(primary);
+  expect(primary.map(item => item.href)).toContain("/pricing");
+  expect(targets.slice(primary.length).map(({ href }) => href)).toContain("/login");
+  expect(targets).toHaveLength(primary.length + 2);
   for (const target of targets) {
-    expect(target.width).toBeGreaterThan(44);
-    expect(target.height).toBeGreaterThanOrEqual(44);
-    expect(target.inside).toBe(true);
+    expect(target.width, target.text).toBeGreaterThan(44);
+    expect(target.height, target.text).toBeGreaterThanOrEqual(44);
+    expect(target.inside, target.text).toBe(true);
   }
 });
 
@@ -152,17 +144,18 @@ test("copy controls and navigation remain readable and operable", async ({ page 
   await dismissConsent(page);
   await expect(page.locator(".docs-copy").first()).toBeVisible();
   expect(await page.locator(".docs-copy").first().evaluate(e => e.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
-  const nav = page.locator("header.nav .nav-actions");
-  // Brief 2026-10-15 move 6: below 1250px the actions move into the phone sheet.
-  const pricing = page.viewportSize()!.width < 1250
-    ? (await page.locator("header.nav details.mobile-primary-nav > summary").click(), page.locator('header.nav details.mobile-primary-nav > nav a.mobile-nav-direct[href="/pricing"]'))
-    : nav.getByRole("link", { name: "Pricing", exact: true });
-  // UX-PLAN-2026-10-17 §5.2 (UX-L2): from 900px the group stays in the row with the filled action;
-  // Pricing and Sign in are sheet rows below 1250. Only below 900 is the group gone.
-  if (page.viewportSize()!.width < 900) await expect(nav).toBeHidden();
-  else {
-    const box = await nav.boundingBox();
-    expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  const width = page.viewportSize()!.width;
+  let pricing;
+  if (width > DRAWER_MAX) {
+    // The bar carries Pricing and the start action, inside the viewport.
+    pricing = page.locator('[data-v34-header] nav[aria-label="Primary"] a[href="/pricing"]');
+    const start = await page.locator('[data-v34-header] a[data-analytics="header-start"]:visible').boundingBox();
+    expect(start).not.toBeNull();
+    expect(start!.x + start!.width).toBeLessThanOrEqual(width);
+  } else {
+    // Below it the bar's items move into the drawer.
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    pricing = page.getByRole("dialog", { name: "Site navigation" }).locator('nav[aria-label="Site"] > ul a[href="/pricing"]');
   }
   await expect(pricing).toBeVisible();
   expect(await pricing.evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(11.5);

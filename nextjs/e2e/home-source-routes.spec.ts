@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createWorldAction } from "../components/v34/ui/create-world";
 
 /*
   The ways in, checked where a visitor actually decides.
@@ -25,41 +26,42 @@ test("the entry page keeps its public product routes actionable, with no console
 
   await page.goto("/");
 
-  // The six-beat page keeps the public sample reachable from the proof and closing scenes. FINAL-SPEC 2026-10-26
-  // §2.3-2.4: the proof's link is the workbench's (s2) "Open in Explore"; the record (s3) is a sheet with no links.
-  await expect(page.locator("section#s3 a")).toHaveCount(0);
-  const proof = page.locator("section#s2");
-  await proof.scrollIntoViewIfNeeded();
-  const proofLinks = proof.locator('a[href="/explore"], a[href^="/explore?"], a[href^="/explore#"]');
-  expect(await proofLinks.count()).toBeGreaterThan(0);
-  for (const link of await proofLinks.all()) {
-    expect(await link.getAttribute("href")).toMatch(/^\/explore(?:[?#/]|$)/);
-  }
+  /*
+    V34 Home (WO-CI-5b): the hero's primary is the shared "Create your World" action, its secondary scrolls to the
+    walkthrough, and the World is one link away. The public reference World stays reachable from the hero, the
+    pricing from the close, and the way to connect an AI from its own band.
+  */
+  const hero = page.locator('[aria-labelledby="v34-title"]');
+  const primary = hero.locator('[data-analytics="hero-primary"]');
+  await expect(primary).toHaveAttribute("href", createWorldAction().href);
+  await expect(primary).toHaveText(createWorldAction().label);
+  const secondary = hero.locator('[data-analytics="hero-secondary"]');
+  await expect(secondary).toHaveAttribute("href", "#walkthrough");
+  await expect(page.locator("#walkthrough")).toHaveCount(1);
+  await expect(hero.locator('a[href="/world"]')).toHaveCount(1);
 
-  const close = page.locator("section#s6");
+  const close = page.locator('section[aria-labelledby="v34-final-title"]');
   await close.scrollIntoViewIfNeeded();
-  await expect(close.locator('a[href="/explore"]')).toHaveCount(1);
   await expect(close.locator('a[href="/pricing"]')).toHaveCount(1);
+  await expect(close.locator('a[href="/world"], a[href="/explore"]')).toHaveCount(0);
+  // The English close keeps its start action on an English destination, and it is the same action as the hero's.
+  const start = close.locator("a").first();
+  await expect(start).toHaveAttribute("href", createWorldAction().href);
+  expect(await start.getAttribute("href")).not.toMatch(/^\/ko(\/|$)/);
+  const connect = page.locator('main a[href="/connect"]');
+  expect(await connect.count()).toBeGreaterThan(0);
+  expect(await page.locator('main a[href="/developers"]').count()).toBeGreaterThan(0);
 
-  // The hero's primary is the document entry: arranged evaluation or live access; the public sample is its
-  // secondary link (founder 2026-11-10); the close retains Pricing.
-  const access = page.locator('#s1 [data-analytics="hero-primary"]');
-  await expect(access).toHaveAttribute("href", /^\/(login|evaluation)$/);
-  await expect(page.locator('#s1 [data-analytics="hero-secondary"]')).toHaveAttribute("href", "/explore");
-
-  // Every one of those next actions clears the touch floor.
-  for (const link of [access, proofLinks.first(), close.locator("a.lv2-text-link").first()]) {
+  // The hero's primary and the close's actions clear the touch floor.
+  for (const link of [primary, ...(await close.locator("a").all())]) {
     const box = await link.boundingBox();
     expect(box?.height ?? 0, "44px touch floor").toBeGreaterThanOrEqual(44);
   }
 
-  // Source metadata can be inspected without dominating the record's initial view.
-  const sourceDetails = proof.locator("article details");
-  await expect(sourceDetails).toHaveCount(1);
-  await sourceDetails.locator("summary").click();
-  // The record list and the region list (FINAL-SPEC 2026-10-26 §2.3: the workbench's details hold both).
-  await expect(sourceDetails.locator("dl")).toHaveCount(2);
-  for (const list of await sourceDetails.locator("dl").all()) await expect(list).toBeVisible();
+  // The walkthrough names its source: a step opens without leaving the page, and its source links go to the publisher.
+  await page.locator("#walkthrough").scrollIntoViewIfNeeded();
+  const sources = page.locator('#walkthrough a[href^="https://"]');
+  expect(await sources.count(), "the walkthrough names its public source").toBeGreaterThan(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });

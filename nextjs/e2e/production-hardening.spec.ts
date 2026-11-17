@@ -18,23 +18,32 @@ const OVERFLOW_ROUTES = [
 test("mobile public navigation remains reachable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "390" && testInfo.project.name !== "360");
   await page.goto("/");
-  const menu = page.locator(".mobile-primary-nav");
-  await expect(menu).toBeVisible();
-  await menu.locator(":scope > summary").click();
   /*
-    Five, not three. Landing V2's `CUSTOMER_NAV` (contract D2) is a five-destination bar, and the
-    sheet renders that array -- so the count and the labels are read off the same source of truth
-    the header uses rather than being a second spelling of it. What this case asserts is unchanged:
-    every section the bar offers is reachable on a phone.
+    V34 shell (WO-CI-5b): below 1001px the bar's items give way to a modal <dialog> drawer opened by "Open navigation"
+    (components/v34/shell/mobile-drawer.tsx). What this case asserts is unchanged: every section the bar offers is
+    reachable on a phone -- the drawer's primary list is the bar's own list, read off the page rather than spelled twice --
+    and the groups behind "More" open in place.
   */
-  const direct = menu.locator(":scope > nav a.mobile-nav-direct");
-  // Brief 2026-10-15 move 6: below the desktop switch Pricing is the sheet's last section row.
-  await expect(direct).toHaveCount(5);
-  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
-  await expect(page.locator("header.nav .nav-actions")).toBeHidden();
-  await expect(menu.locator(":scope > nav a.mobile-nav-cta")).toHaveCount(0);
-  // NAV PANELS 2026-11-09: Product, Resources and Docs each open their group in place.
-  await expect(menu.locator(":scope > nav button[aria-controls]")).toHaveCount(3);
+  const bar = page.locator('[data-v34-header] nav[aria-label="Primary"] a');
+  const offered = await bar.evaluateAll(links => links.map(link => ({ text: link.textContent?.trim() ?? "", href: link.getAttribute("href") })));
+  expect(offered.length, "the bar offers its primary destinations").toBeGreaterThanOrEqual(5);
+  await expect(page.locator('[data-v34-header] nav[aria-label="Primary"]')).toBeHidden();
+  const trigger = page.getByRole("button", { name: "Open navigation" });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  const drawer = page.getByRole("dialog", { name: "Site navigation" });
+  await expect(drawer).toBeVisible();
+  const direct = drawer.locator('nav[aria-label="Site"] > ul a');
+  await expect(direct).toHaveCount(offered.length);
+  expect(await direct.evaluateAll(links => links.map(link => ({ text: link.textContent?.trim() ?? "", href: link.getAttribute("href") })))).toEqual(offered);
+  expect(offered.map(item => item.href)).toContain("/pricing");
+  // The groups behind More open in place: a group's links are hidden until its summary is pressed.
+  const groups = drawer.locator('nav[aria-label="Site"] details');
+  expect(await groups.count(), "the drawer carries the More groups").toBeGreaterThan(0);
+  const first = groups.first();
+  await expect(first.locator("ul a").first()).toBeHidden();
+  await first.locator("summary").click();
+  await expect(first.locator("ul a").first()).toBeVisible();
 });
 
 test("audited public and docs routes keep horizontal overflow local", async ({ page }, testInfo) => {

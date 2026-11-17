@@ -15,6 +15,7 @@ import {
   CASES, CONNECT, FINAL, HERO, JOURNAL, TRUST, WALKTHROUGH, WALKTHROUGH_ANCHOR,
 } from "./home-content";
 import HomeAnalytics from "./home-analytics";
+import HomeDropGuard from "./home-drop-guard";
 import s from "./home.module.css";
 
 /** "01", "02", ... counted from the list position. */
@@ -37,6 +38,7 @@ export function HomeBody() {
   return (
     <>
       <HomeAnalytics />
+      <HomeDropGuard />
 
       <Hero
         variant="home"

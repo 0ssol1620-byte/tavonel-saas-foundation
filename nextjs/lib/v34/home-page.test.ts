@@ -47,12 +47,28 @@ const counts = (n: number) => [String(n), n.toLocaleString("en-US")];
 describe("home route files", () => {
   it("has the component, its content, its analytics and its sheet", () => {
     expect(sources.map((f) => f.file.split("/").pop()).sort()).toEqual([
-      "home-analytics.tsx", "home-content.ts", "home.module.css", "home.tsx",
+      "home-analytics.tsx", "home-content.ts", "home-drop-guard.tsx", "home.module.css", "home.tsx",
     ]);
   });
 
   it("is English only", () => {
     for (const f of sources) expect(f.text, f.file).not.toMatch(/[ㄱ-ㆎ가-힣]/);
+  });
+});
+
+describe("the page-wide drop guard", () => {
+  const guard = stripComments(sources.find((f) => f.file.endsWith("home-drop-guard.tsx"))!.text);
+
+  it("cancels dragover and drop on the document and keeps no file", () => {
+    expect(guard).toMatch(/addEventListener\("dragover"/);
+    expect(guard).toMatch(/addEventListener\("drop"/);
+    expect(guard).toMatch(/preventDefault\(\)/);
+    expect(guard).not.toMatch(/\.files\b|getAsFile|FileReader|FormData|fetch\(|localStorage|sessionStorage|indexedDB/);
+  });
+
+  it("is mounted by the page and renders nothing", () => {
+    expect(stripped(code).find((f) => f.file.endsWith("/home.tsx"))!.text).toMatch(/<HomeDropGuard\s*\/>/);
+    expect(renderToStaticMarkup(createElement(HomeBody))).not.toMatch(/drop-guard|dragging/);
   });
 });
 
