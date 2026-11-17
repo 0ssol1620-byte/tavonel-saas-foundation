@@ -10,12 +10,14 @@ import { h1Text } from "./route-test-support";
 /*
   D33 #4: the retained public routes carry the V34 shell. Most of them reach it through
   `PublicSitePage`, which is `V34Page` without a registry key. /explore cannot: its stage renders
-  the page's one `<main>` itself, so the page composes the same frame around it (WO-CI-6B).
+  the page's one `<main>` itself, so the page draws V34Page's header and footer around it (WO-CI-6B).
 
-  "The same frame" is checked against `V34Page`, not against a copy of its markup: the header, the
-  footer and the wrapper a retained route gets from `V34Page` are what this route must render,
-  byte for byte. And the route must not reach the legacy chrome module at all -- importing it is
-  what put the legacy stylesheet chunk on /explore's first paint, whichever module did the import.
+  "The same header and footer" is checked against `V34Page`, not against a copy of its markup: each
+  is what a retained route gets from `V34Page`, byte for byte, inside V34Page's token wrapper. The
+  stage's `<main>` is NOT inside that wrapper: `.site` sets the colour scheme and the type every
+  descendant inherits, and the workbench is drawn on the legacy body's (round 2, M2). And the route
+  must not reach the legacy chrome module at all -- importing it is what put the legacy stylesheet
+  chunk on /explore's first paint, whichever module did the import and however it imported it.
 */
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/explore" }));
@@ -45,10 +47,29 @@ function element(html: string, tag: string, marker: string): string {
 
 const frame = render(V34Page as FunctionComponent<{ children?: ReactNode }>, createElement("i", { id: "body" }));
 const frameRoot = frame.slice(0, frame.indexOf(">") + 1);
+/** V34Page's wrapper class: the token wrapper whose inherited type and colour scheme the stage must not take. */
+const siteClass = /class="([^"]+)"/.exec(frameRoot)![1]!;
 const frameHeader = element(frame, "header", "data-v34-header");
 const frameFooter = frame.slice(frame.lastIndexOf("<footer"), frame.lastIndexOf("</footer>") + "</footer>".length);
 
-/** Every repository module a source file reaches through static imports (`@/` and relative), CSS included. */
+/**
+ * Every module specifier a source file loads: static `import`/`export ... from`, side-effect
+ * imports, dynamic `import()` (which is what `next/dynamic` and `React.lazy` take), `require()`,
+ * and a stylesheet's `@import`. A specifier any of these name is reached; a type-only import is not,
+ * because it is erased before anything is bundled.
+ */
+function specifiers(source: string): string[] {
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+  const found: string[] = [];
+  for (const match of code.matchAll(/(?:^|[\s;])(?:import|export)\s+(type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']/g)) {
+    if (!match[1]) found.push(match[2]!);
+  }
+  for (const match of code.matchAll(/(?:\bimport|\brequire)\s*\(\s*["'`]([^"'`]+)["'`]/g)) found.push(match[1]!);
+  for (const match of code.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']/g)) found.push(match[1]!);
+  return found;
+}
+
+/** Every repository module a source file reaches (`@/` and relative), stylesheets included. */
 function reach(entry: string): Set<string> {
   const seen = new Set<string>();
   const resolve = (from: string, spec: string): string | null => {
@@ -63,17 +84,70 @@ function reach(entry: string): Set<string> {
     const key = relative(root, file).replaceAll("\\", "/");
     if (seen.has(key)) return;
     seen.add(key);
-    if (!/\.tsx?$/.test(file)) return;
-    const source = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
-    for (const match of source.matchAll(/(?:^|[\s;])(?:import|export)\s+(?:type\s+)?(?:[^"';]*?\sfrom\s+)?["']([^"']+)["']/g)) {
-      if (/^import\s+type\b/.test(match[0].trim())) continue;
-      const next = resolve(file, match[1]!);
+    if (!/\.(tsx?|css)$/.test(file)) return;
+    for (const spec of specifiers(readFileSync(file, "utf8"))) {
+      const next = resolve(file, spec);
       if (next) visit(next);
     }
   };
   visit(join(root, entry));
   return seen;
 }
+
+/** The elements open at `index` in server-rendered markup, outermost first (their opening tags). */
+function ancestors(html: string, index: number): string[] {
+  const VOID = /^(?:area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/i;
+  const stack: { name: string; tag: string }[] = [];
+  for (const match of html.slice(0, index).matchAll(/<(\/?)([a-zA-Z][\w-]*)\b[^>]*?(\/?)>/g)) {
+    const [tag, closing, name, selfClosing] = match;
+    if (closing) {
+      const at = stack.map((open) => open.name).lastIndexOf(name!);
+      if (at >= 0) stack.length = at;
+    } else if (!selfClosing && !VOID.test(name!)) {
+      stack.push({ name: name!, tag });
+    }
+  }
+  return stack.map((open) => open.tag);
+}
+
+describe("the import graph the legacy-chrome check walks", () => {
+  /*
+    Round 1 followed only static imports: `next/dynamic`, `React.lazy` and `require` reached a
+    module without the check seeing it (review r19/fuzz-reach). Every shape a module can be loaded
+    by, crossed with each quote and spacing, must be seen; a type-only import, and an import that is
+    only in a comment, must not.
+  */
+  const target = "@/components/public-site-chrome";
+  const shapes: ((spec: string) => string)[] = [
+    (q) => `import X from ${q};`,
+    (q) => `import { A,\n  B } from ${q}`,
+    (q) => `import * as all from ${q};`,
+    (q) => `import X, { A } from ${q};`,
+    (q) => `import ${q};`,
+    (q) => `export { A } from ${q};`,
+    (q) => `export * from ${q};`,
+    (q) => `const F = dynamic(() => import(${q}));`,
+    (q) => `const F = dynamic(() => import( ${q} ), { ssr: false });`,
+    (q) => `const F = lazy(() => import(${q}));`,
+    (q) => `const F = React.lazy(async () => (await import(${q})).default);`,
+    (q) => `const c = require(${q});`,
+    (q) => `const c = require( ${q} );`,
+    (q) => `x();import(${q}).then(run)`,
+  ];
+  const sources = shapes.flatMap((shape) => [`"`, `'`].map((quote) => shape(`${quote}${target}${quote}`)));
+  it.each(sources)("sees %s", (source) => {
+    expect(specifiers(`const before = 1;\n${source}\nconst after = 2;`)).toContain(target);
+  });
+  it("sees a template-literal dynamic import and a stylesheet @import", () => {
+    expect(specifiers(`const F = dynamic(() => import(\`${target}\`));`)).toContain(target);
+    expect(specifiers(`@import "${target}.module.css";`)).toContain(`${target}.module.css`);
+    expect(specifiers(`@import url("${target}.css") layer(x);`)).toContain(`${target}.css`);
+  });
+  it("does not count a type-only import or a commented-out one", () => {
+    expect(specifiers(`import type { A } from "${target}";`)).toEqual([]);
+    expect(specifiers(`// import X from "${target}";\n/* const F = dynamic(() => import("${target}")); */`)).toEqual([]);
+  });
+});
 
 describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main", ({ path, page }) => {
   it("never reaches the legacy chrome module, so its stylesheet chunk stays off the route", () => {
@@ -82,13 +156,26 @@ describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main"
     expect([...reached].filter((file) => file.startsWith("components/public-site-chrome"))).toEqual([]);
   });
 
-  it("renders V34Page's wrapper, header and footer byte for byte, around exactly one main and one h1", async () => {
+  it("renders V34Page's header and footer byte for byte, each in V34Page's wrapper, and its own main outside it", async () => {
     const { default: Page } = (await import(/* @vite-ignore */ join(root, page))) as { default: FunctionComponent };
     // React hoists the page's preload hints ahead of its markup; the page itself starts after them.
     const html = render(Page).replace(/^(?:<link\b[^>]*>)+/, "");
-    expect(html.slice(0, frameRoot.length), `${path} opens with the V34 wrapper`).toBe(frameRoot);
     expect(element(html, "header", "data-v34-header")).toBe(frameHeader);
     expect(html.slice(html.lastIndexOf("<footer"), html.lastIndexOf("</footer>") + "</footer>".length)).toBe(frameFooter);
+    // The header and the footer each sit in V34Page's wrapper, so they read the same tokens as on every V34 page.
+    const headerAt = html.indexOf("data-v34-header");
+    const footerAt = html.lastIndexOf("<footer");
+    const wrapperOf = (index: number) => ancestors(html, index).filter((tag) => tag.includes(siteClass));
+    expect(wrapperOf(headerAt), `${path}: the header is inside V34Page's wrapper`).toHaveLength(1);
+    expect(wrapperOf(footerAt), `${path}: the footer is inside V34Page's wrapper`).toHaveLength(1);
+    // The stage's main is not: nothing it draws inherits the wrapper's colour scheme or type.
+    const mainAt = html.indexOf("<main");
+    expect(ancestors(html, mainAt).filter((tag) => tag.includes(siteClass)), `${path}: main outside the V34 wrapper`).toEqual([]);
+    for (const wrapper of [...wrapperOf(headerAt), ...wrapperOf(footerAt)]) {
+      expect(wrapper.startsWith(frameRoot.slice(0, -1)), "the wrapper is V34Page's").toBe(true);
+      // A box would make the header a screen tall (`min-height: 100vh`) and confine its sticky bar.
+      expect(wrapper).toMatch(/style="display:contents"/);
+    }
     expect(html.match(/<main\b/g), "one main").toHaveLength(1);
     expect(html.match(/\bid="main"/g), "one skip-link target").toHaveLength(1);
     expect(h1Text(html).length).toBeGreaterThan(0);
@@ -96,9 +183,8 @@ describe.each(OWN_MAIN_ROUTES)("$path carries the V34 shell around its own main"
     expect(outsideMain.match(/<footer\b/g), "one site footer outside main").toHaveLength(1);
     expect(outsideMain.match(/<header\b/g), "one site header outside main").toHaveLength(1);
     // The main sits between the V34 header and the V34 footer, as V34Page places its own.
-    const mainAt = html.indexOf("<main");
-    expect(html.indexOf("data-v34-header")).toBeLessThan(mainAt);
-    expect(html.lastIndexOf("<footer")).toBeGreaterThan(html.indexOf("</main>"));
+    expect(headerAt).toBeLessThan(mainAt);
+    expect(footerAt).toBeGreaterThan(html.indexOf("</main>"));
     expect(html).not.toMatch(/chrome-v2-(?:header|footer)/);
   }, 120_000);
 });

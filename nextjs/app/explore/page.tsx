@@ -144,9 +144,19 @@ const technical: ExploreTechnicalRecord = {
   D33 #4 (WO-CI-6B): /explore is a retained public route, so it carries the V34 shell. Every other
   retained route gets it from `V34Page` (through `PublicSitePage`); this one cannot take `V34Page`
   itself because the stage renders the page's one `<main id="main">` and the T4 template mark on it.
-  So the page draws V34Page's frame around the stage -- the same wrapper, `SiteHeader` and
-  `SiteFooter`, in the same order -- and the stage itself is unchanged. `lib/v34/retained-shell.test.ts`
-  holds this frame to V34Page's own markup.
+
+  So the page draws V34Page's header and footer, each inside V34Page's token wrapper, and leaves the
+  stage OUTSIDE both wrappers. `.site` is not only variables: it sets the colour scheme, the font,
+  the size and the line height every descendant inherits, and the stage was drawn on the legacy
+  body's (15px, 1.62, dark). Wrapping the stage in it changed the computed style of every element
+  in the workbench (round 1 review, receipts/review-WO-CI-6B/r19/probe-inherit.txt: 112 elements at
+  1440). Outside it, the stage inherits exactly what it inherited before, from the same body.
+
+  `display: contents`: the wrappers pass the tokens down by inheritance but draw no box of their
+  own. With a box, `.site`'s `min-height: 100vh` would make the header a screen tall, and the
+  header's `position: sticky` would be confined to a wrapper as tall as itself. The header and the
+  footer paint their own surfaces (`tokens.paper`, `tokens.forest`), so nothing paints the wrapper.
+  `lib/v34/retained-shell.test.ts` holds both to V34Page's own markup and the stage outside them.
 
   The header and footer stay here, on the server, rather than inside the stage (a client component),
   so the footer directory is not shipped to the browser (chrome-02 / D35). The legacy
@@ -156,10 +166,14 @@ const technical: ExploreTechnicalRecord = {
   `SiteHeader` gets no `currentPath`, as on every retained route: /explore is not a primary item, and
   the More panel and the drawer read the path themselves.
 */
+const shellPart = { className: tokens.site, "data-v34-site": "", style: { display: "contents" } } as const;
+
 export default function ExplorePage() {
   return (
-    <div className={tokens.site} data-v34-site="">
-      <SiteHeader />
+    <>
+      <div {...shellPart}>
+        <SiteHeader />
+      </div>
       <ExploreStage
         access={primaryCallToAction()}
         model={model}
@@ -169,7 +183,9 @@ export default function ExplorePage() {
         technical={technical}
         capturedOn={capturedOn}
       />
-      <SiteFooter />
-    </div>
+      <div {...shellPart}>
+        <SiteFooter />
+      </div>
+    </>
   );
 }

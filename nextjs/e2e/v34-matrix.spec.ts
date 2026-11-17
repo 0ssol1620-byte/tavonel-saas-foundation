@@ -84,6 +84,7 @@ if (releaseFilter !== null && releaseFilter !== "live" && releaseFilter !== "hel
 const V34_BODIES_OUTSIDE_REGISTRY: RouteRow[] = [
   { path: "/research/program", release: "live" },
   { path: "/evaluation", release: "live" },
+  { path: "/explore", release: "live" },
 ];
 
 const registryRoutes = await loadRoutes();

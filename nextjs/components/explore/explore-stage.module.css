@@ -11,6 +11,14 @@
   min-height: 100vh;
   color: var(--text-hi);
   background: var(--ground);
+  /*
+    WO-CI-6B. The stage inherited `dark` from the legacy `:root` (app/tavonel.css, BA-254). The V34
+    shell on this page carries the token wrapper, and `html:has(.site)` (components/v34/tokens.module.css)
+    turns the root light for the overscroll bar, which every element below would inherit: native
+    controls, scrollbars and autofill in the workbench would render light on its dark ground. Stated
+    here, it is the value the stage always had, whatever the root says.
+  */
+  color-scheme: dark;
 }
 
 /* ------------------------------------------------------------------ header */
@@ -87,16 +95,14 @@
   folds, Pricing and the access action stay. B-09 allows two header rows below 821px and no more, so at
   the narrowest phones the access action folds too (the closing scene still carries it) and Pricing stays.
 
-  WO-CI-6B: "the narrowest phones" is every phone width, up to 430px. The row wraps rather than
-  overflows now (the 820px block below), so this fold no longer keeps anything on screen; it keeps
-  B-09's two rows. Measured with receipts/WO-CI-6B/measure-header.mjs: with the fold at 380px the
-  row needed 405px of a 390px viewport for "Request access" (and 421px for a longer label); with
-  the access action folded, the row is 278px wide and fits two rows from 360px up.
+  WO-CI-6B: the fold stays at 380px, so the access action stays on a 390-430px phone (the conversion
+  decision). The 15px overflow it caused at 390px is fixed where it came from -- the 820px block below
+  lets the action row wrap instead of growing past the viewport -- not by folding the action away.
 */
 @media (max-width: 860px) {
   .siteLinks a:not([data-phone]) { display: none; }
 }
-@media (max-width: 430px) {
+@media (max-width: 380px) {
   .siteLinks a[data-phone="start"] { display: none; }
 }
 
@@ -1298,25 +1304,4 @@
   .askBar:hover { color: var(--text-hi); }
   .askRegions button:hover { color: var(--text-hi); border-color: var(--verified); }
   .nextSourceNote a:hover { color: var(--text-hi); }
-}
-
-/* ------------------------------------------------------------------ footer */
-
-/*
-  chrome-02 / chrome-03 on /explore.
-
-  The site footer arrived under a stage whose chrome edge is this file's `clamp(14px, 3vw, 40px)`,
-  not the site's `--gutter`: at 1440 the header wordmark sat at x = 40 and the footer's at x = 70
-  (the shared `.shell`'s 1360px cap plus a 30px gutter), and at 412 they were 14 and 16. /explore
-  is the one route with both an instrument header and site chrome, so the two lockups have to agree
-  on one edge. UX-L2 (UX-PLAN-2026-10-17 R1): that edge is the site's one container now -- the stage,
-  its header and this footer all sit on it, as every other page's do.
-
-  Scoped through this wrapper rather than through `footer.site .shell`, which is shared chrome:
-  the rule reaches only the footer this page renders, and it holds whatever the shared cap becomes.
-*/
-.siteFooter :global(footer.site .shell) {
-  width: var(--tv-page-w);
-  max-width: none;
-  padding-inline: 0;
 }
