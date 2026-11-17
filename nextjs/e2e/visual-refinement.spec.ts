@@ -3,9 +3,19 @@ import { test, expect } from "@playwright/test";
 import { activationPolicy } from "../lib/activation-policy";
 import { EXPLORE_CTA } from "../lib/site-navigation";
 
+/*
+  V34 (WO-CI-5a): the chrome is the V34 shell (`[data-v34-header]`, the page's contentinfo footer), Home is
+  the V34 page (its H1 is `#v34-title`, its hero a `section[aria-labelledby="v34-title"]` whose first
+  child is the shell-width column), and /product answers 308 to /platform. Promises are unchanged; the
+  four-stage hero film is not on V34 Home (/film is held, ADR D01 A9), so its half of the edge test is
+  its own test and fails while the film is held -- reported, not removed.
+*/
+const HEADER = "[data-v34-header]";
+const FOOTER = "[data-v34-site] > footer";
+
 test("navigation and hero actions keep readable labels", async ({ page }) => {
   await page.goto("/");
-  for (const selector of ['header.nav .nav-actions a[href="/pricing"]', '[data-analytics="hero-primary"]']) {
+  for (const selector of [`${HEADER} nav[aria-label="Primary"] a[href="/pricing"]`, '[data-analytics="hero-primary"]']) {
     const contrast = await page.locator(selector).first().evaluate(element => {
       const style = getComputedStyle(element);
       const channels = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
@@ -36,24 +46,36 @@ test("navigation and hero actions keep readable labels", async ({ page }) => {
 });
 
 /*
-  The film sits under the centered opening statement in Scene 01. Both Scene 01 and the
-  source-linked explanation in Scene 02 keep the wordmark's measured outer edge.
+  The film sat under the centered opening statement in Scene 01. V34 Home's hero and the section after
+  it keep the wordmark's measured outer edge, and the hero's art (the World instrument) stays inside
+  that column and the viewport. The film half is the next test.
 */
 for (const path of ["/"]) {
-  test(`${path} shares a measured outer edge and keeps the opened walkthrough inside it`, async ({ page }, testInfo) => {
+  test(`${path} shares a measured outer edge and keeps the hero's art inside it`, async ({ page }, testInfo) => {
     test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
-    const wrap = await page.locator("#s1 .lv2-wrap").boundingBox();
-    const filmWrap = await page.locator("#s2 .lv2-wrap").boundingBox();
-    const mark = await page.locator("header .wordmark").boundingBox();
-    const bench = await page.locator("#s2 article[data-case-status]").boundingBox();
-    expect(wrap && filmWrap && mark && bench).toBeTruthy();
+    const hero = page.locator('main section[aria-labelledby="v34-title"]');
+    const wrap = await hero.locator(":scope > div").first().boundingBox();
+    // The next section's column: the first child of the section after the hero.
+    const next = await page.locator('main section[aria-labelledby="v34-title"] + section > div').first().boundingBox();
+    const mark = await page.locator(`${HEADER} a[aria-label="TAVONEL home"]`).first().boundingBox();
+    const art = await hero.locator(":scope > div > div").nth(1).boundingBox();
+    expect(wrap && next && mark && art).toBeTruthy();
     expect(Math.abs(wrap!.x - mark!.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(filmWrap!.x - mark!.x)).toBeLessThanOrEqual(1);
-    expect(bench!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
-    expect(bench!.x + bench!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
-    await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
+    expect(Math.abs(next!.x - mark!.x)).toBeLessThanOrEqual(1);
+    expect(art!.x).toBeGreaterThanOrEqual(wrap!.x - 1);
+    expect(art!.x + art!.width).toBeLessThanOrEqual(wrap!.x + wrap!.width + 1);
+    expect(art!.x).toBeGreaterThanOrEqual(0);
+    expect(art!.x + art!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  });
+
+  test(`${path} keeps the opened walkthrough inside the shared edge`, async ({ page }, testInfo) => {
+    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(path);
+    const filmWrap = await page.locator('main section[aria-labelledby="v34-title"] > div').first().boundingBox();
+    expect(filmWrap).toBeTruthy();
     const disclosure = page.getByTestId("landing-hero-film");
     await expect(disclosure).toBeVisible();
     await expect(disclosure.locator(".compile-film-viewport")).toBeVisible();
@@ -69,23 +91,27 @@ for (const path of ["/"]) {
 
 test("every source has matching upright typography, not a substituted italic face", async ({ page }) => {
   await page.goto("/");
-  const typography = await page.locator("h1#lv2-hero-title .lv2-h1-line").first().evaluate(element => {
+  // V34 Home's H1 is `#v34-title`; every run inside it (the accent span) is held to the H1's own face.
+  const runs = await page.locator("h1#v34-title").evaluate(h1 => [h1, ...h1.querySelectorAll("*")].map(element => {
     const style = getComputedStyle(element);
-    const parent = getComputedStyle(element.closest("h1")!);
+    const parent = getComputedStyle(element === h1 ? h1 : element.closest("h1")!);
     return { family: style.fontFamily, parentFamily: parent.fontFamily, size: style.fontSize,
       parentSize: parent.fontSize, style: style.fontStyle, weight: style.fontWeight, parentWeight: parent.fontWeight, synthesis: style.fontSynthesis, parentSynthesis: parent.fontSynthesis };
-  });
-  expect(typography.family).toBe(typography.parentFamily);
-  expect(typography.size).toBe(typography.parentSize);
-  expect(typography.style).toBe("normal");
-  expect(typography.weight).toBe(typography.parentWeight);
-  expect(typography.synthesis).toBe(typography.parentSynthesis);
+  }));
+  expect(runs.length, "the H1 and its runs").toBeGreaterThanOrEqual(1);
+  for (const typography of runs) {
+    expect(typography.family).toBe(typography.parentFamily);
+    expect(typography.size).toBe(typography.parentSize);
+    expect(typography.style).toBe("normal");
+    expect(typography.weight).toBe(typography.parentWeight);
+    expect(typography.synthesis).toBe(typography.parentSynthesis);
+  }
 });
 
 test("footer labels use their own cells without clipped or escaping text", async ({ page }) => {
   await page.goto("/product");
-  await page.locator("footer.site").scrollIntoViewIfNeeded();
-  const violations = await page.locator("footer.site .site-footer-groups a").evaluateAll(links =>
+  await page.locator(FOOTER).scrollIntoViewIfNeeded();
+  const violations = await page.locator(`${FOOTER} nav a`).evaluateAll(links =>
     links.flatMap(link => {
       const box = link.getBoundingClientRect();
       return link.scrollWidth > link.clientWidth + 1 || box.height < 44
@@ -93,7 +119,7 @@ test("footer labels use their own cells without clipped or escaping text", async
     }));
   expect(violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await expect(page.locator('footer.site a[href="/subprocessors"]')).toBeVisible();
+  await expect(page.locator(`${FOOTER} a[href="/subprocessors"]`)).toBeVisible();
 });
 
 test("the first developer request remains keyboard reachable on a narrow screen", async ({ page }) => {
@@ -109,35 +135,29 @@ test("the first developer request remains keyboard reachable on a narrow screen"
     carries this test's name, every panel is in the HTML with code in it, the panel a reader is
     looking at takes focus from the keyboard, and the strip is one Tab stop rather than four.
   */
-  const sample = page.locator("figure.docs-code");
-  await expect(sample).toHaveCount(1);
-  await expect(page.getByRole("tablist", { name: "First API request example" })).toBeVisible();
-
-  const panels = sample.locator('[role="tabpanel"]');
-  await expect(panels).toHaveCount(4);
-  for (const code of await panels.locator("code").allTextContents()) {
+  /*
+    V34 /developers shows its requests as separate code blocks (components/v34/routes/developers/
+    code-block.tsx) rather than the legacy cURL / TypeScript / Python / MCP tab group, so the tab
+    strip's roving tabindex has no counterpart. The contract it held stays: every sample is in the
+    HTML with code in it, each sits in a named region a keyboard reaches (one Tab stop each, so a
+    long line scrolls inside it rather than widening the page), and the first one takes focus.
+  */
+  const samples = page.locator('main [role="region"][data-v34-scroll]');
+  expect(await samples.count(), "a code sample on /developers").toBeGreaterThanOrEqual(1);
+  for (const code of await samples.locator("pre").allTextContents()) {
     expect(code.trim().length).toBeGreaterThan(0);
   }
+  for (const label of await samples.evaluateAll(regions => regions.map(region => region.getAttribute("aria-label") ?? ""))) {
+    expect(label.trim().length, "each sample region is named").toBeGreaterThan(0);
+  }
+  expect(await samples.evaluateAll(regions => regions.map(region => (region as HTMLElement).tabIndex)))
+    .toEqual(Array(await samples.count()).fill(0));
 
-  const first = panels.first();
-  await expect(first).toHaveAttribute("tabindex", "0");
+  const first = samples.first();
   await first.focus();
   await expect(first).toBeFocused();
-  await expect(first.locator("code")).not.toHaveText("");
-
-  /*
-    The roving tabindex, as the server renders it.
-
-    Asserted on the markup rather than by pressing a key, because a keypress sent before React has
-    hydrated does nothing and retrying it walks the selection along -- a flake with no failure to
-    find. What matters here is the property the pattern requires and the one a reader feels: one
-    Tab stop on the strip, not four, and the rest of the group reached with the arrows that
-    `lib/developer-snippets.test.ts` holds the handler for.
-  */
-  const strip = sample.getByRole("tab");
-  await expect(strip).toHaveCount(4);
-  expect(await strip.evaluateAll(buttons => buttons.map(button => button.tabIndex)))
-    .toEqual([0, -1, -1, -1]);
+  await expect(first.locator("pre")).not.toHaveText("");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 /*
