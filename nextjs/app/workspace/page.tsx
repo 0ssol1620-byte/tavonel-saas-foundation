@@ -11,11 +11,11 @@ import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualif
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
-import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
+import { billingCardHeading, type BillingStatusAccount, type EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
-import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import { putWithProgress } from "@/lib/upload-transfer";
 import {
@@ -4010,9 +4010,9 @@ export default function WorkspacePage() {
               {/* workspace-18 (C1): the selected tab directly above already says "Usage & billing",
                   so the card does not repeat it. It is still headed -- by the plan the account is
                   actually on, or, when that has not been read, by a neutral name for the card.
-                  Never by a plan name this panel does not have. " plan" is appended unless the label ends
-                  in it; the test is a lookahead, because a lookbehind does not parse on Safari before 16.4. */}
-              <h2>{isBillingOfferCode(billingAccount?.accessPlan ?? null) ? BILLING_OFFERS[billingAccount!.accessPlan as BillingOfferCode].label.replace(/^(?![\s\S]*\bplan\)?$)[\s\S]*$/, "$& plan") : billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
+                  Never by a plan name this panel does not have: the held plan comes from `heldOffer`
+                  (WO-CAT-3B), so a v2 holder is not named after its level's legacy plan. */}
+              <h2>{billingCardHeading(billingAccount)}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*

@@ -24,7 +24,7 @@ vi.mock("@/lib/billing-store", () => ({
   issueFoundationCheckoutIntent: intent,
   getFoundationBillingAccount: async () => ({
     ok: true,
-    account: { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null },
+    account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null },
   }),
 }));
 vi.mock("@/lib/commercial-state", () => ({

@@ -393,7 +393,7 @@ describe("checkout overlay look", () => {
 describe("waiting for the entitlement after checkout", () => {
   const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1", label: "Developer" }, customData: { u: "1" } };
   const inactive = {
-    accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0,
+    accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0,
     billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
   } satisfies BillingStatusAccount;
   const active = { ...inactive, accessPlan: "observer_access", subscriptionStatus: "active", creditBalance: 2_000, paddleCustomerId: "ctm_1" };

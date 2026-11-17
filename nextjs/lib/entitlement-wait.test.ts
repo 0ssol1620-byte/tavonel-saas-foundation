@@ -9,6 +9,7 @@ import {
   ENTITLEMENT_PENDING_SENTENCE,
   ENTITLEMENT_WAIT_DELAYS_MS,
   ENTITLEMENT_WAIT_WINDOW_MS,
+  billingCardHeading,
   entitlementActiveSentence,
   entitlementArrived,
   waitForEntitlement,
@@ -17,6 +18,7 @@ import {
 
 const account = (patch: Partial<BillingStatusAccount> = {}): BillingStatusAccount => ({
   accessPlan: null,
+  planCode: null,
   subscriptionStatus: "inactive",
   creditBalance: 0,
   lifetimeCreditsPurchased: 0,
@@ -108,6 +110,74 @@ describe("the wait after checkout.completed", () => {
     const { result, read } = await run([async () => ({ ...ACTIVE, billingHold: true })]);
     expect(read).toHaveBeenCalledTimes(5);
     expect(result.outcome).toBe("pending");
+  });
+
+  /*
+    WO-CAT-3B. A v2 purchase arrives as the level in accessPlan and the plan bought in planCode. Comparing the
+    bought code with accessPlan never matched, so a Personal purchase always ended "pending".
+  */
+  it("ends the wait as active when a Personal purchase arrives, by its plan code", async () => {
+    const personal = account({ accessPlan: "observer_access", planCode: "personal", subscriptionStatus: "active", creditBalance: 2_000 });
+    expect(entitlementArrived("personal", personal)).toBe(true);
+    expect(entitlementArrived("team", account({ accessPlan: "studio_access", planCode: "team", subscriptionStatus: "trialing" }))).toBe(true);
+    // The level alone is the legacy plan, not the v2 one bought; nor is another v2 plan of the same level.
+    expect(entitlementArrived("personal", ACTIVE)).toBe(false);
+    expect(entitlementArrived("personal", account({ ...personal, planCode: "developer" }))).toBe(false);
+    expect(entitlementArrived("observer_access", personal)).toBe(false);
+
+    const read = vi.fn(async () => personal);
+    const done = waitForEntitlement("personal", read);
+    await vi.advanceTimersByTimeAsync(ENTITLEMENT_WAIT_WINDOW_MS);
+    expect(await done).toEqual({ outcome: "active", account: personal });
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("never calls a plan code the resolver refuses an arrival", () => {
+    for (const patch of [
+      { accessPlan: "studio_access", planCode: "enterprise" },
+      { accessPlan: "observer_access", planCode: "team" },
+      { accessPlan: null, planCode: "personal" },
+      { accessPlan: "personal", planCode: null },
+    ]) {
+      const row = account({ ...patch, subscriptionStatus: "active" });
+      for (const bought of ["personal", "team", "enterprise", "observer_access", "studio_access"]) {
+        expect(entitlementArrived(bought, row), `${JSON.stringify(patch)} / ${bought}`).toBe(false);
+      }
+    }
+    // Absent is not null: a status answer without planCode is not read as a legacy plan.
+    const withoutPlanCode: Partial<BillingStatusAccount> = { ...ACTIVE };
+    delete withoutPlanCode.planCode;
+    expect(entitlementArrived("observer_access", withoutPlanCode as BillingStatusAccount)).toBe(false);
+  });
+
+  // Golden values read from entitlementArrived at 7821b0fc (receipts/WO-CAT-3B/golden-legacy-before.json).
+  it("leaves a legacy purchase's wait unchanged", () => {
+    expect(entitlementArrived("observer_access", account({ accessPlan: "observer_access", subscriptionStatus: "active" }))).toBe(true);
+    expect(entitlementArrived("studio_access", account({ accessPlan: "studio_access", subscriptionStatus: "active" }))).toBe(true);
+    expect(entitlementArrived("studio_access", account({ accessPlan: "observer_access", subscriptionStatus: "active" }))).toBe(false);
+    expect(entitlementArrived("observer_access", account({ accessPlan: null, subscriptionStatus: "active" }))).toBe(false);
+  });
+});
+
+describe("the billing card's heading (workspace header)", () => {
+  it("names a v2 holder by the plan bought, never by its level's legacy plan", () => {
+    expect(billingCardHeading(account({ accessPlan: "studio_access", planCode: "team" }))).toBe("Team plan");
+    expect(billingCardHeading(account({ accessPlan: "observer_access", planCode: "personal" }))).toBe("Personal plan");
+    expect(billingCardHeading(account({ accessPlan: "studio_access", planCode: "business" }))).toBe("Business plan");
+  });
+
+  // Golden values read from the page's inline heading at 7821b0fc (receipts/WO-CAT-3B/golden-legacy-before.json).
+  it("leaves a legacy holder's heading and the unread heading unchanged", () => {
+    expect(billingCardHeading(account({ accessPlan: "observer_access" }))).toBe("Developer (2026-09 plan)");
+    expect(billingCardHeading(account({ accessPlan: "studio_access" }))).toBe("Team (2026-09 plan)");
+    expect(billingCardHeading(account())).toBe("Access and balance");
+    expect(billingCardHeading(null)).toBe("Access and balance");
+  });
+
+  it("says a plan code the resolver refuses is not recognized, and names no plan for it", () => {
+    for (const patch of [{ accessPlan: "studio_access", planCode: "enterprise" }, { accessPlan: "observer_access", planCode: "team" }, { accessPlan: "free", planCode: null }]) {
+      expect(billingCardHeading(account(patch)), JSON.stringify(patch)).toBe("Plan not recognized");
+    }
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS, type BillingOfferCode } from "./billing-catalog";
 import { LedgerOracle, type EventOp, type IntentOp, type Op } from "./billing-ledger-replay";
-import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChange, projectionAdmitsReplacement } from "./checkout-policy";
+import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChange, heldOffer, projectionAdmitsReplacement } from "./checkout-policy";
 import type { CommercialState } from "./commercial-state";
 
 const state = (overrides: Partial<CommercialState>): CommercialState => ({
@@ -63,8 +63,8 @@ describe("checkout deployment policy", () => {
 });
 
 describe("one subscription per workspace (Team self-serve, 2026-11-10)", () => {
-  const none = { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null };
-  const developer = { accessPlan: "observer_access", subscriptionStatus: "active", subscriptionCancelAt: null, paddleSubscriptionId: "sub_1" };
+  const none = { accessPlan: null, planCode: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null };
+  const developer = { accessPlan: "observer_access", planCode: null, subscriptionStatus: "active", subscriptionCancelAt: null, paddleSubscriptionId: "sub_1" };
   it("lets a workspace that never held a subscription buy either plan", () => {
     expect(decideSubscriptionChange(none, "observer_access")).toEqual({ allowed: true });
     expect(decideSubscriptionChange(none, "studio_access")).toEqual({ allowed: true });
@@ -190,5 +190,47 @@ describe("plan changes mirror the projection (catalog v2, every code pair)", () 
     // The legacy Developer -> legacy Team path belongs to a legacy holder only.
     expect(decideSubscriptionChange(personal, "studio_access")).toEqual({ allowed: false, code: "BILLING_PLAN_CHANGE_REQUIRED" });
     expect(decideSubscriptionChange({ ...personal, planCode: null }, "studio_access")).toEqual({ allowed: true });
+  });
+});
+
+/*
+  WO-CAT-3B. One resolver answers "which offer does this account hold", and it accepts exactly the rows the
+  database accepts (foundation_billing_accounts_plan_code_check, 20261117140100). A row it refuses is never
+  read as its level: a corrupt plan code must not quietly become the legacy plan of the same level.
+*/
+describe("heldOffer: the one answer to which offer an account holds", () => {
+  const CODES = Object.keys(BILLING_OFFERS) as BillingOfferCode[];
+
+  it("reads a v2 holder by its plan code and a legacy holder by its level, and no plan as none", () => {
+    for (const code of CODES) {
+      const offer = BILLING_OFFERS[code];
+      const row = offer.status === "v2" ? { accessPlan: offer.accessLevel, planCode: code } : { accessPlan: code, planCode: null };
+      expect(heldOffer(row), code).toEqual({ ok: true, code });
+    }
+    expect(heldOffer({ accessPlan: null, planCode: null })).toEqual({ ok: true, code: null });
+  });
+
+  it("refuses every row the database check refuses, and an absent field", () => {
+    const UNKNOWN = { ok: false, code: "BILLING_PLAN_CODE_UNKNOWN" };
+    for (const row of [
+      { accessPlan: "studio_access", planCode: "enterprise" }, // a code the catalog does not name
+      { accessPlan: "observer_access", planCode: "Personal" },
+      { accessPlan: "observer_access", planCode: "team" }, // a plan code above its level
+      { accessPlan: "studio_access", planCode: "personal" }, // and below it
+      { accessPlan: null, planCode: "personal" }, // a plan code with no level (the guard of 20261117140100)
+      { accessPlan: "observer_access", planCode: "observer_access" }, // a legacy code is never a plan code
+      { accessPlan: "personal", planCode: null }, // a v2 code is never a level
+      { accessPlan: "free", planCode: null },
+      { accessPlan: "observer_access", planCode: "" },
+    ]) expect(heldOffer(row), JSON.stringify(row)).toEqual(UNKNOWN);
+    // Absent is not null: a reader that dropped the column is refused, not read as legacy.
+    expect(heldOffer({ accessPlan: "observer_access" } as unknown as Parameters<typeof heldOffer>[0])).toEqual(UNKNOWN);
+  });
+
+  it("refuses a checkout over a plan code it cannot resolve, before anything else is decided", () => {
+    const corrupt = { accessPlan: "studio_access", planCode: "enterprise", subscriptionStatus: "active", subscriptionCancelAt: "2026-12-01T00:00:00Z", paddleSubscriptionId: "sub_1" };
+    expect(decideSubscriptionChange(corrupt, "business")).toEqual({ allowed: false, code: "BILLING_PLAN_CODE_UNKNOWN" });
+    expect(decideSubscriptionChange({ ...corrupt, paddleSubscriptionId: null }, "business")).toEqual({ allowed: false, code: "BILLING_PLAN_CODE_UNKNOWN" });
+    expect(decideSubscriptionChange({ ...corrupt, accessPlan: null, planCode: "team" }, "personal")).toEqual({ allowed: false, code: "BILLING_PLAN_CODE_UNKNOWN" });
   });
 });

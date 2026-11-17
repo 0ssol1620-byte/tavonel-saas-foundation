@@ -8,7 +8,8 @@
 // Not covered here (see lib/testing/postgrest-rpc-psql.ts): PostgREST, RLS and role boundaries, Paddle's own
 // delivery and retry behaviour, concurrency (one session, strictly sequential), now() (constant: one outer
 // transaction per seed), scheduled cancellation (the replay always sends scheduled_change: null, so
-// subscription_cancel_at is never exercised). billing-ledger-replay.db.test.ts inserts the same fixture user;
+// subscription_cancel_at is compared -- with plan_code, as replayOps' planIdentity does (WO-CAT-3B) -- but is
+// always null here; the scenario's offers are the two legacy codes, so plan_code is always null here too). billing-ledger-replay.db.test.ts inserts the same fixture user;
 // the 600_000 timeouts let this suite wait on that row lock. A mismatch between the oracle
 // and the database is a FINDING: record it, never edit the oracle to agree without the Opus reviewer.
 import { createHash, createHmac } from "node:crypto";
@@ -203,7 +204,10 @@ select jsonb_build_object(
       'lifetimeAllowance', lifetime_allowance_units, 'lifetimeReversed', lifetime_credits_reversed,
       'accessPlan', access_plan, 'status', subscription_status, 'subscriptionId', paddle_subscription_id,
       'lastSubAt', case when last_subscription_event_at is null then null
-        else round(extract(epoch from last_subscription_event_at - now()))::int end)
+        else round(extract(epoch from last_subscription_event_at - now()))::int end,
+      'planCode', plan_code,
+      'cancelAt', case when subscription_cancel_at is null then null
+        else round(extract(epoch from subscription_cancel_at - now()))::int end)
     from public.foundation_billing_accounts where workspace_key = ${W}),
   'ledger', coalesce((select jsonb_agg(jsonb_build_object('kind', kind, 'offer', offer_code,
       'txn', transaction_id, 'reversalOf', reversal_of_transaction_id, 'delta', credit_delta, 'eventId', event_id)
@@ -367,12 +371,12 @@ describe.skipIf(!dsn)("webhook replay through the real route into the local data
         if (calls.length !== 1 || calls[0].fn !== "quarantine_foundation_billing_envelope" || !calls[0].ok) problems.push(`quarantine rpc expected, got ${JSON.stringify(calls)}`);
         extraRejections.add(op.eventId);
         quarantined++;
-        expected = { outcome: { ok: { status: "binding_rejected" } }, snapshot: oracle.snapshot(op) };
+        expected = { outcome: { ok: { status: "binding_rejected" } }, snapshot: oracle.snapshotWithPlan(op) };
       } else {
         const outcome = outcomeOf(response.status, json, calls);
         problems = outcome.problems;
         const expectedOutcome = oracle.apply(op);
-        expected = { outcome: expectedOutcome, snapshot: oracle.snapshot(op) };
+        expected = { outcome: expectedOutcome, snapshot: oracle.snapshotWithPlan(op) };
         problems.push(...diffOutcome(expectedOutcome, outcome.outcome));
         const status = expectedOutcome.ok?.status;
         if (typeof status === "string") seen.add(`${op.action}:${status}`);
@@ -386,7 +390,9 @@ describe.skipIf(!dsn)("webhook replay through the real route into the local data
         const account = await getFoundationBillingAccount(REPLAY_WORKSPACE, REPLAY_USER);
         const want = expected.snapshot.account;
         if (!account.ok) problems.push(`account read failed: ${account.code}`);
-        else if (want && (account.account.creditBalance !== want.balance || account.account.accessPlan !== want.accessPlan || account.account.subscriptionStatus !== want.status)) {
+        else if (want && (account.account.creditBalance !== want.balance || account.account.accessPlan !== want.accessPlan
+          || account.account.planCode !== want.planCode || account.account.subscriptionStatus !== want.status
+          || (account.account.subscriptionCancelAt === null) !== (want.cancelAt === null))) {
           problems.push(`account read through the adapter disagrees with the oracle: ${JSON.stringify(account.account)}`);
         }
       }

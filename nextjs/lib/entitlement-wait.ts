@@ -13,9 +13,14 @@
   only a read that says so is.
 */
 
+import { BILLING_OFFERS } from "./billing-catalog";
+import { heldOffer } from "./checkout-policy";
+
 /** The `account` that /api/billing/status returns, as the browser reads it. */
 export type BillingStatusAccount = {
   accessPlan: string | null;
+  /** The v2 offer bought, or null for a legacy plan (catalog v2); read through `heldOffer`, never alone. */
+  planCode: string | null;
   subscriptionStatus: string;
   creditBalance: number;
   lifetimeCreditsPurchased: number;
@@ -39,12 +44,31 @@ export function entitlementActiveSentence(label: string | undefined) {
   return `${label ?? "Plan"} access is active. The signed webhook was persisted.`;
 }
 
-/** The same test `billingProductDecision` applies on the server, for the plan that was bought. */
+/**
+ * The same test `billingProductDecision` applies on the server, for the plan that was bought: the held
+ * offer (`heldOffer`: the plan code for a v2 purchase, the level for a legacy one) is the bought code.
+ * A plan code the resolver refuses is not an arrival.
+ */
 export function entitlementArrived(offerCode: string, account: BillingStatusAccount | null) {
-  return Boolean(account
-    && account.accessPlan === offerCode
+  if (!account) return false;
+  const held = heldOffer(account);
+  return held.ok
+    && held.code === offerCode
     && ["active", "trialing"].includes(account.subscriptionStatus)
-    && !account.billingHold);
+    && !account.billingHold;
+}
+
+/**
+ * The workspace billing card's heading (workspace-18): the held plan's catalog label, " plan" appended
+ * unless the label already ends in it (a lookahead: a lookbehind does not parse on Safari before 16.4);
+ * the neutral name when no account was read or none is held. A plan code the resolver refuses is said to
+ * be unrecognized, never named after its level.
+ */
+export function billingCardHeading(account: BillingStatusAccount | null): string {
+  if (!account) return "Access and balance";
+  const held = heldOffer(account);
+  if (!held.ok) return "Plan not recognized";
+  return held.code === null ? "Access and balance" : BILLING_OFFERS[held.code].label.replace(/^(?![\s\S]*\bplan\)?$)[\s\S]*$/, "$& plan");
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, ms)));

@@ -81,7 +81,20 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     binding.mockReturnValue({ tavonel_nonce: "nonce" });
     intent.mockResolvedValue({ ok: true });
     quote.mockImplementation(realQuote);
-    billingAccount.mockResolvedValue({ ok: true, account: { accessPlan: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null } });
+    billingAccount.mockResolvedValue({ ok: true, account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null } });
+  });
+
+  // WO-CAT-3B: the held plan is read through the resolver, and a plan code it refuses stops checkout before any intent.
+  it("refuses a checkout over a plan code the resolver cannot name, before any payment intent exists", async () => {
+    gate.mockResolvedValue(approved());
+    billingAccount.mockResolvedValue({ ok: true, account: {
+      accessPlan: "studio_access", planCode: "enterprise", subscriptionStatus: "active", subscriptionCancelAt: "2026-12-01T00:00:00Z", paddleSubscriptionId: `sub_${"a".repeat(26)}`,
+    } });
+    const response = await POST(request());
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ code: "BILLING_PLAN_CODE_UNKNOWN" });
+    expect(binding).not.toHaveBeenCalled();
+    expect(intent).not.toHaveBeenCalled();
   });
 
   // R1 review (2026-11-10): a held subscription the projection would not replace refuses before any intent.
@@ -96,7 +109,7 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
     it(`refuses a second subscription over a ${subscriptionStatus} one before any payment intent exists`, async () => {
       gate.mockResolvedValue(approved());
       billingAccount.mockResolvedValue({ ok: true, account: {
-        accessPlan: "observer_access", subscriptionStatus, subscriptionCancelAt: null, paddleSubscriptionId: `sub_${"a".repeat(26)}`,
+        accessPlan: "observer_access", planCode: null, subscriptionStatus, subscriptionCancelAt: null, paddleSubscriptionId: `sub_${"a".repeat(26)}`,
       } });
       const response = await POST(request());
       expect(response.status).toBe(409);

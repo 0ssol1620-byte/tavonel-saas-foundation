@@ -24,7 +24,7 @@ import { GET, POST } from "../app/api/billing/refund-request/route";
 const SUB = `sub_${"a".repeat(26)}`;
 const PAID_AT = "2026-11-08T09:00:00.000Z";
 const paidAccount = {
-  accessPlan: "observer_access", creditBalance: 2_000, paddleCustomerId: `ctm_${"b".repeat(26)}`, paddleSubscriptionId: SUB,
+  accessPlan: "observer_access", planCode: null, creditBalance: 2_000, paddleCustomerId: `ctm_${"b".repeat(26)}`, paddleSubscriptionId: SUB,
 };
 const request = (method: "GET" | "POST", site?: string) => new Request("https://tavonel.test/api/billing/refund-request", {
   method, headers: { authorization: "Bearer t", ...(site ? { "sec-fetch-site": site } : {}) },
@@ -95,6 +95,26 @@ describe("refund request route", () => {
     account.mockResolvedValue({ ok: true, account: { ...paidAccount, paddleSubscriptionId: null } });
     expect((await GET(request("GET"))).status).toBe(409);
     expect((await POST(request("POST"))).status).toBe(409);
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  // WO-CAT-3B: the route reads the held plan through the resolver, so a v2 Team holder is stated Team and its page line.
+  it("states a v2 holder's own plan and page line, and refuses a plan code it cannot resolve without paging anyone", async () => {
+    account.mockResolvedValue({ ok: true, account: { ...paidAccount, accessPlan: "studio_access", planCode: "team" } });
+    const read = await GET(request("GET"));
+    expect(read.status).toBe(200);
+    expect((await read.json()).facts).toMatchObject({ plan: "Team", allowancePages: 300 });
+    await POST(request("POST", "same-origin"));
+    expect(deliver.mock.calls[0]![0].summary).toContain("Team, latest payment");
+    expect(deliver.mock.calls[0]![0].summary).toContain("under 300 pages");
+    deliver.mockClear();
+
+    account.mockResolvedValue({ ok: true, account: { ...paidAccount, accessPlan: "studio_access", planCode: "enterprise" } });
+    for (const response of [await GET(request("GET")), await POST(request("POST", "same-origin"))]) {
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body).toEqual({ code: "BILLING_PLAN_CODE_UNKNOWN" });
+    }
     expect(deliver).not.toHaveBeenCalled();
   });
 });

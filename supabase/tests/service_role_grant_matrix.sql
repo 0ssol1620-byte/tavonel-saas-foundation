@@ -19,7 +19,7 @@
 -- source_fingerprints and document_relations (20261104090500).
 
 begin;
-select plan(73);
+select plan(74);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -141,6 +141,20 @@ select is_empty($$
      and c.relkind in ('r', 'p')
      and exists (select 1 from unnest(d.defaclacl) as entry where entry::text like 'service_role=%')
 $$, 'no role that owns a table in public still re-grants future tables to service_role');
+
+-- ---------------------------------------------------------------------------
+-- 3. The billing projection's entry points (20261117140100, WO-CAT-3B).
+-- ---------------------------------------------------------------------------
+
+-- The server credential reaches the billing projection through v6 alone, which checks the signed binding
+-- and records a durable rejection. v3 (0010/0011) was still executable and skipped both; v4 and v5 were
+-- already closed. The remaining versions are reached by the function owner from inside v6.
+select is(
+  (select string_agg(p.proname, ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname like 'apply\_foundation\_billing\_event%'
+      and has_function_privilege('service_role', p.oid, 'EXECUTE')),
+  'apply_foundation_billing_event_v6',
+  'v6 is the only billing projection function the service role can execute');
 
 select * from finish();
 rollback;
