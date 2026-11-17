@@ -162,15 +162,16 @@ const PLAN_NAME = new RegExp(
 
 describe("plan names stay on /pricing", () => {
   it("the pattern finds a plan named as a plan, and leaves the word team alone", () => {
-    for (const named of [
-      "Once it is open, the Developer plan can be bought online.",
-      "Team and Enterprise are arranged with us.",
-      "Choose Developer, Team or Enterprise.",
-      "On the Team plan you get more pages.",
-      "Upgrade to the Team subscription.",
-      "Enterprise or Team, scoped with you.",
-      "Talk to us about the Enterprise plan.",
-      "The Enterprise tier adds review.",
+    // Fixtures come from the catalog, so a renamed plan changes what the guard is shown, not whether it is tested.
+    const labels = [...Object.values(BILLING_OFFERS).map((offer) => offer.label), "Enterprise"];
+    for (const label of labels) for (const named of [
+      `On the ${label} plan you get more pages.`,
+      `Upgrade to the ${label} subscription.`,
+      `The ${label} tier adds review.`,
+      `Talk to us about the ${label} plan.`,
+      `${label} and Enterprise are arranged with us.`,
+      `Choose ${label}, Team or Enterprise.`,
+      `Enterprise or ${label}, scoped with you.`,
     ]) expect(named).toMatch(PLAN_NAME);
     for (const plain of [
       "Shared Worlds for groups that work together",
