@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { actionBody, agentBadge, batchEligible, decisionProblem, ProposalItem, rowActions } from "../components/change-proposals-panel";
+import { actionBody, agentBadge, batchEligible, decisionProblem, deepLinkGone, listable, ProposalItem, rowActions } from "../components/change-proposals-panel";
 import type { PublicProposal } from "./change-proposals";
 import { PROMPT_INJECTION_FIXTURES } from "./prompt-injection.fixtures";
 
@@ -89,8 +89,8 @@ describe("proposal rows (WO-AN-6)", () => {
   });
   it("a correction row shows kind and before, after in quotes", () => {
     const markup = html(patch());
-    expect(markup).toContain("<q>Billing</q>");
-    expect(markup).toContain("<q>Invoicing</q>");
+    expect(markup).toContain("<q><bdi>Billing</bdi></q>");
+    expect(markup).toContain("<q><bdi>Invoicing</bdi></q>");
     expect(markup).toContain("cccccccccccc");
   });
   it("an injected label is text, never markup", () => {
@@ -105,16 +105,16 @@ describe("proposal rows (WO-AN-6)", () => {
       const e = esc(payload);
       const afterHtml = html(patch({ preview: { ...patchPreview, after: payload } }));
       expect(count(afterHtml, e), id).toBe(1);
-      expect(afterHtml, id).toContain(`<q>${e}</q>`);
+      expect(afterHtml, id).toContain(`<q><bdi>${e}</bdi></q>`);
       const topicHtml = html(label({ preview: { documentId: DOC_A, sourceVersionId: "b".repeat(64), labelKind: "topic", labelKey: payload, decision: "confirmed" } }));
       expect(count(topicHtml, e), id).toBe(1);
-      expect(topicHtml, id).toContain(`<strong>${e}</strong>`);
+      expect(topicHtml, id).toContain(`<strong><bdi>${e}</bdi></strong>`);
     }
   });
   it("a topic key is shown as stored; only the enumerated doc type has its underscores spelled as spaces", () => {
     const shown = (labelKind: string, labelKey: string) => html(label({ preview: { documentId: DOC_A, sourceVersionId: "b".repeat(64), labelKind, labelKey, decision: "confirmed" } }));
-    expect(shown("topic", "tool_call")).toContain("<strong>tool_call</strong>");
-    expect(shown("doc_type", "purchase_order")).toContain("<strong>purchase order</strong>");
+    expect(shown("topic", "tool_call")).toContain("<strong><bdi>tool_call</bdi></strong>");
+    expect(shown("doc_type", "purchase_order")).toContain("<strong><bdi>purchase order</bdi></strong>");
   });
   it("the intro does not say that only a person confirms", () => {
     const src = readFileSync(new URL("../components/change-proposals-panel.tsx", import.meta.url), "utf8");
@@ -126,8 +126,46 @@ describe("proposal rows (WO-AN-6)", () => {
     expect(rowActions(compile({ rechargeCredits: 1, overageCredits: 0 }, { state: "executed", previewDigest: null }))).toEqual([]);
     expect(rowActions(patch({ state: "executed", previewDigest: null }))).toEqual([]);
   });
+  it("every person-visible preview value and the client name sit in a <bdi>, so a bidi control cannot reorder what is confirmed (WO-AN-6B)", () => {
+    const rlo = "\u202Egnp.exe";
+    const proposer = { kind: "agent", grantedBy: "owner@example.invalid", clientLabel: rlo, clientLabelVerified: false } as const;
+    expect(html(label({ proposer }))).toContain(`client name “<bdi>${rlo}</bdi>” (not verified)`);
+    expect(html(label({ preview: { documentId: DOC_A, sourceVersionId: "b".repeat(64), labelKind: "topic", labelKey: rlo, decision: "confirmed" } })))
+      .toContain(`<bdi>${rlo}</bdi>`);
+    const markup = html(patch({ preview: { ...patchPreview, before: rlo, after: rlo } }));
+    expect(markup.split(`<bdi>${rlo}</bdi>`).length - 1).toBe(2);
+  });
+  it("a compile row with nothing to re-charge says so, without 'up to 0' (WO-AN-6B)", () => {
+    const markup = html(compile({ rechargeCredits: 0, overageCredits: 0 }));
+    expect(markup).toContain("Re-charges no credits.");
+    expect(markup).not.toContain("up to 0");
+  });
+  it("a row of an action type this build does not know is skipped; any other malformed row still refuses the page (WO-AN-6B)", () => {
+    const unknown = label({ proposalId: "x9", actionType: "something_new" });
+    expect(listable([label(), unknown])?.map((p) => p.proposalId)).toEqual([ID]);
+    expect(listable([label(), label({ proposalId: "x8", state: "no_such_state" })])).toBeNull();
+  });
+  it("a deep-linked row whose read by id is 404 is gone; any other failure is not (WO-AN-6B)", () => {
+    expect(deepLinkGone({ status: 404 })).toBe(true);
+    expect(deepLinkGone({ status: 503 })).toBe(false);
+    expect(deepLinkGone({ proposal: label() })).toBe(false);
+  });
+  it("Show more is disabled while its read is out (WO-AN-6B)", () => {
+    const src = readFileSync(new URL("../components/change-proposals-panel.tsx", import.meta.url), "utf8");
+    const body = src.slice(src.indexOf("async function showMore()"), src.indexOf("// Deep link:"));
+    expect(body).toMatch(/setBusy\("more"\)/);
+    expect(body).toMatch(/finally \{\s*setBusy\(null\)/);
+  });
+  it("an executed agent-origin label change still offers Undo, so the flag never blocks a reversal (WO-AN-6B)", () => {
+    const proposer = { kind: "agent", grantedBy: "owner@example.invalid", clientLabel: "Desk Agent", clientLabelVerified: false } as const;
+    expect(rowActions(label({ state: "executed", previewDigest: null, proposer }))).toEqual(["undo"]);
+  });
   it("the runbook says a reversal never waits on the flag", () => {
     const adr = readFileSync(new URL("../../docs/adr/0009-agent-proposals.md", import.meta.url), "utf8");
     expect(adr).toContain("The flag stops new effects, never a reversal: with it off, a person can still undo an executed agent-origin proposal.");
+  });
+  it("the runbook says what the kill switch covers and what a later grant is (WO-AN-6B)", () => {
+    const adr = readFileSync(new URL("../../docs/adr/0009-agent-proposals.md", import.meta.url), "utf8");
+    expect(adr).toContain("The kill switch disconnects every grant committed before it commits; a grant created afterwards is a new one, and the flag is what forbids new grants.");
   });
 });
