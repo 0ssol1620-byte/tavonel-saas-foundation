@@ -4114,14 +4114,14 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Starter and Pro."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on a paid plan."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Google Drive and file-server connections are included on Starter and Pro. The free evaluation works with files you upload directly."
-                : "Google Drive and file-server connections are included on Starter and Pro. This workspace has no active plan."}</p>
+                ? "Google Drive and file-server connections are included in every paid plan. The free evaluation works with files you upload directly."
+                : "Google Drive and file-server connections are included in every paid plan. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
@@ -4134,14 +4134,14 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of the Starter and Pro plans."}</h2>
+                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of every paid plan."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Starter or Pro."
-                : "This account has no active compute access. API keys and MCP setup require Starter or Pro."}</p>
+                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with a paid plan."
+                : "This account has no active compute access. API keys and MCP setup require a paid plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"

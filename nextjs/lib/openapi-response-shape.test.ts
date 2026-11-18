@@ -750,7 +750,8 @@ describe("the quickstart names only endpoints the contract publishes", () => {
       .toMatch(/browser-session action by a human/);
     expect(prose, "the quickstart no longer names the plan activation actually requires")
       .toContain("STUDIO_SUBSCRIPTION_REQUIRED");
-    expect(prose).toContain("Pro");
+    expect(prose, "the plan bar names the V22 plans (WO-REL-1)").toContain("Team or Business");
+    expect(prose, "no retired plan name (WO-REL-1)").not.toMatch(/(?<![\w-])(?:Starter|Pro)(?![\w-])/);
 
     // Parity in the languages the audit asked for, asserted rather than trusted.
     const languages = new Set(
