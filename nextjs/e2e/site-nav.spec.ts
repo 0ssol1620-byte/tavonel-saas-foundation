@@ -503,6 +503,21 @@ test.describe("the consent card never stands over a footer row", () => {
   }
 });
 
+/*
+  WO-CI-36 (review): the room is reserved after the footer only. /explore has a `display: contents` shell part around the
+  header alone; a pseudo-element on it would sit under the sticky header and push the stage down when the card opens.
+*/
+test("opening the consent card on /explore does not move the page's main", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/explore", { waitUntil: "domcontentloaded" });
+  const top = () => page.evaluate(() => Math.round(document.querySelector("main")!.getBoundingClientRect().top + window.scrollY));
+  const before = await top();
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect(page.locator("[data-marketing-consent-panel]"), "the consent card is open").toBeVisible();
+  expect(await top(), "main's document top with the card open").toBe(before);
+});
+
 const PUBLIC_UI_REVIEW_ROUTES = [
   { path: "/", name: "home" },
   { path: "/pricing", name: "pricing" },
