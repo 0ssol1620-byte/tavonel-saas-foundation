@@ -44,18 +44,19 @@ async function ctaStates(page: Page, info: TestInfo, name: string, width: number
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-normal.png`);
   await cta.hover();
-  // decision.md G-H: a workflow page's hover is --tv-action-hover #0169cd (tavonel.css), adopted by
-  // solutions.module.css in P2-03. The V34 pill hovers to its own token, read from the page, not typed.
-  const hover = kind === "v34"
-    ? await cta.evaluate((element) => {
-        const probe = document.createElement("span");
-        probe.style.backgroundColor = "var(--v34-header-btn-hover)";
-        element.append(probe);
-        const resolved = getComputedStyle(probe).backgroundColor;
-        probe.remove();
-        return resolved;
-      })
-    : "rgb(1, 105, 205)";
+  // decision.md G-H: a workflow page's hover was --tv-action-hover #0169cd (tavonel.css), adopted by
+  // solutions.module.css in P2-03. Inside the V34 frame the retained .btn is painted by the token sheet
+  // (WO-CI-19, lead decision 15) and hovers to the frame's action-hover token; the V34 pill hovers to its
+  // own token. Both are read from the page, not typed.
+  const token = kind === "v34" ? "var(--v34-header-btn-hover)" : "var(--v34-fg-action-hover, var(--v34-header-btn-hover))";
+  const hover = await cta.evaluate((element, value) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = value;
+    element.append(probe);
+    const resolved = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return resolved;
+  }, token);
   expect(hover, "the hover token resolves").not.toBe("rgba(0, 0, 0, 0)");
   await expect(cta).toHaveCSS("background-color", hover);
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);

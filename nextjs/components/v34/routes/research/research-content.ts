@@ -51,11 +51,13 @@ export const STEPS = {
   The next step after the four: the measured results (WO-CI-24, benchmarks.spec "is reachable from
   research"). /benchmarks is a retained page with no registry row, so its path and its name are the
   trust sequence's own rather than typed here; a sequence without that step stops the build.
+  The sentence ends before the link: the link is the block's action and stands in its own row
+  (lead decision 23), so it is never a 44 px box inside a line of text.
 */
 const benchmarks = TRUST_SEQUENCE.find((step) => step.label === "Benchmarks");
 if (!benchmarks) throw new Error("research: the trust sequence has no Benchmarks step to link");
 export const MEASURED = {
-  text: "How the compiler is measured, and the conditions each result was measured under:",
+  text: "How the compiler is measured, and the conditions each result was measured under.",
   href: benchmarks.href as Route,
   label: benchmarks.label,
 } as const;

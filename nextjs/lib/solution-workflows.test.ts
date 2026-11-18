@@ -171,10 +171,11 @@ describe("Solutions task choices and workflow evidence", () => {
     expect(readHtml).not.toContain("does not establish");
   });
 
-  it("links exported files to the existing compiled-world package section", () => {
+  // Lead decision 9 (WO-CI-24): the package section is ported to /world and the link names it there.
+  it("links exported files to the package section on /world", () => {
     for (const kind of ["ai-ready-knowledge", "knowledge-graph"] as const) {
       const html = renderToStaticMarkup(createElement(SolutionWorkflowProof, { kind, pick: SOLUTIONS[kind].proof }));
-      expect(html).toContain('href="/product/compiled-world#public-package-proof"');
+      expect(html).toContain('href="/world#public-package-proof"');
       expect(html).not.toContain("/product/portable-artifacts");
     }
   });

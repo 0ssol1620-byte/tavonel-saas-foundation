@@ -75,9 +75,12 @@ const INSTEAD_OF_THE_NEXT_STEP: Partial<Record<TrustStep, { to: Route; label: st
   the block's heading is a sub-heading of that Section: an H3, whose size the host's sheet maps to
   the V34 sub-heading size (`--t-6`). As an H2 it sat beside the Section's H2 at a second size
   (/evidence: 33.84px against 61.92px at 1440). A retained page places the block beside its own
-  H2s, so there it stays an H2. A new V34 host is listed here, or its heading is an H2 again.
+  H2s, so there it stays an H2. Only the host knows where it puts the block, so the host names the
+  level (`heading`, required): there is no default for a host to fall into, and a value that is
+  neither level is refused rather than rendered.
 */
-const INSIDE_A_V34_SECTION: ReadonlySet<TrustStep> = new Set<TrustStep>(["/evidence", "/research/program"]);
+const HEADING_LEVELS = ["h2", "h3"] as const;
+type TrustNextHeading = (typeof HEADING_LEVELS)[number];
 
 /**
  * The one next step at the foot of a trust page.
@@ -91,12 +94,19 @@ const INSIDE_A_V34_SECTION: ReadonlySet<TrustStep> = new Set<TrustStep>(["/evide
  * `emphasis="quiet"` and this step renders as a ghost. The step is not removed: the sequence
  * exists because /reproducibility and /research had no way onward at all.
  */
-export function TrustNext({ from, emphasis = "primary" }: { from: TrustStep; emphasis?: "primary" | "quiet" }) {
+export function TrustNext({ from, heading, emphasis = "primary" }: {
+  from: TrustStep;
+  heading: TrustNextHeading;
+  emphasis?: "primary" | "quiet";
+}) {
+  if (!HEADING_LEVELS.includes(heading)) {
+    throw new Error(`TrustNext from ${from}: heading must be one of ${HEADING_LEVELS.join(", ")}, got ${String(heading)}`);
+  }
   const index = TRUST_SEQUENCE.findIndex((step) => step.href === from);
   const override = INSTEAD_OF_THE_NEXT_STEP[from];
   const next = override ? { href: override.to, label: override.label, question: override.question } : TRUST_SEQUENCE[index + 1];
   if (!next) return null;
-  const Heading = INSIDE_A_V34_SECTION.has(from) ? "h3" : "h2";
+  const Heading = heading;
   return (
     <div className="stack trust-next">
       <Heading>Next: {next.label}</Heading>

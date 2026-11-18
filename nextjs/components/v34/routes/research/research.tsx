@@ -98,10 +98,8 @@ export function ResearchBody() {
             </li>
           ))}
         </ol>
-        <p className={s.measured}>
-          {MEASURED.text}{" "}
-          <Link className={s.textLink} href={MEASURED.href} prefetch={false}>{MEASURED.label}</Link>
-        </p>
+        <p className={s.measured}>{MEASURED.text}</p>
+        <Link className={s.textLink} href={MEASURED.href} prefetch={false}>{MEASURED.label}</Link>
       </Section>
 
       <Section surface="paper" eyebrow={RECORD.eyebrow} title={RECORD.title} lead={RECORD.lead}>

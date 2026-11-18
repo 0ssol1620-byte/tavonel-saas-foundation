@@ -161,7 +161,7 @@ describe("what the crosswalk carries over from the legacy page", () => {
 
   it("ends its trust steps on the shared TrustNext, named for this page and quiet", () => {
     expect(body).toContain('import { TrustNext } from "@/components/trust-next"');
-    expect(body).toContain('<TrustNext from="/evidence" emphasis="quiet" />');
+    expect(body).toContain('<TrustNext from="/evidence" heading="h3" emphasis="quiet" />');
     expect(html).toContain("trust-next");
     expect(html).toContain("Next: Benchmarks");
     expect(html).toContain('class="btn ghost"');
