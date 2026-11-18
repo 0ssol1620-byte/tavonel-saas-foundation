@@ -9576,6 +9576,17 @@ function assertV34ProgramEndpoint(path) {
 
 // WO-CI-7 r9: an affected plan runs a selected file only in the projects where one of its cases can run. Synthetic specs under the
 // real mapped names go through the real reader (heldBrowserProjects) and the real planner; the held state follows the switch values.
+// The reader needs the `typescript` package. The pre-install selector step has none, so these five skip there and
+// run in the post-install step, which sets REPAIR_HELD_READER_REQUIRED=1: a missing parser is then a failure, not a skip.
+const heldReaderRequire = (await import('node:module')).createRequire(import.meta.url);
+function heldReaderMissing(t) {
+  try { heldReaderRequire.resolve('typescript'); return false; }
+  catch (error) {
+    if (error?.code !== 'MODULE_NOT_FOUND' || process.env.REPAIR_HELD_READER_REQUIRED === '1') throw error;
+    t.skip('typescript is not installed in this step; the post-install held-pairs step runs these');
+    return true;
+  }
+}
 function heldWorkspace(files) {
   const workspace = mkdtempSync(resolve(tmpdir(), 'repair-held-'));
   for (const [path, body] of Object.entries(files)) { mkdirSync(dirname(resolve(workspace, path)), { recursive: true }); writeFileSync(resolve(workspace, path), body); }
@@ -9591,7 +9602,7 @@ const writeSwitch = (workspace, mounted, phase = 'film') => {
 };
 const HERO_FILE = 'e2e/landing-hero-mobile.spec.ts';
 
-test('affected held pairs: every case skipped by an imported switch is held in each mapped project, and runs again when it flips', () => {
+test('affected held pairs: every case skipped by an imported switch is held in each mapped project, and runs again when it flips', t => { if (heldReaderMissing(t)) return;
   for (const [mounted, phase, expected] of [[false, 'film', [[HERO_FILE, ['360', '390']]]], [true, 'film', []], [false, 'still', []]]) {
     const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC(HELD_CASES) });
     try {
@@ -9604,7 +9615,7 @@ test('affected held pairs: every case skipped by an imported switch is held in e
   assert.deepEqual(planBrowserRuns([HERO_FILE], false).map(run => run.project), ['390', '360'], 'without held pairs the planner is unchanged');
 });
 
-test('affected held pairs: a file-level skip read through a relative import chain holds the file; the plan keeps its other files', () => {
+test('affected held pairs: a file-level skip read through a relative import chain holds the file; the plan keeps its other files', t => { if (heldReaderMissing(t)) return;
   const workspace = heldWorkspace({
     'lib/triage-rollout.ts': 'export const TRIAGE_ENABLED = false;\nexport function disabled(extra: Record<string, unknown> = {}) { return extra; }\n',
     'lib/approval-rollout.ts': 'import { TRIAGE_ENABLED } from "./triage-rollout";\nconst SWITCH = false;\nexport const APPROVAL_ENABLED: boolean = SWITCH || TRIAGE_ENABLED;\n',
@@ -9619,7 +9630,7 @@ test('affected held pairs: a file-level skip read through a relative import chai
   } finally { rmSync(workspace, { recursive: true, force: true }); }
 });
 
-test('affected held pairs: what the reader cannot prove held stays selected, so the one-passing-test rule still decides', () => {
+test('affected held pairs: what the reader cannot prove held stays selected, so the one-passing-test rule still decides', t => { if (heldReaderMissing(t)) return;
   const cases = {
     'a case with no skip': `${HELD_CASES}\ntest("always", async () => {});`,
     'a predicate it cannot evaluate': 'test("narrow", async ({ page }) => {\n  test.skip(isNarrow(page));\n});',
@@ -9647,7 +9658,7 @@ test('affected held pairs: what the reader cannot prove held stays selected, so 
   finally { rmSync(unloadable, { recursive: true, force: true }); }
 });
 
-test('affected held pairs: a project-name skip holds only the projects it names; a missing selected spec stays selected for the report rule', () => {
+test('affected held pairs: a project-name skip holds only the projects it names; a missing selected spec stays selected for the report rule', t => { if (heldReaderMissing(t)) return;
   const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC('test.describe("phone", () => {\n  test.beforeEach(async ({ page }, info) => {\n    test.skip(info.project.name !== "360", "360 only");\n  });\n  test("a", async () => {});\n});\ntest("b", async () => {\n  test.skip(test.info().project.name === "390", "not at 390");\n});') });
   try {
     writeSwitch(workspace, false);
@@ -9658,7 +9669,7 @@ test('affected held pairs: a project-name skip holds only the projects it names;
   } finally { rmSync(workspace, { recursive: true, force: true }); }
 });
 
-test('affected held pairs at this head: the hosted refusals of 77d68786 are exactly the pairs the switches hold', () => {
+test('affected held pairs at this head: the hosted refusals of 77d68786 are exactly the pairs the switches hold', t => { if (heldReaderMissing(t)) return;
   const nextjs = fileURLToPath(new URL('../', import.meta.url));
   const read = path => readFileSync(resolve(nextjs, path), 'utf8');
   const filmHeld = read('lib/hero-phone-mode.ts').includes('export const PHONE_HERO = "film" as "still" | "film";') && !/components\/landing-v2\//.test(read('app/page.tsx'));

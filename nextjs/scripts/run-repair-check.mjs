@@ -653,7 +653,11 @@ function evaluateSkip(ts, node, info, project, importedValue) {
 
 /** Map of selected file -> the mapped projects in which every case of the file is held at this checkout (absent when none). */
 export function heldBrowserProjects(files, workspaceRoot = repoRoot) {
-  const ts = localRequire('typescript');
+  // The selector self-tests run before dependencies are installed. Without the parser nothing can be proven held:
+  // every file stays selected and the one-passing-test rule decides, exactly as before this reader existed.
+  let ts;
+  try { ts = localRequire('typescript'); }
+  catch (error) { if (error?.code === 'MODULE_NOT_FOUND') return new Map(); throw error; }
   const held = new Map();
   for (const file of [...new Set(files)].sort()) {
     const projects = browserProjectsByFile.get(file);
