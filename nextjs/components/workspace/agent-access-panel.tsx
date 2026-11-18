@@ -4,7 +4,6 @@ import { useCallback, useEffect, useReducer, useState } from "react";
 import { AGENT_CLIENT_LABEL_UNVERIFIED, AGENT_PROPOSAL_CONSENT } from "@/lib/agent-consent";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { saveAsFile } from "@/components/change-proposals-panel";
 import type { GrantActivityRow } from "@/lib/change-proposals";
 import styles from "./agent-access-panel.module.css";
 
@@ -56,6 +55,20 @@ const isActivityRow = (r: unknown): r is GrantActivityRow => Boolean(r) && typeo
   && Number.isFinite(Date.parse((r as GrantActivityRow).createdAt))
   && ((r as GrantActivityRow).decidedAt === null || Number.isFinite(Date.parse((r as GrantActivityRow).decidedAt as string)));
 
+/** The listed rows as NDJSON: every row now shown (all pages read so far), in order, one object per line. */
+export function activityNdjson(rows: readonly GrantActivityRow[]): string {
+  return rows.map((row) => JSON.stringify(row)).join("\n") + "\n";
+}
+
+function downloadRows(rows: readonly GrantActivityRow[], filename: string) {
+  const url = URL.createObjectURL(new Blob([activityNdjson(rows)], { type: "application/x-ndjson" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /** What one grant's agent proposed: a page at a time, and the same rows as an NDJSON download. A malformed answer shows nothing. */
 export function GrantActivity({ grantId }: { grantId: string }) {
   const [rows, setRows] = useState<GrantActivityRow[] | null>(null);
@@ -96,7 +109,7 @@ export function GrantActivity({ grantId }: { grantId: string }) {
         {next ? <button type="button" className={styles.action} disabled={busy} onClick={() => void read(next)}>Show more</button> : null}
         {rows && rows.length > 0 ? (
           <button type="button" className={styles.action} disabled={busy}
-            onClick={() => { void saveAsFile(`${base}?format=ndjson`, `agent-activity-${grantId}.ndjson`).then((ok) => { if (!ok) setState("unavailable"); }); }}>
+            onClick={() => downloadRows(rows, `agent-activity-${grantId}.ndjson`)}>
             Export these rows
           </button>
         ) : null}

@@ -1,5 +1,6 @@
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
+const { readFile } = await import("node:fs/promises");
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 type Page = import("@playwright/test").Page;
@@ -710,7 +711,9 @@ test("Agent access: Activity lists what this connection proposed, pages it, and 
 
   const [download] = await Promise.all([page.waitForEvent("download"), panel.getByRole("button", { name: "Export these rows" }).click()]);
   expect(download.suggestedFilename()).toBe(`agent-activity-${grantId}.ndjson`);
-  expect(requests.some((search) => search.includes("format=ndjson"))).toBe(true);
+  // The file holds every listed row (pages 1 and 2), in the listed order, not just the first page.
+  const exported = (await readFile((await download.path())!, "utf8")).trim().split("\n").map((line) => JSON.parse(line).proposalId);
+  expect(exported).toEqual(all.map((r) => r.proposalId));
 
   await activity.click();
   await expect(list).toHaveCount(0);

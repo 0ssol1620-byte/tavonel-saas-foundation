@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { activityLine, ConsentText, copyCredential, GrantActivity, createOutcome, revealAfter, TokenReveal } from "../components/workspace/agent-access-panel";
+import { activityLine, activityNdjson, ConsentText, copyCredential, GrantActivity, createOutcome, revealAfter, TokenReveal } from "../components/workspace/agent-access-panel";
 import { AGENT_PROPOSAL_CONSENT } from "./agent-consent";
 
 // A made-up value that only has the shape of a credential; no real one is used anywhere.
@@ -79,9 +79,20 @@ describe("Agent access activity (WO-AN-10)", () => {
     expect(activityLine({ ...row, actionType: "<img>" as never, state: "later" as never })).toContain("Change · later");
     expect(renderToStaticMarkup(createElement(GrantActivity, { grantId: row.proposalId }))).toContain("Reading activity");
   });
+  it("the export is every listed row, in order, one JSON object per line (pages 1..n after Show more)", () => {
+    const page1 = [row, { ...row, proposalId: "00000000-0000-4000-8000-000000000002" }];
+    const page2 = [{ ...row, proposalId: "00000000-0000-4000-8000-000000000003", receiptAvailable: false }];
+    const listed = [...page1, ...page2];
+    const lines = activityNdjson(listed).split("\n");
+    expect(lines.pop()).toBe("");
+    expect(lines.map((line) => JSON.parse(line).proposalId)).toEqual(listed.map((r) => r.proposalId));
+    expect(lines.map((line) => JSON.parse(line))).toEqual(listed);
+  });
   it("source: the panel offers Activity per grant, with the export and Show more, and no localStorage", () => {
     const source = readFileSync(new URL("../components/workspace/agent-access-panel.tsx", import.meta.url), "utf8");
-    expect(source).toContain("?format=ndjson");
+    // The export is the rows in state (every page shown), never a re-request that would hold only page 1.
+    expect(source).not.toContain("format=ndjson");
+    expect(source).toContain("activityNdjson(rows)");
     expect(source).toContain("Show more");
     expect(source).toMatch(/aria-expanded=\{openActivity === grant\.grantId\}/);
   });
