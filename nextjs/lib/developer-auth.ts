@@ -4,6 +4,7 @@ import { withinAgentMcpDispatch } from "./agent-mcp-dispatch";
 import { authorizeFoundationProduct, type MinimumPlanLevel } from "./billing-product-access";
 import type { DeveloperScope } from "./developer-contracts";
 import { authenticateDeveloperApiKey, consumeDeveloperApiRateLimit, type ApiKeyAudience } from "./developer-store";
+import { resolveActingWorkspace } from "./acting-workspace";
 import { foundationPilotAccess, getRequestUser } from "./foundation-pilot";
 import {
   authorizeFoundationSessionProduct,
@@ -146,8 +147,10 @@ async function resolveFoundationAuthorization(
     if (!authenticated.principal.scopes.includes(scope)) {
       return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
     }
-    const pilot = foundationPilotAccess(authenticated.principal.userId);
-    if (!pilot || pilot.membership.workspaceId !== authenticated.principal.workspaceKey) {
+    // WO-C-T1: a key is bound to the workspace it was created in, which may be one the person is a
+    // member of rather than their own. What admits it is pilot access plus an active membership in
+    // that workspace at the revision the key was made at -- never the derived key alone.
+    if (!foundationPilotAccess(authenticated.principal.userId)) {
       return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
     }
     const authority = await resolveWorkspaceAuthority(
@@ -157,6 +160,11 @@ async function resolveFoundationAuthorization(
     if (!authority.ok) return authority;
     if (authenticated.principal.authorizationRevision !== authority.authorizationRevision) {
       return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
+    }
+    // TC-D3, fail closed: the remote MCP lists Worlds without the viewer's source scope, so it
+    // serves owners and admins only until it can honour a member's scope (WO-C-T3).
+    if (audience === "mcp" && authority.workspaceRole === "member") {
+      return { ok: false as const, code: "REMOTE_MCP_MEMBER_UNAVAILABLE", status: 403 };
     }
     const { audience: _audience, agent: _agent, ...identity } = authenticated.principal;
     const principal: FoundationPrincipal = {
@@ -195,8 +203,8 @@ async function resolveFoundationAuthorization(
 
   const user = await getRequestUser(request);
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
-  const access = foundationPilotAccess(user.id);
-  if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+  const access = await resolveActingWorkspace(request, user);
+  if (!access.ok) return access;
   const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
   if (!authority.ok) return authority;
   if (minimumPlan === null) {
@@ -330,8 +338,8 @@ export async function requireFoundationSession(request: Request, minimumPlan: Mi
 async function resolveFoundationSession(request: Request, minimumPlan: MinimumPlanLevel | null) {
   const user = await getRequestUser(request);
   if (!user) return { ok: false as const, code: "AUTH_REQUIRED", status: 401 };
-  const access = foundationPilotAccess(user.id);
-  if (!access) return { ok: false as const, code: "PILOT_ACCESS_REQUIRED", status: 403 };
+  const access = await resolveActingWorkspace(request, user);
+  if (!access.ok) return access;
   const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
   if (!authority.ok) return authority;
   const productAccess = minimumPlan === null ? null

@@ -11,7 +11,7 @@
     "F-oauth-token": "TAVONEL as the OAuth 2.1 authorization server of the remote MCP. The credential is an authorization code in the form body, sealed to one client and bound to a PKCE S256 verifier, so nothing ambient exists for a forged request to ride. Requires: single-use code, PKCE, exact redirect binding."
   },
   "corsPosture": "No route sets any Access-Control-Allow-* header, and next.config.mjs adds none. There is therefore no credentialed cross-origin access and no wildcard origin anywhere on the API surface. lib/route-classification.test.ts asserts this.",
-  "cookies": "The only Set-Cookie on the API surface is the self-service trial device cookie (lib/self-service-trial.ts:69, HttpOnly; Secure; SameSite=Lax). It is an abuse signal consumed by bootstrap_foundation_self_service_trial, never an authorization credential: app/api/access/bootstrap/route.ts rejects the request with AUTH_REQUIRED before reading it unless a Bearer JWT is present.",
+  "cookies": "The API surface sets two cookies. The first is the self-service trial device cookie (lib/self-service-trial.ts:69, HttpOnly; Secure; SameSite=Lax). It is an abuse signal consumed by bootstrap_foundation_self_service_trial, never an authorization credential: app/api/access/bootstrap/route.ts rejects the request with AUTH_REQUIRED before reading it unless a Bearer JWT is present. The second is the acting-workspace cookie `tavonel_ws` (app/api/workspaces/select/route.ts, HttpOnly; Secure; SameSite=Lax; Path=/; 30 days, WO-C-T1). It selects among the caller's own active workspace memberships and grants nothing: lib/acting-workspace.ts honours it only after a Bearer JWT authenticated the request and only while the user holds an active foundation_workspace_members row for the named workspace, re-read on every request; otherwise the user's own workspace. Privilege still comes only from the Bearer header. Billing and access bootstrap never read it.",
   "routes": {
     "app/api/access/bootstrap/route.ts": {
       "type": "A-bearer",
@@ -687,6 +687,22 @@
         "DELETE"
       ],
       "credential": "bearer:supabase-jwt"
+    },
+    "app/api/workspaces/select/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Sets the acting-workspace cookie tavonel_ws only after the Bearer JWT is authenticated and an active membership in the named workspace is read; choosing one's own workspace clears it. The cookie selects among the caller's own memberships; privilege still comes only from the Bearer header."
+    },
+    "app/api/workspaces/mine/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Lists the caller's own active workspace memberships and which one the request acts in. The cookie selects among the caller's own memberships; privilege still comes only from the Bearer header."
     },
     "app/api/access/processing-terms/route.ts": {
       "type": "A-bearer",

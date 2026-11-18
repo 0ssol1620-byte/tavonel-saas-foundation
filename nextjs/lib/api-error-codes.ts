@@ -188,6 +188,12 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
         whatToDo: "Nothing a caller can send fixes this. It is an operator configuration; retry later.",
       },
       {
+        code: "REMOTE_MCP_MEMBER_UNAVAILABLE",
+        status: 403,
+        meaning: "The remote MCP connection belongs to a person who is a member, not an owner or admin, of the workspace it names. The remote MCP serves owners and admins only, because it cannot yet limit what it reads to the sources a member may read.",
+        whatToDo: "Use the REST API with a key made in Workspace > Developers, or ask a workspace owner or admin to connect the AI client.",
+      },
+      {
         code: "PILOT_ACCESS_REQUIRED",
         status: 403,
         meaning: "The credential is valid and the workspace it names is not admitted to TAVONEL.",

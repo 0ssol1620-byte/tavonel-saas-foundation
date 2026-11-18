@@ -3,7 +3,8 @@ import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { collectionPackageSizeRefusal, validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { assertEquivalenceGate } from "@/lib/equivalence-gate";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { resolveActingWorkspace, revalidateActingWorkspace } from "@/lib/acting-workspace";
+import { getRequestUser } from "@/lib/foundation-pilot";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { authorizeWorldActivation } from "@/lib/trial-ai-access";
 import {
@@ -111,13 +112,15 @@ export async function POST(
     );
   }
 
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  // WO-C-T1: the workspace the person acts in -- their own, or one they are an active member of.
+  const access = await resolveActingWorkspace(request, user);
+  if (!access.ok) return NextResponse.json({ code: access.code }, { status: access.status, headers: NO_STORE });
   const { membership } = access;
   // A paid plan, or the free evaluation's one World (lib/trial-ai-access.ts).
   const productAccess = await authorizeWorldActivation(membership.workspaceId, user.id, membership.role, id, manifestDigest);
   if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
-  if (membership.role !== "owner" && membership.role !== "admin") {
+  // TC-D7: a member may promote inside their scope; only owner and admin may roll back.
+  if (membership.role !== "owner" && membership.role !== "admin" && membership.role !== "member") {
     return NextResponse.json(
       { code: "PROMOTION_ROLE_REQUIRED" },
       { status: 403, headers: NO_STORE }
@@ -274,15 +277,13 @@ export async function POST(
     );
   }
   const currentUser = await getRequestUser(request);
-  const currentPilot = currentUser ? foundationPilotAccess(currentUser.id) : null;
-  if (
-    !currentUser || currentUser.id !== user.id ||
-    !currentPilot || currentPilot.membership.workspaceId !== membership.workspaceId ||
-    (currentPilot.membership.role !== "owner" && currentPilot.membership.role !== "admin")
-  ) {
+  if (!currentUser || currentUser.id !== user.id) {
     return NextResponse.json({ code: "AUTHORIZATION_CHANGED_RETRY" }, { status: 403, headers: NO_STORE });
   }
-  const currentProductAccess = await authorizeWorldActivation(membership.workspaceId, user.id, currentPilot.membership.role, id, manifestDigest);
+  // Same workspace, same role; a revoke or role change in between resolves differently.
+  const currentAccess = await revalidateActingWorkspace(request, currentUser, membership);
+  if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, { status: currentAccess.status, headers: NO_STORE });
+  const currentProductAccess = await authorizeWorldActivation(membership.workspaceId, user.id, membership.role, id, manifestDigest);
   if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
     status: currentProductAccess.status, headers: NO_STORE,
   });
