@@ -581,7 +581,7 @@ async function openAgentAccess(page: Page, grants: Grant[]) {
       grants.unshift(grant);
       return route.fulfill({ status: 201, json: { code: "CREATED", grant, token: FAKE_CREDENTIAL } });
     }
-    return route.fulfill({ json: { code: "OK", grants, truncated: false } });
+    return route.fulfill({ json: { code: "OK", grants, truncated: false, creatable: true } });
   });
   await page.route("**/api/agent-grants/*", (route) => {
     const grant = grants.find((g) => route.request().url().endsWith(g.grantId));

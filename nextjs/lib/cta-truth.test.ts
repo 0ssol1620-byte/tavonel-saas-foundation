@@ -303,6 +303,10 @@ describe("each environment is the state it is named for", () => {
     vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"p".repeat(26)}`);
     expect((await status()).purchasePlan).toBe(false);
     vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"d".repeat(26)}`);
+    // WO-REL-5: both prices with the page meter on for a canary list only still sell nothing; `*` opens the sale.
+    vi.stubEnv("TAVONEL_PAGE_METER_COHORT", "pilot-canary01");
+    expect((await status()).purchasePlan).toBe(false);
+    vi.stubEnv("TAVONEL_PAGE_METER_COHORT", "*");
     expect(await status()).toEqual({ createAccount: true, purchasePlan: true, liveCommerce: true });
   }, RENDER_TIMEOUT);
 });

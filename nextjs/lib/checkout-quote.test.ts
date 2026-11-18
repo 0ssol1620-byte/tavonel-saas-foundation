@@ -4,7 +4,7 @@ const { intent, binding, offers, delivered } = vi.hoisted(() => ({
   intent: vi.fn(),
   binding: vi.fn(),
   offers: { current: new Map<import("./billing-catalog").BillingOfferCode, unknown>() },
-  delivered: { all: true, release: false },
+  delivered: { all: true, release: false, deployment: false },
 }));
 
 vi.mock("@/lib/account-grants", () => ({ getFoundationAccountGrant: async () => ({ ok: true, grant: null }) }));
@@ -15,7 +15,7 @@ vi.mock("@/lib/billing-catalog", async (original) => {
   return {
     ...catalog,
     readConfiguredBillingOffers: () => offers.current,
-    planAvailability: (code: never) =>
+    planAvailability: (code: never) => delivered.deployment ? catalog.planAvailability(code, offers.current) :
       catalog.planAvailability(code, offers.current, delivered.release ? catalog.DELIVERED
         : delivered.all ? new Set(Object.values(catalog.BILLING_OFFERS).flatMap((o) => o.requires)) : new Set()),
     readPaddleBrowserConfig: () => ({ environment: "sandbox", clientToken: `test_${"a".repeat(30)}` }),
@@ -125,6 +125,7 @@ describe("checkout route returns the quote", () => {
     intent.mockResolvedValue({ ok: true });
     delivered.all = true;
     delivered.release = false;
+    delivered.deployment = false;
     offers.current = new Map(v2.map((code) => [code, configured(code)]));
   });
 
@@ -137,6 +138,31 @@ describe("checkout route returns the quote", () => {
     const statuses: Array<[string, number]> = [];
     for (const code of v2) statuses.push([code, (await POST(request(code))).status]);
     expect(statuses).toEqual([["personal", 200], ["developer", 200], ["team", 403], ["business", 403]]);
+  });
+
+  /*
+    WO-REL-5: the same route with `planAvailability`'s own default (the deployment's TAVONEL_PAGE_METER_COHORT) and both
+    V22 prices: only `*` opens Personal and Developer; a canary list, unset or a malformed value refuses every plan
+    before a binding or an intent.
+  */
+  it("with both V22 prices, quotes only when the page meter is on for every workspace", async () => {
+    delivered.deployment = true;
+    offers.current = new Map((["personal", "developer"] as const).map((code) => [code, configured(code)]));
+    for (const cohort of [undefined, "", "pilot-canary01", "pilot-canary01,pilot-canary02", " *", "*,pilot-canary01", "all"]) {
+      vi.stubEnv("TAVONEL_PAGE_METER_COHORT", cohort);
+      for (const code of v2) {
+        const response = await POST(request(code));
+        expect(response.status, `${code} / ${JSON.stringify(cohort)}`).toBe(403);
+        await expect(response.json()).resolves.toEqual({ code: "BILLING_OFFER_CONTACT_REQUIRED" });
+      }
+    }
+    expect(binding).not.toHaveBeenCalled();
+    expect(intent).not.toHaveBeenCalled();
+    vi.stubEnv("TAVONEL_PAGE_METER_COHORT", "*");
+    const statuses: Array<[string, number]> = [];
+    for (const code of v2) statuses.push([code, (await POST(request(code))).status]);
+    expect(statuses).toEqual([["personal", 200], ["developer", 200], ["team", 403], ["business", 403]]);
+    vi.unstubAllEnvs();
   });
 
   it("with the release's line and no V22 price, or only one, every plan is refused before an intent", async () => {

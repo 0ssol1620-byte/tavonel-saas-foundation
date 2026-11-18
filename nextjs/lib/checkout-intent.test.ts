@@ -9,7 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type PlanAvailability } from "./billing-catalog";
+import { BILLING_OFFERS, deliveredForSale, planAvailability, readConfiguredBillingOffers, type PlanAvailability } from "./billing-catalog";
 import {
   checkoutSellable,
   decideCheckoutResume,
@@ -67,12 +67,17 @@ describe("checkoutSellable: the one predicate /login's notice and H1 both read (
   */
   it("sells Personal and Developer only with both V22 prices set, in the release as it is", () => {
     const sellable = (env: Record<string, string>) => OFFER_CODES.filter((code) =>
-      checkoutSellable(served(planAvailability(code, readConfiguredBillingOffers(env))), true));
-    const retired = { PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"o".repeat(26)}`, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"s".repeat(26)}` };
+      checkoutSellable(served(planAvailability(code, readConfiguredBillingOffers(env), deliveredForSale(env))), true));
+    const retired = { PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"o".repeat(26)}`, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"s".repeat(26)}`, TAVONEL_PAGE_METER_COHORT: "*" };
     expect(sellable(retired)).toEqual([]);
     expect(sellable({ ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}` })).toEqual([]);
-    expect(sellable({ ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` }))
-      .toEqual(["personal", "developer"]);
+    const both = { ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` };
+    expect(sellable(both)).toEqual(["personal", "developer"]);
+    // WO-REL-5: both prices set while the page meter is not on for every workspace sells nothing.
+    const noCohort = Object.fromEntries(Object.entries(both).filter(([name]) => name !== "TAVONEL_PAGE_METER_COHORT"));
+    for (const cohort of [undefined, "", "pilot-canary01", " *", "*,pilot-canary01"]) {
+      expect(sellable(cohort === undefined ? noCohort : { ...both, TAVONEL_PAGE_METER_COHORT: cohort }), JSON.stringify(cohort)).toEqual([]);
+    }
   });
 
   /*

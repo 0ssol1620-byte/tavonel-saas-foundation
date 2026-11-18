@@ -391,11 +391,44 @@ describe("GET /api/agent-grants and DELETE /api/agent-grants/{id}", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ code: "OK", grants: [grantRow()], truncated: false });
+    // WO-REL-5: with the flag off, the list is still answered and `creatable` is false.
+    expect(JSON.parse(text)).toEqual({ code: "OK", grants: [grantRow()], truncated: false, creatable: false });
     expect(text).not.toMatch(/tvnl_|token|sha256|[a-f0-9]{64}/);
     expect(calls[0]!.body).toMatchObject({ p_workspace_key: WS, p_user_id: USER });
     expect(requireFoundationRevokeSession).toHaveBeenCalled();
     expect(requireFoundationSession).not.toHaveBeenCalled();
+  });
+
+  it("WO-REL-5: GET answers creatable true only for a workspace POST would create for, and nothing else about the flag", async () => {
+    store(() => Response.json([grantRow()]));
+    const read = async () => (await (await GET(new Request("https://tavonel.com/api/agent-grants", { headers: { authorization: "Bearer session-jwt" } }))).json()) as Record<string, unknown>;
+    const on = await read();
+    expect(on).toEqual({ code: "OK", grants: [grantRow()], truncated: false, creatable: true });
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", "pilot-someoneelse");
+    const outside = await read();
+    expect(outside).toEqual({ ...on, creatable: false });
+    // One boolean: no flag name, no cohort member, no refusal code.
+    expect(JSON.stringify(outside)).not.toMatch(/TAVONEL_|pilot-someoneelse|COHORT|ENABLED/);
+  });
+
+  it("WO-REL-5: GET's creatable and POST's refusal cannot disagree, in every flag and cohort state", async () => {
+    store((name, body) => name === "create_foundation_agent_grant" ? createRpc(name, body) : Response.json([]));
+    const cells: Array<[string | undefined, string | undefined]> = [];
+    for (const flag of [undefined, "", "true", "false", "TRUE", "1"]) {
+      for (const cohort of [undefined, "", WS, `${WS},pilot-b`, "pilot-b", "*", "all", `${WS},bad key`, ` ${WS} `]) cells.push([flag, cohort]);
+    }
+    const seen = new Set<boolean>();
+    for (const [flag, cohort] of cells) {
+      vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", flag as string);
+      vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", cohort as string);
+      const listed = await (await GET(new Request("https://tavonel.com/api/agent-grants", { headers: { authorization: "Bearer session-jwt" } }))).json() as { creatable: unknown };
+      const created = await POST(post(JSON.stringify({ clientLabel: "Agent" })));
+      expect(typeof listed.creatable, `${flag}/${cohort}`).toBe("boolean");
+      expect([listed.creatable, created.status], `${flag}/${cohort}`).toEqual(listed.creatable ? [true, 201] : [false, 404]);
+      seen.add(listed.creatable as boolean);
+    }
+    // Both answers occur, so the agreement is not two constants.
+    expect(seen).toEqual(new Set([true, false]));
   });
 
   it("DELETE revokes the caller's grant with the flag off, never plan-gated", async () => {
