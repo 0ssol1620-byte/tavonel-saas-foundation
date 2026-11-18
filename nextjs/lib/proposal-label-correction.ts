@@ -7,7 +7,7 @@ import { CANONICAL_DOCUMENT_ID, mayPublish, registerCollectionArtifact } from ".
 import { checkConnectorSourceAccessForViewer } from "./connector-source-access";
 import { admitsDerivedCustomerData } from "./derived-data-admission";
 import { collectionCandidateKey, COLLECTION_ID_PATTERN } from "./immutable-keys";
-import { failClosed } from "./proposal-compile-plan";
+import { decidingRead, failClosed, READ_FAILED } from "./proposal-compile-plan";
 import { putWorkspaceCollectionCandidate } from "./r2-objects";
 import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { hasCorrectionChild, recordFoundationReviewPatchIfLeaf } from "./review-store";
@@ -114,6 +114,11 @@ export const labelCorrectionExecutor: ProposalExecutor<LabelPatchInput> = failCl
     registered candidate whose every document the proposer can read and whose derived data is admitted, and
     every refusal up to there is the same not-found. Then the leaf, the evidence, and the patch applied in
     memory. Writes nothing: no registration, no record, no PUT.
+
+    The candidate listing and the access check decide whether the base names something this caller can read
+    (§18: P4 = candidates + access); the agent tool no longer decides it first (WO-AN-8). For an agent, any
+    failure of them -- an error or malformed answer, a throw, an access check that cannot answer -- is the
+    not-found an absent base gets (flagged READ_FAILED for the server log). A person's listing outage stays a 503.
   */
   async prepare(actor, raw, evidenceIds) {
     if (!isObject(raw) || !sameKeys(raw, REQUEST_KEYS)) return failure("PROPOSAL_REQUEST_INVALID", 400);
@@ -121,12 +126,14 @@ export const labelCorrectionExecutor: ProposalExecutor<LabelPatchInput> = failCl
     if (typeof collectionId !== "string" || !COLLECTION_ID_PATTERN.test(collectionId) || typeof baseManifestDigest !== "string" || !SHA256.test(baseManifestDigest)
       || typeof objectId !== "string" || !OBJECT_ID.test(objectId) || !label(before) || !label(after)
       || typeof evidenceId !== "string" || !EVIDENCE_ID.test(evidenceId)) return failure("PROPOSAL_REQUEST_INVALID", 400);
-    const base = await baseCandidateDocuments(actor.workspaceKey, collectionId, baseManifestDigest);
-    if (!base.ok) return base;
+    const agent = actor.kind === "agent";
+    const deciding = decidingRead(agent);
+    const base = await deciding(() => baseCandidateDocuments(actor.workspaceKey, collectionId, baseManifestDigest));
+    if (!base || !base.ok) return agent ? READ_FAILED : base ?? UNAVAILABLE;
     if (base.documentIds === null) return NOT_FOUND;
     const documentIds = base.documentIds;
-    const access = await checkConnectorSourceAccessForViewer(actor.workspaceKey, [...documentIds], actor.userId);
-    if (!access.ok) return NOT_FOUND;
+    const access = await deciding(() => checkConnectorSourceAccessForViewer(actor.workspaceKey, [...documentIds], actor.userId));
+    if (!access?.ok) return access?.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? NOT_FOUND : READ_FAILED;
     if (!await admitsDerivedCustomerData(actor.workspaceKey, documentIds)) return NOT_FOUND;
     const leaf = await leafBinding({ collectionId, baseManifestDigest }, actor.workspaceKey);
     if (!leaf.ok) return leaf;

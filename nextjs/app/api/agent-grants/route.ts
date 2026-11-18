@@ -64,6 +64,10 @@ export async function POST(request: Request) {
     clientLabel: input.clientLabel,
     grantorEmail: auth.principal.email,
   });
-  if (!result.ok) return NextResponse.json({ code: result.code }, { status: STATUS[result.code], headers: NO_STORE });
+  if (!result.ok) {
+    // Busy (the kill switch holds the lock): nothing was created; 2 s is a start value (WO-AN-8).
+    const headers = result.code === "AGENT_GRANTS_BUSY_RETRY" ? { ...NO_STORE, "Retry-After": "2" } : NO_STORE;
+    return NextResponse.json({ code: result.code }, { status: STATUS[result.code], headers });
+  }
   return NextResponse.json({ code: "CREATED", grant: result.grant, token: result.token }, { status: 201, headers: NO_STORE });
 }

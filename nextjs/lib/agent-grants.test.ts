@@ -496,6 +496,16 @@ describe("the kill-switch lock timeout is one retryable refusal (WO-AN-7B)", () 
     }
   });
 
+  /* WO-AN-8: the busy refusal says when to come back (Retry-After: 2, a start value); no other refusal of the route does. */
+  it("POST /api/agent-grants answers the busy refusal with Retry-After: 2, and only that refusal", async () => {
+    store(() => lockTimeout(500));
+    const busy = await POST(post(JSON.stringify({ clientLabel: "Agent" })));
+    expect([busy.status, busy.headers.get("retry-after"), busy.headers.get("cache-control")]).toEqual([503, "2", "no-store"]);
+    store(() => pgError("deadlock detected", 500));
+    const failed = await POST(post(JSON.stringify({ clientLabel: "Agent" })));
+    expect([failed.status, failed.headers.get("retry-after")]).toEqual([503, null]);
+  });
+
   it("the agent-grant routes answer it as 503 AGENT_GRANTS_BUSY_RETRY, and mint or revoke nothing", async () => {
     store(() => lockTimeout(500));
     const created = await POST(post(JSON.stringify({ clientLabel: "Agent" })));
