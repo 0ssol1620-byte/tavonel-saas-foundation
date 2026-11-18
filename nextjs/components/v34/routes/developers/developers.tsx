@@ -110,8 +110,8 @@ export function DevelopersBody() {
         {gateClosed ? (
           <p className={s.notice} role="status" data-capability-gate="customerData">
             <strong>{JOURNEY.gate}</strong> {activationPolicy.customerData.reason}{" "}
-            <Link className={s.inlineLink} href={v34Route("contact").path} prefetch={false}>{JOURNEY.request}</Link>{" "}
-            <Link className={s.inlineLink} href={EXPLORE_CTA.href as Route} prefetch={false}>{EXPLORE_CTA.label}</Link>
+            <Link className={s.sentenceLink} href={v34Route("contact").path} prefetch={false}>{JOURNEY.request}</Link>{" "}
+            <Link className={s.sentenceLink} href={EXPLORE_CTA.href as Route} prefetch={false}>{EXPLORE_CTA.label}</Link>
           </p>
         ) : null}
       </Section>
@@ -129,7 +129,7 @@ export function DevelopersBody() {
         </div>
         <p className={s.sampleNote}>
           {FIRST_READ.note} <code className={s.inlineCode}>{mcpTool}</code>. {FIRST_READ.keys}{" "}
-          <Link className={s.inlineLink} href={WORKSPACE_HREF} prefetch={false}>{FIRST_READ.keysLink}</Link>
+          <Link className={s.sentenceLink} href={WORKSPACE_HREF} prefetch={false}>{FIRST_READ.keysLink}</Link>
         </p>
       </Section>
 

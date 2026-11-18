@@ -94,6 +94,11 @@
   outline-offset: 4px;
 }
 
+/* Inside a sentence the ring sits closer than the row link's 4px: at 4px it reached 1.2px into the line above (WO-CI-30). */
+.inlineLink:focus-visible {
+  outline-offset: 2px;
+}
+
 .links {
   display: grid;
   gap: 0;

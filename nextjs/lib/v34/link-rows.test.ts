@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TrustNext } from "@/components/trust-next";
 import { EnterpriseBody } from "@/components/v34/routes/enterprise/enterprise";
 import { EvidenceBody } from "@/components/v34/routes/evidence/evidence";
@@ -12,6 +12,15 @@ import { ProgramBody } from "@/components/v34/routes/research-program/program";
 import { ResearchBody } from "@/components/v34/routes/research/research";
 import { WorldBody } from "@/components/v34/routes/world/world";
 import { sampleEvidencePage } from "@/lib/evidence-regions";
+import { ContactBody } from "@/components/v34/routes/contact/contact";
+import { DevelopersBody } from "@/components/v34/routes/developers/developers";
+import { SecurityBody } from "@/components/v34/routes/security/security";
+import { inSentenceViolations } from "./in-sentence-guard";
+import { reach } from "./import-graph";
+import contactModule from "@/components/v34/routes/contact/contact.module.css";
+import developersModule from "@/components/v34/routes/developers/developers.module.css";
+import programModule from "@/components/v34/routes/research-program/program.module.css";
+import securityModule from "@/components/v34/routes/security/security.module.css";
 import enterpriseModule from "@/components/v34/routes/enterprise/enterprise.module.css";
 import journalModule from "@/components/v34/routes/journal/journal.module.css";
 import platformModule from "@/components/v34/routes/platform/platform.module.css";
@@ -123,17 +132,30 @@ function linksInContext(html: string): { classes: string[]; text: string; outsid
   return out;
 }
 
-/** The rendered names of a sheet's row classes; a row class the module does not render is refused. */
-function renderedRowClasses({ css, rendered }: Sheet): Map<string, string> {
-  return new Map([...rowClasses(css)].map((local) => {
+/** The rendered names of the row classes of one sheet or several; a row class the module does not render is refused. */
+function renderedRowClasses(sheets: Sheet | Sheet[]): Map<string, string> {
+  return new Map([sheets].flat().flatMap(({ css, rendered }) => [...rowClasses(css)].map((local) => {
     const name = rendered(local);
     if (typeof name !== "string" || name === "") throw new Error(`the sheet's row class .${local} has no rendered name`);
     return [name, local] as const;
+  })));
+}
+
+/**
+ * Every CSS module a route's body reaches through its imports (its own sheet and the sheets of the modules it
+ * imports: a sample frame, a shared card), as sheets. A row class declared in a module the route's own sheet
+ * does not name is still a row class of that page.
+ */
+async function reachedSheets(entry: string): Promise<Sheet[]> {
+  const files = [...reach(ROOT, entry)].filter((file) => file.endsWith(".module.css"));
+  return Promise.all(files.map(async (file) => {
+    const sheetModule = (await import(/* @vite-ignore */ `@/${file}`)) as { default: Record<string, string> };
+    return { css: readFileSync(join(ROOT, file), "utf8"), rendered: (local: string) => sheetModule.default[local] };
   }));
 }
 
-/** The links of a render that carry a row class of the sheet and share their lines with text. */
-function rowLinksInSentences(html: string, sheet: Sheet): string[] {
+/** The links of a render that carry a row class of the sheet(s) and share their lines with text. */
+function rowLinksInSentences(html: string, sheet: Sheet | Sheet[]): string[] {
   const rows = renderedRowClasses(sheet);
   return linksInContext(html)
     .filter((link) => link.outside !== "" && link.classes.some((name) => rows.has(name)))
@@ -180,15 +202,91 @@ describe("decision 23: a row link never sits inside a sentence", () => {
   });
 
   /*
-    /enterprise's `.inline` links sit in its prose with the 44 px box from before this work order;
-    decision 21 hands them to WO-CI-30. They are pinned here by class so that no other row link
-    joins them; when WO-CI-30 makes them plain this list is emptied, not widened.
+    WO-CI-30. /enterprise's `.inline` links and the sample frame's `.link` were the last row classes in a
+    sentence (decision 21 handed them over); both are plain inline now. The route's body reaches two sheets,
+    and the guard reads both.
   */
-  it("/enterprise has no row link inside a sentence apart from WO-CI-30's .inline links", () => {
+  it("/enterprise has no row link inside a sentence, in its own sheet or in a sheet it imports", async () => {
     const html = renderToStaticMarkup(createElement(EnterpriseBody));
-    const found = rowLinksInSentences(html, SHEETS.enterprise);
-    expect(found.length).toBeGreaterThan(0);
-    for (const entry of found) expect(entry, entry).toMatch(/^inline: /);
+    const sheets = await reachedSheets("components/v34/routes/enterprise/enterprise.tsx");
+    expect(sheets.length, "the enterprise body reaches its own sheet and the sample frame's").toBeGreaterThanOrEqual(2);
+    expect(renderedRowClasses(sheets).size).toBeGreaterThan(0);
+    expect(rowLinksInSentences(html, sheets)).toEqual([]);
+    // The in-sentence classes themselves are plain, and the enterprise one is rendered in sentences.
+    for (const [sheetName, name] of [["enterprise", "inline"], ["sample-frame", "link"]] as const) {
+      const css = readFileSync(join(ROOT, "components/v34/routes/enterprise", `${sheetName}.module.css`), "utf8");
+      expect(inSentenceViolations(css, name), `${sheetName} .${name}`).toEqual([]);
+    }
+    expect(linksInContext(html).filter((link) => link.classes.includes(enterpriseModule.inline!) && link.outside !== "").length).toBeGreaterThan(0);
+  });
+
+  it("reads a row class that only a sheet imported by the route declares", () => {
+    const own = literal(".x { color: red; }");
+    const imported = literal(".card { display: inline-flex; min-height: 44px; }");
+    const html = '<p>See <a class="card" href="/x">the card</a> here.</p>';
+    expect(rowLinksInSentences(html, own)).toEqual([]);
+    expect(rowLinksInSentences(html, [own, imported])).toEqual(['card: "the card" in "See here."']);
+  });
+});
+
+/*
+  WO-CI-30 item 3. The same in-sentence row for every V34 sheet whose link class is read inside a sentence:
+  the class is rendered, every link carrying it shares its lines with text, and the guard of lead decision 23
+  (lib/v34/in-sentence-guard.ts, which walks nested blocks and pseudo-elements) finds nothing in its sheet.
+  Self-tests of the guard, with one mutant per rule, are in in-sentence-guard.test.ts.
+*/
+describe("decision 23: the in-sentence link class of each V34 sheet is plain and is rendered in sentences", () => {
+  const SENTENCE = [
+    ["research-program/program", "inlineLink", programModule, () => createElement(ProgramBody)],
+    ["developers/developers", "sentenceLink", developersModule, () => createElement(DevelopersBody)],
+    ["contact/contact", "inline", contactModule, () => createElement(ContactBody)],
+    ["security/security", "inline", securityModule, () => createElement(SecurityBody)],
+  ] as const;
+
+  it.each(SENTENCE)("%s .%s", (sheetName, name, module, body) => {
+    const css = readFileSync(join(ROOT, "components/v34/routes", `${sheetName}.module.css`), "utf8");
+    expect(inSentenceViolations(css, name)).toEqual([]);
+    const rendered = module[name];
+    expect(typeof rendered, `${sheetName} exports .${name}`).toBe("string");
+    const links = linksInContext(renderToStaticMarkup(body())).filter((link) => link.classes.includes(rendered));
+    expect(links.length, `${sheetName}: a link carries .${name}`).toBeGreaterThan(0);
+    expect(links.filter((link) => link.outside === "").map((link) => link.text), `${sheetName}: every .${name} link shares its lines with text`).toEqual([]);
+  });
+});
+
+/*
+  /connect's `.inlineLink` links render only inside the customer-data gate notice, so with the gate open (the
+  state of every build, `activationPolicy.customerData.enabled`) there is nothing to render and no row of the
+  browser spec can measure them. They are read here with the gate closed: the module graph is reset, the policy
+  is replaced by a copy with the flag false, and the body is rendered from that graph (one React, one module).
+*/
+describe("decision 23: /connect's in-sentence links, rendered with the customer-data gate closed", () => {
+  it("renders .inlineLink inside the notice's sentence, and the sheet makes it plain", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/activation-policy", async (original) => {
+      const real = await original<typeof import("@/lib/activation-policy")>();
+      return { ...real, activationPolicy: { ...real.activationPolicy, customerData: { ...real.activationPolicy.customerData, enabled: false } } };
+    });
+    try {
+      const { createElement: element } = await import("react");
+      const { renderToStaticMarkup: render } = await import("react-dom/server");
+      const { ConnectBody: Body } = await import("@/components/v34/routes/connect/connect");
+      const sheet = (await import("@/components/v34/routes/connect/connect.module.css")).default as Record<string, string>;
+      const html = render(element(Body, { remoteOpen: false }));
+      const links = linksInContext(html).filter((link) => link.classes.includes(sheet.inlineLink!));
+      expect(links.map((link) => link.text), "both notice links carry .inlineLink").toEqual(["Discuss your sources", "Open the public Compiled World"]);
+      expect(links.filter((link) => link.outside === "").map((link) => link.text), "and share their lines with the notice's words").toEqual([]);
+      expect(inSentenceViolations(readFileSync(join(ROOT, "components/v34/routes/connect/connect.module.css"), "utf8"), "inlineLink")).toEqual([]);
+      // With the gate open the same body renders none of them: the reason the browser spec has no /connect row.
+    } finally {
+      vi.doUnmock("@/lib/activation-policy");
+      vi.resetModules();
+    }
+    const { createElement: element } = await import("react");
+    const { renderToStaticMarkup: render } = await import("react-dom/server");
+    const { ConnectBody: Body } = await import("@/components/v34/routes/connect/connect");
+    const sheet = (await import("@/components/v34/routes/connect/connect.module.css")).default as Record<string, string>;
+    expect(linksInContext(render(element(Body, { remoteOpen: false }))).filter((link) => link.classes.includes(sheet.inlineLink!))).toEqual([]);
   });
 });
 

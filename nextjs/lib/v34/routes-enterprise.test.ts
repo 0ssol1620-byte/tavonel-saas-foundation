@@ -11,6 +11,7 @@ import { signedProductDemo } from "@/lib/signed-product-demo";
 import { SAMPLE_FRAME_LABEL } from "@/components/sample-world-frame";
 import { ENTERPRISE_REGISTRY_LINKS, RETAINED, SCOPED } from "@/components/v34/routes/enterprise/enterprise-content";
 import { EnterpriseBody } from "@/components/v34/routes/enterprise/enterprise";
+import { inSentenceViolations } from "./in-sentence-guard";
 import { routeMetadata } from "./route-metadata";
 import { V34_ROUTE_KEYS, v34Route } from "./routes";
 
@@ -262,17 +263,30 @@ describe("tokens, targets and states", () => {
     }
   });
 
-  it("gives every link class a 24px target, a hover and a focus state", () => {
+  /*
+    Lead decisions 23 and 25 (WO-CI-30). `.inline` (enterprise.module.css) and `.link` (sample-frame.module.css)
+    are rendered inside sentences, so each is a plain inline box at every width, read by the shared guard
+    (lib/v34/in-sentence-guard.ts); every other link class stands in a row of its own and keeps its target.
+    link-rows.test.ts pins that the render puts these two inside sentences and no row class there.
+  */
+  const IN_SENTENCE = ["inline", "link"];
+
+  it("gives every link class a 24px target, a hover and a focus state, and every class inside a sentence a plain inline box", () => {
     const sheet = stripped(styles).map((f) => f.text).join("\n");
     const linkClasses = [...new Set([...sheet.matchAll(/\.(\w*(?:[lL]ink|inline|source))\s*\{/g)].map((m) => m[1]!))];
     expect(linkClasses.length).toBeGreaterThan(0);
+    for (const name of IN_SENTENCE) {
+      expect(linkClasses, `.${name} is listed as inside a sentence but no rule defines it`).toContain(name);
+      expect(inSentenceViolations(sheet, name), `.${name} is a plain inline box at every width`).toEqual([]);
+    }
     for (const name of linkClasses) {
+      expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
+      expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
+      if (IN_SENTENCE.includes(name)) continue;
       const rule = sheet.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))![1]!;
       const min = rule.match(/min-height:\s*([\d.]+)(px|rem)/);
       expect(min, `.${name} has no min-height`).not.toBeNull();
       expect(Number(min![1]) * (min![2] === "rem" ? 16 : 1), `.${name} target`).toBeGreaterThanOrEqual(24);
-      expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
-      expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
     }
   });
 });

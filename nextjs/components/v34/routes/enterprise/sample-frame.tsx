@@ -59,14 +59,14 @@ export function SampleFrame({ demo }: { demo: SignedProductDemo }) {
       </div>
       <figcaption id="enterprise-sample-caption" className={s.caption}>
         <Tag kind="Sample" />
-        <span className={s.captionText}>
+        <p className={s.captionText}>
           The same answer{" "}
           <Link className={s.link} href={retained(RETAINED.demo)} prefetch={false}>the signed sample path</Link>{" "}
           produces, from repository-owned synthetic PDFs about a fictional appliance. The interval
           moved from {demo.change.from} to {demo.change.to} in a change notice; the answer returns
           the region of the revision that carries it. Deployment evidence for a qualified review is
           produced against your own agreed scope.
-        </span>
+        </p>
       </figcaption>
     </figure>
   );

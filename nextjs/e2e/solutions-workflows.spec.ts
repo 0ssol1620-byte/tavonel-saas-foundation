@@ -43,6 +43,7 @@ async function ctaStates(page: Page, info: TestInfo, name: string, width: number
   await page.mouse.move(0, 0);
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-normal.png`);
+  const rest = await cta.evaluate((element) => getComputedStyle(element).backgroundColor);
   await cta.hover();
   // decision.md G-H: a workflow page's hover was --tv-action-hover #0169cd (tavonel.css), adopted by
   // solutions.module.css in P2-03. Inside the V34 frame the retained .btn is painted by the token sheet
@@ -58,6 +59,10 @@ async function ctaStates(page: Page, info: TestInfo, name: string, width: number
     return resolved;
   }, token);
   expect(hover, "the hover token resolves").not.toBe("rgba(0, 0, 0, 0)");
+  // The first token named is the one the page is expected to define; the fallback after it must not be what answers.
+  const first = token.match(/--[\w-]+/)![0];
+  expect(await cta.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name).trim(), first), `${first} is defined on the page`).not.toBe("");
+  expect(rest, "the CTA at rest is not painted the hover colour").not.toBe(hover);
   await expect(cta).toHaveCSS("background-color", hover);
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-hover.png`);

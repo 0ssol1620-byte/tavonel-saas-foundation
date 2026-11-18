@@ -11,6 +11,7 @@ import { BILLING_OFFERS } from "@/lib/billing-catalog";
 import { signedProductDemo } from "@/lib/signed-product-demo";
 import { JUMP, RETAINED, SECURITY_REGISTRY_LINKS } from "@/components/v34/routes/security/security-content";
 import { SecurityBody } from "@/components/v34/routes/security/security";
+import { inSentenceViolations } from "./in-sentence-guard";
 import { routeMetadata } from "./route-metadata";
 import { V34_ROUTE_KEYS, v34Route } from "./routes";
 
@@ -255,31 +256,6 @@ describe("tokens, targets and states", () => {
     class stands alone, so no class is in neither group, and a name or a line here that the sources no longer
     bear fails.
   */
-  const BOX = /^(?:display|min-height|height|max-height|line-height|vertical-align|position|top|bottom|left|right|inset(?:-[a-z]+)*|float|transform|translate|scale|rotate|zoom|padding(?:-top|-bottom|-block(?:-start|-end)?)?|border(?:-top|-bottom|-block(?:-start|-end)?)?(?:-width|-style)?)$/;
-  const PAINT = /^(?:color|outline(?:-color|-style|-width|-offset)?|background(?:-color|-clip)?|text-decoration(?:-[a-z]+)?|text-underline-offset|forced-color-adjust)$/;
-  // Every style rule with the at-rule conditions that hold it ("" outside any); nested blocks are walked.
-  const cssRules = (css: string, condition = ""): { condition: string; selector: string; declarations: [string, string][] }[] => {
-    const out: { condition: string; selector: string; declarations: [string, string][] }[] = [];
-    for (let i = 0, open = css.indexOf("{"); open >= 0; open = css.indexOf("{", i)) {
-      let depth = 1;
-      let j = open + 1;
-      for (; j < css.length && depth > 0; j++) depth += css[j] === "{" ? 1 : css[j] === "}" ? -1 : 0;
-      expect(depth, "the sheet's braces balance").toBe(0);
-      const prelude = css.slice(i, open).split(/[;}]/).at(-1)!.trim().replace(/\s+/g, " ");
-      const body = css.slice(open + 1, j - 1);
-      if (prelude.startsWith("@")) out.push(...cssRules(body, condition ? `${condition} ${prelude}` : prelude));
-      else {
-        const declarations = body.split(";").map((d) => d.trim().replace(/\s+/g, " ")).filter(Boolean).map((d): [string, string] => {
-          const colon = d.indexOf(":");
-          expect(colon, `${prelude}: "${d}" is a declaration`).toBeGreaterThan(0);
-          return [d.slice(0, colon).trim().toLowerCase(), d.slice(colon + 1).trim()];
-        });
-        out.push({ condition, selector: prelude, declarations });
-      }
-      i = j;
-    }
-    return out;
-  };
   const IN_SENTENCE: Record<string, { file: string; lines: number[] }> = {
     inline: { file: "components/v34/routes/security/security.tsx", lines: [121, 127, 129] },
   };
@@ -292,15 +268,8 @@ describe("tokens, targets and states", () => {
       expect(linkClasses, `.${name} is listed as inside a sentence but no rule defines it`).toContain(name);
       const source = readFileSync(join(root, file), "utf8").split(/\r?\n/);
       for (const line of lines) expect(source[line - 1], `${file}:${line} renders .${name}`).toContain(`className={s.${name}}`);
-      const own = cssRules(sheet).filter((r) => new RegExp(`\\.${name}(?![\\w-])`).test(r.selector));
-      expect(own.filter((r) => r.condition === "").length, `.${name} rules outside any condition`).toBeGreaterThan(0);
-      for (const { condition, selector, declarations } of own) {
-        for (const [property, value] of declarations) {
-          if (condition !== "") expect(property, `${condition} { ${selector} } may only paint`).toMatch(PAINT);
-          else if (property === "display") expect(value, `${selector}: display`).toBe("inline");
-          else expect(property, `${selector} changes or moves the box that holds the link`).not.toMatch(BOX);
-        }
-      }
+      // The shared reader (lib/v34/in-sentence-guard.ts) walks nested blocks, pseudo-elements and states too.
+      expect(inSentenceViolations(sheet, name), `.${name} is a plain inline box at every width`).toEqual([]);
     }
     for (const name of linkClasses) {
       expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));

@@ -70,13 +70,26 @@
   color: var(--v34-fg);
 }
 
-/* Inside a sentence (lead decision 21): the gate notice and the sample note. A plain inline box whose
-   target is its text; the floor above does not apply to an inline box and is reset so the computed style
-   says so. The same class alone in a row (.sectionLink, .fileLinks) keeps the 44 px box above. */
-.notice .inlineLink,
-.sampleNote .inlineLink {
+/* Inside a sentence (lead decisions 23 and 25): the gate notice and the sample note. A plain inline box
+   whose target is its text, a class of its own -- the 44 px floor above belongs to the links that stand
+   alone in a row (.sectionLink, .fileLinks) and is never reset here. */
+.sentenceLink {
   display: inline;
-  min-height: 0;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.sentenceLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+/* Inside a sentence the ring sits closer than the row link's 4px: at 4px it reached 0.41 to 1.2px into the line above (WO-CI-30). */
+.sentenceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 2px;
 }
 
 .inlineLink:focus-visible {
