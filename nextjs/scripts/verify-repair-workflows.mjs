@@ -133,6 +133,9 @@ assert(nativeDbCondition==="always() && needs.collector-only-eligibility.result 
 // the migrations onto the rolled-back schema: 20261117120000 cannot apply there by design (its draft keeps the meter's check
 // constraints, the migration adds them unguarded, and its header says a re-release is a new migration version), so a re-apply step
 // could only fail. Any `supabase migration up` in this job is refused, and the reset must come after the four-row check. No push, no secret.
+// Every fingerprint is written sorted (LC_ALL=C sort): catalog-fingerprints.sql orders by (kind, object) only, and its UNION types the
+// object column as a 63-byte name, so the two reserve_foundation_intake_admission overloads share one key at head and their order is
+// not defined; an unsorted fingerprint could differ from itself. No fingerprint in the job may be written unsorted.
 const rollbackBody=dbRehearsal.slice(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n'));
 const rollbackFourRows=rollbackBody.indexOf('test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4');
 const rollbackFinalReset=rollbackBody.indexOf('supabase db reset\n          fingerprint reset\n          diff rollback-fingerprints/released.tsv rollback-fingerprints/reset.tsv\n');
@@ -144,6 +147,9 @@ assert(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n')>dbRehearsal.indexO
   &&rollbackBody.includes("delete from supabase_migrations.schema_migrations where version = '$version';")
   &&rollbackBody.includes("if grep -v -E $'^[<>] (column|constraint)\\tfoundation_compute_reservations\\t' rollback-fingerprints/rolled-back.diff; then")
   &&rollbackFourRows>0&&rollbackFinalReset>rollbackFourRows&&!rollbackBody.includes('supabase migration up')&&rollbackBody.includes('set -euo pipefail')
+  &&rollbackBody.split('catalog-fingerprints.sql').length===3&&!/catalog-fingerprints\.sql(?! \| LC_ALL=C sort > )/.test(rollbackBody)
+  &&rollbackBody.includes('-f nextjs/scripts/db/catalog-fingerprints.sql | LC_ALL=C sort > rollback-fingerprints/boundary.tsv')
+  &&rollbackBody.includes('-f nextjs/scripts/db/catalog-fingerprints.sql | LC_ALL=C sort > "rollback-fingerprints/$1.tsv"; }')
   &&!rollbackBody.includes('secrets.')&&!rollbackBody.includes('supabase db push')&&!rollbackBody.includes('--linked')&&!rollbackBody.includes('continue-on-error'),
   'the stage rollback rehearsal must run every draft newest-first under db-rehearsal\'s gate, admit only the four rows draft 4 keeps, and end on the released schema');
 assert(dbRehearsal.includes("needs.collector-only-eligibility.outputs.affected != 'true' && needs.collector-only-eligibility.outputs.intended == 'false'"), 'unrelated transport must not run for an affected integration head');

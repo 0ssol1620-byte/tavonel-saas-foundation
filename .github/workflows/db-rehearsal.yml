@@ -1330,7 +1330,8 @@ jobs:
           cut -f2 /tmp/rollback-pairs.tsv | while read -r file; do mv "$file" /tmp/rollback-parked/; done
           supabase db start
           eval "$(supabase status --output env | grep '^DB_URL=')"
-          psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql > rollback-fingerprints/boundary.tsv
+          # Sorted: the file orders by (kind, object) only and two overloads can share a 63-byte object key, so its row order is not defined.
+          psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql | LC_ALL=C sort > rollback-fingerprints/boundary.tsv
           mv /tmp/rollback-parked/*.sql supabase/migrations/
           echo "boundary fingerprint rows: $(wc -l < rollback-fingerprints/boundary.tsv)"
       - name: Apply every migration, roll back newest-first with the drafts, then reset and compare with the released schema
@@ -1339,7 +1340,7 @@ jobs:
           set -euo pipefail
           supabase db reset
           eval "$(supabase status --output env | grep '^DB_URL=')"
-          fingerprint() { psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql > "rollback-fingerprints/$1.tsv"; }
+          fingerprint() { psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql | LC_ALL=C sort > "rollback-fingerprints/$1.tsv"; }
           fingerprint released
           mapfile -t pairs < <(tac /tmp/rollback-pairs.tsv)
           for pair in "${pairs[@]}"; do
