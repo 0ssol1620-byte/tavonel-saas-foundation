@@ -723,6 +723,8 @@
   390, 117.2px at 1440. The policy title has no eyebrow, so its top padding is that whole distance,
   read from those same values. Pinned against the V34 T5 pages in the same run by
   e2e/docs-reading-layout.spec.ts. Scoped to the frame; a policy body outside it keeps the rules above.
+  WO-CI-32: /trust and the framed 404 (app/not-found.tsx) open the same way and carry the same class; they
+  measured 174 / 130 / 110 / 110px (WO-CI-28 gap-after.txt) and are pinned by the same spec.
 */
 [data-v34-site] .scene.doc.policy-page {
   padding-top: calc(clamp(45px, 6vw, 92px) + var(--v34-eyebrow) * 1.4 + 14px);
