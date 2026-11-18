@@ -127,12 +127,18 @@ html:has(.evaluation-page) { color-scheme: light; }
   The 44px floor in tavonel.css (same media query) grows an inline link 12.5px above and below its line and
   pulls the margin back so the paragraph does not reflow. That is sound for one link in a sentence; two links
   on adjacent lines sit one line (about 22px) apart, so each grown box covered half of the other and a tap
-  there opened the wrong page (v34 matrix: 128x25 at 390 and 412, and at 1440 under 200% zoom). Here each link
-  is an atomic 44px box with no pull-back, so the line box grows to hold it and no two targets can share a
-  line's height. Same pattern as `.fine .dev-actions a` (product-polish.css); unlayered, so it outranks the floor.
+  there opened the wrong page (v34 matrix: 128x25 at 390 and 412, and at 1440 under 200% zoom).
+
+  WO-CI-36, lead decisions 23 and 25: WO-CI-14 answered with an atomic 44px box per link. A 44px box inside a 22px
+  line makes that line 44px against 22.40px for the next one (measured at 360, 390, 768, 1079 and 1440 with a coarse
+  pointer: "(1) the line that holds it measures 44.00px against the paragraph's next line 22.40px", 10 of 12 rows), and
+  the target-size criterion does not ask it of a link inside a sentence. Here each link is a plain inline box: its
+  target is its text, no two links can share a line's height, and the paragraph reads as one sentence. Same selector
+  as WO-CI-14's, unlayered, so it outranks the floor; the page's own actions (the plan buttons, the utility row, the
+  overage table) are rows of their own and keep 44px above.
 */
 @media (pointer: coarse), (max-width: 1079px) {
-  .pricing-page .fine:has(> a ~ a) > a { display: inline-flex; align-items: center; min-height: 44px; padding-block: 0; margin-block: 0; }
+  .pricing-page .fine:has(> a ~ a) > a { display: inline; min-height: 0; padding-block: 0; margin-block: 0; }
 }
 /* WO-CI-23: the overage table's "Request access" links are controls, 44px at every width (lead decision 14). */
 .pricing-page table[aria-labelledby="pricing-overage-title"] td a { display: inline-flex; align-items: center; min-height: 44px; }

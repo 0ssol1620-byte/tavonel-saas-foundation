@@ -465,6 +465,59 @@ test.describe("chromium", () => {
   }
 });
 
+/*
+  WO-CI-36. The consent card is fixed over the foot of the page; scrolled to the end with the card open, it stood
+  over footer links (hosted run on 4005c787: the click on the "Explore" footer row at 1,440 was intercepted by the
+  card; measured, it also covered the legal row at 360 and 390). A visitor must be able to reach every footer row
+  without answering the card, so the page reserves the card's room at its end while the card is open. The test never
+  dismisses the card: it scrolls to the end of the page with the card open and asks, for every painted footer link
+  and button, whether the CENTRE of its box lies inside the card's box. (The footer's own groups are opened first so
+  a phone's disclosed rows are painted.)
+*/
+test.describe("the consent card never stands over a footer row", () => {
+  for (const [width, height] of [[360, 844], [390, 844], [768, 900], [1440, 900]] as const) {
+    test(`at ${width}px, scrolled to the end with the card open`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport");
+      await page.setViewportSize({ width, height });
+      await page.goto(DIRECTORY_START, { waitUntil: "domcontentloaded" });
+      // The card shows after the first scroll past 200px (CONSENT_REVEAL); it is answered by nobody here.
+      await page.evaluate(() => window.scrollTo(0, 300));
+      const card = page.locator("[data-marketing-consent-panel]");
+      await expect(card, "the consent card is open").toBeVisible();
+      await page.evaluate((selector) => { for (const group of document.querySelectorAll(`${selector} details`)) (group as HTMLDetailsElement).open = true; }, FOOTER);
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+      const seen = await page.evaluate((selector) => {
+        const cardBox = document.querySelector("[data-marketing-consent-panel]")!.getBoundingClientRect();
+        const rows = [...document.querySelectorAll<HTMLElement>(`${selector} a, ${selector} button`)].filter((row) => row.checkVisibility() && row.getBoundingClientRect().height > 0);
+        const under = rows.filter((row) => {
+          const box = row.getBoundingClientRect();
+          const x = box.left + box.width / 2, y = box.top + box.height / 2;
+          return x >= cardBox.left && x <= cardBox.right && y >= cardBox.top && y <= cardBox.bottom;
+        }).map((row) => `${(row.textContent ?? "").trim().slice(0, 30)} (${row.getAttribute("href") ?? "button"})`);
+        return { rows: rows.length, under };
+      }, FOOTER);
+      expect(seen.rows, "footer rows measured").toBeGreaterThan(10);
+      expect(seen.under, "footer rows whose centre is under the open consent card").toEqual([]);
+      await expect(card, "the card was not dismissed to pass").toBeVisible();
+    });
+  }
+});
+
+/*
+  WO-CI-36 (review): the room is reserved after the footer only. /explore has a `display: contents` shell part around the
+  header alone; a pseudo-element on it would sit under the sticky header and push the stage down when the card opens.
+*/
+test("opening the consent card on /explore does not move the page's main", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/explore", { waitUntil: "domcontentloaded" });
+  const top = () => page.evaluate(() => Math.round(document.querySelector("main")!.getBoundingClientRect().top + window.scrollY));
+  const before = await top();
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect(page.locator("[data-marketing-consent-panel]"), "the consent card is open").toBeVisible();
+  expect(await top(), "main's document top with the card open").toBe(before);
+});
+
 const PUBLIC_UI_REVIEW_ROUTES = [
   { path: "/", name: "home" },
   { path: "/pricing", name: "pricing" },

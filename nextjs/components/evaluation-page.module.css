@@ -89,6 +89,19 @@
   is no longer rendered: the V34 header paints its own surface.
 */
 
+/*
+  WO-CI-36, lead decisions 23 and 25. The worksheet link closes a long sentence in the intro's fine print. The site's
+  44px floor (app/tavonel.css, `(pointer: coarse), (max-width: 1079px)`) makes an in-sentence link an inline-block with
+  12.5px of block padding and the same negative margin; wrapped over three lines at 360 and 390 that box cannot be
+  placed on the paragraph's lines (WO-CI-30, measured by the shared classifier: "(1) the line that holds it measures
+  NaNpx against the paragraph's next line 28.89px"). A link inside a sentence is a plain inline box here, as it is on the
+  V34 pages. (The same rule was first written in app/paper-product.css against `.evaluation-page main`, which this
+  page's markup never matches: the wrapper is inside the frame's <main>, not around it.)
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .page :global(.evaluation-intro .fine) a { display: inline; min-height: 0; padding-block: 0; margin-block: 0; }
+}
+
 @media (max-width: 760px) {
   .page :global(.evaluation-shell) { padding: 32px 0 48px; }
   .page :global(.evaluation-grid) { grid-template-columns: 1fr; gap: 24px; }

@@ -352,7 +352,7 @@ test.describe("R1 on the docs routes: wordmark, H1 and content on the container 
   column, by an amount that depends on the art (/evidence 0, /security about 7px, /enterprise about 21px at
   1440). So the template's distance is each reference's distance less its own copy column's centring; the
   references must agree on it to 1px, and each retained route's distance must equal it to 1px (sub-pixel
-  rounding of the vw clamps). Driven at the decision's four widths from the 1440 project.
+  rounding of the vw clamps). Driven at the six widths of OPENING_WIDTHS from the 1440 project.
 */
 const T5_RETAINED = ["/status", "/privacy", "/terms", "/refunds", "/subprocessors", "/reproducibility", "/trust"] as const;
 // WO-CI-32: the framed 404 is the same policy-page opening; it answers 404 on purpose.
@@ -408,7 +408,7 @@ async function t5TemplateDistance(page: Page) {
 
 test.describe("T5 openings: a retained body sets its H1 where the V34 T5 template does", () => {
   test.beforeEach(async ({}, testInfo) => {
-    test.skip(testInfo.project.name !== "1440", "drives the four widths from the 1440 project");
+    test.skip(testInfo.project.name !== "1440", "drives the six widths of OPENING_WIDTHS from the 1440 project");
   });
   for (const width of OPENING_WIDTHS) {
     test(`header to H1 at ${width}`, async ({ page }) => {

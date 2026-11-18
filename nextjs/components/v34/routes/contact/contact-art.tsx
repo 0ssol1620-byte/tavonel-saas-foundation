@@ -1,9 +1,13 @@
 import s from "./contact.module.css";
 
 const STEPS = ["Message", "Read by a person", "Reply"] as const;
+// WO-CI-36: the nodes are 160 wide on a 200 step (40 left, 40 right, 40 between), and a label starts 16 in. The longest
+// label, "Read by a person", is drawn 114 units wide in the page's face and about 136 in a wider fallback face (Verdana):
+// the 144 units a node leaves it clear the outline by at least 8 units, which is 3.6px at the figure's smallest scale
+// (320px wide) -- over the 2px the overlap audit asks. At 144 wide the same label crossed the edge in the wider face.
 const X0 = 40;
-const STEP = 192;
-const WIDTH = 144;
+const STEP = 200;
+const WIDTH = 160;
 
 /**
  * The drawing for /contact: the three steps an inquiry takes, from the message to a person to a
@@ -26,11 +30,11 @@ export function ContactArt() {
         );
       })}
       {/* envelope on the message */}
-      <rect className={s.mark} x={X0 + 100} y="124" width="28" height="20" rx="3" />
-      <path className={s.mark} d={`M${X0 + 100} 127l14 10l14 -10`} />
+      <rect className={s.mark} x={X0 + WIDTH - 44} y="124" width="28" height="20" rx="3" />
+      <path className={s.mark} d={`M${X0 + WIDTH - 44} 127l14 10l14 -10`} />
       {/* a person on the middle step */}
-      <circle className={s.markFill} cx={X0 + STEP + 114} cy="130" r="6" />
-      <path className={s.mark} d={`M${X0 + STEP + 104} 150a10 10 0 0 1 20 0`} />
+      <circle className={s.markFill} cx={X0 + STEP + WIDTH - 30} cy="130" r="6" />
+      <path className={s.mark} d={`M${X0 + STEP + WIDTH - 40} 150a10 10 0 0 1 20 0`} />
     </svg>
   );
 }
