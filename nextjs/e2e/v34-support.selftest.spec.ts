@@ -23,11 +23,12 @@ import {
   layoutPass,
   openContext,
   openZoomedContext,
+  pressedFramesPass,
   reducedMotionPass,
   statePass,
   textStructurePass,
 } from "./support/v34-passes";
-import { composite, contrastPass, contrastRatio, controlContrastPass, openContentDetails, requiredRatio } from "./support/v34-contrast";
+import { composite, contrastPass, contrastRatio, controlContrast, controlContrastPass, openContentDetails, requiredRatio, TRANSITION_CAP_MS } from "./support/v34-contrast";
 import { escapeRestoresFocus, keyboardWalk } from "./support/v34-keyboard";
 import { drawerPass, moreMenuPass } from "./support/v34-drawer";
 import { assertWorldAgreement, forceWorldMode, readWorldState, type WorldState } from "./support/v34-world";
@@ -280,6 +281,72 @@ test.describe("contrast: the colour and the pixels of a sample come from one sta
     const edge = `<style>@keyframes edge { from { border-color: #000 } to { border-color: #00f } } main button { border: 2px solid #000; background: #fff; width: 40px; height: 40px; animation: edge 1s linear infinite }</style>`;
     await load(page, `<main style="background:#fff;padding:12px">${edge}<button>v</button></main>`);
     expect((await controlContrastPass(page)).map(v => v.detail)).toEqual([expect.stringContaining("boundary changed colour while it was sampled")]);
+  });
+});
+
+test.describe("contrast: bounded waits, nothing dropped, counts kept (WO-CI-35)", () => {
+  test("a transition that outlasts the cap is reported by name, not waited on until the test timeout", async ({ page }) => {
+    // The colour and the border start a 60 s transition at load: the pass must give up at the cap and say why.
+    const slow = `<style>#p,#b{transition:color 60s linear,border-color 60s linear} #b{border:2px solid #000;background:#fff;width:40px;height:40px}</style>`;
+    await load(page, `<main style="background:#fff;padding:12px">${slow}<p id="p" style="background:#fff;margin:0;color:#fff">slow text</p><button id="b">v</button></main><script>getComputedStyle(document.body).color; requestAnimationFrame(() => { document.getElementById("p").style.color = "#111"; document.getElementById("b").style.borderColor = "#00f"; });</script>`);
+    const started = Date.now();
+    const text = await contrastPass(page);
+    expect(text.violations.map(v => v.detail)).toEqual([expect.stringMatching(new RegExp(`^"slow text" still in transition after ${TRANSITION_CAP_MS} ms \\(p color\\): not measured$`))]);
+    const controls = await controlContrast(page);
+    expect(controls.violations.map(v => v.detail)).toEqual([expect.stringMatching(new RegExp(`^boundary still in transition after ${TRANSITION_CAP_MS} ms \\(button border-\\w+-color`))]);
+    expect(controls.checked).toBe(0);
+    expect(Date.now() - started, "two capped waits, not the test timeout").toBeLessThan(4 * TRANSITION_CAP_MS);
+  });
+
+  test("an element that leaves the page while it is sampled is reported, not dropped", async ({ page }) => {
+    // Two bounded waits for an element that is gone (the element timeout plus the clean-up's 2 s), about 16 s locally.
+    test.setTimeout(60_000);
+    // The page removes the element as soon as the pass marks it (text) or hides it for its screenshot (control).
+    const removeOn = (attribute: string) =>
+      `<script>new MutationObserver(records => { for (const r of records) if (r.attributeName === "${attribute}" && r.target.isConnected) r.target.remove(); }).observe(document.body, { subtree: true, attributeFilter: ["${attribute}"] });</script>`;
+    await load(page, `<main style="background:#fff;padding:12px"><p style="color:#111;margin:0">going away</p></main>${removeOn("data-v34-contrast-hide")}`);
+    const text = await contrastPass(page);
+    expect(text.violations.map(v => v.detail)).toEqual([expect.stringMatching(/^"going away" could not be measured: /)]);
+    expect(text.checked).toBe(0);
+    await load(page, `<main style="background:#fff;padding:12px"><button style="border:2px solid #000;background:#fff;width:40px;height:40px">v</button></main>${removeOn("style")}`);
+    const controls = await controlContrast(page);
+    expect(controls.violations.map(v => v.detail)).toEqual([expect.stringMatching(/^could not be measured: /)]);
+    expect(controls.checked).toBe(0);
+  });
+
+  test("each pass says how many elements it measured; an off-canvas honeypot is no control a person sees", async ({ page }) => {
+    // The trap field is the contact form's (.contact-trap: absolute at left -10000px); scrolling cannot bring it on screen.
+    const trap = `<label aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">Website <input name="website" tabindex="-1" style="border:1px solid #eee"></label>`;
+    await load(page, `<main style="background:#fff;padding:12px"><h2 style="color:#111">one</h2><p style="color:#333">two</p><button style="border:2px solid #000;background:#fff;min-width:40px;height:40px">go</button><input style="border:1px solid #555" aria-label="f">${trap}</main>`);
+    expect((await contrastPass(page)).checked).toBe(3);
+    expect(await controlContrast(page)).toEqual({ violations: [], checked: 2 });
+  });
+});
+
+test.describe("pressed frames under reduced motion (WO-CI-35)", () => {
+  // The site's own reduced-motion sweep, read from the sheet that ships it, so this case tests what a visitor gets.
+  const SITE_CSS = readFileSync(new URL("../app/tavonel.css", import.meta.url), "utf8");
+  const SWEEP = /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?(\*, \*::before, \*::after \{[^}]*\})/.exec(SITE_CSS)?.[1];
+  // The /world camera control's shape: fill and label change together on press; the label inherits its colour.
+  const control = (css: string) =>
+    `<main style="background:#07100e;padding:12px"><style>.t{color:#f2f7f0;background:#12251f;border:1px solid #5d8070;padding:10px 14px;transition:color 200ms,background-color 200ms} .t[aria-pressed="true"]{color:#0b1713;background:#c9f2a5} ${css}</style><button class="t" aria-pressed="false"><span>Play camera</span></button></main><script>document.querySelector(".t").addEventListener("click", e => { const b = e.currentTarget; b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); });</script>`;
+
+  test("the shipped sweep lands a press in one frame; the 0.01ms sweep and a plain transition do not", async ({ page }) => {
+    expect(SWEEP, "the reduced-motion sweep was not found in app/tavonel.css").toBeTruthy();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page, control(`@media (prefers-reduced-motion: reduce) { ${SWEEP} }`));
+    expect(await pressedFramesPass(page)).toEqual([]);
+    // The sweep as it was before WO-CI-35: the label starts its own 0.01ms transition a frame after its fill's ends.
+    const old = SWEEP!.replace(/transition-duration:[^;]*;/, "transition-duration: 0.01ms !important;");
+    await load(page, control(`@media (prefers-reduced-motion: reduce) { ${old} }`));
+    const lagging = await pressedFramesPass(page);
+    expect(lagging.map(v => v.detail)).toEqual(expect.arrayContaining([expect.stringMatching(/^press \(aria-pressed false -> true\): [1-9]\d* of 10 frames under AA; frame \d+: "Play camera"/)]));
+    // No sweep at all: a 200 ms cross-fade passes through unreadable frames.
+    await load(page, control(""));
+    expect((await pressedFramesPass(page)).length).toBeGreaterThan(0);
+    // A control that does not transition is clean.
+    await load(page, control(`.t, .t * { transition: none }`));
+    expect(await pressedFramesPass(page)).toEqual([]);
   });
 });
 

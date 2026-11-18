@@ -98,6 +98,93 @@ export async function reducedMotionPass(page: Page): Promise<Violation[]> {
 }
 
 /**
+ * Under reduced motion a pressed-state change lands in one frame for everything it recolours. Every visible, enabled
+ * [aria-pressed] button is pressed and pressed back; on each of the next `frames` animation frames after each press,
+ * its own text and its descendants' is read against the fill behind it, and a frame under WCAG AA is a violation.
+ * The class it guards: a control whose fill and label change together, where the label inherits its colour and so
+ * starts its own transition a frame after the control's has ended (WO-CI-31: one frame of 1.08:1 on every press of
+ * the /world camera control under the site's 0.01ms reduced-motion sweep). Call it with reduced motion emulated.
+ */
+export async function pressedFramesPass(page: Page, frames = 10): Promise<Violation[]> {
+  const found = await page.evaluate(async (count: number) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("no 2d context to resolve a colour");
+    const rgba = (value: string): number[] => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = "#000";
+      ctx.fillStyle = value;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      return [r, g, b, a / 255];
+    };
+    const over = (fg: number[], bg: number[]) => [0, 1, 2].map(i => fg[i] * fg[3] + bg[i] * (1 - fg[3]));
+    const lum = (c: number[]) => {
+      const ch = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2]);
+    };
+    const ratio = (a: number[], b: number[]) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+    // The fill behind an element: its own and its ancestors' background colours, composited down to the first opaque one (white if none).
+    const fill = (el: Element): number[] => {
+      const layers: number[][] = [];
+      for (let n: Element | null = el; n; n = n.parentElement) {
+        const c = rgba(getComputedStyle(n).backgroundColor);
+        if (c[3] > 0) layers.push(c);
+        if (c[3] >= 1) break;
+      }
+      let base = [255, 255, 255];
+      for (const layer of layers.reverse()) base = over(layer, base);
+      return base;
+    };
+    const name = (e: Element) => `${e.tagName.toLowerCase()}${e.id ? `#${e.id}` : ""}${typeof e.className === "string" && e.className ? `.${e.className.trim().split(/\s+/)[0]}` : ""}`;
+    // The worst text of the control right now: the lowest ratio against its required one, with what was read.
+    const read = (control: Element) => {
+      let worst: { margin: number; detail: string } | null = null;
+      for (const e of [control, ...control.querySelectorAll("*")]) {
+        if (![...e.childNodes].some(n => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 0)) continue;
+        const s = getComputedStyle(e);
+        if (s.visibility !== "visible" || s.display === "none") continue;
+        let opacity = 1;
+        for (let n: Element | null = e; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+        if (opacity === 0) continue;
+        const fg = rgba(s.color);
+        fg[3] *= opacity;
+        const bg = fill(e);
+        const r = ratio(over(fg, bg), bg);
+        const size = parseFloat(s.fontSize);
+        const required = size >= 24 || (size >= 18.66 && (Number(s.fontWeight) || 400) >= 700) ? 3 : 4.5;
+        const margin = r - required;
+        if (!worst || margin < worst.margin) worst = { margin, detail: `"${(e.textContent ?? "").trim().slice(0, 30)}" ${r.toFixed(2)}:1 needs ${required}:1 (${s.color} on rgb(${bg.map(Math.round).join(",")}))` };
+      }
+      return worst;
+    };
+    const frame = () => new Promise<void>(done => requestAnimationFrame(() => done()));
+    const controls = [...document.querySelectorAll("button[aria-pressed], [role=button][aria-pressed]")].filter(e => {
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility === "visible" && !e.matches(":disabled, [aria-disabled='true']");
+    });
+    const out: { selector: string; detail: string }[] = [];
+    for (const control of controls) {
+      for (const step of ["press", "press back"]) {
+        const from = control.getAttribute("aria-pressed");
+        (control as HTMLElement).click();
+        const bad: string[] = [];
+        for (let f = 1; f <= count; f++) {
+          await frame();
+          const w = read(control);
+          if (w && w.margin + 0.005 < 0) bad.push(`frame ${f}: ${w.detail}`);
+        }
+        const to = control.getAttribute("aria-pressed");
+        if (bad.length > 0) out.push({ selector: name(control), detail: `${step} (aria-pressed ${from} -> ${to}): ${bad.length} of ${count} frames under AA; ${bad[0]}` });
+      }
+    }
+    return { out, controls: controls.length };
+  }, frames);
+  return found.out.map(f => ({ pass: "pressed-frames", ...f }));
+}
+
+/**
  * Forced colors: buttons keep a border, selected controls an outline or border, and nothing sets
  * `forced-color-adjust: none` outside canvas and svg.
  */
