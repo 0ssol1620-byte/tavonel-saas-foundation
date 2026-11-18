@@ -774,6 +774,17 @@ const sourceFiles = (dirs: readonly string[]) => dirs.flatMap((dir) => {
 });
 const isTest = (path: string) => /\.test\.|\.spec\.|[\\/]e2e[\\/]|[\\/]tests?[\\/]/.test(path);
 
+/*
+  Limit of the cases that scan the tree (re-derived, WO-CI-37; the rule of this file is that no limit moves
+  without a measurement). Alone, warm: 0.14-0.31 s per case; the first run after the file cache is cold: 3.05 s
+  (receipts/WO-CI-37/idle.txt); with 24 busy loops on 12 cores 0.14-0.22 s (loaded.txt); in the lead's joint
+  run under load "no auto-activation switch exists anywhere" took 8.22 s and failed the default 5 s
+  (receipts/joint-fnd-qa3/summary.txt). The slowest measurement is 8.22 s; the limit is 30 s, about 3.6 times
+  that, so a loaded builder passes and a scan that really hangs still fails. The walk is not repeated per
+  case in a way that costs time (a warm walk of the whole tree is 0.2 s), so it is not made cheaper.
+*/
+const SCAN_TIMEOUT_MS = 30_000;
+
 describe("source tests", () => {
   it("the string /api/agent-mcp appears only in the agent route, lib/agent-*, the Agent access panel, tests and four named files", () => {
     /*
@@ -790,7 +801,7 @@ describe("source tests", () => {
       .filter((path) => !allowed(path) && readFileSync(path, "utf8").includes("/api/agent-mcp"))
       .map((path) => relative(NEXTJS, path));
     expect(offenders).toEqual([]);
-  });
+  }, SCAN_TIMEOUT_MS);
 
   it("every /api/agent-mcp in scripts/repair-scope.mjs sits inside a quoted owned path", () => {
     const text = readFileSync(join(NEXTJS, "scripts/repair-scope.mjs"), "utf8");
@@ -808,7 +819,7 @@ describe("source tests", () => {
     const offenders = sourceFiles([NEXTJS, join(REPO, "supabase"), join(REPO, "docs"), join(REPO, ".github")])
       .filter((path) => path !== self && readFileSync(path, "utf8").includes(name)).map((path) => relative(REPO, path));
     expect(offenders).toEqual([]);
-  });
+  }, SCAN_TIMEOUT_MS);
 
   it("the OpenAPI document and public/developer/** say nothing of agent-mcp (mutant: add a path)", async () => {
     const { GET: openApi } = await import("@/app/api/openapi/route");
@@ -818,7 +829,7 @@ describe("source tests", () => {
     const published = sourceFiles([join(NEXTJS, "public", "developer")]);
     expect(published.length).toBeGreaterThan(0);
     expect(published.filter((path) => readFileSync(path, "utf8").includes("agent-mcp")).map((path) => relative(NEXTJS, path))).toEqual([]);
-  });
+  }, SCAN_TIMEOUT_MS);
 });
 
 // ---------------------------------------------------------------------------------------------------------------

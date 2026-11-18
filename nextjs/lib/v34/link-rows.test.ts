@@ -193,6 +193,8 @@ describe("decision 23: a row link never sits inside a sentence", () => {
     // Not vacuous: the render has links and the sheets have row classes for the rule to apply to.
     expect(linksInContext(html).length).toBeGreaterThan(0);
     expect(sheets.length, "the body reaches its own sheet and at least one more").toBeGreaterThan(1);
+    // The route's own sheet is one of them: a reach that lost it would pass on the imported sheets alone.
+    expect(sheets.map((reached) => reached.css), "the route's own sheet is among the reached sheets").toContain(SHEETS[route].css);
     expect(renderedRowClasses(sheets).size).toBeGreaterThanOrEqual(renderedRowClasses(SHEETS[route]).size);
     expect(rowLinksInSentences(html, sheets)).toEqual([]);
   });

@@ -107,10 +107,10 @@ const PROOF_ROUTES = ["/reproducibility"];
     the file that actually carries its words, which is why the map below names that module. A page
     whose CSS or shared component changed and whose own file did not keeps the older date. That is
     the correct direction to be wrong in: `lastmod` overstated is a crawl budget spent on nothing.
-  - **A shallow clone flattens it.** Vercel builds from a shallow clone, so `git log` there can
-    answer with the tip commit for every file. The value is still a real date, and the fallback
-    below covers the case where there is no git at all (a tarball, a container without the
-    history): the entry is emitted with no `lastmod` rather than with an invented one.
+  - **A shallow clone has no dates.** Vercel builds from a shallow clone, where `git log` dates every
+    untouched file with the boundary commit. That is a date that looks real and is not, so a shallow
+    repository, no git at all (a tarball) and an unreadable log all give the same answer: the
+    entries are emitted with no `lastmod` rather than with an invented one.
 */
 const ROUTE_SOURCE = (path: string): string => {
   if (path.startsWith("/docs/")) return "lib/docs-content.ts";
@@ -143,12 +143,18 @@ function gitOutput(args: string[]): string {
   return result.status === 0 ? result.stdout : "";
 }
 
+const noDates = () => ({ lastCommitDate: (): Date | undefined => undefined, newestCommitUnder: (): Date | undefined => undefined });
+
 const { lastCommitDate, newestCommitUnder } = (() => {
   const dates = new Map<string, Date>();
   try {
     // Paths in `git log --name-only` are relative to the repository root, and this package is a
     // directory inside it, so the prefix is what turns `app/sitemap.ts` into the key git printed.
     const prefix = gitOutput(["rev-parse", "--show-prefix"]).trim();
+    // A shallow clone's boundary commit "adds" every file it still holds, so the log would date
+    // untouched pages with a commit that did not touch them. Only an explicit "false" is trusted:
+    // "true", an error, or an old git that echoes the flag all mean no dates.
+    if (gitOutput(["rev-parse", "--is-shallow-repository"]).trim() !== "false") return noDates();
     // \x01 cannot occur in a path, so it is an unambiguous record separator.
     let when: Date | undefined;
     for (const line of gitOutput(["log", "--format=%x01%cI", "--name-only"]).split("\n")) {
