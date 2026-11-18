@@ -18,6 +18,7 @@ nextjs/public/developer/*.mjs text eol=lf
 nextjs/public/developer/*.py text eol=lf
 nextjs/public/developer/*.json text eol=lf
 nextjs/public/developer/*.md text eol=lf
+nextjs/public/developer/*.service text eol=lf
 
 # SQL migrations are applied by digest-sensitive tooling and read by tests that
 # assert on exact text; keep them stable across platforms for the same reason.
