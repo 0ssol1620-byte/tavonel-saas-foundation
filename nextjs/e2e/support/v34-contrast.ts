@@ -45,10 +45,85 @@ type Target = {
   fontPx: number;
   weight: number;
   kind: "text" | "control";
-  disabled: boolean;
 };
 
 const HIDE_ATTR = "data-v34-contrast-hide";
+
+type Paint = {
+  fg: [number, number, number, number];
+  border: [number, number, number, number];
+  fill: [number, number, number, number];
+  text: string;
+  disabled: boolean;
+  /** Everything a sample of the element depends on: its text, its disabled state, and the colours, fills and opacity of it and every ancestor. */
+  state: string;
+};
+
+/**
+ * Runs in the page: the element's paint as it is now. Its text colour carries the opacity of every ancestor, as in
+ * collectTargets, whose canvas normalisation this repeats: a function evaluated in the page cannot share a closure.
+ */
+function readPaint(el: Element): Paint {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("no 2d context to resolve a colour");
+  const rgba = (value: string): [number, number, number, number] => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = "#000";
+    ctx.fillStyle = value;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return [r, g, b, a / 255];
+  };
+  let opacity = 1;
+  const chain: string[] = [];
+  for (let n: Element | null = el; n; n = n.parentElement) {
+    const s = getComputedStyle(n);
+    opacity *= Number(s.opacity);
+    chain.push(`${s.color} ${s.backgroundColor} ${s.backgroundImage} ${s.borderTopColor} ${s.opacity} ${s.filter}`);
+  }
+  const s = getComputedStyle(el);
+  const fg = rgba(s.color);
+  fg[3] *= opacity;
+  const text = (el.textContent ?? "").trim().slice(0, 40);
+  const disabled = el.matches(":disabled, [aria-disabled='true']");
+  return { fg, border: rgba(s.borderTopColor), fill: rgba(s.backgroundColor), text, disabled, state: `${text} ${disabled}\n${chain.join("\n")}` };
+}
+
+/**
+ * Runs in the page: resolves when every finite animation or transition on the element or an ancestor has ended.
+ * An infinite one never ends; the paint check in sampleSettled then decides whether it touches what is sampled.
+ */
+function transitionsEnded(el: Element): Promise<unknown> {
+  const own = document.getAnimations().filter(a => {
+    const effect = a.effect instanceof KeyframeEffect ? a.effect : null;
+    const target = effect?.target ?? null;
+    return effect !== null && target !== null && target.contains(el) && a.playState === "running" && Number.isFinite(Number(effect.getComputedTiming().endTime));
+  });
+  return Promise.all(own.map(a => a.finished.catch(() => undefined)));
+}
+
+const SAMPLE_ATTEMPTS = 3;
+
+/**
+ * Takes `sample` (the screenshots) between two reads of the element's paint and returns them only when both reads
+ * agree, so the colour and the pixels belong to one state of the page. Read once at collection and sampled later,
+ * they did not: in WebKit /world goes live 546-915 ms after load, after the matrix's 500 ms settle, and the pass read
+ * the camera control's label while the control was disabled (#f2f7f0 at opacity 0.5) and took its surface after the
+ * view had pressed it (#c9f2a5): 1.07:1 that no frame ever showed (WO-CI-31). Finite transitions are waited out first.
+ * A paint that changes on every attempt is returned as null: the caller fails it, it is never passed.
+ */
+async function sampleSettled<T>(handle: Locator, sample: () => Promise<T>): Promise<{ paint: Paint; value: T } | null> {
+  for (let attempt = 0; attempt < SAMPLE_ATTEMPTS; attempt++) {
+    await handle.evaluate(transitionsEnded);
+    const before = await handle.evaluate(readPaint);
+    const value = await sample();
+    const after = await handle.evaluate(readPaint);
+    if (before.state === after.state) return { paint: after, value };
+  }
+  return null;
+}
 
 /** Runs in the page: elements that carry text (inside `scope` when given), deduplicated by (colour, size class, surface class). */
 function collectTargets([max, scope]: [number, string | null]): Target[] {
@@ -107,7 +182,6 @@ function collectTargets([max, scope]: [number, string | null]): Target[] {
       fontPx,
       weight,
       kind: "text",
-      disabled: el.matches(":disabled, [aria-disabled='true']"),
     });
     if (out.length >= max) break;
   }
@@ -247,36 +321,44 @@ export async function contrastPass(page: Page, options: ContrastOptions = {}): P
     try {
       await centreInView(handle);
       await handle.evaluate((e, a) => e.setAttribute(a, ""), HIDE_ATTR);
-      // Only the element's own text lines are sampled: its border, corners and child elements stay out.
-      const own = await handle.evaluate(ownTextRects);
-      const rects = await handle.evaluate(openRects, own);
-      if (rects.length < own.length) {
-        result.reported.push({ pass: "contrast", selector: t.selector, detail: `"${t.text}" ${own.length - rects.length} of ${own.length} line(s) under a fixed layer, not sampled` });
-      }
-      let ex: { dark: Rgb; light: Rgb } | null = null;
-      for (const clip of rects) {
-        const png = await page.screenshot({ type: "png", clip, timeout: 3000 });
-        const e = await page.evaluate(extremes, png.toString("base64"));
-        if (!e) continue;
-        ex = ex
-          ? { dark: luminance(e.dark) < luminance(ex.dark) ? e.dark : ex.dark, light: luminance(e.light) > luminance(ex.light) ? e.light : ex.light }
-          : e;
-      }
+      const got = await sampleSettled(handle, async () => {
+        // Only the element's own text lines are sampled: its border, corners and child elements stay out.
+        const own = await handle.evaluate(ownTextRects);
+        const rects = await handle.evaluate(openRects, own);
+        let ex: { dark: Rgb; light: Rgb } | null = null;
+        for (const clip of rects) {
+          const png = await page.screenshot({ type: "png", clip, timeout: 3000 });
+          const e = await page.evaluate(extremes, png.toString("base64"));
+          if (!e) continue;
+          ex = ex
+            ? { dark: luminance(e.dark) < luminance(ex.dark) ? e.dark : ex.dark, light: luminance(e.light) > luminance(ex.light) ? e.light : ex.light }
+            : e;
+        }
+        return { lines: own.length, open: rects.length, ex };
+      });
       await handle.evaluate((e, a) => e.removeAttribute(a), HIDE_ATTR);
+      if (!got) {
+        result.violations.push({ pass: "contrast", selector: t.selector, detail: `"${t.text}" changed colour while it was sampled, on each of ${SAMPLE_ATTEMPTS} attempts: not measured` });
+        continue;
+      }
+      const { paint, value: { lines, open, ex } } = got;
+      if (open < lines) {
+        result.reported.push({ pass: "contrast", selector: t.selector, detail: `"${paint.text}" ${lines - open} of ${lines} line(s) under a fixed layer, not sampled` });
+      }
       if (!ex) continue;
       const required = requiredRatio(t.fontPx, t.weight, t.kind);
       const worst = Math.min(
-        ...[ex.dark, ex.light].map(bg => contrastRatio(composite(t.fg, bg), bg)),
+        ...[ex.dark, ex.light].map(bg => contrastRatio(composite(paint.fg, bg), bg)),
       );
       result.checked += 1;
       if (worst + 0.005 >= required) continue;
       const v: Violation = {
         pass: "contrast",
         selector: t.selector,
-        detail: `"${t.text}" ${worst.toFixed(2)}:1 needs ${required}:1 (${t.fontPx}px/${t.weight}, fg rgb(${t.fg.slice(0, 3).join(",")}) over ${ex.dark.join(",")} .. ${ex.light.join(",")})`,
+        detail: `"${paint.text}" ${worst.toFixed(2)}:1 needs ${required}:1 (${t.fontPx}px/${t.weight}, fg rgb(${paint.fg.slice(0, 3).join(",")}) over ${ex.dark.join(",")} .. ${ex.light.join(",")})`,
       };
       const rationale = Object.entries(options.exceptions ?? {}).find(([k]) => t.selector.includes(k))?.[1];
-      if (t.disabled) result.reported.push(v);
+      if (paint.disabled) result.reported.push(v);
       else if (rationale) result.excepted.push({ ...v, rationale });
       else result.violations.push(v);
     } catch {
@@ -352,17 +434,27 @@ export async function controlContrastPass(page: Page, max = 30, scope?: string):
       await centreInView(handle);
       const box = await handle.boundingBox();
       if (!box || (await handle.evaluate(openRects, [box])).length === 0) continue;
-      await handle.evaluate(e => ((e as HTMLElement).style.visibility = "hidden"));
-      const rect = await handle.boundingBox();
-      const png = rect ? await page.screenshot({ type: "png", clip: rect, timeout: 3000 }) : null;
-      await handle.evaluate(e => ((e as HTMLElement).style.visibility = ""));
-      if (!png) continue;
+      // The border and fill are read again around the screenshot, as in the text pass: one state for both.
+      const got = await sampleSettled(handle, async () => {
+        await handle.evaluate(e => ((e as HTMLElement).style.visibility = "hidden"));
+        const rect = await handle.boundingBox();
+        const png = rect ? await page.screenshot({ type: "png", clip: rect, timeout: 3000 }) : null;
+        await handle.evaluate(e => ((e as HTMLElement).style.visibility = ""));
+        return png;
+      });
+      if (!got) {
+        out.push({ pass: "control-contrast", selector: c.selector, detail: `boundary changed colour while it was sampled, on each of ${SAMPLE_ATTEMPTS} attempts: not measured` });
+        continue;
+      }
+      const { paint, value: png } = got;
+      // Disabled since collection: skipped, as collectControls skips it.
+      if (!png || paint.disabled) continue;
       const ex = await page.evaluate(extremes, png.toString("base64"));
       if (!ex) continue;
-      const edge = (paint: readonly [number, number, number, number]) =>
-        paint[3] < 0.05 ? 1 : Math.min(...[ex.dark, ex.light].map(bg => contrastRatio(composite(paint, bg), bg)));
-      const best = Math.max(edge(c.border), edge(c.fill));
-      if (best + 0.005 < 3) out.push({ pass: "control-contrast", selector: c.selector, detail: `boundary ${best.toFixed(2)}:1 needs 3:1 (border rgb(${c.border.slice(0, 3).join(",")}) ${c.borderPx}px)` });
+      const edge = (colour: readonly [number, number, number, number]) =>
+        colour[3] < 0.05 ? 1 : Math.min(...[ex.dark, ex.light].map(bg => contrastRatio(composite(colour, bg), bg)));
+      const best = Math.max(edge(paint.border), edge(paint.fill));
+      if (best + 0.005 < 3) out.push({ pass: "control-contrast", selector: c.selector, detail: `boundary ${best.toFixed(2)}:1 needs 3:1 (border rgb(${paint.border.slice(0, 3).join(",")}) ${c.borderPx}px)` });
     } catch {
       await handle.evaluate(e => ((e as HTMLElement).style.visibility = "")).catch(() => undefined);
     }

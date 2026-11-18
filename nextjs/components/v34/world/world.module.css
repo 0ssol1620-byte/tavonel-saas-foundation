@@ -179,6 +179,18 @@
   cursor: default;
 }
 
+/*
+  A control's label and fill change in the same frame. Under reduced motion the site's sweep (tavonel.css) gives
+  every element a 0.01ms transition of every property, and the camera control's label <span> inherits its colour:
+  its transition began a frame after the button's had ended, so for one frame the pressed fill (#d8f7bd under the
+  pointer) carried the unpressed label (#f2f7f0), 1.08:1, on 20 of 20 presses in Chromium and in WebKit (WO-CI-31).
+  Here neither transitions.
+*/
+.control,
+.control * {
+  transition-property: none;
+}
+
 @media (pointer: coarse) {
   .control {
     min-height: 44px;

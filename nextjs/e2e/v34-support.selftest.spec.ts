@@ -242,6 +242,47 @@ test.describe("contrast", () => {
   });
 });
 
+test.describe("contrast: the colour and the pixels of a sample come from one state (WO-CI-31)", () => {
+  // The page changes state after the pass has read the colours and before it takes the pixels, as /world in WebKit
+  // went live and pressed its camera control in the middle of the pass. The flip here is triggered by the pass itself
+  // (the attribute or style it sets on the element it samples), so it lands in that window on every run.
+  const control = `<style>.t{color:#f2f7f0;background:#12251f;border:1px solid #5d8070;padding:10px 14px} .t.on{color:#0b1713;background:#c9f2a5;border-color:#c9f2a5} .t.bad{color:#f2f7f0;background:#c9f2a5}</style>`;
+  const flipOn = (to: string, attribute: string) =>
+    `<script>new MutationObserver(() => { document.getElementById("b").className = "t ${to}"; }).observe(document.body, { subtree: true, attributeFilter: ["${attribute}"] });</script>`;
+
+  test("text: a state that changes mid-pass is measured in the state it changed to", async ({ page }) => {
+    await load(page, `<main style="background:#07100e;padding:12px">${control}<button id="b" class="t"><span>Play camera</span></button></main>${flipOn("on", "data-v34-contrast-hide")}`);
+    expect((await contrastPass(page)).violations).toEqual([]);
+    // The state it changed to is still judged: a light label on the light fill fails, with the colour it has now.
+    await load(page, `<main style="background:#07100e;padding:12px">${control}<button id="b" class="t"><span>Play camera</span></button></main>${flipOn("bad", "data-v34-contrast-hide")}`);
+    const bad = await contrastPass(page);
+    expect(bad.violations.map(v => v.detail)).toEqual([expect.stringMatching(/^"Play camera" 1\.\d+:1 needs 4\.5:1 .*fg rgb\(242,247,240\) over 201,242,165/)]);
+  });
+
+  test("control: a boundary that changes mid-pass is measured in the state it changed to", async ({ page }) => {
+    const faint = `<style>main button{border:1px solid #e2e2e2;background:#fff;width:40px;height:40px} main button.t.on{border-color:#555}</style>`;
+    await load(page, `<main style="background:#fff;padding:12px">${faint}<button id="b" class="t">v</button></main>${flipOn("on", "style")}`);
+    expect(await controlContrastPass(page)).toEqual([]);
+  });
+
+  test("a running transition is waited out, not sampled half way", async ({ page }) => {
+    // White text turning dark on white over 1.5 s: half way it is grey, and only its end state is what a reader is left with.
+    await load(page, `<main style="background:#fff;padding:12px"><p id="p" style="background:#fff;margin:0">fading in to dark</p></main><script>const p = document.getElementById("p"); p.style.color = "#fff"; getComputedStyle(p).color; p.style.transition = "color 1.5s linear"; p.style.color = "#111";</script>`);
+    expect((await contrastPass(page)).violations).toEqual([]);
+  });
+
+  test("a colour that never holds still is not measured, and that fails", async ({ page }) => {
+    // Dark blue on white at every instant, so a single sample would pass it; no two reads agree, so nothing was measured.
+    const cycling = `<style>@keyframes cycle { from { color: #000 } to { color: #00f } } #p { animation: cycle 1s linear infinite }</style>`;
+    await load(page, `<main style="background:#fff;padding:12px">${cycling}<p id="p" style="background:#fff;margin:0">cycling text</p></main>`);
+    const text = await contrastPass(page);
+    expect(text.violations.map(v => v.detail)).toEqual([expect.stringContaining('"cycling text" changed colour while it was sampled, on each of 3 attempts')]);
+    const edge = `<style>@keyframes edge { from { border-color: #000 } to { border-color: #00f } } main button { border: 2px solid #000; background: #fff; width: 40px; height: 40px; animation: edge 1s linear infinite }</style>`;
+    await load(page, `<main style="background:#fff;padding:12px">${edge}<button>v</button></main>`);
+    expect((await controlContrastPass(page)).map(v => v.detail)).toEqual([expect.stringContaining("boundary changed colour while it was sampled")]);
+  });
+});
+
 test.describe("keyboard", () => {
   test("walk catches a missing focus ring and a tiny target, passes a clean page", async ({ page }) => {
     await load(page, `<a href="#a" style="outline:none">a</a><a href="#b" class="ring" style="display:inline-block;width:10px;height:10px">b</a>`, `.ring:focus{outline:2px solid #00e}`);
