@@ -1,0 +1,38 @@
+# TAVONEL source agent as a systemd --user service (WO-LOC-7).
+#
+# Install steps are user-authorized and nothing here runs by itself. See "Run as a user service"
+# in source-agent-operations.md: it creates the state directory, the key file (mode 0600) and
+# enables this unit with `systemctl --user enable --now tavonel-source-agent.service`.
+#
+# The key lives only in agent.env, which the user creates. This file never contains one.
+[Unit]
+Description=TAVONEL source agent (continuous inventory sync)
+Documentation=https://tavonel.com/developer/source-agent-operations.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/tavonel/agent.env
+# Refuse to start when agent.env is not mode 0600 or any binding is empty: an empty --root
+# would otherwise fall back to the working directory.
+ExecStartPre=/bin/sh -c 'test "$$(stat -c %%a %h/.config/tavonel/agent.env)" = 600 && test -n "$$TAVONEL_API_KEY" && test -n "$$TAVONEL_SOURCE_ROOT" && test -n "$$TAVONEL_CONNECTION_ID" && test -n "$$TAVONEL_APPROVE_CREDITS"'
+WorkingDirectory=%h/.local/state/tavonel
+ExecStart=/usr/bin/python3 %h/.local/share/tavonel/tavonel-source-agent.py --watch --root ${TAVONEL_SOURCE_ROOT} --connection-id ${TAVONEL_CONNECTION_ID} --state %h/.local/state/tavonel/state.json --approve-up-to-credits ${TAVONEL_APPROVE_CREDITS} --allow-unknown-page-count
+Restart=on-failure
+RestartSec=30
+
+# Hardening. The source root is read-only to the agent (the whole file system is, under strict,
+# and the home directory is named again below); the state directory is the one place it writes.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadOnlyPaths=%h
+ReadWritePaths=%h/.local/state/tavonel
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=default.target

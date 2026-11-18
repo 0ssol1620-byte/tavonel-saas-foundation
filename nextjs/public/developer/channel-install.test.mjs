@@ -16,13 +16,13 @@
 
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
-import { constants, existsSync, readFileSync } from "node:fs";
+import { constants, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { copyFile, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SOURCE_DIRECTORY = fileURLToPath(new URL(".", import.meta.url));
@@ -627,6 +627,64 @@ describe("signed channel", () => {
     } else {
       assert.equal(outcome.code, 0, outcome.stderr);
       assert.equal(JSON.parse(outcome.stdout).code, "CHANNEL_VERIFIED");
+    }
+  });
+});
+
+/*
+  WO-LOC-7: the Linux user unit. systemd is not available where this runs, so what is proved here is the
+  unit's text and the one piece of shell it carries (ExecStartPre), run through sh with systemd's own
+  specifier rules applied. That the unit loads and sandboxes on a real host is `systemd-analyze --user
+  verify` plus a start on Linux, which this test does not do.
+*/
+describe("the source agent user unit", () => {
+  const UNIT_NAME = "tavonel-source-agent.service";
+  const unit = readFileSync(join(SOURCE_DIRECTORY, UNIT_NAME), "utf8");
+  const lines = unit.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("#"));
+  const values = (key) => lines.filter((line) => line.startsWith(`${key}=`)).map((line) => line.slice(key.length + 1));
+
+  test("is in the manifest with the digest of its bytes", () => {
+    const asset = MANIFEST.assets.sourceAgentService;
+    assert.equal(asset.url, `https://tavonel.com/developer/${UNIT_NAME}`);
+    assert.equal(asset.sha256, `sha256:${sha256Hex(readFileSync(join(SOURCE_DIRECTORY, UNIT_NAME)))}`);
+  });
+
+  test("sets the hardening keys, one writable path, and never carries a key", () => {
+    for (const [key, value] of [["NoNewPrivileges", "yes"], ["ProtectSystem", "strict"], ["Restart", "on-failure"]]) {
+      assert.deepEqual(values(key), [value], key);
+    }
+    assert.deepEqual(values("ReadOnlyPaths"), ["%h"]);
+    assert.deepEqual(values("ReadWritePaths"), ["%h/.local/state/tavonel"]);
+    assert.deepEqual(values("EnvironmentFile"), ["%h/.config/tavonel/agent.env"]);
+    assert.match(values("ExecStart")[0], /^\/usr\/bin\/python3 \S+tavonel-source-agent\.py --watch /);
+    assert.doesNotMatch(unit, /TAVONEL_API_KEY=/);
+    assert.doesNotMatch(unit, /tvnl_/);
+  });
+
+  test("ExecStartPre refuses a loose key file and any empty binding, and passes a complete one", (context) => {
+    const probe = spawnSync("sh", ["-c", "exit 0"]);
+    if (probe.error) return context.skip("no POSIX sh on this machine: run on the hosted Linux step");
+    const body = /^ExecStartPre=\/bin\/sh -c '(.*)'$/m.exec(unit)?.[1];
+    assert.ok(body, "ExecStartPre is a single-quoted sh -c");
+    const script = body.replace(/%(.)|\$\$/g, (whole, specifier) => (whole === "$$" ? "$" : specifier === "%" ? "%" : specifier === "h" ? "/home/synthetic" : whole));
+    assert.doesNotMatch(script, /%[^a]/, "no systemd specifier is left unresolved");
+    const fakeBin = mkdtempSync(join(tmpdir(), "unit-stat-"));
+    writeFileSync(join(fakeBin, "stat"), '#!/bin/sh\necho "$FAKE_MODE"\n', { mode: 0o755 });
+    try {
+      const good = { TAVONEL_API_KEY: "synthetic-not-a-key", TAVONEL_SOURCE_ROOT: "/approved", TAVONEL_CONNECTION_ID: "c", TAVONEL_APPROVE_CREDITS: "5", FAKE_MODE: "600" };
+      const exit = (overrides) => spawnSync("sh", ["-c", script], { env: { PATH: `${fakeBin}${delimiter}${process.env.PATH}`, ...good, ...overrides } }).status;
+      assert.equal(exit({}), 0);
+      for (const bad of [{ FAKE_MODE: "644" }, { FAKE_MODE: "660" }, { FAKE_MODE: "" }, { TAVONEL_API_KEY: "" }, { TAVONEL_SOURCE_ROOT: "" },
+        { TAVONEL_CONNECTION_ID: "" }, { TAVONEL_APPROVE_CREDITS: "" }]) {
+        assert.notEqual(exit(bad), 0, JSON.stringify(Object.keys(bad)) + JSON.stringify(bad));
+      }
+      for (const name of ["TAVONEL_API_KEY", "TAVONEL_SOURCE_ROOT", "TAVONEL_CONNECTION_ID", "TAVONEL_APPROVE_CREDITS"]) {
+        const env = { PATH: `${fakeBin}${delimiter}${process.env.PATH}`, ...good };
+        delete env[name];
+        assert.notEqual(spawnSync("sh", ["-c", script], { env }).status, 0, `${name} unset`);
+      }
+    } finally {
+      rmSync(fakeBin, { recursive: true, force: true });
     }
   });
 });

@@ -43,6 +43,7 @@ describe("developer distribution", () => {
       mcp: "tavonel-mcp.mjs",
       consumerContext: "consumer-context.mjs",
       sourceAgent: "tavonel-source-agent.py",
+      sourceAgentService: "tavonel-source-agent.service",
       verifyExport: "tavonel-verify-export.mjs",
       verifyPackage: "tavonel-verify-package.mjs",
       verifyRoundtrip: "tavonel-verify-roundtrip.py",
