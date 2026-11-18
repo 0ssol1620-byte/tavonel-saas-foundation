@@ -4,8 +4,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { current, type NavGroupLinks } from "@/lib/v34/nav";
+import type { NavGroupLinks } from "@/lib/v34/nav";
 import tokens from "../tokens.module.css";
+import { current } from "./current";
 import s from "./more-menu.module.css";
 
 /**

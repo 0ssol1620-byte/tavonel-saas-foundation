@@ -5,8 +5,9 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { HeaderAccountActions } from "@/components/site-nav/desktop-primary-nav";
-import { current, type NavGroupLinks, NavLink } from "@/lib/v34/nav";
+import type { NavGroupLinks, NavLink } from "@/lib/v34/nav";
 import tokens from "../tokens.module.css";
+import { current } from "./current";
 import { listenShellEscape } from "./more-menu";
 import s from "./mobile-drawer.module.css";
 
