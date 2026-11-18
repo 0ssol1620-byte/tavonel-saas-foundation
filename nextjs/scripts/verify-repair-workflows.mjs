@@ -109,6 +109,22 @@ for (const full of [
     assert(gate.includes(`\n          test "\${{ needs.${job}.result }}" = "success"\n`), `Launch gate no longer checks needs.${job}.result`);
   }
 }
+// WO-CI-39: every Playwright install in Launch QA restores the browsers and apt's archives first and keeps apt's downloads in the
+// cached directory. browser-qa and lighthouse installed uncached until this pin. On run 44245837641, webkit's uncached apt download
+// ran until the 20-minute job timeout cancelled the job, and the job had to be re-run.
+{
+  const jobs = launch.slice(launch.indexOf('\njobs:\n') + 1).split(/\n(?=  [A-Za-z0-9_-]+:\n)/).slice(1).map(text => ({ name: text.slice(2, text.indexOf(':')), text }));
+  // Any line outside a comment that runs `playwright install`, however it is spelled (pnpm exec, npx, a `- run:` line).
+  const install = /\n[ -]*(?:run: )?[^\n#]*\bplaywright install\b/g, installing = jobs.filter(job => job.text.match(install));
+  for (const name of ['browser-qa', 'product-qa', 'lighthouse', 'v34-matrix']) assert(installing.some(job => job.name === name), `Launch QA ${name} no longer installs Playwright browsers where this pin reads it`);
+  for (const { name, text } of installing) {
+    const restore = text.indexOf('\n        uses: actions/cache@v4\n'), keep = text.indexOf('APT::Keep-Downloaded-Packages "true"');
+    const cached = restore >= 0 ? text.slice(restore, text.indexOf('\n      - ', restore + 1)) : '';
+    assert(cached.includes('\n            ~/.cache/ms-playwright\n') && cached.includes('\n            ~/.cache/apt-archives/*.deb\n') && keep > restore
+      && [...text.matchAll(install)].every(match => match.index > keep),
+    `Launch QA ${name}: a Playwright install runs before the browser and apt-archive cache is restored and apt keeps its downloads there`);
+  }
+}
 assert(/pull_request:\n\s+types: \[opened, synchronize, reopened\]/.test(repair), 'repair event set changed');
 assert(repair.includes('name: Repair scope validation'), 'repair check must remain distinct');
 assert(repair.includes('run: node scripts/repair-collector-only.mjs plan'), 'Repair must independently verify collector eligibility before narrowing');
