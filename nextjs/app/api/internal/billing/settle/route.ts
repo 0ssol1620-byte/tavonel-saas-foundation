@@ -7,6 +7,7 @@ import { billingSecret } from "@/lib/billing-secrets";
 import { appendServiceAuditEvent } from "@/lib/enterprise-store";
 import { DOCUMENT_ID_PATTERN, WORKSPACE_ID_PATTERN } from "@/lib/immutable-keys";
 import { alertOcrFailure } from "@/lib/operations-alert-triggers";
+import { pageMeterSettles } from "@/lib/page-meter-cohort";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -142,10 +143,13 @@ export async function POST(request: Request) {
   const sourceSha256 = typeof input.sourceSha256 === "string" && SOURCE_SHA256.test(input.sourceSha256)
     ? input.sourceSha256
     : null;
-  // Page meter (20261117120000). A read that finished or failed is settled by its pages; only a
-  // release, which charges nothing, stays on the per-document v3 path. A body without `pages` is
-  // a worker from before the meter: refused as retryable, never settled at a guessed length.
-  const metered = !completedRead && (input.outcome === "settled" || input.outcome === "operator_review");
+  // Page meter (20261117120000), for the workspaces TAVONEL_PAGE_METER_COHORT names (WO-REL-2):
+  // a read that finished or failed is settled by its pages. Every other workspace, and every
+  // release, stays on the per-document v3 path exactly as before the meter. For a metered
+  // workspace a body without `pages` is a worker from before the meter: refused as retryable,
+  // never settled at a guessed length.
+  const metered = !completedRead && (input.outcome === "settled" || input.outcome === "operator_review")
+    && pageMeterSettles(workspaceKey);
   if (metered && !Object.prototype.hasOwnProperty.call(input, "pages")) {
     return NextResponse.json({ code: "COMPUTE_PAGE_COUNT_REQUIRED" }, { status: 503, headers });
   }

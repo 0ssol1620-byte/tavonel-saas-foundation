@@ -35,6 +35,23 @@ describe("status API compatibility", () => {
     expect(raw).not.toHaveProperty("billing");
     expect(raw).not.toHaveProperty("r2");
     expect(raw).not.toHaveProperty("coreV2");
+    expect(raw).not.toHaveProperty("pageMeter");
+  });
+
+  it("says whether the page-meter cohort is configured, never which workspaces (WO-REL-2)", async () => {
+    const cases: Array<[string | undefined, string]> = [
+      [undefined, "page_meter_cohort_not_configured"], ["", "page_meter_cohort_not_configured"],
+      ["*", "page_meter_cohort_configured"], ["pilot-canary01,pilot-canary02", "page_meter_cohort_configured"],
+      ["all", "page_meter_cohort_not_configured"], ["*,pilot-canary01", "page_meter_cohort_not_configured"],
+    ];
+    for (const [value, expected] of cases) {
+      vi.unstubAllEnvs();
+      if (value !== undefined) vi.stubEnv("TAVONEL_PAGE_METER_COHORT", value);
+      const text = await legacyStatus().text();
+      expect((JSON.parse(text) as { pageMeter: unknown }).pageMeter, String(value)).toBe(expected);
+      expect(text).not.toContain("pilot-canary");
+      expect(await publicStatusV2().text()).not.toContain("pageMeter");
+    }
   });
 
   it("separates account creation from the legacy document-workflow flag", async () => {
