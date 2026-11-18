@@ -27,7 +27,8 @@ export function WorldInstrument({ variant = "hero" }: { variant?: "hero" | "full
         overview={describeOverview(corpus, "layers")}
         legend={stats.layers.map((l) => ({ kind: l.kind, layer: l.layer, color: KIND_COLORS[l.kind], count: l.count }))}
       >
-        <Image className={styles.fallbackImage} src="/v34/world-layers.svg" width={900} height={620} alt={worldAltText(corpus)} unoptimized priority={variant === "hero"} />
+        {/* The hero image is the home LCP element; `priority` alone preloads it at Low (WO-CI-16c). */}
+        <Image className={styles.fallbackImage} src="/v34/world-layers.svg" width={900} height={620} alt={worldAltText(corpus)} unoptimized priority={variant === "hero"} fetchPriority={variant === "hero" ? "high" : undefined} />
       </WorldIsland>
       <ul className={styles.domains} aria-label="Records by domain">
         {stats.domains.map((d) => (
