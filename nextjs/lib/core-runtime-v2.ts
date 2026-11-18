@@ -60,10 +60,10 @@ const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 /**
  * The env flag that turns a re-compile of an already-active collection into a revision compile.
  *
- * Off by default, and deliberately: the wire contract on this side is written against
- * `packages/product-core/src/akc_product_core/contracts.py` as it stands in the
- * `codex/tavonel-p0p2-productization` worktree, and nothing here verifies that the *deployed*
- * lambda is built from that revision. Sending `operationClass: "incremental_recompile"` to a
+ * Off by default, and deliberately: the wire contract on this side is pinned by
+ * `core-runtime-v2.revision-contract.test.ts` to exchanges captured from a local staging of AKC
+ * 6b3a27bf (sourceDigest a37d19b6, the digest live `/health` reported on 2026-11-18), and nothing
+ * here verifies that the *deployed* lambda serves those files. Sending `operationClass: "incremental_recompile"` to a
  * Core that does not accept it is a refused compile, not a wrong World -- but it is still a
  * refusal a customer would see, so the switch is an operator's to throw after the checks in
  * `CA_LANE_REPORT_knowledge.md` pass.
@@ -901,7 +901,8 @@ export async function dispatchProductCoreV2(
     ![result.receipt.totalArtifacts, result.receipt.rebuiltArtifacts, result.receipt.workAvoidedArtifacts]
       .every((count) => Number.isSafeInteger(count) && count >= 0) ||
     !["passed", "failed", "not_run"].includes(result.receipt.equivalence) ||
-    (result.status === "completed" && envelope.previousActiveWorld !== undefined && result.receipt.equivalence !== "passed") ||
+    // A revision Core did not reject is one it proved equal to a full rebuild; review_required is no exception (WO-E-INC-1).
+    (result.status !== "rejected" && envelope.previousActiveWorld !== undefined && result.receipt.equivalence !== "passed") ||
     result.receipt.requestId !== envelope.requestId ||
     result.receipt.inputSha256 !== inputSha256 ||
     canonicalCandidate === null ||
@@ -915,4 +916,70 @@ export async function dispatchProductCoreV2(
     return { ok: false, code: "CORE_V2_RECEIPT_INVALID" };
   }
   return { ok: true, result };
+}
+
+type ProductCoreV2Dispatch = Awaited<ReturnType<typeof dispatchProductCoreV2>>;
+
+/*
+  WO-E-INC-1: a revision compile Core would not take becomes one full compile, and the result says
+  why. Each line states what Core answered and nothing about the cause it did not report.
+
+  The refusals placed here are the ones that answer the revision request as such and that a full
+  compile -- a different request: no previous World, another idempotency key, a smaller body -- can
+  get past. Every other code (authentication, customer data disabled, output size, transport,
+  receipt) is the same problem for a full compile, or an integrity failure, and is returned as it
+  came; so is a code this list has never seen. The partition of every code Core a37d19b6 (AKC
+  6b3a27bf) can answer is pinned by core-runtime-v2.revision-contract.test.ts.
+*/
+const REVISION_HOLD_LINES = {
+  FULL_REBUILD_EQUIVALENCE_FAILED: "Compiled in full: the compiler did not prove the revision equal to a full rebuild.",
+  CORE_REQUEST_INVALID: "Compiled in full: the compiler refused the revision request as invalid.",
+  CORE_COMPILE_REJECTED: "Compiled in full: the compiler rejected the revision request.",
+  CORE_IDEMPOTENCY_CONFLICT: "Compiled in full: the compiler holds a different request under this revision's key.",
+  COMPILE_INPUT_TOO_LARGE: "Compiled in full: the revision request, with the previous World, was over the request size bound.",
+} as const;
+export type RevisionHoldReason = keyof typeof REVISION_HOLD_LINES;
+const HELD_REFUSAL_CODES: ReadonlySet<string> = new Set<RevisionHoldReason>([
+  "CORE_REQUEST_INVALID", "CORE_COMPILE_REJECTED", "CORE_IDEMPOTENCY_CONFLICT", "COMPILE_INPUT_TOO_LARGE",
+]);
+
+export type RevisionCompileOutcome =
+  | { attempted: true; outcome: "equivalent" }
+  | { attempted: true; outcome: "held"; reason: RevisionHoldReason; line: string };
+
+function revisionHoldReason(revision: ProductCoreV2Dispatch): RevisionHoldReason | null {
+  if (!revision.ok) return HELD_REFUSAL_CODES.has(revision.code) ? revision.code as RevisionHoldReason : null;
+  const { status, receipt, candidate } = revision.result;
+  return status === "rejected" && receipt.equivalence === "failed" && candidate.reviewReasons.includes("FULL_REBUILD_EQUIVALENCE_FAILED")
+    ? "FULL_REBUILD_EQUIVALENCE_FAILED" : null;
+}
+
+/**
+ * A revision compile of `documents` from `previousActiveWorld`. When Core holds, exactly one full
+ * compile follows -- never a second revision attempt, which would get the same answer -- and the
+ * outcome carries the reason whether that full compile succeeds or not.
+ */
+export async function dispatchProductCoreV2Revision(
+  env: ProductCoreV2Env,
+  workspaceId: string,
+  documents: CollectionOcrInput[],
+  previousActiveWorld: NonNullable<ProductCoreV2CompileRequest["previousActiveWorld"]>,
+  now = new Date(),
+  customerDataGate?: CustomerDataAuthorization,
+  expectedSourceScope?: CustomerDataScope,
+  logicalCollectionKey?: string,
+  remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS,
+  requestedBlueprint?: CoreBlueprintId,
+): Promise<ProductCoreV2Dispatch & { revisionCompile?: RevisionCompileOutcome }> {
+  const deadline = Date.now() + remainingLatencyMs;
+  const revision = await dispatchProductCoreV2(env, workspaceId, documents, now, previousActiveWorld,
+    customerDataGate, expectedSourceScope, logicalCollectionKey, remainingLatencyMs, requestedBlueprint);
+  const reason = revisionHoldReason(revision);
+  if (!reason) {
+    return revision.ok && revision.result.status !== "rejected"
+      ? { ...revision, revisionCompile: { attempted: true, outcome: "equivalent" } } : revision;
+  }
+  const full = await dispatchProductCoreV2(env, workspaceId, documents, new Date(), null,
+    customerDataGate, expectedSourceScope, logicalCollectionKey, deadline - Date.now(), requestedBlueprint);
+  return { ...full, revisionCompile: { attempted: true, outcome: "held", reason, line: REVISION_HOLD_LINES[reason] } };
 }
