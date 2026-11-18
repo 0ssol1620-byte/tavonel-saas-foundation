@@ -1,0 +1,40 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/master/files.stone"
+  ],
+  "retrievedAt": "2026-11-18T13:22:05Z",
+  "scenario": "A file under /old, then a DeletedMetadata of the folder /old later on the same page. The spec: 'For each DeletedMetadata, if your local state has something at the given path, remove it and all its children.'",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dropboxapi.com/2/files/list_folder/continue",
+    "cursor": "AAHsynthetic-dropbox-cursor-9"
+  },
+  "status": 200,
+  "headers": {},
+  "body": {
+    "entries": [
+      {
+        ".tag": "file",
+        "name": "late.pdf",
+        "id": "id:SYNTHlate00000000000000004",
+        "path_lower": "/old/late.pdf",
+        "path_display": "/old/late.pdf",
+        "client_modified": "2026-10-01T09:00:00Z",
+        "server_modified": "2026-10-01T09:00:00Z",
+        "rev": "015a1c10ce0dd81",
+        "size": 2048,
+        "content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        ".tag": "deleted",
+        "name": "old",
+        "path_lower": "/old",
+        "path_display": "/old"
+      }
+    ],
+    "cursor": "AAHsynthetic-dropbox-cursor-10",
+    "has_more": false
+  }
+}

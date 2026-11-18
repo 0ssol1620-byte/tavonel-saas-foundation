@@ -1,6 +1,6 @@
 import type { OAuthConnectorProvider } from "./connector-oauth";
 import { assertSafeUrl, safeFetch, type EgressPolicy } from "./safe-url";
-import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
+import { dropboxReconciliationEnabled } from "./dropbox-reconciliation-switch";
 
 export type OAuthSourceTarget = {
   rootPath?: string;
@@ -162,10 +162,11 @@ async function jsonRequest(
 }
 
 /*
-  Main dbe22b1e's Dropbox mapping, kept verbatim for the intake-approval rollout switch off: a
-  DeletedMetadata (path, no id) takes its path_lower as nativeId and carries no providerPath, so
-  the worker suspends it by that id as main does. The path-only tombstone below is only resolvable
-  by reconcile_dropbox_source_page (migration 20261007100000), which ships behind the same switch.
+  Main dbe22b1e's Dropbox mapping, kept verbatim for the Dropbox reconciliation switch off
+  (lib/dropbox-reconciliation-switch.ts): a DeletedMetadata (path, no id) takes its path_lower as
+  nativeId and carries no providerPath, so the worker suspends it by that id as main does. The
+  path-only tombstone below is only resolvable by reconcile_dropbox_source_page (migration
+  20261007100000), which ships behind the same switch the worker reads.
 */
 function mainDropboxObservation(row: Record<string, unknown>): OAuthSourceItem | null {
   const tag = row[".tag"];
@@ -194,9 +195,10 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     LIST_POLICY.dropbox,
   );
   const rows = sourceRows(payload, "entries");
+  const reconcile = dropboxReconciliationEnabled();
   const items = completeObservations(rows.map((row): OAuthSourceItem | OAuthPathTombstone | null => {
     if (!readableRow(row)) return null;
-    if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return mainDropboxObservation(row);
+    if (!reconcile) return mainDropboxObservation(row);
     const tag = row[".tag"];
     const deleted = tag === "deleted";
     // DeletedMetadata has path_lower and no id. The path travels beside the id, never as one.
