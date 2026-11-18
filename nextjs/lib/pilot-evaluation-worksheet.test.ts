@@ -6,6 +6,7 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import EvaluationPage from "@/components/evaluation-page";
 import { activationPolicy } from "@/lib/activation-policy";
+import { KO_CHROME } from "@/lib/site-navigation";
 
 // Only the public site chrome is replaced, as in components/evaluation-page.test.tsx; the page,
 // the contact form, the activation policy and the static worksheets are the real ones.
@@ -305,7 +306,8 @@ describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, ga
       expect(html).toContain('href="/explore"');
       expect(html).toContain(locale === "en" ? 'href="/pricing"' : 'href="/ko/pricing"');
       // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale. WO-REL-1: it names no plan as bought online.
-      expect(html).toContain(locale === "en" ? "Once it is open, the pricing page shows for each plan whether it can be bought online or is arranged with us." : "열린 뒤에는 요금제마다 바로 구매할 수 있는지, 저희와 함께 정하는지 요금제 페이지에 표시됩니다.");
+      // WO-REL-1 r4: taken from the source constants, so a rewording cannot strand this pin (the English wording is pinned in customer-data-live-path.test.ts).
+      expect(html).toContain(locale === "en" ? activationPolicy.customerData.reason : KO_CHROME.customerDataGate);
       expect(html).not.toMatch(/<script\b/);
     });
   }
