@@ -225,7 +225,7 @@ const CLOSED = {
   },
   pricing: [
     { href: "/explore", label: "Explore a Compiled World" },
-    // Catalog v2 (PB-2026-11-V22, CAT-D1): DELIVERED is empty, so every paid plan is requested in every state.
+    // Catalog v2 (PB-2026-11-V22): no V22 price is set in these states, so every paid plan is requested (WO-REL-1).
     { href: "/contact?plan=Personal", label: "Request Personal access" },
     { href: "/contact?plan=Developer", label: "Request Developer access" },
     { href: "/contact?plan=Team", label: "Request Team access" },
@@ -269,7 +269,7 @@ const TABLE = {
     header: { href: "/login", label: "Start free" },
     home: { ...CLOSED.home, primary: { href: "/login", label: "Start free" } },
     homeKo: { ...CLOSED.homeKo, primary: { href: "/login", label: "사용 신청하기" } },
-    // Live commerce opens the Free start. It opens no paid plan: the plans' capabilities are not delivered (CAT-D1).
+    // Live commerce opens the Free start. It opens no paid plan: the two V22 prices are unset here (WO-REL-1, build 1).
     pricing: [{ href: "/login", label: "Start free" }, ...CLOSED.pricing.slice(1)],
     // /explore follows the switch too (JOURNEY-MAP D-07, A5).
     explore: {
@@ -291,10 +291,19 @@ describe("each environment is the state it is named for", () => {
   it.each([
     ["S0", { createAccount: false, purchasePlan: false, liveCommerce: false }],
     ["S1", { createAccount: true, purchasePlan: false, liveCommerce: false }],
-    ["S2", { createAccount: true, purchasePlan: true, liveCommerce: true }],
+    // WO-REL-1: every gate open and the two V22 prices unset is build 1 of the release: nothing on sale, so no purchase.
+    ["S2", { createAccount: true, purchasePlan: false, liveCommerce: true }],
   ] as const)("%s", async (state, expected) => {
     await enter(state);
     expect(await status()).toEqual(expected);
+  }, RENDER_TIMEOUT);
+
+  it("S2 with both V22 prices set (build 2) opens purchase; with one alone it stays closed", async () => {
+    await enter("S2");
+    vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"p".repeat(26)}`);
+    expect((await status()).purchasePlan).toBe(false);
+    vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"d".repeat(26)}`);
+    expect(await status()).toEqual({ createAccount: true, purchasePlan: true, liveCommerce: true });
   }, RENDER_TIMEOUT);
 });
 
@@ -426,28 +435,32 @@ describe("the checkout-intent notice", () => {
 
 /*
   Catalog v2 (PB-2026-11-V22, WO-CAT-2). /pricing buys exactly what the server computed as `purchasable` and
-  requests everything else. The seam is the one the checkout route test uses: the catalog module with
-  `planAvailability` handed a delivered set (here every capability, or none) -- and a v2 price env, which is
-  the other half of the gate. Nothing in the page reads either.
+  requests everything else. WO-REL-1: the seam is the release's own DELIVERED (or nothing) and the two V22 price envs --
+  both set (build 2), Personal alone (a misconfiguration that must open nothing) or none (build 1). Nothing in the page
+  reads either.
 */
+type SalePrices = "both" | "personal" | "none";
+function stubSalePrices(prices: SalePrices) {
+  if (prices !== "none") vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"a".repeat(26)}`);
+  if (prices === "both") vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"e".repeat(26)}`);
+}
+
 describe("catalog v2: /pricing buys only what the server computed as purchasable", () => {
-  const PRICE = `pri_${"a".repeat(26)}`;
   afterEach(() => {
     vi.doUnmock("@/lib/billing-catalog");
   });
 
-  async function pricingHtml({ delivered, personalPrice }: { delivered: boolean; personalPrice: boolean }) {
+  async function pricingHtml({ delivered, prices }: { delivered: boolean; prices: SalePrices }) {
     await enter("S2");
     vi.doMock("@/lib/billing-catalog", async (original) => {
       const catalog = await original<typeof import("./billing-catalog")>();
-      const all = new Set(Object.values(catalog.BILLING_OFFERS).flatMap((offer) => offer.requires));
       return {
         ...catalog,
         planAvailability: (code: never, configured: never) =>
-          catalog.planAvailability(code, configured, delivered ? all : new Set()),
+          catalog.planAvailability(code, configured, delivered ? catalog.DELIVERED : new Set()),
       };
     });
-    if (personalPrice) vi.stubEnv("PADDLE_PRICE_PERSONAL", PRICE);
+    stubSalePrices(prices);
     const { default: PricingPage } = await import("../app/pricing/page");
     return renderToStaticMarkup(createElement(PricingPage as FunctionComponent<Record<string, unknown>>));
   }
@@ -458,38 +471,44 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
     return ld.flatMap((doc) => (doc["@graph"] ?? []) as Array<{ "@type": string; name?: string; availability?: string }>).filter((node) => node["@type"] === "Offer");
   };
 
-  it("with a delivered line and a configured price, exactly one Buy link: Personal", async () => {
-    const html = await pricingHtml({ delivered: true, personalPrice: true });
+  it("with the release's line and both V22 prices set, exactly two Buy links: Personal and Developer", async () => {
+    const html = await pricingHtml({ delivered: true, prices: "both" });
+    const { BILLING_OFFERS } = await import("./billing-catalog");
     const actions = planActions(html);
-    expect(actions.filter((action) => action.label.startsWith("Buy"))).toEqual([
-      { href: "/login?next=checkout&offer=personal", label: "Buy Personal — $29/month" },
-    ]);
-    // The other three paid plans have no price env here, so they stay requests.
+    // Price and name from the catalog, which billing-catalog.test.ts pins to PB-2026-11-V22.
+    expect(actions.filter((action) => action.label.startsWith("Buy"))).toEqual((["personal", "developer"] as const).map((code) => ({
+      href: `/login?next=checkout&offer=${code}`, label: `Buy ${BILLING_OFFERS[code].label} — $${BILLING_OFFERS[code].priceUsd}/month`,
+    })));
+    // Team and Business wait on per-member source scopes, so they stay requests.
     expect(actions.filter((action) => action.label.startsWith("Request")).map((action) => action.label)).toEqual([
-      "Request Developer access", "Request Team access", "Request Business access",
+      "Request Team access", "Request Business access",
     ]);
-    // JSON-LD names exactly the plan that can be bought.
-    expect(offers(html).map((node) => [node.name, node.availability])).toEqual([["Personal", "https://schema.org/InStock"]]);
+    // JSON-LD names exactly the plans that can be bought.
+    expect(offers(html).map((node) => [node.name, node.availability])).toEqual([
+      ["Personal", "https://schema.org/InStock"], ["Developer", "https://schema.org/InStock"],
+    ]);
   }, RENDER_TIMEOUT);
 
-  it("removing the price env flips Personal to Request access: no Buy link, no Offer", async () => {
-    const html = await pricingHtml({ delivered: true, personalPrice: false });
-    expect(planActions(html).map((action) => action.label)).toEqual([
-      "Request Personal access", "Request Developer access", "Request Team access", "Request Business access",
-    ]);
-    expect(offers(html)).toEqual([]);
+  it("with both V22 prices unset (build 1), or only one of them, every plan is Request access and no Offer is published", async () => {
+    for (const prices of ["none", "personal"] as const) {
+      const html = await pricingHtml({ delivered: true, prices });
+      expect(planActions(html).map((action) => action.label), prices).toEqual([
+        "Request Personal access", "Request Developer access", "Request Team access", "Request Business access",
+      ]);
+      expect(offers(html), prices).toEqual([]);
+    }
   }, RENDER_TIMEOUT);
 
   it("a configured price does not open a plan whose line is not delivered", async () => {
-    const html = await pricingHtml({ delivered: false, personalPrice: true });
+    const html = await pricingHtml({ delivered: false, prices: "both" });
     expect(planActions(html).some((action) => action.label.startsWith("Buy"))).toBe(false);
     expect(html).not.toContain("Buy Personal");
     expect(offers(html)).toEqual([]);
   }, RENDER_TIMEOUT);
 
   it("no body renders an overage figure next to a Buy action, and no plan card names automation, SSO, an SLA or federation", async () => {
-    for (const personalPrice of [true, false]) {
-      const html = await pricingHtml({ delivered: true, personalPrice });
+    for (const prices of ["both", "none"] as const) {
+      const html = await pricingHtml({ delivered: true, prices });
       const start = html.indexOf('id="pricing-overage-title"');
       expect(start, "the overage table is rendered").toBeGreaterThan(0);
       const overage = html.slice(start, html.indexOf("</table>", start));
@@ -514,7 +533,7 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
     const planValues = (html: string) => anchors(html).flatMap(({ href }) =>
       href.includes("?") ? new URLSearchParams(href.slice(href.indexOf("?") + 1)).getAll("plan") : []);
     const seen: string[] = [];
-    for (const seam of [{ delivered: true, personalPrice: true }, { delivered: true, personalPrice: false }, { delivered: false, personalPrice: false }]) {
+    for (const seam of [{ delivered: true, prices: "both" }, { delivered: true, prices: "none" }, { delivered: false, prices: "none" }] as const) {
       seen.push(...planValues(await pricingHtml(seam)));
     }
     const { default: CheckoutIntentNotice } = await import("../components/checkout-intent-notice");
@@ -608,22 +627,20 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
   "purchasable" down and the heading promises the checkout; removing the price takes the promise away again.
 */
 describe("catalog v2: /login promises a checkout only for what the server computed as purchasable", () => {
-  const PRICE = `pri_${"b".repeat(26)}`;
   afterEach(() => {
     vi.doUnmock("@/lib/billing-catalog");
   });
 
-  async function loginAvailability({ delivered, personalPrice }: { delivered: boolean; personalPrice: boolean }) {
+  async function loginAvailability({ delivered, prices }: { delivered: boolean; prices: SalePrices }) {
     await enter("S2");
     vi.doMock("@/lib/billing-catalog", async (original) => {
       const catalog = await original<typeof import("./billing-catalog")>();
-      const all = new Set(Object.values(catalog.BILLING_OFFERS).flatMap((offer) => offer.requires));
       return {
         ...catalog,
-        planAvailability: (code: never, configured: never) => catalog.planAvailability(code, configured, delivered ? all : new Set()),
+        planAvailability: (code: never, configured: never) => catalog.planAvailability(code, configured, delivered ? catalog.DELIVERED : new Set()),
       };
     });
-    if (personalPrice) vi.stubEnv("PADDLE_PRICE_PERSONAL", PRICE);
+    stubSalePrices(prices);
     const { default: LoginPage } = await import("../app/login/page");
     const element = (LoginPage as () => { props: { availability: Record<string, string> } })();
     return element.props.availability;
@@ -635,8 +652,9 @@ describe("catalog v2: /login promises a checkout only for what the server comput
   };
 
   it("a purchasable Personal: 'One step before checkout.' and the held-for-you notice", async () => {
-    const availability = await loginAvailability({ delivered: true, personalPrice: true });
+    const availability = await loginAvailability({ delivered: true, prices: "both" });
     expect(availability.personal).toBe("purchasable");
+    expect(availability.developer).toBe("purchasable");
     expect(availability.team).toBe("request_access");
     expect(availability.observer_access).toBe("retired");
     expect(await heading(availability, true)).toBe("One step before checkout.");
@@ -648,8 +666,8 @@ describe("catalog v2: /login promises a checkout only for what the server comput
     expect(await heading(availability, null)).toBe("Sign in to TAVONEL.");
   }, RENDER_TIMEOUT);
 
-  it("the same page with no Personal price, or nothing delivered: a request, never the promise", async () => {
-    for (const seam of [{ delivered: true, personalPrice: false }, { delivered: false, personalPrice: true }]) {
+  it("the same page with no V22 price, only the Personal one, or nothing delivered: a request, never the promise", async () => {
+    for (const seam of [{ delivered: true, prices: "none" }, { delivered: true, prices: "personal" }, { delivered: false, prices: "both" }] as const) {
       const availability = await loginAvailability(seam);
       expect(availability.personal, JSON.stringify(seam)).toBe("request_access");
       expect(await heading(availability, true), JSON.stringify(seam)).toBe("Sign in to TAVONEL.");

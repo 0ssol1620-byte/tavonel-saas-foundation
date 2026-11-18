@@ -176,7 +176,7 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       literally. The gate is still stated, still in Korean, still once.
     */
     expect(LANDING_V2_COPY.ko.start.microtext, "the Korean close states the gate in the reader's language")
-      .toContain("열린 뒤에는 Starter 요금제를 바로 구매할 수 있고, Pro와 Enterprise는 저희와 함께 정합니다");
+      .toContain("열린 뒤에는 요금제마다 바로 구매할 수 있는지, 저희와 함께 정하는지 요금제 페이지에 표시됩니다");
     expect(copyDeck, "and the English close is the policy's own sentence, not a paraphrase")
       .toContain("microtext: activationPolicy.customerData.reason");
     expect(copyDeck, "the Korean close reads the site's one spelling of the gate, not a second one")

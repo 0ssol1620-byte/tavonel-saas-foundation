@@ -17,21 +17,19 @@ vi.mock("@/lib/account-grants", () => ({
 }));
 vi.mock("@/lib/billing-binding", () => ({ createCheckoutBinding: binding }));
 /*
-  Catalog v2 (WO-CAT-1/2): no plan is purchasable while `DELIVERED` is empty, so this file gives the route a purchasable plan the
-  way `checkout-quote.test.ts` does: the catalog with `planAvailability` handed every capability, plus a configured v2 price.
+  Catalog v2 (WO-CAT-1/2). This file gives the route a purchasable plan through a seam: the catalog with `planAvailability`
+  handed the release's DELIVERED (WO-REL-1) or nothing, plus the two V22 prices configured or none (the sale opens whole).
   The live-checkout customer-data gate it exercises is unchanged; only the plan it is exercised with is the v2 `developer`.
 */
 vi.mock("@/lib/billing-catalog", async (original) => {
   const catalog = await original<typeof import("./billing-catalog")>();
-  const all = new Set(Object.values(catalog.BILLING_OFFERS).flatMap((offer) => offer.requires));
-  const configured = () => seam.configured
-    ? new Map([["developer", { ...catalog.BILLING_OFFERS.developer, code: "developer", priceId: `pri_${"a".repeat(26)}` }]])
-    : new Map();
+  const priced = (code: "personal" | "developer", c: string) => [code, { ...catalog.BILLING_OFFERS[code], code, priceId: `pri_${c.repeat(26)}` }] as const;
+  const configured = () => seam.configured ? new Map([priced("personal", "p"), priced("developer", "a")]) : new Map();
   return {
     ...catalog,
     readConfiguredBillingOffers: configured,
     planAvailability: (code: never, offers: never = configured() as never) =>
-      catalog.planAvailability(code, offers, seam.delivered ? all : new Set()),
+      catalog.planAvailability(code, offers, seam.delivered ? catalog.DELIVERED : new Set()),
     readPaddleBrowserConfig: () => !seam.paddle ? null : commercial().provider === "sandbox"
       ? { environment: "sandbox", clientToken: `test_${"a".repeat(30)}` }
       : { environment: "production", clientToken: `live_${"a".repeat(30)}` },

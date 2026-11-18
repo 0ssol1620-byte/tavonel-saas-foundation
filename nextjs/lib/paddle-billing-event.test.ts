@@ -358,6 +358,26 @@ describe("catalog v2 leaves the retired offers' webhooks resolvable", () => {
     });
   });
 
+  /*
+    WO-REL-1: opening the V22 sale is an env change on the same SHA. A legacy subscriber's renewal parses to the same
+    projection with the sale closed (no V22 price), open (both set) and misconfigured (one set, or one malformed).
+  */
+  it("projects a legacy renewal identically whether the V22 sale is closed, open or misconfigured", () => {
+    const closed = { ...env, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"s".repeat(26)}` };
+    const states = [
+      closed,
+      { ...closed, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` },
+      { ...closed, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}` },
+      { ...closed, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: "pri_not_a_price" },
+    ];
+    for (const binding of [checkoutBinding(), legacyCheckoutBinding()]) {
+      const event = renewal(binding);
+      const projections = states.map((state) => parsePaddleBillingAction(event, state));
+      expect(projections[0]).toMatchObject({ action: "allowance", offerCode: "observer_access", configuredCreditDelta: 2_000 });
+      for (const projection of projections) expect(projection).toEqual(projections[0]);
+    }
+  });
+
   it("still parses a subscription.updated for studio_access", () => {
     const studioPrice = `pri_${"s".repeat(26)}`;
     const binding = createCheckoutBinding({ ...bindingInput, offerCode: "studio_access" }, SECRET, new Date(EVENT_AT));

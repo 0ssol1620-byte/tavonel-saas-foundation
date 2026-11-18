@@ -107,8 +107,14 @@ export const activationPolicy = {
     "opening in stages" sentence is gone. What opens a workspace is its owner accepting the
     processing terms; the release row and the grant still decide, so it still says the workspace
     shows whether it is open.
+
+    WO-REL-1 (ledger L613 item 1). "Once it is open, the Starter plan can be bought online. Pro and Enterprise are
+    arranged with us rather than enabled by a plan purchase." named two plans the V22 price book retired and said one
+    of them could be bought, whatever `planAvailability` answered -- false on every deployment where the V22 prices are
+    unset. This string is a constant rendered on prerendered pages too, so it cannot follow the price env. It now
+    names no plan and says where the answer is: /pricing renders each plan from `planAvailability`, true in both states.
   */
-  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Starter plan can be bought online. Pro and Enterprise are arranged with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the pricing page shows for each plan whether it can be bought online or is arranged with us." },
 } as const;
 
 /*

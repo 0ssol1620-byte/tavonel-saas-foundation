@@ -58,14 +58,15 @@ import {
 } from "./fixtures/workspace-fixture";
 
 /*
-  Catalog v2 (PB-2026-11-V22, WO-CAT-2). Nothing is on sale while `DELIVERED` is empty, so /pricing renders no Buy action
+  Catalog v2 (PB-2026-11-V22, WO-CAT-2). Nothing is on sale while the two V22 price envs are unset, as in the fixture build
+  (WO-REL-1: the sale opens with PADDLE_PRICE_PERSONAL and PADDLE_PRICE_DEVELOPER both set), so /pricing renders no Buy action
   and a checkout is reached only by an offer code carried in the address (`/pricing?checkout=<code>`, `/workspace?checkout=<code>`)
   or by sign-in -- the resume paths this file drives with a mocked checkout reply. The shared fixture answers for the v2
   `personal` plan, with the quote `use-checkout` requires before it opens an overlay (WO-CAT-2 L5).
 */
 const PERSONAL = BILLING_OFFERS.personal;
 
-/** Every paid plan's action on /pricing is a request, because no capability is delivered; there is no Buy link. */
+/** Every paid plan's action on /pricing is a request, because no V22 price is set in this build; there is no Buy link. */
 const PAID_CODES = ["personal", "developer", "team", "business"] as const;
 async function expectEveryPaidPlanRequestsAccess(page: Page) {
   for (const code of PAID_CODES) {

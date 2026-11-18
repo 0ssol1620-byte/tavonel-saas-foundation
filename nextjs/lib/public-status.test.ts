@@ -15,7 +15,7 @@ const commercial = {
 describe("public deployment status v2", () => {
   // D-12 (delegated decision 2026-11-09): the shipped policy now opens the whole customer path.
   it("opens account, purchase and customer processing on the shipped policy", () => {
-    const status = buildPublicStatusV2({
+    const status = buildPublicStatusV2({ planOnSale: true,
       now: NOW,
       commercial,
       accessMode: "self_service",
@@ -33,7 +33,7 @@ describe("public deployment status v2", () => {
   });
 
   it("allows an account while purchase and customer processing stay closed", () => {
-    const status = buildPublicStatusV2({
+    const status = buildPublicStatusV2({ planOnSale: true,
       now: NOW,
       commercial,
       accessMode: "self_service",
@@ -58,7 +58,7 @@ describe("public deployment status v2", () => {
     const policy = Object.fromEntries(
       Object.entries(activationPolicy).map(([key, value]) => [key, { ...value, enabled: true }]),
     ) as unknown as typeof activationPolicy;
-    const status = buildPublicStatusV2({ now: NOW, commercial, accessMode: "self_service", authReady: true, policy });
+    const status = buildPublicStatusV2({ planOnSale: true, now: NOW, commercial, accessMode: "self_service", authReady: true, policy });
 
     expect(status.availableActions.createAccount.enabled).toBe(true);
     expect(status.availableActions.purchasePlan.enabled).toBe(true);
@@ -66,7 +66,7 @@ describe("public deployment status v2", () => {
   });
 
   it("does not advertise account creation in a pilot-only deployment", () => {
-    const status = buildPublicStatusV2({
+    const status = buildPublicStatusV2({ planOnSale: true,
       now: NOW, commercial, accessMode: "pilot", authReady: true, policy: activationPolicy,
     });
     expect(status.availableActions.signIn.enabled).toBe(true);
@@ -74,7 +74,7 @@ describe("public deployment status v2", () => {
   });
 
   it("contains no operator configuration or secret-adjacent fields", () => {
-    const status = buildPublicStatusV2({ now: NOW, commercial, accessMode: "self_service", authReady: true, policy: activationPolicy });
+    const status = buildPublicStatusV2({ planOnSale: true, now: NOW, commercial, accessMode: "self_service", authReady: true, policy: activationPolicy });
     const keys: string[] = [];
     const visit = (value: unknown) => {
       if (!value || typeof value !== "object") return;
@@ -95,7 +95,7 @@ describe("public deployment status v2", () => {
     const policy = Object.fromEntries(
       Object.entries(activationPolicy).map(([key, value]) => [key, { ...value, enabled: true }]),
     ) as unknown as typeof activationPolicy;
-    const status = buildPublicStatusV2({
+    const status = buildPublicStatusV2({ planOnSale: true,
       now: NOW,
       commercial,
       accessMode: "self_service",
@@ -126,7 +126,7 @@ describe("public deployment status v2", () => {
   });
 
   it("rejects legacy, partial, and malformed payloads at the consumer boundary", () => {
-    const valid = buildPublicStatusV2({
+    const valid = buildPublicStatusV2({ planOnSale: true,
       now: NOW,
       commercial,
       accessMode: "self_service",
@@ -141,5 +141,45 @@ describe("public deployment status v2", () => {
       ...valid,
       availableActions: { ...valid.availableActions, signIn: { enabled: "yes" } },
     })).toBeNull();
+  });
+});
+
+/*
+  WO-REL-1 (ledger L613 item 1, FAST-TRACK S2): `purchasePlan` says a plan can be bought only while one is `purchasable`.
+  Every launch gate open used to be enough, so with the V22 prices unset the deployment claimed a sale checkout refuses.
+*/
+describe("purchasePlan follows the catalog's planAvailability, in both price-env states", () => {
+  const LAUNCHED = {
+    COMMERCIAL_MODE: "live", PADDLE_SANDBOX: "false", TAVONEL_BILLING_LAUNCH_APPROVED: "true", ACCESS_MODE: "self_service",
+    NEXT_PUBLIC_SUPABASE_URL: "https://tenant.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-anon-key", VERCEL_ENV: "production",
+    PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"a".repeat(26)}`, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"b".repeat(26)}`,
+  };
+  const V22 = { PADDLE_PRICE_PERSONAL: `pri_${"c".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` };
+
+  it("is closed, and says plans are requested, with every gate open and both V22 prices unset", () => {
+    const action = readPublicStatusV2(LAUNCHED, NOW).availableActions.purchasePlan;
+    expect(action).toEqual({ enabled: false, href: "/contact", reason: "Plans are available through Request access." });
+    expect(action.reason).not.toMatch(/can be (?:bought|purchased)/);
+  });
+
+  it("is open with both V22 prices set", () => {
+    const action = readPublicStatusV2({ ...LAUNCHED, ...V22 }, NOW).availableActions.purchasePlan;
+    expect(action).toEqual({ enabled: true, href: "/pricing", reason: "A plan can be purchased for an available customer workflow." });
+  });
+
+  it("stays closed with only one of the two prices set, or one that is not a price id (failure paths)", () => {
+    for (const env of [
+      { ...LAUNCHED, PADDLE_PRICE_PERSONAL: V22.PADDLE_PRICE_PERSONAL },
+      { ...LAUNCHED, PADDLE_PRICE_DEVELOPER: V22.PADDLE_PRICE_DEVELOPER },
+      { ...LAUNCHED, ...V22, PADDLE_PRICE_DEVELOPER: "pri_not_a_price" },
+    ]) expect(readPublicStatusV2(env, NOW).availableActions.purchasePlan.enabled).toBe(false);
+  });
+
+  it("a plan on sale never opens purchase past a closed gate", () => {
+    const action = readPublicStatusV2({ ...LAUNCHED, ...V22, TAVONEL_BILLING_LAUNCH_APPROVED: "false" }, NOW).availableActions.purchasePlan;
+    expect(action.enabled).toBe(false);
+    expect(action.reason).toBe("Purchasing does not enable customer document processing today.");
+    expect(buildPublicStatusV2({ now: NOW, commercial, accessMode: "self_service", authReady: true, policy: activationPolicy, planOnSale: false })
+      .availableActions.purchasePlan.enabled).toBe(false);
   });
 });

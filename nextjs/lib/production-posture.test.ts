@@ -65,14 +65,17 @@ describe("production posture @ 4c80bb30", () => {
     });
   });
 
-  it("sells no plan online while no capability is delivered, even with every price configured", () => {
-    // The posture a channel alone cannot state: the deployment sells what `planAvailability` says, and that is nothing yet.
+  it("sells Personal and Developer online only with their prices set, and nothing else even with every price configured", () => {
+    // The posture a channel alone cannot state: the deployment sells what `planAvailability` says (WO-REL-1).
     const codes = Object.keys(BILLING_OFFERS) as BillingOfferCode[];
     const env = Object.fromEntries(codes.map((code, index) => [BILLING_OFFERS[code].priceEnv, `pri_${String(index).repeat(26)}`]));
     const configured = readConfiguredBillingOffers(env);
     expect(configured.size, "every plan has a price").toBe(codes.length);
-    expect(codes.filter((code) => planAvailability(code, configured) === "purchasable")).toEqual([]);
+    expect(codes.filter((code) => planAvailability(code, configured) === "purchasable")).toEqual(["personal", "developer"]);
     expect(codes.filter((code) => planAvailability(code, configured) === "retired")).toEqual(["observer_access", "studio_access"]);
+    // Build 1 of the release: the two V22 prices unset, nothing is sold.
+    const closed = readConfiguredBillingOffers({ PADDLE_PRICE_OBSERVER_ACCESS: env.PADDLE_PRICE_OBSERVER_ACCESS!, PADDLE_PRICE_STUDIO_ACCESS: env.PADDLE_PRICE_STUDIO_ACCESS! });
+    expect(codes.filter((code) => planAvailability(code, closed) === "purchasable")).toEqual([]);
   });
 
   it("keeps every shipped manifest row's status and known limitations", () => {

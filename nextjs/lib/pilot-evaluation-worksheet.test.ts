@@ -304,8 +304,8 @@ describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, ga
       expect(html).toContain(`lang="${locale}"`);
       expect(html).toContain('href="/explore"');
       expect(html).toContain(locale === "en" ? 'href="/pricing"' : 'href="/ko/pricing"');
-      // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale. Pro stays contact (CAT-D4).
-      expect(html).toContain(locale === "en" ? "Once it is open, the Starter plan can be bought online. Pro and Enterprise are arranged with us rather than enabled by a plan purchase." : "열린 뒤에는 Starter 요금제를 바로 구매할 수 있고, Pro와 Enterprise는 저희와 함께 정합니다.");
+      // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale. WO-REL-1: it names no plan as bought online.
+      expect(html).toContain(locale === "en" ? "Once it is open, the pricing page shows for each plan whether it can be bought online or is arranged with us." : "열린 뒤에는 요금제마다 바로 구매할 수 있는지, 저희와 함께 정하는지 요금제 페이지에 표시됩니다.");
       expect(html).not.toMatch(/<script\b/);
     });
   }

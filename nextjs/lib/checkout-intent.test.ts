@@ -9,7 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BILLING_OFFERS, planAvailability, type PlanAvailability } from "./billing-catalog";
+import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type PlanAvailability } from "./billing-catalog";
 import {
   checkoutSellable,
   decideCheckoutResume,
@@ -53,12 +53,26 @@ describe("checkoutSellable: the one predicate /login's notice and H1 both read (
     expect(checkoutSellable(served("retired"), true)).toBe(false);
   });
 
-  it("fails closed for every offer with nothing delivered, which is every offer today", () => {
+  it("fails closed for every offer with nothing delivered, even with every price configured", () => {
     const configured = new Map(OFFER_CODES.map((code) => [code, true] as const));
     for (const code of OFFER_CODES) {
-      expect(planAvailability(code, configured), code).not.toBe("purchasable");
-      expect(checkoutSellable(served(planAvailability(code, configured)), true), code).toBe(false);
+      expect(planAvailability(code, configured, new Set()), code).not.toBe("purchasable");
+      expect(checkoutSellable(served(planAvailability(code, configured, new Set())), true), code).toBe(false);
     }
+  });
+
+  /*
+    WO-REL-1, both price-env states through the real catalog: with the two V22 prices unset no offer is sellable even on
+    an open deployment; with both set exactly Personal and Developer are; with one alone, none is.
+  */
+  it("sells Personal and Developer only with both V22 prices set, in the release as it is", () => {
+    const sellable = (env: Record<string, string>) => OFFER_CODES.filter((code) =>
+      checkoutSellable(served(planAvailability(code, readConfiguredBillingOffers(env))), true));
+    const retired = { PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"o".repeat(26)}`, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"s".repeat(26)}` };
+    expect(sellable(retired)).toEqual([]);
+    expect(sellable({ ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}` })).toEqual([]);
+    expect(sellable({ ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` }))
+      .toEqual(["personal", "developer"]);
   });
 
   /*

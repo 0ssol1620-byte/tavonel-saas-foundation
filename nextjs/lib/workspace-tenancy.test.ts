@@ -55,15 +55,17 @@ describe("the workspace key is a function of the user", () => {
 });
 
 describe("nothing claims a membership feature that the tenancy model cannot carry", () => {
-  it("keeps every plan a Request-access volume plan, never a membership plan sold online", () => {
-    // Catalog v2 (PB-2026-11-V22, CAT-D1): no plan is purchasable while DELIVERED is empty, and the plans that carry
-    // seats or shared sources (Team, Business) additionally wait on per-member source scopes the tenancy model cannot carry.
-    expect(DELIVERED.size).toBe(0);
+  it("never sells a membership plan online: what is sold is single-seat", () => {
+    // WO-REL-1: DELIVERED holds the Personal/Developer line (one seat each, capped by seat_cap). The plans that carry
+    // seats or shared sources (Team, Business) wait on per-member source scopes the tenancy model cannot carry.
+    expect(DELIVERED.has("per_member_source_scopes")).toBe(false);
+    const every = Object.fromEntries(Object.values(BILLING_OFFERS).map((offer, i) => [offer.priceEnv, `pri_${String(i).repeat(26)}`]));
+    const configured = readConfiguredBillingOffers(every);
     for (const code of ["personal", "developer", "team", "business"] as const) {
-      // Even with its price configured, the plan is requested: the capabilities on its line are not delivered.
-      const configured = readConfiguredBillingOffers({ [BILLING_OFFERS[code].priceEnv]: `pri_${"a".repeat(26)}` });
       expect(configured.has(code), `${code} has its price`).toBe(true);
-      expect(planAvailability(code, configured), code).toBe("request_access");
+      // Even with every price configured, a plan with more than one seat is requested.
+      if (BILLING_OFFERS[code].included.seats > 1) expect(planAvailability(code, configured), code).toBe("request_access");
+      else expect(BILLING_OFFERS[code].included.seats, code).toBe(1);
       // The card's feature bullets promise no seat, member, role or onboarding.
       const card = [BILLING_OFFERS[code].description, ...BILLING_OFFERS[code].features].join(" ");
       expect(card, code).not.toMatch(/\b(seats?|members?|roles?|onboarding)\b/i);

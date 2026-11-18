@@ -90,7 +90,7 @@ describe("customer data on the live compile path", () => {
     internal vocabulary rides along. The closed-gate phrasing is held out so it cannot survive the
     switch on the most-rendered sentence on the site.
   */
-  it("states the open path in the reader's terms, and only the plan that sells itself as bought online", () => {
+  it("states the open path in the reader's terms, and names no plan as bought online", () => {
     expect(activationPolicy.customerData.enabled).toBe(true);
     const { reason } = activationPolicy.customerData;
     // Review PR201-R1 B3 and R2: the sentence says what happens -- the workspace is created, it shows
@@ -99,8 +99,10 @@ describe("customer data on the live compile path", () => {
     expect(reason).toContain("Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms.");
     expect(reason).not.toMatch(/in stages|stage by stage/);
     expect(reason).toContain("Your workspace shows whether it is open.");
-    // Starter/Pro rename (2026-11-10); Pro stays contact (CAT-D4).
-    expect(reason).toContain("Once it is open, the Starter plan can be bought online. Pro and Enterprise are arranged with us rather than enabled by a plan purchase.");
+    // WO-REL-1: a constant cannot follow the price env, so it names no plan and says where `planAvailability` is read.
+    expect(reason).toContain("Once it is open, the pricing page shows for each plan whether it can be bought online or is arranged with us.");
+    expect(reason, "no plan named as buyable").not.toMatch(/\b(?:Starter|Pro|Personal|Developer|Team|Business)\b/);
+    expect(reason).not.toMatch(/\bcan be bought online\./);
     expect(reason).not.toMatch(/waiting list|in turn|notify|notification|we will (?:email|tell)/i);
     expect(reason).not.toMatch(/^Sign in to upload|can be bought online;/);
     expect(reason, "plain sentences").not.toContain(";");

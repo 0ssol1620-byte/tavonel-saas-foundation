@@ -82,8 +82,8 @@ for (const [source, sentence] of [
     await page.route("**/api/v1/oauth-connectors/authorize", route => { authorizeCalls += 1; return route.fulfill({ status: 402, json: { code: "TRIAL_FEATURE_NOT_INCLUDED" } }); });
     await page.goto("/workspace/connections");
     const gate = page.locator(".workspace-access-gate");
-    await expect(gate.getByRole("heading", { name: "Available on Starter and Pro." })).toBeVisible();
-    await expect(gate).toContainText("Google Drive and file-server connections are included on Starter and Pro.");
+    await expect(gate.getByRole("heading", { name: "Available on a paid plan." })).toBeVisible();
+    await expect(gate).toContainText("Google Drive and file-server connections are included in every paid plan.");
     await expect(gate).toContainText(sentence);
     await expect(gate).not.toContainText(/Dropbox|OneDrive/);
     await expect(gate.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");

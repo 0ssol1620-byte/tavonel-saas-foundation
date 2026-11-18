@@ -70,6 +70,9 @@ describe("status API compatibility", () => {
     vi.stubEnv("FOUNDATION_BILLING_SETTLEMENT_HMAC", "a".repeat(32));
     vi.stubEnv("PADDLE_PRICE_OBSERVER_ACCESS", `pri_${"a".repeat(26)}`);
     vi.stubEnv("PADDLE_PRICE_STUDIO_ACCESS", `pri_${"b".repeat(26)}`);
+    // WO-REL-1: the open state is the one with the two V22 prices set (build 2); the closed one is below.
+    vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"c".repeat(26)}`);
+    vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"d".repeat(26)}`);
 
     const legacy = await legacyStatus().json() as { liveCheckout: boolean; selfService: boolean; billing: string };
     const publicStatus = parsePublicStatusV2(await publicStatusV2().json());
@@ -141,10 +144,44 @@ describe("legacy status: the catalog readiness check (WO-CAT-1)", () => {
     expect(legacy.billing).toBe("live_incomplete");
   });
 
-  it("stays ready when only v2 prices that nothing delivers yet are missing", async () => {
+  /*
+    WO-REL-1 (ledger L613, FAST-TRACK S2). With every V22 price unset the sale is closed: configured, nothing to buy.
+    This test used to expect "live_checkout_ready" here -- a status saying a plan can be bought while none could.
+  */
+  it("reports a closed sale as launch pending, not checkout ready, with every V22 price unset", async () => {
     configureBilling({ PADDLE_PRICE_PERSONAL: "", PADDLE_PRICE_DEVELOPER: "", PADDLE_PRICE_TEAM: "", PADDLE_PRICE_BUSINESS: "" });
-    const legacy = await legacyStatus().json() as { billing: string };
+    const legacy = await legacyStatus().json() as { billing: string; liveCheckout: boolean };
+    const publicStatus = parsePublicStatusV2(await publicStatusV2().json());
+    expect(legacy.billing).toBe("live_launch_pending");
+    expect(legacy.liveCheckout).toBe(false);
+    expect(publicStatus?.availableActions.purchasePlan.enabled).toBe(false);
+    const operations = readPublicOperations();
+    expect(operations.readiness.billingConfigured).toBe(true);
+    expect(operations.readiness.billingLive).toBe(false);
+    expect(operations.components.billing.detail).toBe("Paddle live checkout configured, but checkout is closed and no plan can be bought");
+  });
+
+  it("is ready with Personal and Developer priced and Team and Business unpriced", async () => {
+    configureBilling({ PADDLE_PRICE_TEAM: "", PADDLE_PRICE_BUSINESS: "" });
+    const legacy = await legacyStatus().json() as { billing: string; liveCheckout: boolean };
     expect(legacy.billing).toBe("live_checkout_ready");
+    expect(legacy.liveCheckout).toBe(true);
+  });
+
+  it("reports one V22 price alone, or a malformed one, as a configuration error that opens nothing", async () => {
+    const states: Array<Record<string, string>> = [
+      { PADDLE_PRICE_DEVELOPER: "" },
+      { PADDLE_PRICE_PERSONAL: "" },
+      { PADDLE_PRICE_DEVELOPER: "pri_not_a_price" },
+    ];
+    for (const overrides of states) {
+      configureBilling(overrides);
+      const legacy = await legacyStatus().json() as { billing: string; liveCheckout: boolean };
+      expect(legacy.billing, JSON.stringify(overrides)).toBe("live_incomplete");
+      expect(legacy.liveCheckout, JSON.stringify(overrides)).toBe(false);
+      expect(readPublicOperations().readiness.billingConfigured, JSON.stringify(overrides)).toBe(false);
+      vi.unstubAllEnvs();
+    }
   });
 
   it("is ready with every price set, and the operations readiness agrees with the route", async () => {
