@@ -128,9 +128,14 @@ const nativeDbCondition=nativeDbBody.match(/    if: >-\n([\s\S]*?)    runs-on:/)
 assert(nativeDbCondition==="always() && needs.collector-only-eligibility.result == 'success' && ((needs.collector-only-eligibility.outputs.native_database == 'true' && needs.collector-only-eligibility.outputs.intended == 'true' && needs.collector-only-eligibility.outputs.eligible == 'false') || (needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'))", 'DB requires an exact native fresh-execution or a normal decision, and an affected pull request runs the full job beside its selected-fixture lane (review 3, CI-TI-2)');
 // WO-CI-7 round 8: the stage rollback rehearsal is a job of its own, last in the file, gated exactly as db-rehearsal is. It pairs every
 // migration after the pinned production boundary with exactly one draft, applies them all, runs the drafts newest-first (deleting each
-// tracker row as the drafts' headers tell the operator to), and fails on any fingerprint line but the four rollback-20261117120000 keeps;
-// then the CLI applies the same migrations again and the fingerprint must equal the released one. No remote push, no secret.
+// tracker row as the drafts' headers tell the operator to), and fails on any fingerprint line but the four rollback-20261117120000 keeps.
+// Round 8 closing: the last step resets the local database and the fingerprint must equal the released one. It no longer re-applies
+// the migrations onto the rolled-back schema: 20261117120000 cannot apply there by design (its draft keeps the meter's check
+// constraints, the migration adds them unguarded, and its header says a re-release is a new migration version), so a re-apply step
+// could only fail. Any `supabase migration up` in this job is refused, and the reset must come after the four-row check. No push, no secret.
 const rollbackBody=dbRehearsal.slice(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n'));
+const rollbackFourRows=rollbackBody.indexOf('test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4');
+const rollbackFinalReset=rollbackBody.indexOf('supabase db reset\n          fingerprint reset\n          diff rollback-fingerprints/released.tsv rollback-fingerprints/reset.tsv\n');
 const rollbackCondition=rollbackBody.match(/    if: >-\n([\s\S]*?)    runs-on:/)?.[1]?.replace(/\s+/g,' ').trim();
 assert(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n')>dbRehearsal.indexOf('\n  browser-storage-transport:\n')&&rollbackCondition===nativeDbCondition
   &&rollbackBody.includes('needs: [collector-only-eligibility]')&&rollbackBody.includes('ROLLBACK_BOUNDARY: "20261110040000"')
@@ -138,8 +143,7 @@ assert(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n')>dbRehearsal.indexO
   &&rollbackBody.includes('mapfile -t pairs < <(tac /tmp/rollback-pairs.tsv)')&&rollbackBody.includes('psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$draft"')
   &&rollbackBody.includes("delete from supabase_migrations.schema_migrations where version = '$version';")
   &&rollbackBody.includes("if grep -v -E $'^[<>] (column|constraint)\\tfoundation_compute_reservations\\t' rollback-fingerprints/rolled-back.diff; then")
-  &&rollbackBody.includes('test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4')&&rollbackBody.includes('supabase migration up --local')
-  &&rollbackBody.includes('diff rollback-fingerprints/released.tsv rollback-fingerprints/reapplied.tsv')&&rollbackBody.includes('set -euo pipefail')
+  &&rollbackFourRows>0&&rollbackFinalReset>rollbackFourRows&&!rollbackBody.includes('supabase migration up')&&rollbackBody.includes('set -euo pipefail')
   &&!rollbackBody.includes('secrets.')&&!rollbackBody.includes('supabase db push')&&!rollbackBody.includes('--linked')&&!rollbackBody.includes('continue-on-error'),
   'the stage rollback rehearsal must run every draft newest-first under db-rehearsal\'s gate, admit only the four rows draft 4 keeps, and end on the released schema');
 assert(dbRehearsal.includes("needs.collector-only-eligibility.outputs.affected != 'true' && needs.collector-only-eligibility.outputs.intended == 'false'"), 'unrelated transport must not run for an affected integration head');

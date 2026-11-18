@@ -1263,13 +1263,14 @@ jobs:
   # boundary is applied, then rolled back newest-first by its own reviewed draft under supabase/drafts (each draft run as
   # the operator runs it, then its tracker row deleted as the draft's header tells the operator to), and the schema must
   # equal the boundary schema except the four foundation_compute_reservations column/constraint lines that
-  # rollback-20261117120000 keeps on purpose (its header: the metered columns hold what was charged). Then the same
-  # migrations apply again through the CLI and the schema must equal the released one, so the job ends on the released
-  # schema. Any other difference, a draft that refuses, a migration without exactly one draft, or a re-apply that fails
-  # stops the job red. A separate job, so a red rollback rehearsal is never confused with a red chain (db-rehearsal).
+  # rollback-20261117120000 keeps on purpose (its header: the metered columns hold what was charged). Then the local
+  # database is reset and its schema must equal the released one, so the job ends on the released schema. The migrations
+  # are not applied again onto the rolled-back schema: 20261117120000 cannot apply there by design (the kept check
+  # constraints meet its unguarded `add constraint`; its draft says a re-release is a new migration version). Any other
+  # difference, a draft that refuses, a migration without exactly one draft, or a reset that differs stops the job red. A separate job, so a red rollback rehearsal is never confused with a red chain (db-rehearsal).
   # Same gate as db-rehearsal: it runs exactly when that job runs. No secret, no project ref, no remote database.
   stage-rollback-rehearsal:
-    name: Stage rollback rehearsal (drafts newest-first, then forward again)
+    name: Stage rollback rehearsal (drafts newest-first, then reset to the released schema)
     needs: [collector-only-eligibility]
     if: >-
       always() && needs.collector-only-eligibility.result == 'success' &&
@@ -1332,7 +1333,7 @@ jobs:
           psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql > rollback-fingerprints/boundary.tsv
           mv /tmp/rollback-parked/*.sql supabase/migrations/
           echo "boundary fingerprint rows: $(wc -l < rollback-fingerprints/boundary.tsv)"
-      - name: Apply every migration, roll back newest-first with the drafts, then apply forward again
+      - name: Apply every migration, roll back newest-first with the drafts, then reset and compare with the released schema
         if: steps.pairs.outputs.state == 'present'
         run: |
           set -euo pipefail
@@ -1355,10 +1356,10 @@ jobs:
             echo "the rollback left a difference no draft states"; exit 1
           fi
           test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4
-          supabase migration up --local
-          fingerprint reapplied
-          diff rollback-fingerprints/released.tsv rollback-fingerprints/reapplied.tsv
-          echo "rolled back $(wc -l < /tmp/rollback-pairs.tsv) migrations to the boundary schema and applied them again to the released schema"
+          supabase db reset
+          fingerprint reset
+          diff rollback-fingerprints/released.tsv rollback-fingerprints/reset.tsv
+          echo "rolled back $(wc -l < /tmp/rollback-pairs.tsv) migrations to the boundary schema; the reset database has the released schema"
       - uses: actions/upload-artifact@v4
         if: always() && steps.pairs.outputs.state == 'present'
         with:
