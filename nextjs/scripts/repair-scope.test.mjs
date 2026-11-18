@@ -96,7 +96,7 @@ import {
   W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS, W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
-import { V34_SELFTEST_WEBKIT_CASE, auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
+import { V34_SELFTEST_WEBKIT_CASE, auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, heldBrowserProjects, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
@@ -3124,7 +3124,7 @@ test('Explore repair successor plan reuses the unchanged424 selection with both 
 });
 test('Explore repair successor reports reuse the unchanged runner owner: 34 units, six Solutions cases with104 captures and the separate nineteen-case Explore report', () => {
   const runner=readFileSync(resolve(solutionsRepoRoot,'nextjs/scripts/run-repair-check.mjs'),'utf8');
-  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity)'));
+  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity, held)'));
   const root=mkdtempSync(resolve(tmpdir(),'repair-explore-successor-'));try{const f=exploreFixture(root);f.plan.exploreRepairPresentation={eligible:true,source:{profile:'explore-repair-successor',parent:solutionsAdmission.EXPLORE_SUCCESSOR_PARENT}};
     assert.equal(collectSolutionsWorkflowCaptures(root,f.plan,true).length,104);
     const r=readExploreRepairExecution(root,f.plan);assert.equal(r.units.passed,34);assert.equal(r.solutionsBrowser.passed,6);assert.equal(r.exploreBrowser.passed,17);assert.equal(r.exploreBrowser.skipped,2);assert.equal(r.captures.length,104);assert.equal(r.exploreCases.length,19);
@@ -3865,7 +3865,7 @@ test('affected Explore admission: the plan has no historical flags and no Soluti
   assert.deepEqual(plan.pendingFullDebt,['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair']);
   // The ordinary plan takes the shared planner; only a historical plan takes the separate two-report Explore planner.
   const runner=readFileSync(new URL('./run-repair-check.mjs',import.meta.url),'utf8');
-  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity)'));
+  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity, held)'));
   assert.deepEqual([...EXPLORE_REPAIR_BROWSER_FILES],[AFFECTED_EXPLORE_SPEC,'e2e/solutions-workflows.spec.ts']);
   assert.deepEqual(planExploreRepairBrowserRuns([...EXPLORE_REPAIR_BROWSER_FILES],false),[{kind:'project',project:'1440',files:['e2e/solutions-workflows.spec.ts']},{kind:'project',project:'1440',files:[AFFECTED_EXPLORE_SPEC]}]);
   assert.equal(EXPLORE_BROWSER_CASES.length,19);assert.equal(EXPLORE_1440_ALLOWED_SKIPS.length,2);
@@ -9573,3 +9573,100 @@ function assertV34ProgramEndpoint(path) {
   assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles], [[], [group], [], [...owner.unitFiles].sort(), [...owner.browserFiles].sort()], path);
   return true;
 }
+
+// WO-CI-7 r9: an affected plan runs a selected file only in the projects where one of its cases can run. Synthetic specs under the
+// real mapped names go through the real reader (heldBrowserProjects) and the real planner; the held state follows the switch values.
+function heldWorkspace(files) {
+  const workspace = mkdtempSync(resolve(tmpdir(), 'repair-held-'));
+  for (const [path, body] of Object.entries(files)) { mkdirSync(dirname(resolve(workspace, path)), { recursive: true }); writeFileSync(resolve(workspace, path), body); }
+  return workspace;
+}
+const HELD_SWITCH = mounted => `import { fileURLToPath } from "node:url";\nimport { phase } from "./phase";\nconst here: string = fileURLToPath(new URL("./", import.meta.url));\nexport const MOUNTED = ${mounted} as boolean;\nexport const PHASE = phase as "still" | "film";\nexport const showsStill = (project: string): boolean => PHASE === "still" && ["360", "390"].includes(project) && here.length > 0;\nexport const panel = { open: false };\n`;
+const HERO_SPEC = cases => `import { expect, test } from "@playwright/test";\nimport { MOUNTED, showsStill, panel } from "./support/switch";\n${cases}\n`;
+const HELD_CASES = 'test.describe("film", () => {\n  test.beforeEach(async ({ page }, info) => {\n    test.skip(!MOUNTED, "not mounted");\n  });\n  for (const motion of ["reduce", "no-preference"]) {\n    test(`plays ${motion}`, async ({ page }) => { await page.goto("/"); });\n  }\n});\ntest("while the still stands in", async ({ page }, testInfo) => {\n  test.skip(!["360", "390"].includes(testInfo.project.name), "phone");\n  test.skip(!showsStill(testInfo.project.name), "the film is the phone hero");\n});';
+const writeSwitch = (workspace, mounted, phase = 'film') => {
+  mkdirSync(resolve(workspace, 'e2e/support'), { recursive: true });
+  writeFileSync(resolve(workspace, 'e2e/support/switch.ts'), HELD_SWITCH(mounted));
+  writeFileSync(resolve(workspace, 'e2e/support/phase.ts'), `export const phase: string = "${phase}";\n`);
+};
+const HERO_FILE = 'e2e/landing-hero-mobile.spec.ts';
+
+test('affected held pairs: every case skipped by an imported switch is held in each mapped project, and runs again when it flips', () => {
+  for (const [mounted, phase, expected] of [[false, 'film', [[HERO_FILE, ['360', '390']]]], [true, 'film', []], [false, 'still', []]]) {
+    const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC(HELD_CASES) });
+    try {
+      writeSwitch(workspace, mounted, phase);
+      const held = heldBrowserProjects([HERO_FILE], workspace);
+      assert.deepEqual([...held], expected, `${mounted}/${phase}`);
+      assert.deepEqual(planBrowserRuns([HERO_FILE], false, held).map(run => run.project), expected.length ? [] : ['390', '360']);
+    } finally { rmSync(workspace, { recursive: true, force: true }); }
+  }
+  assert.deepEqual(planBrowserRuns([HERO_FILE], false).map(run => run.project), ['390', '360'], 'without held pairs the planner is unchanged');
+});
+
+test('affected held pairs: a file-level skip read through a relative import chain holds the file; the plan keeps its other files', () => {
+  const workspace = heldWorkspace({
+    'lib/triage-rollout.ts': 'export const TRIAGE_ENABLED = false;\nexport function disabled(extra: Record<string, unknown> = {}) { return extra; }\n',
+    'lib/approval-rollout.ts': 'import { TRIAGE_ENABLED } from "./triage-rollout";\nconst SWITCH = false;\nexport const APPROVAL_ENABLED: boolean = SWITCH || TRIAGE_ENABLED;\n',
+    'e2e/workspace-intake-triage.spec.ts': 'import { test } from "@playwright/test";\nimport { APPROVAL_ENABLED } from "../lib/approval-rollout";\ntest.skip(!APPROVAL_ENABLED, "ships only with the switch");\ntest("a", async () => {});\ntest("b", async () => {});\n',
+    'e2e/overlap-audit.spec.ts': 'import { test } from "@playwright/test";\ntest("draws nothing over text", async () => {});\n',
+  });
+  try {
+    const files = ['e2e/overlap-audit.spec.ts', 'e2e/workspace-intake-triage.spec.ts'];
+    const held = heldBrowserProjects(files, workspace);
+    assert.deepEqual([...held], [['e2e/workspace-intake-triage.spec.ts', ['audit']]]);
+    assert.deepEqual(planBrowserRuns(files, false, held), [{ kind: 'project', project: 'audit', files: ['e2e/overlap-audit.spec.ts'] }]);
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
+test('affected held pairs: what the reader cannot prove held stays selected, so the one-passing-test rule still decides', () => {
+  const cases = {
+    'a case with no skip': `${HELD_CASES}\ntest("always", async () => {});`,
+    'a predicate it cannot evaluate': 'test("narrow", async ({ page }) => {\n  test.skip(isNarrow(page));\n});',
+    'a skip nested in an if': 'test("webkit", async ({ browserName }) => {\n  if (browserName === "webkit") test.skip(!MOUNTED, "x");\n});',
+    'a skip after a statement that can fail first': 'test("late", async ({ page }) => {\n  await page.goto("/");\n  test.skip(!MOUNTED, "x");\n});',
+    'a declared skipped case': 'test.skip("declared", async () => {});',
+    'a fixme case': 'test.fixme("later", async () => {});',
+    'a zero-argument skip': 'test("bare", async () => {\n  test.skip();\n});',
+    'a member of a name the spec does not import': 'test("local", async ({ page }, testInfo) => {\n  test.skip(testInfo.retry === 0);\n});',
+    'an imported member that is absent': 'test("absent", async () => {\n  test.skip(!panel.missing);\n});',
+    'a skip on a name the spec does not import': 'test("unimported", async () => {\n  test.skip(!LOCAL_SWITCH);\n});',
+    'a comparison of a non-primitive': 'test("object", async () => {\n  test.skip(panel !== "x");\n});',
+    'no case at all': 'const nothing = 1;',
+  };
+  for (const [label, body] of Object.entries(cases)) {
+    const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC(body) });
+    try { writeSwitch(workspace, false); assert.deepEqual([...heldBrowserProjects([HERO_FILE], workspace)], [], label); }
+    finally { rmSync(workspace, { recursive: true, force: true }); }
+  }
+  const unloadable = heldWorkspace({
+    'e2e/support/switch.ts': 'import React from "react";\nexport const MOUNTED = Boolean(React) && false;\n',
+    [HERO_FILE]: 'import { test } from "@playwright/test";\nimport { MOUNTED } from "./support/switch";\ntest("a", async () => {\n  test.skip(!MOUNTED, "x");\n});\n',
+  });
+  try { assert.deepEqual([...heldBrowserProjects([HERO_FILE], unloadable)], [], 'a switch module that imports a package is not read'); }
+  finally { rmSync(unloadable, { recursive: true, force: true }); }
+});
+
+test('affected held pairs: a project-name skip holds only the projects it names; a missing selected spec stays selected for the report rule', () => {
+  const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC('test.describe("phone", () => {\n  test.beforeEach(async ({ page }, info) => {\n    test.skip(info.project.name !== "360", "360 only");\n  });\n  test("a", async () => {});\n});\ntest("b", async () => {\n  test.skip(test.info().project.name === "390", "not at 390");\n});') });
+  try {
+    writeSwitch(workspace, false);
+    assert.deepEqual([...heldBrowserProjects([HERO_FILE], workspace)], [[HERO_FILE, ['390']]]);
+    const missing = heldBrowserProjects(['e2e/film-line-stability.spec.ts'], workspace);
+    assert.deepEqual([...missing], []);
+    assert.deepEqual(planBrowserRuns(['e2e/film-line-stability.spec.ts'], false, missing), [{ kind: 'project', project: '390', files: ['e2e/film-line-stability.spec.ts'] }]);
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
+test('affected held pairs at this head: the hosted refusals of 77d68786 are exactly the pairs the switches hold', () => {
+  const nextjs = fileURLToPath(new URL('../', import.meta.url));
+  const read = path => readFileSync(resolve(nextjs, path), 'utf8');
+  const filmHeld = read('lib/hero-phone-mode.ts').includes('export const PHONE_HERO = "film" as "still" | "film";') && !/components\/landing-v2\//.test(read('app/page.tsx'));
+  const intakeHeld = read('lib/intake-approval-rollout.ts').includes('const APPROVAL_LINEAGE_SWITCH = false;') && read('lib/intake-triage-rollout.ts').includes('export const INTAKE_TRIAGE_ROLLOUT_ENABLED = false;');
+  const files = ['e2e/film-line-stability.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/failure-states-audit.spec.ts'];
+  const expected = [
+    ...(filmHeld ? [['e2e/film-line-stability.spec.ts', ['390']], ['e2e/landing-hero-film-loading.spec.ts', ['390']], ['e2e/landing-hero-mobile.spec.ts', ['360', '390']]] : []),
+    ...(intakeHeld ? [['e2e/workspace-intake-triage.spec.ts', ['audit']]] : []),
+  ];
+  assert.deepEqual([...heldBrowserProjects(files, nextjs)], expected);
+});
