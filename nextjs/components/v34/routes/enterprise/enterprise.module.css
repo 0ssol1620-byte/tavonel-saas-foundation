@@ -217,10 +217,10 @@
   line-height: 1.6;
 }
 
+/* Inside a sentence (lead decisions 23 and 25): a plain inline box whose target is its text. Nothing here may
+   change the line that holds it; the page's jump index and rows keep the 44 px floor. */
 .inline {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  display: inline;
   color: var(--v34-fg-link);
   font-weight: 600;
   text-underline-offset: 3px;

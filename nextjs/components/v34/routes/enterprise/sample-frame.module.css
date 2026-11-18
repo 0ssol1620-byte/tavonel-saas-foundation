@@ -132,15 +132,16 @@
   line-height: 1.55;
 }
 
+/* The caption text is a paragraph (a sentence with a link in it is one), flexed beside the Sample tag. */
 .captionText {
   flex: 1 1 28ch;
   min-width: 0;
+  margin: 0;
 }
 
+/* Inside the caption's sentence (lead decisions 23 and 25): a plain inline box whose target is its text. */
 .link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  display: inline;
   color: var(--v34-fg-link);
   font-weight: 600;
   text-underline-offset: 3px;

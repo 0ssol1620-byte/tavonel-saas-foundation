@@ -183,6 +183,12 @@
   line-height: 1.5;
 }
 
+/* The row after it is the action of this block, and keeps the gap a step has between its text and its link
+   (.step: 9px); it was flush against the sentence (0 px). The sheet has no spacing token. */
+.measured + .textLink {
+  margin-top: 9px;
+}
+
 .textLink {
   display: inline-flex;
   align-items: center;

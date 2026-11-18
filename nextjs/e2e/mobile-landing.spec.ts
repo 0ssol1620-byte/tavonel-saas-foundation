@@ -231,10 +231,23 @@ test.describe("on a touch screen", () => {
       }
       window.scrollTo(0, 0);
     });
-    const short = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("a, button, summary, [role='tab']")]
-      .map(element => ({ element, rect: element.getBoundingClientRect() }))
-      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.height < 43.99)
-      .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height })));
+    /* WO-CI-30, on lead decisions 23 and 25: a link inside a sentence on a V34 route is a plain inline box whose
+       target is its text (WCAG 2.5.8 excepts it), and the rows at the end of this file measure that contract.
+       This floor is not asked of those links -- only of a link that measureInSentenceLinks finds plain, with no
+       violation, and that carries a class of the V34 sheets' in-sentence table. Any other short control, a
+       legacy in-sentence link included, still fails here. (/integrations answers 308 to /connect, whose two
+       in-sentence links measured 19 and 43.8px.) */
+    const sentence = (await page.evaluate(measureInSentenceLinks))
+      .filter(link => link.contract === "plain" && link.violations.length === 0 && link.classes.some(name => [...Object.values(V34_IN_SENTENCE), ...V34_GATE_CLOSED_ONLY].some(pattern => pattern.test(name))))
+      .map(link => link.index);
+    const short = await page.evaluate(exempt => {
+      const main = [...document.querySelectorAll("main a[href]")];
+      return [...document.querySelectorAll<HTMLElement>("a, button, summary, [role='tab']")]
+        .filter(element => !exempt.some(index => main[index] === element))
+        .map(element => ({ element, rect: element.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.height < 43.99)
+        .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height }));
+    }, sentence);
     expect(short).toEqual([]);
 
     /* The other axis, on the filter chips. A target is two-dimensional and these held the 44px
@@ -347,7 +360,8 @@ test.describe("on a touch screen", () => {
   (4) each of its boxes is at least 44px high, within 1px;
   (5) none of its boxes intersects a box of any other link in main (in a sentence or not): the tap would
       land on the wrong link. Reported once per pair with both texts' lengths and the overlap rectangle.
-      Overlap with plain text is allowed; that is what a hit area is.
+      Overlap with plain text is allowed; that is what a hit area is. Two plain links fail the same rule when
+      their boxes meet by 2px or more in both directions (WO-CI-30).
   No pixel value for a line height is written here; "line-height: normal" reads as NaN and fails.
 */
 function measureInSentenceLinks() {
@@ -410,9 +424,10 @@ function measureInSentenceLinks() {
   const mid = (b: Box) => (b.top + b.bottom) / 2;
   const unmoved = (rect: Box, shift: number) => ({ top: rect.top - shift, bottom: rect.bottom - shift });
   const rectsOf = (element: Element): Rect[] => [...element.getClientRects()].map(r => ({ top: r.top, bottom: r.bottom, left: r.left, right: r.right }));
-  const found: { text: string; classes: string[]; contract: "plain" | "hit-area"; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number; boxes: Rect[]; lineBoxes: (Box | null)[]; fontSize: number; paragraphFontSize: number; violations: string[] }[] = [];
+  const found: { index: number; text: string; classes: string[]; contract: "plain" | "hit-area"; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number; boxes: Rect[]; lineBoxes: (Box | null)[]; fontSize: number; paragraphFontSize: number; violations: string[] }[] = [];
   const anchors = [...document.querySelectorAll<HTMLElement>("main a[href]")];
   const hitAreas: { index: number; entry: (typeof found)[number] }[] = [];
+  const linkEntries: typeof hitAreas = [];
   anchors.forEach((link, index) => {
     if (!inline(link) || link.getClientRects().length === 0) return;
     const block = blockOf(link);
@@ -485,8 +500,9 @@ function measureInSentenceLinks() {
     const fontSize = parseFloat(getComputedStyle(link).fontSize);
     const paragraphFontSize = parseFloat(own.fontSize);
     if (!(fontSize >= paragraphFontSize - 0.01)) violations.push(`(3) its font size ${px(fontSize)}px is smaller than the paragraph's ${px(paragraphFontSize)}px`);
-    const entry = { text: (link.textContent ?? "").trim().slice(0, 40), classes: [...link.classList], contract, height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length, boxes, lineBoxes: lines.map(line => line.strut), fontSize, paragraphFontSize, violations };
+    const entry = { index, text: (link.textContent ?? "").trim().slice(0, 40), classes: [...link.classList], contract, height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length, boxes, lineBoxes: lines.map(line => line.strut), fontSize, paragraphFontSize, violations };
     found.push(entry);
+    linkEntries.push({ index, entry });
     if (contract === "hit-area") hitAreas.push({ index, entry });
   });
   // (5) A hit-area link against every other link in main. A pair of two hit-area links is checked once, by the later.
@@ -501,32 +517,91 @@ function measureInSentenceLinks() {
       }
     });
   }
+  // (5) also between two plain links: boxes that meet by 2px or more in both directions (a negative margin, a shift)
+  // put one link's tap on the other. Reported once per pair, on the later link, with both texts' lengths.
+  const plain = linkEntries.filter(({ entry }) => entry.contract === "plain");
+  plain.forEach((first, n) => plain.slice(n + 1).forEach(second => {
+    if (anchors[first.index].contains(anchors[second.index]) || anchors[second.index].contains(anchors[first.index])) return;
+    for (const p of first.entry.boxes) for (const q of second.entry.boxes) {
+      const width = Math.min(p.right, q.right) - Math.max(p.left, q.left), height = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
+      if (width >= 2 && height >= 2) second.entry.violations.push(`(5) the boxes of two plain links (of ${first.entry.text.length} and ${second.entry.text.length} characters) intersect by ${px(width)} x ${px(height)}px`);
+    }
+  }));
   return found;
 }
 
-// The in-sentence link classes of the five V34 sheets (decision 23), as CSS Modules names them in the build
-// ("<sheet>_<class>__<hash>"). Each route must render at least one, so a renamed class or naming scheme fails here.
+// The in-sentence link classes of the V34 sheets (decisions 23 and 25), as CSS Modules names them in the build
+// ("<sheet>_<class>__<hash>"). Each route must render at least one, so a renamed class or naming scheme fails
+// here. /pricing and /evaluation are retained pages (the site's own G1-TAP rule styles their links) and are not
+// rows yet: measured by this contract on the WO-CI-30 build, 10 of 12 and 4 of 12 rows fail, so they are named in
+// that receipt for the lane that owns the retained bodies, not skipped here. /connect has no row for the same kind of
+// reason: its two in-sentence links (`.inlineLink`) render only while the customer-data gate is closed, which no CI
+// build is (activation-policy customerData.enabled is true), so a row there would assert something that is never
+// rendered. They were measured on a gate-closed build (WO-CI-30 receipt) and are pinned by link-rows.test.ts, which
+// renders the body with the gate closed; V34_GATE_CLOSED_ONLY keeps their class known to the touch-floor row.
 const V34_IN_SENTENCE: Record<string, RegExp> = {
   "/research/program": /^program_inlineLink__/,
   "/contact": /^contact_inline__/,
   "/security": /^security_inline__/,
-  "/developers": /^developers_inlineLink__/,
+  "/developers": /^developers_sentenceLink__/,
+  "/enterprise": /^enterprise_inline__/,
 };
 
+const V34_GATE_CLOSED_ONLY = [/^connect_inlineLink__/];
+
+async function checkInSentenceLinks(page: import("@playwright/test").Page, route: string, v34Class: RegExp) {
+  await page.goto(route);
+  // /contact's answers are in closed <details>; open every one so its links are laid out.
+  await page.evaluate(() => { for (const details of document.querySelectorAll("main details")) details.open = true; });
+  const links = await page.evaluate(measureInSentenceLinks);
+  expect(links.length, `${route} renders at least one link inside a sentence`).toBeGreaterThan(0);
+  // Every link's every violation, in one assertion: a failure names all of them, not the first. A pair of links
+  // whose boxes meet (5) is named by its rectangle and the two texts' lengths, not by the texts.
+  expect(links.flatMap(link => link.violations.map(violation => (violation.startsWith("(5)") ? violation : `"${link.text}" (${link.contract}): ${violation}`))), `${route}: links inside a sentence`).toEqual([]);
+  // Decision 23: no hit area comes back into the V34 sheets through the generic hit-area contract.
+  const v34 = links.filter(link => link.classes.some(name => v34Class.test(name)));
+  expect(v34.length, `${route} renders a link inside a sentence with the class ${v34Class}`).toBeGreaterThan(0);
+  expect(v34.filter(link => link.contract !== "plain").map(link => `"${link.text}" (${link.classes.join(" ")}) is a hit-area link, ${link.height.toFixed(2)}px high`), `${route}: V34 links inside a sentence are plain inline boxes`).toEqual([]);
+}
+
+/*
+  WO-CI-30 item 1. The rows run at the three phone-and-desktop widths of the width projects and at 768 (between
+  391 and 1,079 px, where the site's own touch rules change), and again at 1,440 with a coarse pointer. Both are
+  rows of this file and not new Playwright projects: a project is the whole spec file again (every test of
+  this file would run a fourth and a fifth time to reach these rows), while the width projects this file
+  already runs under give the widths, and a describe-level `test.use` gives the pointer. The coarse rows
+  assert that the page really reports `(pointer: coarse)`, so a context that did not get a touch screen fails
+  instead of passing as a second fine-pointer run.
+*/
 for (const [route, v34Class] of Object.entries(V34_IN_SENTENCE)) {
   test(`a link inside a sentence on ${route} is judged by what it is, plain or hit area, and a V34 one is plain`, async ({ page }, testInfo) => {
-    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
-    await page.goto(route);
-    // /contact's answers are in closed <details>; open every one so its links are laid out.
-    await page.evaluate(() => { for (const details of document.querySelectorAll("main details")) details.open = true; });
-    const links = await page.evaluate(measureInSentenceLinks);
-    expect(links.length, `${route} renders at least one link inside a sentence`).toBeGreaterThan(0);
-    // Every link's every violation, in one assertion: a failure names all of them, not the first. A pair of links
-    // whose boxes meet (5) is named by its rectangle and the two texts' lengths, not by the texts.
-    expect(links.flatMap(link => link.violations.map(violation => (violation.startsWith("(5)") ? violation : `"${link.text}" (${link.contract}): ${violation}`))), `${route}: links inside a sentence`).toEqual([]);
-    // Decision 23: no hit area comes back into the V34 sheets through the generic hit-area contract.
-    const v34 = links.filter(link => link.classes.some(name => v34Class.test(name)));
-    expect(v34.length, `${route} renders a link inside a sentence with the class ${v34Class}`).toBeGreaterThan(0);
-    expect(v34.filter(link => link.contract !== "plain").map(link => `"${link.text}" (${link.classes.join(" ")}) is a hit-area link, ${link.height.toFixed(2)}px high`), `${route}: V34 links inside a sentence are plain inline boxes`).toEqual([]);
+    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360; 768 has its own rows below");
+    await checkInSentenceLinks(page, route, v34Class);
   });
 }
+
+// The width projects CI runs (launch-qa.yml) do not include `768`, so 768 is a row of the 1440 project with its own
+// viewport, the way the coarse rows get their pointer; the row asserts the width it measured.
+test.describe("at 768", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+  for (const [route, v34Class] of Object.entries(V34_IN_SENTENCE)) {
+    test(`a link inside a sentence on ${route} meets the same contract at 768`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "the 768 rows run once, under the 1440 project, which CI runs");
+      await page.goto(route);
+      expect(await page.evaluate(() => innerWidth), "this context is 768 px wide").toBe(768);
+      await checkInSentenceLinks(page, route, v34Class);
+    });
+  }
+});
+
+test.describe("with a coarse pointer", () => {
+  test.use({ hasTouch: true, isMobile: true });
+  for (const [route, v34Class] of Object.entries(V34_IN_SENTENCE)) {
+    test(`a link inside a sentence on ${route} meets the same contract at 1440 with a coarse pointer`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "the coarse-pointer rows run once, at 1440");
+      await page.goto(route);
+      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "this context reports a coarse pointer").toBe(true);
+      await checkInSentenceLinks(page, route, v34Class);
+    });
+  }
+});

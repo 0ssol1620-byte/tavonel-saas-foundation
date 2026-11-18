@@ -66,10 +66,13 @@
 }
 
 /*
-  The shared TrustNext step is legacy global markup (h2, .fine, .btn) that reads the dark site's
-  names. Set here to this surface's tokens, or its words are dark-ground text on paper.
+  The shared TrustNext step is legacy global markup (h3, .fine, .btn) that reads the dark site's
+  names. Set here to this surface's tokens, or its words are dark-ground text on paper. Its heading
+  is this Section's sub-heading (lead decision 17, WO-CI-24), so the size the global h3 rule reads
+  (--t-6) is the V34 sub-heading size.
 */
 .next {
+  --t-6: var(--v34-h3);
   --text-hi: var(--v34-fg);
   --text-mid: var(--v34-fg-muted);
   --text-lo: var(--v34-fg-muted);
@@ -113,6 +116,11 @@
 .inlineLink:focus-visible {
   outline: 3px solid var(--v34-fg-focus);
   outline-offset: 3px;
+}
+
+/* Inside a sentence the ring sits closer than the row link's 3px: at 3px it reached 0.58 to 0.92px into the line above (WO-CI-30). */
+.inlineLink:focus-visible {
+  outline-offset: 2px;
 }
 
 @media (max-width: 1000px) {
