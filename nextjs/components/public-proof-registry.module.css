@@ -117,7 +117,7 @@
   title (components/v34/ui/text.module.css). Specific enough to win over the media rules above at every
   width; outside the frame they stand as they are.
 */
-:global([data-v34-site]) .hero { min-height: 0; padding-top: clamp(45px, 6vw, 92px); }
+:global([data-v34-site]) .hero { min-height: 0; padding-top: clamp(45px, 6vw, 92px); align-items: start; }
 :global([data-v34-site]) .heroLead { gap: 14px; }
 :global([data-v34-site]) .heroLead > :global(.eyebrow) { line-height: 1.4; }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }

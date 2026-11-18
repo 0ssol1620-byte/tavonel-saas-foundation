@@ -184,14 +184,22 @@ for (const { path: route, release, rootScheme = "light" } of routes) {
           await settle(page, route);
           const text = await contrastPass(page);
           const controls = await controlContrastPass(page);
-          // Controls inside a closed <details> are skipped above; open the ones in main and measure those too.
+          // Text and controls inside a closed <details> body are not painted, so both passes above skip them (an unpainted box samples whatever lies beneath).
+          // Open the content disclosures in main and measure both again; the text pass is scoped to the disclosures so its sample cap is spent on them.
           const closed = await openContentDetails(page);
+          const reported = [...text.reported];
+          const excepted = [...text.excepted];
           if (closed > 0) {
             const seen = new Set(controls.map(v => `${v.selector} ${v.detail}`));
             controls.push(...(await controlContrastPass(page)).filter(v => !seen.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));
+            const seenText = new Set(text.violations.map(v => `${v.selector} ${v.detail}`));
+            const opened = await contrastPass(page, { scope: "main details" });
+            text.violations.push(...opened.violations.filter(v => !seenText.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));
+            reported.push(...opened.reported);
+            excepted.push(...opened.excepted);
           }
           const violations = [...text.violations, ...controls];
-          record({ route, width, engine: browserName, colorScheme: scheme, pass: "contrast", violations, reported: text.reported, excepted: text.excepted });
+          record({ route, width, engine: browserName, colorScheme: scheme, pass: "contrast", violations, reported, excepted });
           all.push(...violations.map(v => ({ ...v, detail: `${scheme}: ${v.detail}` })));
         } finally {
           await ctx.close();

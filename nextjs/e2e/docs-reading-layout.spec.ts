@@ -354,11 +354,14 @@ test.describe("R1 on the docs routes: wordmark, H1 and content on the container 
   references must agree on it to 1px, and each retained route's distance must equal it to 1px (sub-pixel
   rounding of the vw clamps). Driven at the decision's four widths from the 1440 project.
 */
-const T5_RETAINED = ["/status", "/privacy", "/terms", "/refunds", "/subprocessors", "/reproducibility"] as const;
+const T5_RETAINED = ["/status", "/privacy", "/terms", "/refunds", "/subprocessors", "/reproducibility", "/trust"] as const;
+// WO-CI-32: the framed 404 is the same policy-page opening; it answers 404 on purpose.
+const FRAMED_404 = "/not-a-page-wo-ci-32";
 const T5_V34 = (Object.keys(ROUTE_TEMPLATES) as V34RouteKey[])
   .filter((key) => ROUTE_TEMPLATES[key] === "T5" && v34Route(key).release === "live")
   .map((key) => v34Route(key).path);
-const OPENING_WIDTHS = [1440, 768, 390, 360] as const;
+// 1280 and 1101 are inside the two-column hero (1,101-1,439 px), where a longer /reproducibility summary used to push the H1 down.
+const OPENING_WIDTHS = [1440, 1280, 1101, 768, 390, 360] as const;
 
 /** Runs in the page; self-contained because Playwright serialises it. */
 function openingDistance() {
@@ -378,9 +381,10 @@ function openingDistance() {
   };
 }
 
-async function openingAt(page: Page, route: string) {
+async function openingAt(page: Page, route: string, status: "ok" | "404" = "ok") {
   const response = await page.goto(route);
-  expect(response?.status(), `${route} answers`).toBeLessThan(400);
+  if (status === "404") expect(response?.status(), `${route} answers 404`).toBe(404);
+  else expect(response?.status(), `${route} answers`).toBeLessThan(400);
   await page.evaluate(() => document.fonts.ready);
   return page.evaluate(openingDistance);
 }
@@ -416,6 +420,10 @@ test.describe("T5 openings: a retained body sets its H1 where the V34 T5 templat
         expect(m.inFrame, `${route} renders inside the V34 frame`).toBe(true);
         expect.soft(Math.abs(m.distance - template), `${route} @${width}: H1 ${m.distance.toFixed(2)}px under the header, T5 template ${template.toFixed(2)}px`).toBeLessThanOrEqual(1);
       }
+      const missing = await openingAt(page, FRAMED_404, "404");
+      readings.push(`${FRAMED_404} distance ${missing.distance.toFixed(2)}`);
+      expect(missing.inFrame, `${FRAMED_404} renders inside the V34 frame`).toBe(true);
+      expect.soft(Math.abs(missing.distance - template), `${FRAMED_404} @${width}: H1 ${missing.distance.toFixed(2)}px under the header, T5 template ${template.toFixed(2)}px`).toBeLessThanOrEqual(1);
       await test.info().attach(`t5-openings-${width}`, { body: readings.join("\n"), contentType: "text/plain" });
     });
   }
