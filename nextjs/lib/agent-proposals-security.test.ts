@@ -296,6 +296,11 @@ function realReaderAnswer(path: string, body: Record<string, unknown> | null, js
   const ws = eq("workspace_key");
   const counted = (rows: unknown[]) => new Response(JSON.stringify(rows), { status: 200, headers: { "content-range": `0-${rows.length}/${rows.length}` } });
   switch (table) {
+    case "rpc/documents_outside_member_scope": {
+      // The agent's person owns WS: nothing is outside their scope there; any other workspace has no membership.
+      if (down.access) return failed(down.access);
+      return json(body!.p_workspace_key !== WS || body!.p_user_id !== PERSON);
+    }
     case "rpc/connector_documents_blocked": {
       if (down.access) return failed(down.access);
       return json(body!.p_workspace_key === WS && (body!.p_document_ids as string[]).some((id) => unreadable.has(id)));
@@ -387,7 +392,7 @@ const p4Args = (fields: Row = {}) => ({ collectionId: COLLECTION, baseManifestDi
 // ---------------------------------------------------------------------------------------------------------------
 
 /** §8 I-1, exact names. current_foundation_processing_terms_acceptance: the v2 customer-data gate's one store read. */
-const READ_RPCS = ["connector_documents_blocked_for_viewer", "connector_documents_blocked", "read_library_organize", "list_collection_candidates",
+const READ_RPCS = ["documents_outside_member_scope", "connector_documents_blocked_for_viewer", "connector_documents_blocked", "read_library_organize", "list_collection_candidates",
   "quote_foundation_compile_recharge", "get_world_change_proposal", "list_world_change_proposals_page", "list_world_change_proposals",
   "current_foundation_processing_terms_acceptance"];
 const WRITE_RPCS = ["create_world_change_proposal", "consume_foundation_api_rate_limit"];

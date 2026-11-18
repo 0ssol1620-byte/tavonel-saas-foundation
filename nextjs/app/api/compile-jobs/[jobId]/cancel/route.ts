@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { advanceCompileJob, isTerminalCompileState, readCompileJob } from "@/lib/compile-job-store";
+import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,8 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
       : 503;
     return NextResponse.json({ code: existing.code }, { status, headers: HEADERS });
   }
+  const scopeRefusal = await memberSourcesRefusal(auth.principal, existing.value.documentIds);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: HEADERS });
   if (existing.value.state === "cancelled") {
     return NextResponse.json({ code: "OK", job: existing.value, cancelled: true }, { headers: HEADERS });
   }

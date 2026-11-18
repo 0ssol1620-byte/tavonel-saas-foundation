@@ -9,6 +9,7 @@ import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@
 import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import { DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import {
@@ -150,9 +151,12 @@ async function search(request: Request, context: { params: Promise<{ id: string 
   // lexical + structure and reports it in `degradations`, so the caller can tell a
   // full-pipeline result from a degraded one instead of silently receiving weaker retrieval.
   // The allowance, before the index read and retrieval.
+  const served = historical ?? active.world;
+  // A member searches a World only when every source behind the served version is in their scope.
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, served.manifestDigest);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
   const admitted = await meter.admit(auth.principal);
   if (!admitted.ok) return NextResponse.json({ code: admitted.code }, { status: admitted.status, headers: NO_STORE });
-  const served = historical ?? active.world;
   const indexStateAtAdmission = await readRetrievalIndexState({
     workspaceKey: auth.principal.workspaceKey,
     collectionId: id,

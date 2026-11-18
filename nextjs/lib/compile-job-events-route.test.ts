@@ -31,7 +31,7 @@ const event = (sequence: number, state: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  authorize.mockResolvedValue({ ok: true, principal: { workspaceKey: "pilot" } });
+  authorize.mockResolvedValue({ ok: true, principal: { workspaceKey: "pilot", workspaceRole: "owner" } });
   readJob.mockResolvedValue({ ok: true, value: { jobId: JOB, state: "structuring" } });
 });
 

@@ -67,7 +67,7 @@ vi.mock("@/lib/developer-auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-auth")>()),
   authorizeFoundationRequest: async () => ({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: ["ask:read"] },
+    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: ["ask:read"], workspaceRole: "owner" },
   }),
   revalidateFoundationAuthorization: async (_request: Request, expected: unknown) => ({ ok: true, principal: expected }),
 }));

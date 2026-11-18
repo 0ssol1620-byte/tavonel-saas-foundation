@@ -8,6 +8,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
 import {
   getFoundationActiveWorld,
   listFoundationWorldVersions,
@@ -53,6 +54,9 @@ export async function GET(
   // A consumer context is bound to the principal just verified, before anything is read.
   const binding = bindConsumerContext(request.headers, auth.principal, { scope: "worlds:read", collectionId: id });
   if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
+  // A World outside a member's scope is not described to them at all (WO-C-T3).
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
   if (binding.bound) {
     /*
       Bound: the activeWorld is the row the context resolved against -- the active World for

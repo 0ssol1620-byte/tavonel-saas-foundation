@@ -10,6 +10,11 @@ const encoder = new TextEncoder();
 export async function GET(request: Request, context: { params: Promise<{ runId: string }> }) {
   const auth = await authorizeFoundationRequest(request, "documents:read", "observer");
   if (!auth.ok) return Response.json({ code: auth.code }, { status: auth.status, headers: { "Cache-Control": "no-store" } });
+  // A connector run names sources before any scope can be checked against them, so a member reads
+  // none (WO-C-T3, fail closed). Owners and admins are unchanged.
+  if (auth.principal.workspaceRole !== "owner" && auth.principal.workspaceRole !== "admin") {
+    return Response.json({ code: "MEMBER_SOURCE_SCOPE_DENIED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   const { runId } = await context.params;
   const job = await getJobStatus(auth.principal.workspaceKey, runId);
   if (!job.ok) {

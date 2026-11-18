@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readCompileJob } from "@/lib/compile-job-store";
+import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
@@ -31,5 +32,8 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
       : 503;
     return NextResponse.json({ code: job.code }, { status, headers: HEADERS });
   }
+  // A job over a source outside a member's scope is not theirs to read (WO-C-T3).
+  const scopeRefusal = await memberSourcesRefusal(auth.principal, job.value.documentIds);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: HEADERS });
   return NextResponse.json({ code: "OK", job: job.value }, { headers: HEADERS });
 }

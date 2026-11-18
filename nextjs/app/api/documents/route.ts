@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
+import { filterMemberReadableDocumentIds } from "@/lib/member-source-scope";
 import { readTombstonedUploadDocumentIds } from "@/lib/customer-source-lifecycle";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import {
@@ -103,8 +104,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ code: tombstoned.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
   const selected = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceId, listed.objects));
-  const documents = selected.documents.filter((item) => !tombstoned.ids.has(item.documentId.toLowerCase()));
-  const ambiguousDocumentIds = selected.ambiguousDocumentIds.filter((id) => !tombstoned.ids.has(id.toLowerCase()));
+  // A member lists only the sources in their scope (WO-C-T3): the rest are dropped, not counted.
+  const scoped = await filterMemberReadableDocumentIds(auth.principal,
+    [...selected.documents.map((item) => item.documentId), ...selected.ambiguousDocumentIds]);
+  if (!scoped.ok) return NextResponse.json({ code: scoped.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const documents = selected.documents.filter((item) => !tombstoned.ids.has(item.documentId.toLowerCase()) &&
+    scoped.documentIds.has(item.documentId));
+  const ambiguousDocumentIds = selected.ambiguousDocumentIds.filter((id) => !tombstoned.ids.has(id.toLowerCase()) &&
+    scoped.documentIds.has(id));
   const visibleDocumentIds = [...documents.map((item) => item.documentId), ...ambiguousDocumentIds];
   const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceId, visibleDocumentIds, auth.principal.userId);
   if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
@@ -112,7 +119,7 @@ export async function GET(request: Request) {
     headers: { "Cache-Control": "no-store" },
   });
   const reviewDocuments = documents.filter((item) => item.processingState === "operator_review" && item.ocrReviewKey && item.sanitizedKey).slice(0, 20);
-  const [reviewReceipts, quarantine] = await Promise.all([
+  const [reviewReceipts, quarantineListed] = await Promise.all([
     Promise.all(reviewDocuments.map(async (item) => ({
       documentId: item.documentId,
       versionKey: item.versionKey,
@@ -125,9 +132,20 @@ export async function GET(request: Request) {
       new Set([...visibleDocumentIds, ...tombstoned.ids].map((id) => id.toLowerCase())),
     ),
   ]);
-  if (!quarantine.ok) {
+  if (!quarantineListed.ok) {
     return NextResponse.json({ code: "QUARANTINE_LIST_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  // The quarantine and stored rows are sources too: a member sees only those in their scope.
+  const quarantineScoped = await filterMemberReadableDocumentIds(auth.principal,
+    [...quarantineListed.documents.map((item) => item.documentId), ...quarantineListed.failedDocumentIds]);
+  if (!quarantineScoped.ok) {
+    return NextResponse.json({ code: quarantineScoped.code }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+  const quarantine = {
+    ...quarantineListed,
+    documents: quarantineListed.documents.filter((item) => quarantineScoped.documentIds.has(item.documentId)),
+    failedDocumentIds: quarantineListed.failedDocumentIds.filter((id) => quarantineScoped.documentIds.has(id)),
+  };
   // A review receipt that was listed and then could not be read or validated is not "no reason":
   // the row stays and its id is reported in `partial`. One that could not be read carries no reason;
   // one that loaded and was refused carries the refusal's code instead of the worker's reason.

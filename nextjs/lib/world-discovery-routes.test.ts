@@ -104,7 +104,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [] },
+    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [], workspaceRole: "owner" },
   });
   pilot.mockReturnValue({ membership: { workspaceId: WORKSPACE, role: "owner" } });
   productAccess.mockResolvedValue({ ok: true, source: "paid", billingExempt: false });

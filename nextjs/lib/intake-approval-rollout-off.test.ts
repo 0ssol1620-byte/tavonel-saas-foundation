@@ -70,7 +70,7 @@ vi.mock("@/lib/supabase-admin", () => ({
 vi.mock("@/lib/developer-auth", () => ({
   authorizeFoundationRequest: async () => ({ ok: true, principal: {
     kind: "session", workspaceKey: "pilot-969dc192daa24119", userId: "969dc192-daa2-4119-a5d9-9a7621f171a1",
-    authorizationRevision: 1, accessSource: "paid",
+    authorizationRevision: 1, accessSource: "paid", workspaceRole: "owner",
   } }),
 }));
 vi.mock("@/lib/activation-policy", () => ({ activationPolicy: { customerIntake: { enabled: true, reason: "open" } } }));

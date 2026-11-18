@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runCollectionCompile } from "@/lib/collection-compile-run";
 import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
+import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
@@ -50,6 +51,9 @@ export async function POST(request: Request) {
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
+  // A member compiles only sources in their scope (WO-C-T3, TC-D7).
+  const scopeRefusal = await memberSourcesRefusal(auth.principal, documentIds);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: { "Cache-Control": "no-store" } });
 
   /*
     The synchronous primitive both starts the compile and finishes it, so it fires both events

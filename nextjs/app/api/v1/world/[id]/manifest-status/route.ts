@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bindConsumerContext, releaseConsumerContext, resolveBoundSnapshot } from "@/lib/consumer-context-api";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getManifestActivationStatus } from "@/lib/world-store";
@@ -43,6 +44,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   // Bound: the active World is resolved before the status is read. Legacy reads exactly as before.
   const snapshot = binding.bound ? await resolveBoundSnapshot(binding, auth.principal.workspaceKey) : null;
   if (snapshot && !snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
+  // The status of a World outside a member's scope is not theirs to read (WO-C-T3).
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, snapshot?.resolved.snapshot.manifestDigest);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
   const status = await getManifestActivationStatus(auth.principal.workspaceKey, id, digest);
   if (!status.ok) {
     return NextResponse.json(

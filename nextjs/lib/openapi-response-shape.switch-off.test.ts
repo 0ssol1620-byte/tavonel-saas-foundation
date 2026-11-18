@@ -168,7 +168,7 @@ function apiRequest(path: string, body: unknown, headers: Record<string, string>
 function grantKey(extra: Record<string, unknown> = {}) {
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: "user-shape", scopes: [], ...extra },
+    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: "user-shape", scopes: [], workspaceRole: "owner", ...extra },
   });
 }
 
