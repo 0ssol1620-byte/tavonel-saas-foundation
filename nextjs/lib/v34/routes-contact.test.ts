@@ -203,24 +203,21 @@ describe("tokens, targets and states", () => {
   });
 
   /*
-    Lead decision 22 (WO-CI-29; replaces decision 21's "at every width"). A link alone in a row keeps a
-    floor-sized target. A link inside a sentence follows the site's G1-TAP rule (app/tavonel.css):
-    - outside any condition it is a plain inline box whose target is its text: no display but inline, no
-      min-height or height, no own line-height or vertical-align, no block padding, no top or bottom border,
-      no position, offset, float or transform -- each would grow the line that holds it, reach into the lines
-      above and below, or move it off its line;
-    - under exactly G1-TAP's condition it takes one rule with one declaration, the 44px hit area, which leaves
-      the line box alone;
-    - any other conditional block may touch it only to paint (colour, outline, background, text decoration),
-      never its box. (Decision 22 says such a block fails; the forced-colors focus outline on .inline in
-      contact.module.css is paint only and stays -- reported to the lead.)
+    Lead decision 23 (WO-CI-29; replaces decision 22). A link alone in a row keeps a floor-sized target. A
+    link inside a sentence is a plain inline box whose target is its text (WCAG 2.5.8 excepts it) at every
+    width: a 44px box inside a 19 to 30px line reaches into the lines above and below whatever the width,
+    where it shares tap area with a link on the next line or covers that line's words. So, inside any media
+    or other at-rule block as well as outside, nothing may grow its box, its line or move it:
+    - outside any condition: no display but inline, no min-height or height, no own line-height or
+      vertical-align, no block padding, no top, bottom or block border, no position, offset, float,
+      transform, translate, scale, rotate or zoom;
+    - inside any condition (a media query at any width or pointer, a nested block, forced colours): only
+      paint -- colour, outline, background and text decoration.
     IN_SENTENCE names the classes rendered mid-sentence, with the lines that render them; every other link
     class stands alone, so no class is in neither group, and a name or a line here that the sources no longer
     bear fails.
   */
-  const TOUCH = "@media (pointer: coarse), (max-width: 1079px)";
-  const HIT_AREA = "padding-block: calc((44px - 1em) / 2)";
-  const BOX = /^(?:display|min-height|height|max-height|line-height|vertical-align|position|top|bottom|inset(?:-block(?:-start|-end)?)?|float|transform|translate|padding(?:-top|-bottom|-block(?:-start|-end)?)?|border(?:-top|-bottom|-block(?:-start|-end)?)?(?:-width|-style)?)$/;
+  const BOX = /^(?:display|min-height|height|max-height|line-height|vertical-align|position|top|bottom|left|right|inset(?:-[a-z]+)*|float|transform|translate|scale|rotate|zoom|padding(?:-top|-bottom|-block(?:-start|-end)?)?|border(?:-top|-bottom|-block(?:-start|-end)?)?(?:-width|-style)?)$/;
   const PAINT = /^(?:color|outline(?:-color|-style|-width|-offset)?|background(?:-color|-clip)?|text-decoration(?:-[a-z]+)?|text-underline-offset|forced-color-adjust)$/;
   // Every style rule with the at-rule conditions that hold it ("" outside any); nested blocks are walked.
   const cssRules = (css: string, condition = ""): { condition: string; selector: string; declarations: [string, string][] }[] => {
@@ -249,7 +246,7 @@ describe("tokens, targets and states", () => {
     inline: { file: "components/v34/routes/contact/contact.tsx", lines: [35, 39, 43, 47, 51, 55] },
   };
 
-  it("gives every link class alone in a row a 24px target, every link class inside a sentence a plain inline box with G1-TAP's hit area on a touch or narrow screen, and each a hover and a focus state", () => {
+  it("gives every link class alone in a row a 24px target, every link class inside a sentence a plain inline box at every width, and each a hover and a focus state", () => {
     const sheet = stripped(styles).map((f) => f.text).join("\n");
     const linkClasses = [...new Set([...sheet.matchAll(/\.(mail|inline)\s*\{/g)].map((m) => m[1]!))];
     expect(linkClasses.length).toBe(2);
@@ -259,9 +256,7 @@ describe("tokens, targets and states", () => {
       for (const line of lines) expect(source[line - 1], `${file}:${line} renders .${name}`).toContain(`className={s.${name}}`);
       const own = cssRules(sheet).filter((r) => new RegExp(`\\.${name}(?![\\w-])`).test(r.selector));
       expect(own.filter((r) => r.condition === "").length, `.${name} rules outside any condition`).toBeGreaterThan(0);
-      const touch = own.filter((r) => r.condition === TOUCH);
-      expect(touch.map((r) => [r.selector, r.declarations.map(([p, v]) => `${p}: ${v}`)]), `.${name} under ${TOUCH}`).toEqual([[`.${name}`, [HIT_AREA]]]);
-      for (const { condition, selector, declarations } of own.filter((r) => r.condition !== TOUCH)) {
+      for (const { condition, selector, declarations } of own) {
         for (const [property, value] of declarations) {
           if (condition !== "") expect(property, `${condition} { ${selector} } may only paint`).toMatch(PAINT);
           else if (property === "display") expect(value, `${selector}: display`).toBe("inline");

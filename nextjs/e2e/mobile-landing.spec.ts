@@ -312,13 +312,15 @@ test.describe("on a touch screen", () => {
 });
 
 /*
-  WO-CI-29, lead decision 22 (replaces decision 21's "at every width"). A link inside a sentence follows
-  the site's G1-TAP rule (app/tavonel.css, "BA-240 · the 44px floor"): on a touch or narrow screen it
-  gets a 44px hit area that leaves the paragraph's leading alone; on a wide screen with a fine pointer it
-  is a plain inline box whose target is its text (WCAG 2.5.8 excepts it). Which of the two applies is
-  decided in the page, by the same media query G1-TAP and the V34 sheets use (copied exactly), never by
-  the project's name. A link alone in a row keeps the 44px floor at every width (the touch-floor rows
-  above).
+  WO-CI-29, lead decision 23 (replaces decision 22). A 44px box inside a 19 to 30px line reaches into the
+  lines above and below whatever the width, so a link inside a sentence of the V34 sheets is a plain inline
+  box at every width (its target is its text, which WCAG 2.5.8 excepts), and a link that must be an easy tap
+  gets a row of its own (the touch-floor rows above). Other sheets of the site may still give an in-sentence
+  link a hit area (app/tavonel.css G1-TAP). The contract is chosen per link by what the link is, measured in
+  the page -- never by route, selector, width, media query or project name:
+  - plain: every box of the link lies inside the line box of its own text run on that box, within 1px;
+  - hit area: any other link (a box taller than its line, or moved off it). A box that leaves its line but is
+    under 44px is not a third kind: it is a hit-area link and fails (4).
 
   Found by measuring, not by class name: every painted, inline-level link in main whose paragraph
   holds words outside it, on its own lines (a link that is a flex or grid item, or alone in its block
@@ -336,24 +338,22 @@ test.describe("on a touch screen", () => {
       baseline): its next line, or on the last line the one before; a one-line paragraph is compared
       with its own computed line height. A link that fills a line of its own is measured the same way;
   (3) its computed font size is not smaller than the paragraph's.
-  Wide, fine pointer:
+  Plain:
   (2) each of its boxes lies inside the line box of its own text run on that box, within 1px -- the
       line that holds it in layout, so a link moved onto another line fails.
-  Touch or narrow:
+  Hit area:
   (2) its words lie inside the line box that holds them (the hit area may reach the lines above and
       below; the words may not leave their line);
   (4) each of its boxes is at least 44px high, within 1px;
-  (5) no two different links' boxes intersect: the tap would land on the wrong link. Reported once per
-      pair with both texts' lengths and the overlap rectangle. Overlap with plain text is allowed;
-      that is what a hit area is.
+  (5) none of its boxes intersects a box of any other link in main (in a sentence or not): the tap would
+      land on the wrong link. Reported once per pair with both texts' lengths and the overlap rectangle.
+      Overlap with plain text is allowed; that is what a hit area is.
   No pixel value for a line height is written here; "line-height: normal" reads as NaN and fails.
 */
 function measureInSentenceLinks() {
   type Box = { top: number; bottom: number };
   type Rect = Box & { left: number; right: number };
   type Line = Box & { base: number | null; strut: Box | null };
-  // G1-TAP's condition (app/tavonel.css) and the five V34 sheets', character for character.
-  const touch = matchMedia("(pointer: coarse), (max-width: 1079px)").matches;
   const inline = (element: Element) => getComputedStyle(element).display.startsWith("inline");
   const blockOf = (element: Element) => {
     let block: Element | null = element;
@@ -409,15 +409,18 @@ function measureInSentenceLinks() {
   const px = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
   const mid = (b: Box) => (b.top + b.bottom) / 2;
   const unmoved = (rect: Box, shift: number) => ({ top: rect.top - shift, bottom: rect.bottom - shift });
-  const found: { text: string; contract: "touch" | "wide"; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number; boxes: Rect[]; lineBoxes: (Box | null)[]; fontSize: number; paragraphFontSize: number; violations: string[] }[] = [];
-  for (const link of document.querySelectorAll<HTMLElement>("main a[href]")) {
-    if (!inline(link) || link.getClientRects().length === 0) continue;
+  const rectsOf = (element: Element): Rect[] => [...element.getClientRects()].map(r => ({ top: r.top, bottom: r.bottom, left: r.left, right: r.right }));
+  const found: { text: string; classes: string[]; contract: "plain" | "hit-area"; height: number; hold: number; next: number; pitches: (number | null)[]; lines: number; boxes: Rect[]; lineBoxes: (Box | null)[]; fontSize: number; paragraphFontSize: number; violations: string[] }[] = [];
+  const anchors = [...document.querySelectorAll<HTMLElement>("main a[href]")];
+  const hitAreas: { index: number; entry: (typeof found)[number] }[] = [];
+  anchors.forEach((link, index) => {
+    if (!inline(link) || link.getClientRects().length === 0) return;
     const block = blockOf(link);
-    if (!block) continue;
+    if (!block) return;
     const all = runs(block);
     // In a sentence: its paragraph has words outside the link. Wherever the link wraps to, even onto a
     // line of its own, it is still a line of that paragraph.
-    if (!all.some(run => !link.contains(run.node) && run.rects.length > 0)) continue;
+    if (!all.some(run => !link.contains(run.node) && run.rects.length > 0)) return;
     const own = getComputedStyle(block);
     const lineHeight = parseFloat(own.lineHeight);
     const lines: Line[] = [];
@@ -464,37 +467,54 @@ function measureInSentenceLinks() {
     const leaves = (what: string, box: Box, strut: Box | null) => strut
       ? `(2) ${what} ${px(box.top)}..${px(box.bottom)} leaves its line box ${px(strut.top)}..${px(strut.bottom)} by ${px(Math.max(0, strut.top - box.top))}px above and ${px(Math.max(0, box.bottom - strut.bottom))}px below`
       : `(2) ${what} ${px(box.top)}..${px(box.bottom)}: the line that holds it has no measured line box (line height ${own.lineHeight})`;
-    const boxes: Rect[] = [...link.getClientRects()].map(r => ({ top: r.top, bottom: r.bottom, left: r.left, right: r.right }));
-    if (touch) {
+    const boxes = rectsOf(link);
+    // The line box of its own text run on each box: the word drawn inside the box, placed where layout put it.
+    const ownLine = boxes.map(box => words.find(w => w.line >= 0 && (w.rect.left + w.rect.right) / 2 >= box.left && (w.rect.left + w.rect.right) / 2 <= box.right && mid(w.rect) >= box.top && mid(w.rect) <= box.bottom));
+    // What the link is: plain when every box is inside its own line box; anything else is a hit-area link.
+    const contract: "plain" | "hit-area" = boxes.every((box, i) => ownLine[i] !== undefined && inside(box, lines[ownLine[i]!.line].strut)) ? "plain" : "hit-area";
+    if (contract === "plain") {
+      boxes.forEach((box, i) => {
+        const word = ownLine[i];
+        if (!word) violations.push(`(2) its box ${px(box.top)}..${px(box.bottom)} holds none of its words placed on a line`);
+        else if (!inside(box, lines[word.line].strut)) violations.push(leaves("its box", box, lines[word.line].strut));
+      });
+    } else {
       for (const word of words) if (!inside(word.rect, lines[word.line]?.strut ?? null)) violations.push(leaves("its words", word.rect, lines[word.line]?.strut ?? null));
       for (const box of boxes) if (!(box.bottom - box.top >= 43)) violations.push(`(4) its box ${px(box.top)}..${px(box.bottom)} is ${px(box.bottom - box.top)}px high, under the 44px hit area`);
-    } else {
-      for (const box of boxes) {
-        // The line box of its own text run on this box: the word drawn inside the box, placed where layout put it.
-        const word = words.find(w => w.line >= 0 && (w.rect.left + w.rect.right) / 2 >= box.left && (w.rect.left + w.rect.right) / 2 <= box.right && mid(w.rect) >= box.top && mid(w.rect) <= box.bottom);
-        if (!word) { violations.push(`(2) its box ${px(box.top)}..${px(box.bottom)} holds none of its words placed on a line`); continue; }
-        if (!inside(box, lines[word.line].strut)) violations.push(leaves("its box", box, lines[word.line].strut));
-      }
     }
     const fontSize = parseFloat(getComputedStyle(link).fontSize);
     const paragraphFontSize = parseFloat(own.fontSize);
     if (!(fontSize >= paragraphFontSize - 0.01)) violations.push(`(3) its font size ${px(fontSize)}px is smaller than the paragraph's ${px(paragraphFontSize)}px`);
-    found.push({ text: (link.textContent ?? "").trim().slice(0, 40), contract: touch ? "touch" : "wide", height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length, boxes, lineBoxes: lines.map(line => line.strut), fontSize, paragraphFontSize, violations });
-  }
-  if (touch) {
-    // (5) Among every in-sentence link of the page: the later of two links whose boxes meet carries the pair.
-    found.forEach((b, j) => found.slice(0, j).forEach(a => {
-      for (const p of a.boxes) for (const q of b.boxes) {
+    const entry = { text: (link.textContent ?? "").trim().slice(0, 40), classes: [...link.classList], contract, height: link.getBoundingClientRect().height, hold, next, pitches, lines: lines.length, boxes, lineBoxes: lines.map(line => line.strut), fontSize, paragraphFontSize, violations };
+    found.push(entry);
+    if (contract === "hit-area") hitAreas.push({ index, entry });
+  });
+  // (5) A hit-area link against every other link in main. A pair of two hit-area links is checked once, by the later.
+  const hitIndex = new Set(hitAreas.map(h => h.index));
+  for (const { index, entry } of hitAreas) {
+    anchors.forEach((other, j) => {
+      if (j === index || (hitIndex.has(j) && j > index) || other.contains(anchors[index]) || anchors[index].contains(other)) return;
+      const otherLength = (other.textContent ?? "").trim().slice(0, 40).length;
+      for (const p of entry.boxes) for (const q of rectsOf(other)) {
         const left = Math.max(p.left, q.left), right = Math.min(p.right, q.right), top = Math.max(p.top, q.top), bottom = Math.min(p.bottom, q.bottom);
-        if (right - left > 0.01 && bottom - top > 0.01) b.violations.push(`(5) the boxes of two links (of ${a.text.length} and ${b.text.length} characters) intersect over ${px(left)}..${px(right)} x ${px(top)}..${px(bottom)}`);
+        if (right - left > 0.01 && bottom - top > 0.01) entry.violations.push(`(5) the boxes of two links (of ${otherLength} and ${entry.text.length} characters) intersect over ${px(left)}..${px(right)} x ${px(top)}..${px(bottom)}`);
       }
-    }));
+    });
   }
   return found;
 }
 
-for (const route of ["/research/program", "/contact", "/security", "/developers"]) {
-  test(`a link inside a sentence on ${route} follows the site's tap rule for its width`, async ({ page }, testInfo) => {
+// The in-sentence link classes of the five V34 sheets (decision 23), as CSS Modules names them in the build
+// ("<sheet>_<class>__<hash>"). Each route must render at least one, so a renamed class or naming scheme fails here.
+const V34_IN_SENTENCE: Record<string, RegExp> = {
+  "/research/program": /^program_inlineLink__/,
+  "/contact": /^contact_inline__/,
+  "/security": /^security_inline__/,
+  "/developers": /^developers_inlineLink__/,
+};
+
+for (const [route, v34Class] of Object.entries(V34_IN_SENTENCE)) {
+  test(`a link inside a sentence on ${route} is judged by what it is, plain or hit area, and a V34 one is plain`, async ({ page }, testInfo) => {
     test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360");
     await page.goto(route);
     // /contact's answers are in closed <details>; open every one so its links are laid out.
@@ -503,6 +523,10 @@ for (const route of ["/research/program", "/contact", "/security", "/developers"
     expect(links.length, `${route} renders at least one link inside a sentence`).toBeGreaterThan(0);
     // Every link's every violation, in one assertion: a failure names all of them, not the first. A pair of links
     // whose boxes meet (5) is named by its rectangle and the two texts' lengths, not by the texts.
-    expect(links.flatMap(link => link.violations.map(violation => (violation.startsWith("(5)") ? violation : `"${link.text}": ${violation}`))), `${route}: links inside a sentence (${links[0]!.contract} contract)`).toEqual([]);
+    expect(links.flatMap(link => link.violations.map(violation => (violation.startsWith("(5)") ? violation : `"${link.text}" (${link.contract}): ${violation}`))), `${route}: links inside a sentence`).toEqual([]);
+    // Decision 23: no hit area comes back into the V34 sheets through the generic hit-area contract.
+    const v34 = links.filter(link => link.classes.some(name => v34Class.test(name)));
+    expect(v34.length, `${route} renders a link inside a sentence with the class ${v34Class}`).toBeGreaterThan(0);
+    expect(v34.filter(link => link.contract !== "plain").map(link => `"${link.text}" (${link.classes.join(" ")}) is a hit-area link, ${link.height.toFixed(2)}px high`), `${route}: V34 links inside a sentence are plain inline boxes`).toEqual([]);
   });
 }
