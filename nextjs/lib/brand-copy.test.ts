@@ -863,7 +863,9 @@ describe("public copy", () => {
 
   it("keeps qualification details reachable without leading the landing page with a beta badge", () => {
     const source = landingSource();
-    const workspace = read("app/workspace/page.tsx");
+    // WO-REL-4 closing round: the workspace's source choices moved to their own module so they can be rendered in a test.
+    const workspace = read("components/workspace/source-choices.tsx");
+    expect(read("app/workspace/page.tsx")).toContain("<WorkspaceSourceChoices ");
     expect(source).not.toContain('<span className="st">BETA</span>');
     expect(source).not.toContain(
       '<span className="st">ENTERPRISE-ASSISTED</span>'

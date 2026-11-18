@@ -1163,7 +1163,7 @@ console.log("compile job:", accepted.jobId);` },
       { kind: "endpoint", operationId: "startOAuthConnectorAuthorization" },
       { kind: "endpoint", operationId: "revokeOAuthConnector" },
       { kind: "heading", text: "Availability by provider" },
-      { kind: "note", text: "Connector availability differs by provider and by workspace, and listOAuthConnectors reports configured: false for a provider whose client TAVONEL does not hold rather than hiding it. The Integrations page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
+      { kind: "note", text: "Connector availability differs by provider and by workspace, and listOAuthConnectors reports configured: false for a provider whose client TAVONEL does not hold rather than hiding it. The Connect page states which are live; this page does not restate it, because two pages saying different things about the same connector is how that goes wrong." },
     ],
   },
   {
@@ -1248,12 +1248,13 @@ console.log("compile job:", accepted.jobId);` },
         G11 REMOTE-MCP (DECISION-REGISTER S6-09, S6-10). Whether this site serves the endpoint is
         TAVONEL_REMOTE_MCP_ENABLED, read here the way the workspace's Connect AI panel reads it. The
         docs pages are built with the deployment's env, and that env only changes with a new build
-        (RELEASE_ORDER.md, W1-A1), so the sentence below is the endpoint's own state, never a guess.
+        (RELEASE_ORDER.md, W1-A1), so the subsection below is the endpoint's own state, never a guess.
+        WO-REL-4 (lead ruling 2026-11-18): the whole subsection, through the OAuth flow, exists only
+        while the switch is on. Switched off, this page describes the stdio server above, which is what a
+        customer can use, and says nothing about the remote one.
       */
+      ...(remoteMcpEnabled() ? ([
       { kind: "heading", text: "Remote MCP endpoint" },
-      ...(remoteMcpEnabled() ? [] : [
-        { kind: "note" as const, text: "**Not available on this site yet.** Every URL in this subsection answers 404 here. Connect through the stdio server above." },
-      ]),
       { kind: "note", text: "**Who can connect.** A member of a workspace on a paid plan. A free evaluation connects only where trial AI access is on, with one live key or connection at a time and the trial's daily query bound, and is otherwise refused with 402 TRIAL_FEATURE_NOT_INCLUDED. While access is opening in stages, a workspace that is not yet admitted is refused with 403 REMOTE_MCP_COHORT_EXCLUDED. If the access settings cannot be read, the endpoint admits nobody and answers 503 REMOTE_MCP_COHORT_CONFIG_INVALID." },
       { kind: "prose", text: `With the switch on, the same ${MCP_TOOL_COUNT_WORD} read-only tools are served over MCP Streamable HTTP, protocol revision 2025-06-18, at /api/mcp — for clients that connect by URL instead of launching a local process, such as ChatGPT connectors and other web agents. The tool table is the stdio server's own file, so the two cannot list different tools apart from search and fetch where they are enabled, and neither has a write tool. initialize and tools/list answer without a token; every tools/call needs one.` },
       { kind: "note", text: "Only the JSON response form of Streamable HTTP is served: each POST carries one JSON-RPC message and gets one JSON body back. There is no SSE stream (GET /api/mcp answers 405) and no Mcp-Session-Id, both of which the transport allows a server to omit. A client that insists on either will not connect." },
@@ -1335,6 +1336,7 @@ console.log("compile job:", accepted.jobId);` },
         ],
       },
       { kind: "note", text: "The access token is a developer API key minted for the connection, in its own form (tvnl_mcp_…): it works through /api/mcp only, and the REST API refuses it with 401 API_KEY_AUDIENCE_INVALID. It is listed under Workspace › Developers with the client's name, apart from the keys you make by hand, and can be revoked there. Reconnecting the same client replaces its earlier key. The remote endpoint refuses any key that holds a scope outside the five read scopes. Rate limits and tenant scoping are the API's own, per key and per scope." },
+      ] satisfies DocsBlock[]) : []),
       { kind: "heading", text: "Verifying an answer" },
       { kind: "prose", text: "Where signed answer receipts are on, an ask_world or POST /collections/{id}/ask answer carries signedReceipt: an Ed25519 signature, under its own scope tavonel.signed_answer_receipt.v1, over the collection, the World state, the manifest digest, the sha256 of the question (never its text), the status, the cited evidence ids and the answer's output digest. Save the whole answer as JSON, fetch the trust store from /api/export/trust, and run `node tavonel-verify-answer.mjs --receipt answer.json --trust-store trust.json`, adding `--question-file question.txt` to check the question too. It recomputes the output digest from the answer text and citations, so an answer edited after signing fails. The trust store is required, since it is where a revoked key is named; `--trusted-fingerprint sha256:…` may be added as a pin. A receipt stays valid if its key was valid when it signed: a key that later expired or was retired still verifies its earlier receipts, a revoked key verifies none, and a signing time in the future or a payload time that is not the signing time is refused. An answer that cannot be signed while receipts are on is withheld with 503 ANSWER_SIGNING_UNAVAILABLE, never sent unsigned." },
     ],

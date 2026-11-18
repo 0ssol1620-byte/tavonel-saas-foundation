@@ -47,7 +47,6 @@ export const SOURCES = {
   lead: "Each source publishes its own dates and terms, so a fact can be traced to its origin.",
   items: [
     { label: "SEC EDGAR", text: "Official filings and XBRL facts.", href: "https://www.sec.gov/search-filings/edgar-application-programming-interfaces" },
-    { label: "ALFRED", text: "Economic vintages and revisions. Series rights vary.", href: "https://alfred.stlouisfed.org/" },
     { label: "EIA", text: "Energy supply and inventory data.", href: "https://www.eia.gov/opendata/" },
     { label: "US Census", text: "Building permits and housing supply.", href: "https://www.census.gov/construction/bps/" },
   ],

@@ -129,8 +129,9 @@ describe("revenue paths", () => {
 
     it("appears only in a Request access allowance line or overage row on today's page", async () => {
       const html = await pricingHtml();
-      // The rule reads what it guards: four request-access allowance lines and four overage rows, and they name KQU.
-      expect(allowedRanges(html)).toHaveLength(8);
+      // The rule reads what it guards: four request-access allowance lines and two overage rows (PCU, KQU; WO-REL-4
+      // removed the storage and extra-seat rows, lead decision C3), and they name KQU.
+      expect(allowedRanges(html)).toHaveLength(6);
       expect(text(html)).toMatch(/\bKQU\b/);
       expect(misplacedTerms(html)).toEqual([]);
     }, 180_000);
@@ -139,8 +140,8 @@ describe("revenue paths", () => {
       const html = await pricingHtml({ saleOpen: true });
       expect(text(html)).toContain("Buy Personal");
       expect(text(html)).toContain("Buy Developer");
-      // Team and Business keep Request access, and so does every overage row: 2 + 4 places.
-      expect(allowedRanges(html)).toHaveLength(6);
+      // Team and Business keep Request access, and so does every overage row: 2 + 2 places.
+      expect(allowedRanges(html)).toHaveLength(4);
       expect(misplacedTerms(html)).toEqual([]);
     }, 180_000);
 

@@ -225,7 +225,9 @@ test("closed intake offers a working public evaluation and an Enterprise convers
   await expect(enterprise.getByRole("link", { name: "Scope an Enterprise pilot" })).toHaveAttribute("href", "/contact?plan=Enterprise");
   // Catalog v2: Team is told apart by what it delivers, and what is not sold yet stays folded under Plan limits.
   const team = page.locator("article.plan").filter({ has: page.getByRole("heading", { name: "Team", exact: true }) });
-  await expect(team.getByText("Review queue and version history", { exact: true })).toBeVisible();
+  // WO-REL-4: every plan reaches the review queue and version history, so Team's card no longer sells them as its own.
+  await expect(team.getByText("Everything in Developer", { exact: true })).toBeVisible();
+  await expect(team).not.toContainText("Review queue and version history");
   await expect(team).not.toContainText(/single-member|guided corpus onboarding/i);
   await expect(team.getByText("Per-member source permissions")).not.toBeVisible();
   await team.getByText("Plan limits").click();

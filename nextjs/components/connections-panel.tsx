@@ -390,7 +390,7 @@ export default function ConnectionsPanel() {
               <small className="field-help">The local agent uses your existing AWS profile, workload role, or provider environment. Credential values never enter TAVONEL.</small>
             </>
           ) : (
-            <p className="field-help">Choose a folder on a local NTFS or ReFS drive (Windows) or a local Linux file system. The local agent reads it on your machine, and no credential for it reaches TAVONEL. <a href="/developer/tavonel-source-agent.py" download>Download source agent</a>.</p>
+            <p className="field-help">Choose a folder on a local NTFS or ReFS drive (Windows) or a supported local Linux file system. The local agent reads it on your machine, and no credential for it reaches TAVONEL. <a href="/developer/tavonel-source-agent.py" download>Download source agent</a>.</p>
           )}
           <label htmlFor="connection-name">Name this connection <small>optional</small></label>
           <input id="connection-name" maxLength={100} value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={providerLabel(provider)} />

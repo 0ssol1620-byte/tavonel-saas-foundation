@@ -33,7 +33,7 @@ export const SUPPORT = {
 export const REFERENCE = {
   eyebrow: "Public reference corpus",
   title: "A standards revision, kept as a Change record.",
-  lead: "The public reference corpus keeps a NIST control catalog release as a Change record. It names the announcement it was read from and sits beside the publications that document it.",
+  lead: "The public reference corpus keeps a NIST control catalog release as a curated Change record. It names the announcement it cites and sits beside the publications that document it.",
   changes: { href: to("changes"), label: "Inspect revision handling" },
   security: { href: to("security"), label: "Privacy and access" },
   recordKind: "Change",

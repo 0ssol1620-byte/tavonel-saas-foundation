@@ -214,7 +214,7 @@ key scoped to `connections:sync` and `documents:intake`; add
 `connections:read` only when the same key also needs inventory access. The key
 is read from `TAVONEL_API_KEY` only and never from a command argument.
 
-A local folder on an NTFS or ReFS drive (Windows) or a local Linux file system
+A local folder on an NTFS or ReFS drive (Windows) or a supported local Linux file system
 uses the local agent and operating-system permissions; the runbook
 (`source-agent-operations.md`) lists what the agent refuses before it lists
 anything. S3, R2, and MinIO use the same agent with an existing AWS profile,

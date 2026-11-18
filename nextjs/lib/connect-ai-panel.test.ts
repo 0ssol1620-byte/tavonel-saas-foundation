@@ -10,7 +10,7 @@ describe("Connect AI panel (W1-A1)", () => {
   });
 
   it("shows one MCP URL, the Claude steps first, and says no client handshake was verified", () => {
-    const html = renderToStaticMarkup(createElement(ConnectAiPanel));
+    const html = renderToStaticMarkup(createElement(RemoteMcpAvailability, { enabled: true }, createElement(ConnectAiPanel)));
     expect(html).toContain("https://tavonel.com/api/mcp");
     expect(html).toContain("Add custom connector");
     expect(html).toContain("Add to ChatGPT");
@@ -32,5 +32,12 @@ describe("Connect AI panel (W1-A1)", () => {
     const on = renderToStaticMarkup(createElement(RemoteMcpAvailability, { enabled: true }, createElement(ConnectAiPanel)));
     expect(on).toContain("https://tavonel.com/api/mcp");
     expect(on).not.toContain(localBridge);
+  });
+
+  it("is switched off where no server said, the same as a server's false (WO-REL-4 closing round)", () => {
+    const off = renderToStaticMarkup(createElement(RemoteMcpAvailability, { enabled: false }, createElement(ConnectAiPanel)));
+    const bare = renderToStaticMarkup(createElement(ConnectAiPanel));
+    expect(bare).toBe(off);
+    expect(bare).not.toContain("/api/mcp");
   });
 });

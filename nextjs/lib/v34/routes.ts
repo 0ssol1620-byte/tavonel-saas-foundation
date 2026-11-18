@@ -80,7 +80,7 @@ const ROWS: readonly Row[] = [
     description: "Configuration steps for reading a World from an MCP client through a local stdio server or the HTTP API, with an API key and read-only tools.",
     release: "live", nav: { group: "build-trust", label: "Connect" }, primaryNav: true, schema: "WebPage", ogLabel: "Connect" },
   { key: "pricing", path: "/pricing", title: "Pricing for compiling and reading Worlds",
-    description: "See the evaluation allowance, the plans on sale and what a credit buys, with the refund terms and an estimate of what a document set costs to compile.",
+    description: "See the evaluation allowance, each plan and how to get it, what a credit buys, the refund terms and an estimate of what a document set costs to compile.",
     release: "live", nav: { group: "company", label: "Pricing" }, primaryNav: true, schema: "WebPage", ogLabel: "Pricing" },
   { key: "personal", path: "/personal", title: "Turn your own PDFs into a World you can cite",
     description: "Compile your own PDFs into a World of your own, cite answers back to the page they came from, read it from an MCP client and revoke any API key at any time.",
@@ -141,7 +141,7 @@ const ROWS: readonly Row[] = [
     description: "Keep standards and procedures as a World where each requirement cites its source and a revision shows exactly which controls changed.",
     release: "live", nav: { group: "for-you", label: "Engineering" }, schema: "WebPage", ogLabel: "Engineering" },
   { key: "billing", path: "/billing", title: "How credits, pages and billing work together",
-    description: "Learn what a credit is, how many credits a page uses, how refunds work and what happens when a balance runs out before a compile starts.",
+    description: "Credits pay for the pages a compile reads, and the balance is checked before a compile starts. Plans, prices and refund terms are on the pricing page.",
     release: "live", nav: { group: "company", label: "Billing" }, schema: "WebPage", ogLabel: "Billing" },
   // held: no licensed collection exists. Live with rights clearance and a catalog data receipt.
   { key: "catalog", path: "/catalog", title: "A catalog of licensed knowledge collections",

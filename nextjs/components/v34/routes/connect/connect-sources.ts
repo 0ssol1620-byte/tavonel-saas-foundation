@@ -41,7 +41,7 @@ export const CONNECTORS: ReadonlyArray<{
 ];
 
 export const CUSTOMER_RUN: ReadonlyArray<readonly [string, string]> = [
-  ["Local folder", "Read a folder on a local NTFS or ReFS drive (Windows) or a local Linux file system through your own import agent."],
+  ["Local folder", "Read a folder on a local NTFS or ReFS drive (Windows) or a supported local Linux file system through your own import agent."],
   ["S3-compatible object storage", "Import a selected bucket and prefix while credentials stay with your agent."],
 ];
 

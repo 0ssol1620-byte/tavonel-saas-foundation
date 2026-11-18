@@ -48,10 +48,14 @@ const CLIENTS = [
 ] as const;
 type ClientId = (typeof CLIENTS)[number]["id"];
 
-/** Whether this deployment serves /api/mcp; null where no server said (the panel then shows its steps). */
-const Availability = createContext<boolean | null>(null);
+/*
+  Whether this deployment serves /api/mcp. WO-REL-4 closing round: where no server said (no provider
+  above the panel), the panel is switched off -- it used to show the remote steps then, so a page that
+  forgot the layout offered a URL that answers 404. Only a server's `true` opens it.
+*/
+const Availability = createContext<boolean>(false);
 export function RemoteMcpAvailability({ enabled, children }: { enabled: boolean; children?: ReactNode }) {
-  return <Availability.Provider value={enabled}>{children}</Availability.Provider>;
+  return <Availability.Provider value={enabled === true}>{children}</Availability.Provider>;
 }
 
 export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headingLevel?: "h2" | "h3" }) {
@@ -67,8 +71,8 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
   return (
     <section className={styles.panel} aria-labelledby="connect-ai-title" data-testid="connect-ai-panel">
       {/* WO-REL-4: switched off, the panel names what a client can use here, the local bridge, and no hosted client. */}
-      <Heading id="connect-ai-title">{enabled === false ? "Connect an MCP client" : "Connect Claude or ChatGPT"}</Heading>
-      {enabled === false ? (
+      <Heading id="connect-ai-title">{enabled ? "Connect Claude or ChatGPT" : "Connect an MCP client"}</Heading>
+      {!enabled ? (
         <>
           <p role="status">An MCP client reads your active World through the local MCP bridge, with an API key from a paid plan.</p>
           <Link className="btn btn-ghost" href="/docs/mcp">Local MCP setup</Link>
