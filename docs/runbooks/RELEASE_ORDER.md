@@ -856,3 +856,23 @@ is true only for `VERCEL_ENV=preview` or `V34_SHOW_HELD=1`. **The Production env
 Production variable list before a release that changes the route registry. To open a held route on purpose, use a
 Preview deployment, or set the variable on a build you serve yourself. A server started without it is measured by
 `e2e/v34-matrix.spec.ts` ("held routes answer 404 ..." with `V34_SERVER_MODE=production`).
+
+## Page meter cohort (`TAVONEL_PAGE_METER_COHORT`, WO-REL-2)
+
+Migration `20261117120000` settles a read by its pages (`settle_foundation_compute_v4`: 4 credits a standard page,
+capped at what the customer approved). This server-only variable decides which workspaces the settle route
+(`nextjs/app/api/internal/billing/settle/route.ts`) sends there; the decision is `pageMeterSettles()` in
+`nextjs/lib/page-meter-cohort.ts` and nowhere else.
+
+| Value | Effect |
+|---|---|
+| unset or empty | Nobody is metered. Every read settles on `settle_foundation_compute_v3` with the worker's per-document `actualCredits`, as `main` does before the meter. |
+| `pilot-a,pilot-b` (1–50 exact workspace keys, comma-separated, spaces around a key ignored) | Those workspaces are metered; every other workspace settles as above. |
+| `*` (exactly, alone) | Every workspace is metered. |
+| anything else (`all`, ` *`, `*,pilot-a`, an empty item, a key of the wrong shape, more than 50 keys) | Invalid. Nobody is metered (never treated as `*`). Each settlement that would have asked logs `page_meter_cohort_refused` with code `PAGE_METER_COHORT_CONFIG_INVALID` (the value is not logged), and `/api/status` reports `pageMeter: "page_meter_cohort_not_configured"`. |
+
+`/api/status` says only `page_meter_cohort_configured` or `page_meter_cohort_not_configured`; the list is never
+returned. Releases always stay on v3. A refund on a failed compile (`reverse_foundation_compute_for_failed_compile`)
+reverses only rows v4 settled (`charge_basis` not null) and reverses what that row was charged, whatever the cohort
+says when the compile fails; a read settled on v3 is not reversed, as before the meter.
+Like every Vercel variable, a change takes effect when a new deployment becomes production.

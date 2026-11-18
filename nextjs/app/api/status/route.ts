@@ -6,6 +6,7 @@ import { readCommercialState } from "@/lib/commercial-state";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { readPaddleApiConfig } from "@/lib/paddle-api";
 import { readProductCoreV2Env } from "@/lib/core-runtime-v2";
+import { pageMeterCohortConfigured } from "@/lib/page-meter-cohort";
 import { readPublicStatusV2 } from "@/lib/public-status";
 import { FOUNDATION_R2_BUCKET, readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 import { readSupabaseAdminConfig } from "@/lib/supabase-admin";
@@ -62,6 +63,8 @@ export function GET() {
       r2,
       signedExport,
       coreV2,
+      // WO-REL-2: whether TAVONEL_PAGE_METER_COHORT holds a valid value. Never which workspaces.
+      pageMeter: pageMeterCohortConfigured() ? "page_meter_cohort_configured" : "page_meter_cohort_not_configured",
     },
     { headers: { "Cache-Control": "no-store" } },
   );
