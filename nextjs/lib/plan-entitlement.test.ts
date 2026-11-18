@@ -146,11 +146,14 @@ describe("plan entitlement", () => {
   */
   it("keeps a plan whose product is unfinished off self-serve checkout", () => {
     // The gate is `planAvailability` (capabilities delivered and a configured price), not the commercial mode:
-    // no V22 plan is purchasable while DELIVERED is empty, and the retired plans never are.
+    // WO-REL-1: DELIVERED holds the Personal/Developer line only; Team and Business wait on per-member source scopes
+    // nothing delivers, and the retired plans are never purchasable.
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
     expect(BILLING_OFFERS.observer_access.status).toBe("retired");
     expect(BILLING_OFFERS.studio_access.status).toBe("retired");
-    expect(DELIVERED.size).toBe(0);
+    expect(DELIVERED.has("per_member_source_scopes")).toBe(false);
+    expect(BILLING_OFFERS.team.requires).toContain("per_member_source_scopes");
+    expect(BILLING_OFFERS.business.requires).toContain("per_member_source_scopes");
     const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
     expect(pricing, "the pricing card must derive checkout from saleChannel")
       .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');

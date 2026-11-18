@@ -2,7 +2,7 @@ import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers } from "./billing-catalog";
-import { OFFER_CODES, REVENUE_PATHS, revenuePathForOffer } from "./revenue-paths";
+import { OFFER_CODES, REVENUE_PATHS, revenuePathForOffer, type RevenuePath } from "./revenue-paths";
 
 // /pricing is rendered below; its header reads the route it is on.
 vi.mock("next/navigation", () => ({ usePathname: () => "/pricing" }));
@@ -19,15 +19,17 @@ describe("revenue paths", () => {
     expect([...mapped].sort()).toEqual([...OFFER_CODES].sort());
   });
 
-  it("maps the v2 codes to not_sold paths while the sale is closed, and the retired codes to the allowance ledger", () => {
+  it("maps every offer the release can sell to a sold path, and the retired codes to the allowance ledger", () => {
     expect(OFFER_CODES.length).toBe(6);
     const everyEnv = Object.fromEntries(OFFER_CODES.map((c, i) => [BILLING_OFFERS[c].priceEnv, `pri_${String(i).repeat(26)}`]));
     const configured = readConfiguredBillingOffers(everyEnv);
+    // WO-REL-1: with every price set, Personal and Developer are purchasable, so their paths are sold self-serve.
+    expect(OFFER_CODES.filter((code) => planAvailability(code, configured) === "purchasable")).toEqual(["personal", "developer"]);
     for (const code of OFFER_CODES) {
-      // No offer is purchasable now, so no path may claim to be sold self-serve.
-      expect(planAvailability(code, configured), code).not.toBe("purchasable");
-      expect(revenuePathForOffer(code).state, code).not.toBe("sold_self_serve");
+      if (planAvailability(code, configured) === "purchasable") expect(revenuePathForOffer(code).state, code).toBe("sold_self_serve");
     }
+    // With no price set nothing is purchasable, whatever the table says (the closed sale of build 1).
+    for (const code of OFFER_CODES) expect(planAvailability(code, readConfiguredBillingOffers({})), code).not.toBe("purchasable");
     for (const code of ["observer_access", "studio_access"] as const) {
       expect(revenuePathForOffer(code).ledgerPath, code).toBe("allowance");
     }
@@ -62,21 +64,16 @@ describe("revenue paths", () => {
     its allowance names a not_sold meter family: the catalog's own test refuses that (billing-catalog.test.ts).
   */
   describe("pricing copy names a not_sold family only where its action is Request access", () => {
-    const PRICE = `pri_${"c".repeat(26)}`;
     afterEach(() => {
-      vi.doUnmock("@/lib/billing-catalog");
       vi.unstubAllEnvs();
     });
 
-    async function pricingHtml(seam?: { personalOnSale: boolean }) {
+    /** Today's page, or (saleOpen) the same release with its two V22 prices set: build 2 of the release plan. */
+    async function pricingHtml(seam?: { saleOpen: boolean }) {
       vi.resetModules();
-      if (seam?.personalOnSale) {
-        vi.doMock("@/lib/billing-catalog", async (original) => {
-          const catalog = await original<typeof import("./billing-catalog")>();
-          const all = new Set(Object.values(catalog.BILLING_OFFERS).flatMap((offer) => offer.requires));
-          return { ...catalog, planAvailability: (code: never, configured: never) => catalog.planAvailability(code, configured, all) };
-        });
-        vi.stubEnv("PADDLE_PRICE_PERSONAL", PRICE);
+      if (seam?.saleOpen) {
+        vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"c".repeat(26)}`);
+        vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"d".repeat(26)}`);
         // A Buy action also needs the deployment's purchase open: the launch flags `nextjs/vercel.json` sets in production.
         for (const [name, value] of Object.entries({
           VERCEL_ENV: "production", COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", ACCESS_MODE: "self_service",
@@ -122,9 +119,9 @@ describe("revenue paths", () => {
      * Every occurrence of a not_sold term outside those places, with the text around it. A term starts a word ("GB" is
      * not the "gb" of "rgba"); it may end inside one, so "Skill run" still finds "Skill runs".
      */
-    function misplacedTerms(html: string) {
+    function misplacedTerms(html: string, paths: readonly RevenuePath[] = REVENUE_PATHS) {
       const ranges = allowedRanges(html);
-      return REVENUE_PATHS.filter((path) => path.state === "not_sold").flatMap((path) => path.terms.flatMap((term) =>
+      return paths.filter((path) => path.state === "not_sold").flatMap((path) => path.terms.flatMap((term) =>
         [...html.matchAll(new RegExp(`(?<![A-Za-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"))]
           .filter((match) => !ranges.some(([start, end]) => match.index! >= start && match.index! < end))
           .map((match) => `${path.family} "${term}": ${text(html.slice(Math.max(0, match.index! - 90), match.index! + 60)).trim()}`)));
@@ -138,26 +135,43 @@ describe("revenue paths", () => {
       expect(misplacedTerms(html)).toEqual([]);
     }, 180_000);
 
-    it("is caught on a card that carries a Buy action (failure path: the seam opens Personal while KQU is not sold)", async () => {
-      const html = await pricingHtml({ personalOnSale: true });
+    it("holds with the sale open: Personal and Developer carry Buy, and the meters on their line are sold", async () => {
+      const html = await pricingHtml({ saleOpen: true });
       expect(text(html)).toContain("Buy Personal");
-      const misplaced = misplacedTerms(html);
+      expect(text(html)).toContain("Buy Developer");
+      // Team and Business keep Request access, and so does every overage row: 2 + 4 places.
+      expect(allowedRanges(html)).toHaveLength(6);
+      expect(misplacedTerms(html)).toEqual([]);
+    }, 180_000);
+
+    /*
+      WO-REL-1 flipped KQU and storage to sold (their meters are delivered), so the failure paths below run the guard
+      against the table as it stood before the release: it must still catch a not_sold meter's term where it may not be.
+    */
+    const NOT_SOLD_METERS: RevenuePath[] = REVENUE_PATHS.map((path) =>
+      path.meter === "kqu" ? { ...path, state: "not_sold", terms: ["KQU"] }
+        : path.meter === "storageGb" ? { ...path, state: "not_sold", terms: ["GB"] } : path);
+
+    it("is caught on a card that carries a Buy action (failure path: the sale open while KQU is not sold)", async () => {
+      const html = await pricingHtml({ saleOpen: true });
+      expect(text(html)).toContain("Buy Personal");
+      const misplaced = misplacedTerms(html, NOT_SOLD_METERS);
       expect(misplaced.some((line) => line.startsWith('CONTEXT_KQU "KQU"') && line.includes("Each month: 500 PCU")), misplaced.join("\n")).toBe(true);
     }, 180_000);
 
     it("is caught in a sentence outside the two places (failure path)", () => {
       const html = '<p>A KQU is one bounded knowledge retrieval request.</p><h3 id="pricing-overage-title">x</h3><table><tr><td>KQU</td><td>Request access</td></tr></table>';
-      expect(misplacedTerms(html)).toHaveLength(1);
-      expect(misplacedTerms(html)[0]).toContain("A KQU is one bounded knowledge retrieval request.");
+      expect(misplacedTerms(html, NOT_SOLD_METERS)).toHaveLength(1);
+      expect(misplacedTerms(html, NOT_SOLD_METERS)[0]).toContain("A KQU is one bounded knowledge retrieval request.");
     });
 
     it("is caught on a storage quantity in GB outside the two places (failure path, WO-CAT-2 N5)", () => {
       const overage = '<h3 id="pricing-overage-title">x</h3><table><tr><td>Storage</td><td>$0.20 / GB-month</td><td>Request access</td></tr></table>';
-      const misplaced = misplacedTerms(`<table><tr><th>Storage included, GB</th><td>50</td></tr></table>${overage}`);
+      const misplaced = misplacedTerms(`<table><tr><th>Storage included, GB</th><td>50</td></tr></table>${overage}`, NOT_SOLD_METERS);
       expect(misplaced).toHaveLength(1);
       expect(misplaced[0]).toMatch(/^STORAGE_RETENTION "GB": Storage included, GB 50 /);
       // The rate in its Request access row stays allowed, and "rgba" is not a GB.
-      expect(misplacedTerms(`<p style="color: rgba(0,0,0,1)">x</p>${overage}`)).toEqual([]);
+      expect(misplacedTerms(`<p style="color: rgba(0,0,0,1)">x</p>${overage}`, NOT_SOLD_METERS)).toEqual([]);
     });
   });
 });

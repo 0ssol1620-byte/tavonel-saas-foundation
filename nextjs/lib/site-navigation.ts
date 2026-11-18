@@ -245,9 +245,11 @@ export const KO_CHROME = {
     D-12, delegated decision 2026-11-09: the literal Korean of the switch-on sentence, staged per
     review PR201-R1 B3. Every syllable is inside the KO Home font subset (landing-v2-page.test.ts).
     ADR 0008, 2026-11-09: no longer staged; it names what opens a workspace, as the English does.
+    WO-REL-1: the plan sentence names no plan and points at /pricing, as the English does; every syllable is
+    still inside the KO Home subset.
   */
   customerDataGate:
-    "로그인하면 워크스페이스가 만들어지고, 처리 약관에 동의하면 내 원문 업로드와 컴파일이 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 Starter 요금제를 바로 구매할 수 있고, Pro와 Enterprise는 저희와 함께 정합니다.",
+    "로그인하면 워크스페이스가 만들어지고, 처리 약관에 동의하면 내 원문 업로드와 컴파일이 열립니다. 내 워크스페이스의 열림 상태는 워크스페이스 화면에 표시됩니다. 열린 뒤에는 요금제마다 바로 구매할 수 있는지, 저희와 함께 정하는지 요금제 페이지에 표시됩니다.",
 } as const;
 
 /**

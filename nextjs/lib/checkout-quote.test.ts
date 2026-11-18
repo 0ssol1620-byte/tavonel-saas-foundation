@@ -4,19 +4,20 @@ const { intent, binding, offers, delivered } = vi.hoisted(() => ({
   intent: vi.fn(),
   binding: vi.fn(),
   offers: { current: new Map<import("./billing-catalog").BillingOfferCode, unknown>() },
-  delivered: { all: true },
+  delivered: { all: true, release: false },
 }));
 
 vi.mock("@/lib/account-grants", () => ({ getFoundationAccountGrant: async () => ({ ok: true, grant: null }) }));
 vi.mock("@/lib/billing-binding", () => ({ createCheckoutBinding: binding }));
-// The test seam: "every capability delivered" is the one thing a test may change about the catalog.
+// The test seam: what is delivered (every capability, the release's own DELIVERED, or nothing) and which prices are configured.
 vi.mock("@/lib/billing-catalog", async (original) => {
   const catalog = await original<typeof import("./billing-catalog")>();
   return {
     ...catalog,
     readConfiguredBillingOffers: () => offers.current,
     planAvailability: (code: never) =>
-      catalog.planAvailability(code, offers.current, delivered.all ? new Set(Object.values(catalog.BILLING_OFFERS).flatMap((o) => o.requires)) : new Set()),
+      catalog.planAvailability(code, offers.current, delivered.release ? catalog.DELIVERED
+        : delivered.all ? new Set(Object.values(catalog.BILLING_OFFERS).flatMap((o) => o.requires)) : new Set()),
     readPaddleBrowserConfig: () => ({ environment: "sandbox", clientToken: `test_${"a".repeat(30)}` }),
   };
 });
@@ -123,7 +124,33 @@ describe("checkout route returns the quote", () => {
     binding.mockReturnValue({ tavonel_nonce: "nonce" });
     intent.mockResolvedValue({ ok: true });
     delivered.all = true;
+    delivered.release = false;
     offers.current = new Map(v2.map((code) => [code, configured(code)]));
+  });
+
+  /*
+    WO-REL-1, the release as it is (its own DELIVERED), in both price-env states and the half state between them.
+  */
+  it("with the release's line and both V22 prices: Personal and Developer quote, Team and Business are refused", async () => {
+    delivered.release = true;
+    offers.current = new Map((["personal", "developer"] as const).map((code) => [code, configured(code)]));
+    const statuses: Array<[string, number]> = [];
+    for (const code of v2) statuses.push([code, (await POST(request(code))).status]);
+    expect(statuses).toEqual([["personal", 200], ["developer", 200], ["team", 403], ["business", 403]]);
+  });
+
+  it("with the release's line and no V22 price, or only one, every plan is refused before an intent", async () => {
+    delivered.release = true;
+    for (const priced of [[], ["personal"], ["developer"]] as BillingOfferCode[][]) {
+      offers.current = new Map(priced.map((code) => [code, configured(code)]));
+      for (const code of v2) {
+        const response = await POST(request(code));
+        expect(response.status, `${code} with ${priced.join("+") || "none"}`).toBe(403);
+        await expect(response.json()).resolves.toEqual({ code: "BILLING_OFFER_CONTACT_REQUIRED" });
+      }
+    }
+    expect(binding).not.toHaveBeenCalled();
+    expect(intent).not.toHaveBeenCalled();
   });
 
   for (const code of v2) {

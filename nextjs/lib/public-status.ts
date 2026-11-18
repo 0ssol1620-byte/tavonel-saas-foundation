@@ -1,4 +1,5 @@
 import { activationPolicy } from "./activation-policy";
+import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "./billing-catalog";
 import { readCommercialState, type CommercialState } from "./commercial-state";
 import { readAccessMode, type AccessMode } from "./foundation-pilot";
 import { PUBLIC_STATUS_SCHEMA, type PublicStatusV2 } from "./public-status-contract";
@@ -16,6 +17,8 @@ type PublicStatusInputs = {
   accessMode: AccessMode;
   authReady: boolean;
   policy: PublicCapabilityPolicy;
+  /** At least one plan is `purchasable` (catalog v2: its line delivered and its sale priced whole). No default: the caller states it. */
+  planOnSale: boolean;
 };
 
 const CLOSED_REASON = "This action is not open today. Request a scoped pilot to continue.";
@@ -34,7 +37,12 @@ export function buildPublicStatusV2(inputs: PublicStatusInputs): PublicStatusV2 
     && inputs.policy.ocrGpu.enabled
     && inputs.policy.customerData.enabled;
   const selfServiceReady = inputs.authReady && inputs.accessMode === "self_service";
-  const purchaseReady = inputs.commercial.liveChargesEnabled && selfServiceReady && customerPathReady;
+  const gatesOpen = inputs.commercial.liveChargesEnabled && selfServiceReady && customerPathReady;
+  /*
+    WO-REL-1. Every gate open used to be enough for "A plan can be purchased", whatever the catalog said, so with no
+    V22 price set the deployment claimed a sale that checkout refuses. The claim now also needs a plan on sale.
+  */
+  const purchaseReady = gatesOpen && inputs.planOnSale;
 
   return {
     schemaVersion: PUBLIC_STATUS_SCHEMA,
@@ -71,7 +79,9 @@ export function buildPublicStatusV2(inputs: PublicStatusInputs): PublicStatusV2 
         href: purchaseReady ? "/pricing" : "/contact",
         reason: purchaseReady
           ? "A plan can be purchased for an available customer workflow."
-          : "Purchasing does not enable customer document processing today.",
+          : gatesOpen
+            ? "Plans are available through Request access."
+            : "Purchasing does not enable customer document processing today.",
       },
       compileCustomerDocuments: {
         enabled: customerPathReady,
@@ -99,5 +109,7 @@ export function readPublicStatusV2(
     accessMode: readAccessMode(env),
     authReady: supabaseUrl.startsWith("https://") && Boolean(supabaseAnon),
     policy: activationPolicy,
+    planOnSale: (Object.keys(BILLING_OFFERS) as BillingOfferCode[])
+      .some((code) => planAvailability(code, readConfiguredBillingOffers(env)) === "purchasable"),
   });
 }

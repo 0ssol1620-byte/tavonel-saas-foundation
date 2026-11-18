@@ -36,24 +36,25 @@ export const REVENUE_PATHS: readonly RevenuePath[] = [
   // through foundation_trial_policy and reserve_foundation_compute_v3 with billing source "trial".
   { family: "CORE_FREE", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [] },
   /*
-    Catalog v2 (PB-2026-11-V22). No v2 plan is purchasable until `DELIVERED` holds every capability on
-    its line (`planAvailability`), so these paths are `not_sold`; WO-CAT-7 flips them with the release
-    that proves the meters. They already name their ledger path, because the two retired offers settle
-    renewals through it today: they are never sold again, and an existing subscriber keeps both the
-    price and the `allowance` path until they change plan.
+    Catalog v2 (PB-2026-11-V22). WO-REL-1 (= WO-CAT-7) is the release that proves the meters: `DELIVERED` holds the
+    Personal and Developer line, so these families are sold self-serve -- in the release that carries them, once
+    its two prices are set. With them unset `planAvailability` sells nothing, whatever this table says, and
+    Team and Business stay Request access (their line is not delivered). The retired offers settle renewals
+    through the same `allowance` path: they are never sold again, and an existing subscriber keeps both the
+    price and the path until they change plan.
   */
   {
     family: "CORE_PERSONAL_TEAM_BUSINESS",
-    state: "not_sold",
+    state: "sold_self_serve",
     offerCodes: ["personal", "team", "business", "observer_access", "studio_access"],
     ledgerPath: "allowance", // every offer is kind "subscription"; paddle-billing-event emits action "allowance"
     terms: [],
   },
-  { family: "DEV", state: "not_sold", offerCodes: ["developer"], ledgerPath: "allowance", terms: [] },
+  { family: "DEV", state: "sold_self_serve", offerCodes: ["developer"], ledgerPath: "allowance", terms: [] },
   { family: "COMPILE_PCU", state: "sold_self_serve", offerCodes: [], ledgerPath: "compute_reservation", terms: [], meter: "pcu" },
-  { ...notSold("CONTEXT_KQU", "KQU"), meter: "kqu" },
-  // "GB", not only "GB-month": a storage quantity in GB (an allowance, a comparison row) names the meter as surely as its rate (WO-CAT-2 N5).
-  { ...notSold("STORAGE_RETENTION", "GB"), meter: "storageGb" },
+  // Counted and capped inside a plan's allowance (kqu_meter, storage_meter delivered); no overage is billed past it.
+  { family: "CONTEXT_KQU", state: "sold_self_serve", offerCodes: [], ledgerPath: "allowance", terms: [], meter: "kqu" },
+  { family: "STORAGE_RETENTION", state: "sold_self_serve", offerCodes: [], ledgerPath: "allowance", terms: [], meter: "storageGb" },
   notSold("STEWARD_SYNC", "Steward sync"),
   notSold("SKILL_RUN_LICENSE", "Verified Skill", "Skill run"),
   notSold("WORLD_FIRST_PARTY", "first-party World"),

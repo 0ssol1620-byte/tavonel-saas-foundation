@@ -27,8 +27,22 @@ export type Capability =
   | "pcu_accepted_meter" | "kqu_meter" | "storage_meter" | "seat_cap"
   | "per_member_source_scopes" | "org_policy_audit";
 
-/** Empty at catalog v2: no plan is purchasable online until the product delivers every item on its line. */
-export const DELIVERED: ReadonlySet<Capability> = new Set<Capability>([]);
+/*
+  WO-REL-1 (= WO-CAT-7): the four capabilities on the Personal and Developer line, each beside the tests that prove
+  the delivered behaviour. `billing-catalog.test.ts` pins this set to those proofs: a capability added here without
+  a proof file fails it. Team and Business also need `per_member_source_scopes` (and Business `org_policy_audit`),
+  which nothing delivers, so they stay Request access.
+*/
+export const DELIVERED: ReadonlySet<Capability> = new Set<Capability>([
+  // Pages settle as metered, a refunded or failed read gives its pages back: supabase/tests/foundation_page_meter.sql, lib/page-meter.test.ts (WO-D27-4).
+  "pcu_accepted_meter",
+  // Hold then settle per answer, 402 before retrieval at the allowance: supabase/tests/knowledge_query_units.sql, lib/kqu-meter.test.ts (WO-CAT-4, WO-CAT-8).
+  "kqu_meter",
+  // Stored bytes capped at intake admission: supabase/tests/workspace_storage_allowance.sql, lib/intake-admission.test.ts (WO-CAT-5, WO-CAT-8).
+  "storage_meter",
+  // Members plus pending invites capped on invite and accept: supabase/tests/workspace_seat_allowance.sql, lib/workspace-membership.test.ts (WO-CAT-6).
+  "seat_cap",
+]);
 
 /** V22 overage rates. Shown with "Request access": nothing bills past an allowance yet. Automation is absent on purpose (Autopilot is held). */
 export const METER_RATES_USD = { pcu: 0.04, kqu: 0.006, storageGbMonth: 0.2, seatMonth: 15 } as const;
@@ -270,30 +284,62 @@ export function readConfiguredBillingOffers(env: Environment = process.env) {
 
 export type PlanAvailability = "purchasable" | "request_access" | "retired";
 
-/** The one decision every surface reads: buy online only when the product delivers the whole line and its price is configured. */
+const lineDelivered = (code: BillingOfferCode, delivered: ReadonlySet<Capability>) =>
+  (BILLING_OFFERS[code].requires as readonly Capability[]).every((c) => delivered.has(c));
+
+/** The current offers whose whole line is delivered: they go on sale together, or none of them does. */
+const saleGroup = (delivered: ReadonlySet<Capability>) =>
+  (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).filter((code) => !isRetired(code) && lineDelivered(code, delivered));
+
+/**
+ * The one decision every surface reads: buy online only when the product delivers the whole line and the sale is
+ * configured whole. With DELIVERED as it is, that is Personal and Developer together: one of the two prices alone (or
+ * one that is not a usable `pri_` id, which `readConfiguredBillingOffers` drops) opens neither -- `catalogConfigured`
+ * reports it as a configuration error instead of a half-open sale.
+ */
 export function planAvailability(
   code: BillingOfferCode,
   configured: ReadonlyMap<BillingOfferCode, unknown> = readConfiguredBillingOffers(),
   delivered: ReadonlySet<Capability> = DELIVERED,
 ): PlanAvailability {
-  const offer = BILLING_OFFERS[code];
-  if (offer.status === "retired") return "retired";
-  return (offer.requires as readonly Capability[]).every((c) => delivered.has(c)) && configured.has(code)
+  if (isRetired(code)) return "retired";
+  return lineDelivered(code, delivered) && saleGroup(delivered).every((member) => configured.has(member))
     ? "purchasable"
     : "request_access";
 }
 
 /**
- * Readiness of the price configuration: every retired offer is configured (a missing legacy env is a
- * renewal incident), and so is every offer that would be purchasable. A v2 offer waiting for a
- * capability may have no price yet.
+ * What is wrong with the price configuration, by env name (empty = configured). A retired offer without its price is
+ * a renewal incident; a current offer's env that is set to something `readConfiguredBillingOffers` cannot use (not a
+ * `pri_` id, or shared with another offer) is an error, not "unset"; and the sale group is priced whole or not at
+ * all. Every current price unset is a closed sale, which is a valid configuration. Env names only, never a value.
  */
-export function catalogConfigured(
-  configured: ReadonlyMap<BillingOfferCode, unknown> = readConfiguredBillingOffers(),
+export function priceConfigurationProblems(
+  env: Environment = process.env,
   delivered: ReadonlySet<Capability> = DELIVERED,
-) {
-  return (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).every((code) =>
-    configured.has(code) || (!isRetired(code) && !(BILLING_OFFERS[code].requires as readonly Capability[]).every((c) => delivered.has(c))));
+): string[] {
+  const configured = readConfiguredBillingOffers(env);
+  const problems: string[] = [];
+  for (const code of Object.keys(BILLING_OFFERS) as BillingOfferCode[]) {
+    const { priceEnv } = BILLING_OFFERS[code];
+    if (configured.has(code)) continue;
+    if (isRetired(code)) problems.push(`${priceEnv}: missing, so a renewal of this retired plan cannot resolve`);
+    else if (env[priceEnv]?.trim()) problems.push(`${priceEnv}: set, but not a usable Paddle price id`);
+  }
+  const group = saleGroup(delivered);
+  const priced = group.filter((code) => configured.has(code));
+  if (priced.length > 0 && priced.length < group.length) {
+    const with_ = priced.map((code) => BILLING_OFFERS[code].priceEnv).join(", ");
+    for (const code of group.filter((member) => !configured.has(member))) {
+      problems.push(`${BILLING_OFFERS[code].priceEnv}: required with ${with_}; no plan is sold until the whole group is priced`);
+    }
+  }
+  return problems;
+}
+
+/** Readiness of the price configuration, as /api/status and /status report it: no problem above. */
+export function catalogConfigured(env: Environment = process.env, delivered: ReadonlySet<Capability> = DELIVERED) {
+  return priceConfigurationProblems(env, delivered).length === 0;
 }
 
 export function findOfferByPriceId(priceId: string, env: Environment = process.env) {

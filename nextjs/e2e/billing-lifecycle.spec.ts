@@ -58,6 +58,31 @@ test("an active subscription shows its state, its remaining pages and a working 
   await expect(card).not.toContainText("not read yet");
 });
 
+/*
+  WO-REL-1 (ledger L613 item 3). Opening the V22 sale is an env-only redeploy (PADDLE_PRICE_PERSONAL and
+  PADDLE_PRICE_DEVELOPER). This card reads only /api/billing/status, never a price env, so a legacy holder's renewal
+  reads the same in both states; this build has the prices unset, and the unit tests run both states
+  (lib/paddle-billing-event.test.ts, lib/status-route-contract.test.ts). What the card must never do in either: offer
+  a legacy holder a purchase, or name the retired 2026-11-10 plan names.
+*/
+test("a legacy holder's renewal card offers no purchase and names no retired plan name", async ({ page }) => {
+  const card = await openBilling(page, account({
+    accessPlan: "observer_access",
+    subscriptionStatus: "active",
+    creditBalance: 2_000,
+    lifetimeCreditsPurchased: 2_000,
+    paddleCustomerId: "ctm_fixture_legacy",
+    updatedAt: "2026-11-01T00:00:00Z",
+  }));
+
+  await expect(card.getByRole("heading", { name: BILLING_OFFERS.observer_access.label, exact: true })).toBeVisible();
+  await expect(card.locator(":scope > dl")).toContainText("active");
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
+  await expect(card.getByRole("link", { name: /^Buy / })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: /^Buy / })).toHaveCount(0);
+  await expect(card).not.toContainText(/\bStarter\b|\bPro plan\b|can be bought/);
+});
+
 test("a past-due account keeps the hold visible as an alert, not a colour", async ({ page }) => {
   const card = await openBilling(page, account({
     accessPlan: "observer_access",
