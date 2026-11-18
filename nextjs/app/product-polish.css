@@ -328,9 +328,10 @@
   BQ-102. The error catalogue's filter. It sits directly above its table, so the two read as one
   block rather than as a stray input on a documentation page.
 */
-.docs-table-filter { display: grid; gap: 6px; margin: 24px 0 12px; max-width: 30rem; }
+.docs-table-filter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 24px 0 12px; max-width: 30rem; }
 .docs-table-filter label { font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--text-mid); }
 .docs-table-filter input {
+  min-width: 0; /* its intrinsic width set the grid track: 335 px on a 320 px page with the CI fonts (WO-CI-41) */
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--hairline-hi);

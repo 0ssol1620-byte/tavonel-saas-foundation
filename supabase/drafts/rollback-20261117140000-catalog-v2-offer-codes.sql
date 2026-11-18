@@ -45,7 +45,8 @@ begin
     raise exception 'rollback_20261117140000_refused: % rows hold a v2 offer code', v_rows;
   end if;
 
-  select md5(string_agg(md5(pg_get_functiondef(f::regprocedure)), ',' order by f))
+  -- collate "C": the expected digest was taken in byte order; a database collation that sorts "_" before "(" (en_US.UTF-8) reorders the five names.
+  select md5(string_agg(md5(pg_get_functiondef(f::regprocedure)), ',' order by f collate "C"))
     into v_md5
     from unnest(array[
       'public.apply_foundation_billing_event(text,text,timestamptz,text,text,text,uuid,text,text,text,text,text,integer,text)',
