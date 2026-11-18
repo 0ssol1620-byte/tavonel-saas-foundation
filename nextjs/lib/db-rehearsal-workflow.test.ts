@@ -1,9 +1,28 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+
+/*
+  Awaited, never spawnSync (WO-CI-38): the gate tests below run a Node child each, back to back, and
+  synchronous children chained across them held this worker's event loop for up to 67.4 s on this
+  machine -- past vitest's 60 s worker RPC window, so the run exited 1 on `[vitest-worker]: Timeout
+  calling "onTaskUpdate"` with every test green. Same result fields as spawnSync; a child that cannot
+  start rejects instead of reading as a non-zero status.
+*/
+function spawnChild(file: string, args: string[], options: { cwd?: string; env: NodeJS.ProcessEnv }): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+  });
+}
 
 // Windows checkouts may carry CRLF (autocrlf); the repository stores LF.
 const workflow = readFileSync("../.github/workflows/db-rehearsal.yml", "utf8").replace(/\r\n/g, "\n");
@@ -148,7 +167,7 @@ describe("db-rehearsal native World SQL acceptance", () => {
 
   type Row = {kind:string;source:string;path:string;sha256:string;copySha256:string;version:string};
   type Stage = {schemaVersion:number;state:string;requestedHead:string;checkoutHead:string;prerequisiteStageSha256:string;prerequisiteVersion:string;records:Row[]};
-  function runGate(overrides:Record<string,string|undefined>={},mutate?:(root:string,stage:Stage)=>void) {
+  async function runGate(overrides:Record<string,string|undefined>={},mutate?:(root:string,stage:Stage)=>void) {
     const tempRoot=realpathSync(tmpdir()),temp=realpathSync(mkdtempSync(join(tempRoot,"native-world-sql-gate-")));
     if (dirname(temp)!==tempRoot || !basename(temp).startsWith("native-world-sql-gate-")) throw Error("Fixture cleanup path escaped temporary root");
     try {
@@ -174,14 +193,14 @@ describe("db-rehearsal native World SQL acceptance", () => {
       const env:NodeJS.ProcessEnv={...process.env,WORLD_STAGE_RESULT:"success",WORLD_STATE:"ephemeral",WORLD_PREREQUISITE_RESULT:"success",
         FIRST_PGTAP_RESULT:"success",SECOND_PGTAP_RESULT:"success",WORLD_REQUESTED_HEAD:head,WORLD_CHECKOUT_HEAD:head,...overrides};
       for(const [key,value] of Object.entries(overrides)) if(value===undefined) delete env[key];
-      const run=spawnSync(process.execPath,["--input-type=module","-e",gateCode],{cwd:temp,env,encoding:"utf8"});
+      const run=await spawnChild(process.execPath,["--input-type=module","-e",gateCode],{cwd:temp,env});
       const receipt=JSON.parse(readFileSync(join(temp,"native-world-sql-rehearsal-receipt.json"),"utf8"));
       return {run,receipt};
     } finally {rmSync(temp,{recursive:true,force:true});}
   }
 
-  it("accepts exact copies with simulated successful outcomes while leaving qualification and races pending",()=>{
-    const {run,receipt}=runGate();expect(run.status,run.stderr).toBe(0);
+  it("accepts exact copies with simulated successful outcomes while leaving qualification and races pending",async ()=>{
+    const {run,receipt}=await runGate();expect(run.status,run.stderr).toBe(0);
     expect(receipt.gate).toBe("passed-native-world-unit-sql-only");expect(receipt.records).toHaveLength(2);
     expect(receipt.fullQualification).toBe("pending");expect(receipt.realConcurrency).toBe("UNRUN");
     expect(receipt.reservationExpiryCrossSession).toBe("UNRUN");
@@ -197,8 +216,8 @@ describe("db-rehearsal native World SQL acceptance", () => {
     ["skipped prerequisite",{WORLD_PREREQUISITE_RESULT:"skipped"}], ["failed first pass",{FIRST_PGTAP_RESULT:"failure"}],
     ["skipped first pass",{FIRST_PGTAP_RESULT:"skipped"}], ["cancelled second pass",{SECOND_PGTAP_RESULT:"cancelled"}],
     ["missing second pass",{SECOND_PGTAP_RESULT:undefined}], ["wrong checkout",{WORLD_CHECKOUT_HEAD:"b".repeat(40)}],
-  ])("rejects %s and records both fixture groups as unaccepted",(_label,overrides)=>{
-    const {run,receipt}=runGate(overrides);expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");
+  ])("rejects %s and records both fixture groups as unaccepted",async (_label,overrides)=>{
+    const {run,receipt}=await runGate(overrides);expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");
     expect(receipt.publicClosedGateEvidence.status).toBe("unaccepted");expect(receipt.privateVerifierDoubleEvidence.status).toBe("unaccepted");
   });
 
@@ -216,8 +235,8 @@ describe("db-rehearsal native World SQL acceptance", () => {
     ["undiscoverable test",(_root:string,stage:Stage)=>{stage.records[1].path="supabase/drafts/not-discovered.sql";}],
     ["unaccepted prerequisite",(root:string)=>writeFileSync(join(root,"native-sql-rehearsal-receipt.json"),JSON.stringify({gate:"failed"}))],
     ["mutated prerequisite",(root:string)=>writeFileSync(join(root,".native-sql-rehearsal-stage.json"),"{}")],
-  ])("rejects %s despite simulated successful step outcomes",(_label,mutate)=>{
-    const {run,receipt}=runGate({},mutate);expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");expect(receipt.failures.length).toBeGreaterThan(0);
+  ])("rejects %s despite simulated successful step outcomes",async (_label,mutate)=>{
+    const {run,receipt}=await runGate({},mutate);expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");expect(receipt.failures.length).toBeGreaterThan(0);
   });
 });
 
@@ -259,11 +278,11 @@ describe("db-rehearsal model-provider spend proof", () => {
     ["no marker", undefined],
     ["a malformed marker", "tavonel-disposable-not-a-uuid"],
     ["a marker with SQL in it", "tavonel-disposable-00000000-0000-0000-0000-000000000000' or true --"],
-  ])("refuses to start with %s, before any database connection", (_label, marker) => {
+  ])("refuses to start with %s, before any database connection", async (_label, marker) => {
     const env: NodeJS.ProcessEnv = { ...process.env, MODEL_PROVIDER_SPEND_RACE_TEST: "1", PGPORT: "54322", PGPASSWORD: "postgres" };
     delete env.MODEL_PROVIDER_SPEND_RACE_MARKER;
     if (marker !== undefined) env.MODEL_PROVIDER_SPEND_RACE_MARKER = marker;
-    const result = spawnSync(process.execPath, ["scripts/db/model-provider-spend-race.mjs"], { env, encoding: "utf8" });
+    const result = await spawnChild(process.execPath, ["scripts/db/model-provider-spend-race.mjs"], { env });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("MODEL_PROVIDER_SPEND_RACE_MARKER from the CI fresh-stack step is required");
     expect(result.stdout).not.toContain("PASS");
@@ -343,7 +362,7 @@ describe("db-rehearsal exact native SQL acceptance", () => {
 
   type RecordRow = {kind: string; source: string; path: string; sha256: string; version: string};
   type Stage = {schemaVersion: number; state: string; requestedHead: string; checkoutHead: string; records: RecordRow[]};
-  function runGate(overrides: Record<string,string|undefined> = {}, mutate?: (root: string, stage: Stage) => void) {
+  async function runGate(overrides: Record<string,string|undefined> = {}, mutate?: (root: string, stage: Stage) => void) {
     const tempRoot = realpathSync(tmpdir());
     const temp = realpathSync(mkdtempSync(join(tempRoot, "native-sql-gate-")));
     if (dirname(temp) !== tempRoot || !basename(temp).startsWith("native-sql-gate-"))
@@ -367,14 +386,14 @@ describe("db-rehearsal exact native SQL acceptance", () => {
         FIRST_PGTAP_RESULT:"success",SECOND_PGTAP_RESULT:"success",NATIVE_REQUESTED_HEAD:"a".repeat(40),
         NATIVE_CHECKOUT_HEAD:"b".repeat(40),...overrides};
       for (const [key,value] of Object.entries(overrides)) if (value === undefined) delete env[key];
-      const run = spawnSync(process.execPath,["--input-type=module","-e",gateCode],{cwd:temp,env,encoding:"utf8"});
+      const run = await spawnChild(process.execPath,["--input-type=module","-e",gateCode],{cwd:temp,env});
       const receipt = JSON.parse(readFileSync(join(temp,"native-sql-rehearsal-receipt.json"),"utf8"));
       return {run,receipt};
     } finally { rmSync(temp,{recursive:true,force:true}); }
   }
 
-  it("accepts two successful step outcomes and exact copies without claiming runtime authority or concurrency", () => {
-    const {run,receipt} = runGate();
+  it("accepts two successful step outcomes and exact copies without claiming runtime authority or concurrency", async () => {
+    const {run,receipt} = await runGate();
     expect(run.status,run.stderr).toBe(0);
     expect(receipt.gate).toBe("passed-native-sql-only");
     expect(receipt.fullQualification).toBe("pending");
@@ -384,14 +403,14 @@ describe("db-rehearsal exact native SQL acceptance", () => {
     expect(receipt.checkoutHead).not.toBe(receipt.requestedHead);
   });
 
-  it("requires the exact requested checkout for an admitted native scope", () => {
-    const {run,receipt}=runGate({NATIVE_SCOPE_REQUIRED:"true"});
+  it("requires the exact requested checkout for an admitted native scope", async () => {
+    const {run,receipt}=await runGate({NATIVE_SCOPE_REQUIRED:"true"});
     expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");
     expect(receipt.failures.join(" ")).toContain("exact requested head");
   });
 
-  it("accepts required native scope only with matching head and both passes", () => {
-    const {run,receipt}=runGate({NATIVE_SCOPE_REQUIRED:"true",NATIVE_CHECKOUT_HEAD:"a".repeat(40)},(_root,stage)=>{stage.checkoutHead="a".repeat(40);});
+  it("accepts required native scope only with matching head and both passes", async () => {
+    const {run,receipt}=await runGate({NATIVE_SCOPE_REQUIRED:"true",NATIVE_CHECKOUT_HEAD:"a".repeat(40)},(_root,stage)=>{stage.checkoutHead="a".repeat(40);});
     expect(run.status,run.stderr).toBe(0);expect(receipt.gate).toBe("passed-native-sql-only");
     expect(receipt.checkoutHead).toBe(receipt.requestedHead);expect(receipt.fullQualification).toBe("pending");
   });
@@ -404,8 +423,8 @@ describe("db-rehearsal exact native SQL acceptance", () => {
     ["failed first pass",{FIRST_PGTAP_RESULT:"failure"}],
     ["cancelled second pass",{SECOND_PGTAP_RESULT:"cancelled"}],
     ["missing second pass",{SECOND_PGTAP_RESULT:undefined}],
-  ])("rejects %s and retains separate unaccepted fixture evidence",(_label,overrides) => {
-    const {run,receipt} = runGate(overrides);
+  ])("rejects %s and retains separate unaccepted fixture evidence",async (_label,overrides) => {
+    const {run,receipt} = await runGate(overrides);
     expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");
     expect(receipt.privatePositiveFixtureEvidence.status).toBe("unaccepted");
     expect(receipt.publicClosedGateEvidence.status).toBe("unaccepted");
@@ -418,8 +437,8 @@ describe("db-rehearsal exact native SQL acceptance", () => {
     ["wrong requested head",(_temp:string,stage:Stage) => {stage.requestedHead="c".repeat(40);}],
     ["undiscoverable fixture",(_temp:string,stage:Stage) => {stage.records[6].path="supabase/drafts/not-discovered.sql";}],
     ["unordered migration",(_temp:string,stage:Stage) => {stage.records[1].version=stage.records[0].version;}],
-  ])("rejects %s despite two successful outcomes",(_label,mutate) => {
-    const {run,receipt} = runGate({},mutate);
+  ])("rejects %s despite two successful outcomes",async (_label,mutate) => {
+    const {run,receipt} = await runGate({},mutate);
     expect(run.status).not.toBe(0);expect(receipt.gate).toBe("failed");
     expect(receipt.failures.length).toBeGreaterThan(0);
   });
