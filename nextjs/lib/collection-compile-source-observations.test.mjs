@@ -144,20 +144,35 @@ test("SYNTHETIC: unavailable existing audit prevents publication and is not coun
   assert.equal(f.audit[0].details.sourceProcessingObservations.coverage.status, "incomplete");
 });
 
-test("SYNTHETIC: real public route forwards authenticated principal instead of request body identity", async () => {
+async function postRoute(extraBody) {
   let args;
   const route = load("app/api/collections/compile/route.ts", {
     "next/server": { NextResponse: { json: (value, options) => ({ value, options }) } },
     "@/lib/collection-compile-run": { runCollectionCompile: async (...values) => { args = values; return { ok: false, code: "TEST_STOP", status: 503, payload: {} }; } },
     "@/lib/compile-limits": { judgeCompileSet: () => ({ ok: true }) },
     "@/lib/developer-auth": { authorizeFoundationRequest: async () => ({ ok: true, principal: { workspaceKey: WS, userId: USER, accessSource: "owner_grant" } }) },
-    "@/lib/enterprise-http": { readBoundedJson: async () => ({ ok: true, value: { documentIds: [DOC], userId: "forged", observationPrincipal: { userId: "forged" } } }) },
+    "@/lib/enterprise-http": { readBoundedJson: async () => ({ ok: true, value: { documentIds: [DOC], userId: "forged", observationPrincipal: { userId: "forged" }, ...extraBody } }) },
     "@/lib/funnel-events": { recordServerFunnel: () => {} },
     "@/lib/immutable-keys": { DOCUMENT_ID_PATTERN: /^[0-9a-f-]{36}$/ },
     "@/lib/compute-reservation": { assertFoundationIntakeCompileSet: async () => ({ ok: true }) },
+    "@/lib/core-blueprint-choice": load("lib/core-blueprint-choice.ts", {}),
   });
-  await route.POST({ headers: new Map() });
+  const response = await route.POST({ headers: new Map() });
+  return { args, response };
+}
+
+test("SYNTHETIC: real public route forwards authenticated principal instead of request body identity", async () => {
+  const { args } = await postRoute({});
   assert.deepEqual(plain(args[4]), { userId: USER, provenance: "authenticated_request" });
+  assert.equal(args[6], undefined);
+});
+
+test("SYNTHETIC: real public route forwards a supported blueprint and refuses an unknown one without compiling", async () => {
+  assert.equal((await postRoute({ blueprint: "legal-contracts" })).args[6], "legal-contracts");
+  assert.equal((await postRoute({ blueprint: "generic" })).args[6], undefined);
+  const refused = await postRoute({ blueprint: "creative-works" });
+  assert.equal(refused.args, undefined);
+  assert.equal(refused.response.value.code, "BLUEPRINT_UNSUPPORTED");
 });
 
 test("SYNTHETIC: real durable worker forwards its stored job principal and exact job identity", async () => {
