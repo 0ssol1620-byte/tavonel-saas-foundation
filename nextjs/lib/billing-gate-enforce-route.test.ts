@@ -65,15 +65,17 @@ describe("internal billing gate enforcement route", () => {
     It runs with the same inputs and answers the same with the sale closed, open, or half-configured.
   */
   it("runs the same with the V22 sale closed, open or half-configured", async () => {
-    const states = [
+    const states = ([
       {},
       { PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` },
       { PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}` },
-    ];
+    // WO-REL-5: and in every page-meter cohort state.
+    ] as Record<string, string>[]).flatMap((state) => [state, ...["pilot-canary01", "*", " *"].map((cohort) => ({ ...state, TAVONEL_PAGE_METER_COHORT: cohort }))]);
     const outcomes: unknown[] = [];
     for (const state of states) {
       vi.stubEnv("PADDLE_PRICE_PERSONAL", "");
       vi.stubEnv("PADDLE_PRICE_DEVELOPER", "");
+      vi.stubEnv("TAVONEL_PAGE_METER_COHORT", "");
       for (const [name, value] of Object.entries(state)) vi.stubEnv(name, value);
       const response = await call();
       outcomes.push([response.status, await response.json()]);

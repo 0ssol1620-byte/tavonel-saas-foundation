@@ -1,5 +1,5 @@
 import { activationPolicy } from "./activation-policy";
-import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, deliveredForSale, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "./billing-catalog";
 import { readCommercialState, type CommercialState } from "./commercial-state";
 import { readAccessMode, type AccessMode } from "./foundation-pilot";
 import { PUBLIC_STATUS_SCHEMA, type PublicStatusV2 } from "./public-status-contract";
@@ -110,6 +110,6 @@ export function readPublicStatusV2(
     authReady: supabaseUrl.startsWith("https://") && Boolean(supabaseAnon),
     policy: activationPolicy,
     planOnSale: (Object.keys(BILLING_OFFERS) as BillingOfferCode[])
-      .some((code) => planAvailability(code, readConfiguredBillingOffers(env)) === "purchasable"),
+      .some((code) => planAvailability(code, readConfiguredBillingOffers(env), deliveredForSale(env)) === "purchasable"),
   });
 }

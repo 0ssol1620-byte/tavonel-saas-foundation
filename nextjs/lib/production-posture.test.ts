@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { CAPABILITY_MANIFEST } from "../../shared/capabilityManifest";
 import { activationPolicy } from "./activation-policy";
-import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, deliveredForSale, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "./billing-catalog";
 import { qualifiedBenchmarkRecords } from "./benchmark-registry";
 import registry from "./benchmark-registry.records.json";
 
@@ -71,11 +71,14 @@ describe("production posture @ 4c80bb30", () => {
     const env = Object.fromEntries(codes.map((code, index) => [BILLING_OFFERS[code].priceEnv, `pri_${String(index).repeat(26)}`]));
     const configured = readConfiguredBillingOffers(env);
     expect(configured.size, "every plan has a price").toBe(codes.length);
-    expect(codes.filter((code) => planAvailability(code, configured) === "purchasable")).toEqual(["personal", "developer"]);
-    expect(codes.filter((code) => planAvailability(code, configured) === "retired")).toEqual(["observer_access", "studio_access"]);
+    // WO-REL-5: with the page meter on for every workspace (`*`); with it on for a canary list only, nothing is sold.
+    const metered = deliveredForSale({ TAVONEL_PAGE_METER_COHORT: "*" });
+    expect(codes.filter((code) => planAvailability(code, configured, metered) === "purchasable")).toEqual(["personal", "developer"]);
+    expect(codes.filter((code) => planAvailability(code, configured, metered) === "retired")).toEqual(["observer_access", "studio_access"]);
+    expect(codes.filter((code) => planAvailability(code, configured, deliveredForSale({ TAVONEL_PAGE_METER_COHORT: "pilot-canary01" })) === "purchasable")).toEqual([]);
     // Build 1 of the release: the two V22 prices unset, nothing is sold.
     const closed = readConfiguredBillingOffers({ PADDLE_PRICE_OBSERVER_ACCESS: env.PADDLE_PRICE_OBSERVER_ACCESS!, PADDLE_PRICE_STUDIO_ACCESS: env.PADDLE_PRICE_STUDIO_ACCESS! });
-    expect(codes.filter((code) => planAvailability(code, closed) === "purchasable")).toEqual([]);
+    expect(codes.filter((code) => planAvailability(code, closed, metered) === "purchasable")).toEqual([]);
   });
 
   it("keeps every shipped manifest row's status and known limitations", () => {

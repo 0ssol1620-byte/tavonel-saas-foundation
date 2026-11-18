@@ -238,6 +238,8 @@ describe("status reports a pasted key as billing not configured", () => {
       // WO-REL-1: "live_checkout_ready" now also needs a plan on sale, the two V22 prices.
       PADDLE_PRICE_PERSONAL: `pri_${"c".repeat(26)}`,
       PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}`,
+      // WO-REL-5: and the page meter on for every workspace.
+      TAVONEL_PAGE_METER_COHORT: "*",
     })) vi.stubEnv(name, value);
   });
 

@@ -876,3 +876,12 @@ returned. Releases always stay on v3. A refund on a failed compile (`reverse_fou
 reverses only rows v4 settled (`charge_basis` not null) and reverses what that row was charged, whatever the cohort
 says when the compile fails; a read settled on v3 is not reversed, as before the meter.
 Like every Vercel variable, a change takes effect when a new deployment becomes production.
+
+**The sale waits for `*` (WO-REL-5, lead ruling 2026-11-18).** The order is canary (a list, sale closed) → rollout (`*`)
+→ sale (`PADDLE_PRICE_PERSONAL` and `PADDLE_PRICE_DEVELOPER`). `planAvailability` in `nextjs/lib/billing-catalog.ts`
+counts the page meter as delivered for the sale only when this variable is exactly `*` (`deliveredForSale()`); unset,
+a list or an invalid value keeps every plan at Request access exactly as with the prices unset — `/pricing`, `/login`,
+checkout, `/api/status/v2` `purchasePlan`. Prices set while it is not `*` are a configuration error: `/api/status`
+`billing` reads `live_incomplete` (or `sandbox_incomplete`), `/status` shows billing not configured, and each status
+read logs `catalog_sale_held_page_meter` with code `PAGE_METER_NOT_ALL_SALE_HELD` (env name only, never the value).
+A legacy subscriber’s renewal resolves by price id and is the same in every state.

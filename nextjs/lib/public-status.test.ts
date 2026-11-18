@@ -154,7 +154,8 @@ describe("purchasePlan follows the catalog's planAvailability, in both price-env
     NEXT_PUBLIC_SUPABASE_URL: "https://tenant.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-anon-key", VERCEL_ENV: "production",
     PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"a".repeat(26)}`, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"b".repeat(26)}`,
   };
-  const V22 = { PADDLE_PRICE_PERSONAL: `pri_${"c".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` };
+  // WO-REL-5: the open sale is the two prices with the page meter on for every workspace.
+  const V22 = { PADDLE_PRICE_PERSONAL: `pri_${"c".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}`, TAVONEL_PAGE_METER_COHORT: "*" };
 
   it("is closed, and says plans are requested, with every gate open and both V22 prices unset", () => {
     const action = readPublicStatusV2(LAUNCHED, NOW).availableActions.purchasePlan;
@@ -173,6 +174,16 @@ describe("purchasePlan follows the catalog's planAvailability, in both price-env
       { ...LAUNCHED, PADDLE_PRICE_DEVELOPER: V22.PADDLE_PRICE_DEVELOPER },
       { ...LAUNCHED, ...V22, PADDLE_PRICE_DEVELOPER: "pri_not_a_price" },
     ]) expect(readPublicStatusV2(env, NOW).availableActions.purchasePlan.enabled).toBe(false);
+  });
+
+  it("WO-REL-5: stays closed, and says plans are requested, with both prices set while the page meter is not on for everyone", () => {
+    for (const cohort of [undefined, "", "pilot-canary01", "pilot-canary01,pilot-canary02", " *", "*,pilot-canary01", "all"]) {
+      const env: Record<string, string> = { ...LAUNCHED, ...V22 };
+      if (cohort === undefined) delete env.TAVONEL_PAGE_METER_COHORT; else env.TAVONEL_PAGE_METER_COHORT = cohort;
+      const action = readPublicStatusV2(env, NOW).availableActions.purchasePlan;
+      expect(action, JSON.stringify(cohort)).toEqual({ enabled: false, href: "/contact", reason: "Plans are available through Request access." });
+      expect(JSON.stringify(readPublicStatusV2(env, NOW)), JSON.stringify(cohort)).not.toMatch(/pilot-canary|PAGE_METER/);
+    }
   });
 
   it("a plan on sale never opens purchase past a closed gate", () => {
