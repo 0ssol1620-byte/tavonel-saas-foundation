@@ -8576,6 +8576,7 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-in-sentence-guard', 4, '0016458fb1e67a3e', 5, '048903ee5ea32aa4', ['e2e/mobile-landing.spec.ts', 'e2e/p4-followups.spec.ts'], {}],
   ['v34-frame', 3, '3d16097bbf3b034b', 2, '22f3cd846a30de7c', ['e2e/docs-reading-layout.spec.ts'], {}],
   ['v34-shell-client-weight', 2, '601b907f0fb5b3b8', 2, 'c5dc2177d17f842a', [], {}],
+  ['source-availability', 5, 'f4a2bee82d192af7', 4, 'a51c2808fd4904e3', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };

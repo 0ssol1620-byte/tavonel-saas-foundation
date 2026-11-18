@@ -3439,6 +3439,15 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
+  // source-availability (WO-REL-4): which sources a workspace is offered. configuredOAuthProviders() is the one server-side fact
+  // the /api/v1/oauth-connectors route, the /connect cards and the workspace source tiles read; its own suite, the tile render
+  // suite, the /connect render suite and the copy pins exercise them.
+  'source-availability': Object.freeze({
+    paths: Object.freeze(['app/api/v1/oauth-connectors/route.ts', 'components/workspace/source-choices.tsx', 'lib/connector-oauth-secrets.test.ts', 'lib/connector-oauth-secrets.ts', 'lib/workspace-source-choices.test.ts']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/connector-oauth-secrets.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/workspace-source-choices.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.
