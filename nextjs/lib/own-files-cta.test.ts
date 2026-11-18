@@ -38,7 +38,8 @@ describe("the 'Run this on your own files' block", () => {
 
   /*
     The real path: OwnFilesCta reads the deployment's action and Personal's availability when it renders. The live
-    commerce env is the one revenue-paths.test.ts uses for build 2; only the two V22 prices differ between the renders.
+    commerce env is the one revenue-paths.test.ts uses for build 2 (page meter on for every workspace, which the sale
+    requires since WO-REL-5); only the two V22 prices differ between the renders.
   */
   it("states the Personal price on a live deployment only once the two V22 prices are set", async () => {
     const render = async (prices: boolean) => {
@@ -46,7 +47,7 @@ describe("the 'Run this on your own files' block", () => {
       vi.resetModules();
       for (const [name, value] of Object.entries({
         VERCEL_ENV: "production", COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", ACCESS_MODE: "self_service",
-        PADDLE_SANDBOX: "false", NEXT_PUBLIC_SUPABASE_URL: "https://own-files.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "own-files-anon",
+        PADDLE_SANDBOX: "false", TAVONEL_PAGE_METER_COHORT: "*", NEXT_PUBLIC_SUPABASE_URL: "https://own-files.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "own-files-anon",
         PADDLE_PRICE_PERSONAL: prices ? `pri_${"c".repeat(26)}` : "",
         PADDLE_PRICE_DEVELOPER: prices ? `pri_${"d".repeat(26)}` : "",
       })) vi.stubEnv(name, value);

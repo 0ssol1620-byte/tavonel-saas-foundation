@@ -155,7 +155,8 @@ describe("revenue paths", () => {
       for (const cohort of [undefined, "pilot-canary01", " *"]) {
         const html = await pricingHtml({ saleOpen: true, cohort });
         expect(text(html), JSON.stringify(cohort)).not.toMatch(/\bBuy\b/);
-        expect(allowedRanges(html), JSON.stringify(cohort)).toHaveLength(8);
+        // Four plan cards and the two overage rows (PCU, KQU) WO-REL-4 kept: 4 + 2 places.
+        expect(allowedRanges(html), JSON.stringify(cohort)).toHaveLength(6);
         expect(html, JSON.stringify(cohort)).not.toContain("pilot-canary");
         vi.unstubAllEnvs();
       }
