@@ -250,6 +250,31 @@ describe("app/landing-v2.css", () => {
   });
 });
 
+/*
+  WO-CI-16b (2026-11-18): the first paint of every route waited for `landing-v2.css` and
+  `one-path.css`, imported by the root layout. Measured on the Lighthouse-job build (receipt
+  `receipts/WO-CI-16b/`): no rule of either matches an element on /, /explore, /privacy,
+  /pricing, /security, /platform, /compiler or /login at 390 or 1440. Each is imported by what
+  renders its classes instead: `.lv2` (and `:lang(ko)`'s Korean landing) is LandingPage's root,
+  `.compile-film-*` is CompileStagePlayer's, `.one-path-ai-*` / `.one-path-more` are the
+  workspace shell's. A sheet that returns to the root layout puts a render-blocking request back
+  on every route; a user that loses its import renders unstyled.
+*/
+describe("route-scoped global sheets", () => {
+  const code = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  it("the root layout imports neither landing-v2.css nor one-path.css", () => {
+    expect(code("app/layout.tsx")).not.toMatch(/import\s+["'][^"']*(landing-v2|one-path)\.css["']/);
+  });
+  it.each([
+    ["components/landing-v2/landing-page.tsx", ["@/app/one-path.css", "@/app/landing-v2.css"]],
+    ["components/compile-stage-player.tsx", ["@/app/one-path.css"]],
+    ["app/workspace/layout.tsx", ["@/app/one-path.css"]],
+  ])("%s imports the sheets that style its classes, ahead of every other import", (path, sheets) => {
+    const imports = [...code(path).matchAll(/^import\s+(?:[^"';]+\s+from\s+)?["']([^"']+)["'];?$/gm)].map((match) => match[1]);
+    expect(imports.slice(0, sheets.length)).toEqual(sheets);
+  });
+});
+
 describe("app/layout.tsx fonts", () => {
   /*
     FOLLOW-UPS review NB-6 (2026-10-19). Plex is display: optional, so a first visit usually paints the next face in
