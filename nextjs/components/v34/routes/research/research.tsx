@@ -11,7 +11,7 @@ import { Section } from "@/components/v34/ui/section";
 import { Tag } from "@/components/v34/ui/tag";
 import { PUBLIC_CORPUS_STATS, readPublicCorpus } from "@/lib/v34/public-corpus";
 import { v34Route } from "@/lib/v34/routes";
-import { BRIDGE, FINAL, HERO, PROGRAM, RECORD, STATES, STEPS, THREAD } from "./research-content";
+import { BRIDGE, FINAL, HERO, MEASURED, PROGRAM, RECORD, STATES, STEPS, THREAD } from "./research-content";
 import { readResearchThread, statusLabel, type ThreadSource } from "./research-data";
 import { ResearchArt, ThreadArt } from "./research-art";
 import s from "./research.module.css";
@@ -98,6 +98,8 @@ export function ResearchBody() {
             </li>
           ))}
         </ol>
+        <p className={s.measured}>{MEASURED.text}</p>
+        <Link className={s.textLink} href={MEASURED.href} prefetch={false}>{MEASURED.label}</Link>
       </Section>
 
       <Section surface="paper" eyebrow={RECORD.eyebrow} title={RECORD.title} lead={RECORD.lead}>

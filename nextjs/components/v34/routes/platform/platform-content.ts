@@ -23,6 +23,13 @@ const to = (key: V34RouteKey): Route => v34Route(key).path;
 
 const record = v34Route("platform");
 
+/** A registered route's navigation label. A route without one has no name to link it by. */
+function navLabel(key: V34RouteKey): string {
+  const nav = v34Route(key).nav;
+  if (!nav) throw new Error(`the platform page links "${key}" by its navigation label, and it has none`);
+  return nav.label;
+}
+
 /** One clause of the compiler contract, as the page states it. */
 function promised(id: string) {
   const found = clause(id);
@@ -78,6 +85,8 @@ export const LIFECYCLE = {
       text: `Read the active World through ${MCP_TOOL_COUNT_WORD} read-only MCP tools or the HTTP API, or request a signed package.`,
     },
   ],
+  /** The process has its own page; the lifecycle links to it rather than repeating it. */
+  method: { href: to("methods"), label: navLabel("methods") },
 } as const;
 
 export const ATTACHED = {
@@ -178,6 +187,7 @@ export const FINAL = {
 /** Every internal destination the page can render, for the release guard. */
 export const PLATFORM_DESTINATIONS: readonly Route[] = [
   HERO.secondary.href,
+  LIFECYCLE.method.href,
   YOUR_AI.items[1].link.href,
   ...CHECKS.rows.flatMap((row) => (!("file" in row.look) ? [row.look.href] : [])),
   CHANGE.items[1].link.href,

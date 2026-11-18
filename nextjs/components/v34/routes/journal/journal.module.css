@@ -154,8 +154,104 @@
   line-height: 1.5;
 }
 
+.referenceNote {
+  margin: 8px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+/* The reference entries the hub does not list, after it and outside its filter. */
+.referenceAfter {
+  margin-top: 28px;
+}
+
 @media (min-width: 761px) {
   .reference {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/*
+  The hub's filter (lead decision 10, ported from the former resources hub): a fragment link per
+  tag and `:target`, with no script, no query string and every entry kept in the document. Each
+  control is named by `[id="find-<tag>"]`, an attribute selector, because CSS Modules rewrites an
+  `#id` selector the way it rewrites a class (and a V34 sheet takes no `:global`); an attribute
+  selector is never rewritten. CSS cannot compare `:target`'s id with an
+  attribute value, so the rules enumerate the tags of `RESOURCE_PURPOSES` and `RESOURCE_WORKFLOWS`.
+  A browser without `:has()` shows every entry, and the controls are ordinary in-page links.
+*/
+.hub {
+  display: grid;
+  gap: 20px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.groupLabel {
+  flex-basis: 100%;
+  max-width: none;
+  margin: 10px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.groupLabel:first-child {
+  margin-top: 0;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-pill);
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+/* Hover paints the ground, as the /security jump pills do, so a selected chip answers it too. */
+.filter:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.filter:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+/* "Everything" is the state on arrival; the targeted control is the selection once there is one. */
+.filter:first-of-type,
+.filter:target {
+  border-color: var(--v34-fg);
+  color: var(--v34-fg);
+}
+
+/* Once another control is targeted, "Everything" stops claiming to be the selection. */
+.hub:has(.filter:not(:first-of-type):target) .filter:first-of-type:not(:target) {
+  border-color: var(--v34-fg-rule);
+  color: var(--v34-fg-muted);
+}
+
+.hub:has([id="find-evaluate"]:target) [data-tags]:not([data-tags~="evaluate"]),
+.hub:has([id="find-build"]:target) [data-tags]:not([data-tags~="build"]),
+.hub:has([id="find-verify"]:target) [data-tags]:not([data-tags~="verify"]),
+.hub:has([id="find-learn"]:target) [data-tags]:not([data-tags~="learn"]),
+.hub:has([id="find-compile-and-review"]:target) [data-tags]:not([data-tags~="compile-and-review"]),
+.hub:has([id="find-use-elsewhere"]:target) [data-tags]:not([data-tags~="use-elsewhere"]),
+.hub:has([id="find-handle-a-revision"]:target) [data-tags]:not([data-tags~="handle-a-revision"]) {
+  display: none;
 }

@@ -779,7 +779,12 @@ describe("the crawl surface for the contract route", () => {
     const paths = sitemap().map((entry) => new URL(entry.url).pathname);
     expect(paths).toContain("/changes");
     expect(paths).not.toContain(ROUTE);
-  });
+    // Explicit limit, re-derived from a measurement, not raised to go green. Importing `@/app/sitemap` runs one
+    // whole-history `git log` (app/sitemap.ts), so the case costs a git traversal, not a unit of logic.
+    // Measured 2026-11-18, this case alone: idle (heavy lock held) 0.93-0.98 s over 5 runs; while another lane's
+    // `next build` ran 35.8 s (cold first run), then 2.9, 1.9, 1.3, 1.0 s; earlier receipts joint-fnd-qa1 recorded
+    // 8.67 s (120 s limit, passed) and 12.5 s (lock held, failed the 5 s default). Limit = 110 s, 3x the slowest (35.8 s).
+  }, 110_000);
 
   it("makes no noindex claim the crawler that reaches this page could act on", () => {
     // Stripped, because the comment above the metadata explains the field that used to be here.

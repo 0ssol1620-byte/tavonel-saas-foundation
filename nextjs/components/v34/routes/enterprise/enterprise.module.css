@@ -236,6 +236,45 @@
   outline-offset: 3px;
 }
 
+/*
+  Page jump index (lead decision 11): the /security pills, one per row, so each target is its own
+  row of the index and no two touch targets share a line.
+*/
+.jump {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 clamp(28px, 4vw, 44px);
+  padding: 0;
+  list-style: none;
+}
+
+.jumpLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-pill);
+  background: transparent;
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.jumpLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.jumpLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
 @media (max-width: 1000px) {
   .chain {
     grid-template-columns: repeat(2, minmax(0, 1fr));

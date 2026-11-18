@@ -246,10 +246,13 @@
 }
 
 /*
-  The shared TrustNext step is legacy global markup (h2, .fine, .btn.ghost) that reads the dark
+  The shared TrustNext step is legacy global markup (h3, .fine, .btn.ghost) that reads the dark
   site's names. Set here to this surface's tokens, or its words are dark-ground text on paper.
+  Its heading is this Section's sub-heading (lead decision 17), so the size the global h3 rule
+  reads (--t-6) is the V34 sub-heading size the steps' titles use.
 */
 .trustCase {
+  --t-6: var(--v34-h3);
   --text-hi: var(--v34-fg);
   --text-mid: var(--v34-fg-muted);
   --text-lo: var(--v34-fg-muted);

@@ -450,7 +450,7 @@ export default function BenchmarksPage() {
               </p>
             </div>
             {/* Conversion pass 2026-11-09: the page's one filled action is the start below, so the next trust step is quiet (BA-097). */}
-            <TrustNext from="/benchmarks" emphasis="quiet" />
+            <TrustNext from="/benchmarks" heading="h2" emphasis="quiet" />
             <OwnFilesCta />
           </div>
         </div>

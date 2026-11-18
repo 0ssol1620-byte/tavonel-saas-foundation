@@ -143,8 +143,8 @@ describe("the moved body is whole", () => {
   it("ends on the trust step that follows /reproducibility, whose next step is the notes", () => {
     const body = stripped(code).find((f) => f.file.endsWith("/program.tsx"))!;
     expect(PROGRAM_STEP).toBe("/research/program");
-    expect(body.text).toContain('<TrustNext from="/research/program" />');
-    expect(body.text).toContain(`<TrustNext from="${PROGRAM_STEP}" />`);
+    expect(body.text).toContain('<TrustNext from="/research/program" heading="h3" />');
+    expect(body.text).toContain(`<TrustNext from="${PROGRAM_STEP}" heading="h3" />`);
     expect(html).toContain('class="stack trust-next"');
     expect(html).toMatch(/<a\b[^>]*\bhref="\/research\/notes"[^>]*>Read what was measured<\/a>/);
   });

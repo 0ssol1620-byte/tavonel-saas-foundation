@@ -45,6 +45,9 @@ export function PlatformBody() {
             </li>
           ))}
         </ol>
+        <p className={s.method}>
+          <Link className={s.textLink} href={LIFECYCLE.method.href} prefetch={false}>{LIFECYCLE.method.label}</Link>
+        </p>
       </Section>
 
       <Section surface="green" eyebrow={ATTACHED.eyebrow} title={ATTACHED.title} lead={ATTACHED.lead}>

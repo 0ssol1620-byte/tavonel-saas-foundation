@@ -44,18 +44,19 @@ async function ctaStates(page: Page, info: TestInfo, name: string, width: number
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-normal.png`);
   await cta.hover();
-  // decision.md G-H: a workflow page's hover is --tv-action-hover #0169cd (tavonel.css), adopted by
-  // solutions.module.css in P2-03. The V34 pill hovers to its own token, read from the page, not typed.
-  const hover = kind === "v34"
-    ? await cta.evaluate((element) => {
-        const probe = document.createElement("span");
-        probe.style.backgroundColor = "var(--v34-header-btn-hover)";
-        element.append(probe);
-        const resolved = getComputedStyle(probe).backgroundColor;
-        probe.remove();
-        return resolved;
-      })
-    : "rgb(1, 105, 205)";
+  // decision.md G-H: a workflow page's hover was --tv-action-hover #0169cd (tavonel.css), adopted by
+  // solutions.module.css in P2-03. Inside the V34 frame the retained .btn is painted by the token sheet
+  // (WO-CI-19, lead decision 15) and hovers to the frame's action-hover token; the V34 pill hovers to its
+  // own token. Both are read from the page, not typed.
+  const token = kind === "v34" ? "var(--v34-header-btn-hover)" : "var(--v34-fg-action-hover, var(--v34-header-btn-hover))";
+  const hover = await cta.evaluate((element, value) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = value;
+    element.append(probe);
+    const resolved = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return resolved;
+  }, token);
   expect(hover, "the hover token resolves").not.toBe("rgba(0, 0, 0, 0)");
   await expect(cta).toHaveCSS("background-color", hover);
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
@@ -78,8 +79,8 @@ for (const width of [390, 1440, 1920]) {
     await page.evaluate(() => document.fonts.ready);
     await capture(page, info, `solutions-hub-${width}.png`);
     await expect(page.locator(TASK_CARDS)).toHaveCount(5);
-    // Soft: the V34 hub carries no design-partner section (reported, not edited away).
-    await expect.soft(page.locator("#design-partners-title")).toHaveCount(1);
+    // Lead decision 13 (WO-CI-24): the soft #design-partners-title row is retired; the V34 hub and
+    // the prototype carry no design-partner section.
     const hubTitle = page.locator("main h1");
     const hubLede = page.locator("main h1 + div p").first();
     expect(Math.abs((await hubTitle.boundingBox())!.x - (await hubLede.boundingBox())!.x)).toBeLessThan(2);
@@ -118,7 +119,7 @@ for (const width of [390, 1440, 1920]) {
       expect(proofHref.pathname).toBe("/explore");
       expect(proofHref.searchParams.get("evidence")).toBe(selectedEvidence);
       const packageLink = proof.getByRole("link", { name: "Inspect the full sample package" });
-      if (await packageLink.count()) await expect(packageLink).toHaveAttribute("href", "/product/compiled-world#public-package-proof");
+      if (await packageLink.count()) await expect(packageLink).toHaveAttribute("href", "/world#public-package-proof");
       for (const link of await proof.locator("a").all()) {
         expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         await link.focus();
@@ -185,10 +186,9 @@ for (const width of [390, 1440, 1920]) {
         await page.goto(`/solutions/${slug}`, { waitUntil: "networkidle" });
         const packageLink = page.getByRole("link", { name: "Inspect the full sample package" });
         await tabTo(page, packageLink);
-        // The link still names /product/compiled-world, which answers 308 to /world (V34 D33 1.1).
-        await Promise.all([page.waitForURL("**/world**"), page.keyboard.press("Enter")]);
-        // Soft: /world carries no #public-package-proof (reported); the journeys below still run.
-        await expect.soft(page.locator("#public-package-proof")).toBeVisible();
+        // Lead decision 9 (WO-CI-24): the package section is ported to /world and the link names it there.
+        await Promise.all([page.waitForURL("**/world#public-package-proof"), page.keyboard.press("Enter")]);
+        await expect(page.locator("#public-package-proof")).toBeVisible();
         await capture(page, info, `solutions-${slug}-${width}-package-destination.png`);
       }
     }

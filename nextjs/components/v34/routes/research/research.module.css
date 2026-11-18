@@ -176,6 +176,13 @@
   line-height: 1.5;
 }
 
+/* The line after the four steps that names the measured results. */
+.measured {
+  margin: 24px 0 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
 .textLink {
   display: inline-flex;
   align-items: center;

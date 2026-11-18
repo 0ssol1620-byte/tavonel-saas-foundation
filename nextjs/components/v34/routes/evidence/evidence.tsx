@@ -164,7 +164,7 @@ export function EvidenceBody({ view }: { view: EvidencePageView }) {
               </li>
             ))}
           </ul>
-          <TrustNext from="/evidence" emphasis="quiet" />
+          <TrustNext from="/evidence" heading="h3" emphasis="quiet" />
         </div>
       </Section>
 
