@@ -8575,6 +8575,7 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-held-feature', 3, 'a89767cf98a9d2c6', 3, '3852904d96f1827e', ['e2e/film-line-stability.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/visual-refinement.spec.ts'], {}],
   ['v34-in-sentence-guard', 4, '0016458fb1e67a3e', 5, '048903ee5ea32aa4', ['e2e/mobile-landing.spec.ts', 'e2e/p4-followups.spec.ts'], {}],
   ['v34-frame', 3, '3d16097bbf3b034b', 2, '22f3cd846a30de7c', ['e2e/docs-reading-layout.spec.ts'], {}],
+  ['v34-shell-client-weight', 2, '601b907f0fb5b3b8', 2, 'c5dc2177d17f842a', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8909,7 +8910,8 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
   // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too. Round 8: WO-CI-16 is in
   // flight (codex/v34-ci-16 at 2c52aa89) and adds the shell's current() and its client-weight suite.
-  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), ['v34-shell-client-weight']);
+  // WO-CI-16 merged and moved to the program owners: nothing is pending at this head.
+  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
     for (const path of owner.paths) {

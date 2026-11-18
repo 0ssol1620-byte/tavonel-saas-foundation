@@ -3431,6 +3431,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze(['e2e/docs-reading-layout.spec.ts']),
     externalChecks: Object.freeze({}),
   }),
+  // v34-shell-client-weight (WO-CI-16, merged): the shell's own current() and the suite that keeps every client module of the shell
+  // and home away from next/server and the route registry; nav.test.ts holds current()'s cases.
+  'v34-shell-client-weight': Object.freeze({
+    paths: Object.freeze(['components/v34/shell/current.ts', 'lib/v34/shell-client-weight.test.ts']),
+    unitFiles: Object.freeze(['lib/v34/nav.test.ts', 'lib/v34/shell-client-weight.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.
@@ -3440,14 +3448,8 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
 // changes four existing suites, each already owned.
 // WO-AN-7B's migration 20261117130300 and its rollback draft (merged) need no entry: every supabase/{migrations,tests,drafts}/*.sql is
 // the database-contract group's.
-export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
-  'v34-shell-client-weight': Object.freeze({
-    paths: Object.freeze(['components/v34/shell/current.ts', 'lib/v34/shell-client-weight.test.ts']),
-    unitFiles: Object.freeze(['lib/v34/nav.test.ts', 'lib/v34/shell-client-weight.test.ts']),
-    browserFiles: Object.freeze([]),
-    externalChecks: Object.freeze({}),
-  }),
-});
+// WO-CI-16 merged and moved to the program owners: nothing is pending.
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({});
 // D-4 and WO-AN-1: the program's pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
 // rehearsal (round 7: WO-CAT-3's catalog_v2_offer_codes.sql joins the four). Fixtures that build a SQL-bearing head take this list, never
 // a copy of it.
