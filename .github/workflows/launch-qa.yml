@@ -71,8 +71,35 @@ jobs:
           cache: pnpm
           cache-dependency-path: nextjs/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # Cached as in product-qa (its comment has the apt measurements), one key per browser. On PR #249 this install took
+      # up to 13m29s (webkit) and 7m07s (firefox) against a 44s / 24s median, and on 2026-11-18 (run 44245837641) webkit's
+      # apt download (185 packages, 139 MB) had fetched about 127 MB in 19m31s, about 110 kB/s, when the 20-minute job
+      # timeout cancelled it and the job had to be re-run. The second restore key falls back to product-qa's cache, which
+      # v34-matrix saves with WebKit's archives.
+      - name: Read the Playwright version and runner image
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright browsers and their apt archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/apt-archives/*.deb
+          key: browser-qa-pw-${{ matrix.browser }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.image }}
+          restore-keys: |
+            browser-qa-pw-${{ matrix.browser }}-${{ steps.playwright.outputs.version }}-
+            product-qa-pw-${{ steps.playwright.outputs.version }}-
+      - name: Keep apt's downloaded archives in the cached directory
+        run: |
+          mkdir -p ~/.cache/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\n' "$HOME/.cache/apt-archives" | sudo tee /etc/apt/apt.conf.d/99-product-qa-archives
       - name: Install ${{ matrix.browser }} runtime
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+        run: |
+          pnpm exec playwright install --with-deps ${{ matrix.browser }}
+          # Drop archives the mirror no longer serves, so a restored cache does not grow every image.
+          sudo apt-get autoclean -qq
       - name: Run launch QA
         run: pnpm exec playwright test --project=launch-${{ matrix.browser }}
       - name: Verify analytics consent at all seven widths and reduced motion, and every purchase door without launch approval
@@ -237,8 +264,33 @@ jobs:
         with:
           python-version: "3.12"
       - run: pnpm install --frozen-lockfile
+      # Cached as in product-qa (its comment has the apt measurements). Full Chromium, not --only-shell: the Lighthouse step
+      # below launches chromium.executablePath(). Its own key, falling back to product-qa's, whose archives hold Chromium's
+      # system packages: this job has failed on its budgets, and actions/cache saves only after a green job.
+      - name: Read the Playwright version and runner image
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright browsers and their apt archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/apt-archives/*.deb
+          key: lighthouse-pw-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.image }}
+          restore-keys: |
+            lighthouse-pw-${{ steps.playwright.outputs.version }}-
+            product-qa-pw-${{ steps.playwright.outputs.version }}-
+      - name: Keep apt's downloaded archives in the cached directory
+        run: |
+          mkdir -p ~/.cache/apt-archives/partial
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\n' "$HOME/.cache/apt-archives" | sudo tee /etc/apt/apt.conf.d/99-product-qa-archives
       - name: Install Chromium runtime
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          # Drop archives the mirror no longer serves, so a restored cache does not grow every image.
+          sudo apt-get autoclean -qq
       - run: pnpm exec next build
       - name: Start production app
         run: pnpm start --hostname 127.0.0.1 --port 3117 > /tmp/tavonel-next.log 2>&1 &
