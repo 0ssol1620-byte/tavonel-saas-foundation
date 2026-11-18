@@ -22,6 +22,19 @@ type ApiKey = {
   remoteMcp?: true;
 };
 
+/**
+ * The sentence under the inventory when the server read more keys than it lists (`truncated` from
+ * GET /api/developer/keys, DEVELOPER_INVENTORY_LIMIT in lib/developer-store.ts). Only an explicit
+ * `true` says older keys exist; the server always sends both booleans.
+ */
+export function olderKeysNote(truncated: unknown): string | null {
+  const flags = truncated !== null && typeof truncated === "object" ? truncated as Record<string, unknown> : {};
+  if (flags.keys === true && flags.remoteMcpKeys === true) return "Showing the newest 100 keys and the newest 100 remote MCP connections; older ones exist.";
+  if (flags.keys === true) return "Showing the newest 100; older keys exist.";
+  if (flags.remoteMcpKeys === true) return "Showing the newest 100 remote MCP connections; older ones exist.";
+  return null;
+}
+
 async function sessionToken() {
   const client = getSupabaseBrowserClient();
   const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -37,6 +50,7 @@ export default function DeveloperPanel() {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("Reading API key inventory.");
+  const [olderNote, setOlderNote] = useState<string | null>(null);
 
   const load = async () => {
     const token = await sessionToken();
@@ -45,11 +59,12 @@ export default function DeveloperPanel() {
       return;
     }
     const response = await fetch("/api/developer/keys", { headers: { authorization: `Bearer ${token}` } });
-    const json = await response.json() as { code?: string; keys?: ApiKey[]; remoteMcpKeys?: ApiKey[] };
+    const json = await response.json() as { code?: string; keys?: ApiKey[]; remoteMcpKeys?: ApiKey[]; truncated?: unknown };
     if (!response.ok || !Array.isArray(json.keys)) {
       setNotice(`API keys could not be read. ${failureSentence(json.code, response.status)}`);
       return;
     }
+    setOlderNote(olderKeysNote(json.truncated));
     // Live remote MCP keys first, read apart from the hand-made ones so neither crowds the other out.
     setKeys([...(json.remoteMcpKeys ?? []).map((key) => ({ ...key, remoteMcp: true as const })), ...json.keys]);
     setNotice(json.keys.length > 0 ? `${json.keys.filter((key) => !key.revokedAt).length} active key(s).` : "No API key has been issued.");
@@ -170,6 +185,7 @@ export default function DeveloperPanel() {
                 {!key.revokedAt ? <button type="button" className="icon-action" disabled={busy} onClick={() => void revoke(key)} aria-label={`Revoke ${key.name}`}><Trash2 size={15} /></button> : null}
               </article>
             ))}
+            {olderNote ? <p className="world-empty">{olderNote}</p> : null}
           </div>
         </div>
       </div>
