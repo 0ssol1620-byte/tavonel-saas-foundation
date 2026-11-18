@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -502,6 +503,8 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
           expect(held.length, `${at}: client ${index} holds ${held.length} unrevoked keys`).toBeLessThanOrEqual(1);
           for (const row of held) expect(consented[index], `${at}: scope beyond consent`).toEqual(expect.arrayContaining(row.scopes));
         }
+        // The loop is microtask-only; one macrotask per step lets the worker answer vitest's 60 s RPC (WO-CI-38).
+        await yieldToEventLoop();
       }
     }, 120_000);
   }
