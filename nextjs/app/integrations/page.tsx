@@ -57,7 +57,7 @@ const OAUTH = [
 ] as const;
 
 const INFRA = [
-  ["Mounted file server", "Customer-run", "Read an SMB, NFS or SFTP-backed mounted directory through your own import agent."],
+  ["Local folder", "Customer-run", "Read a folder on a local NTFS or ReFS drive (Windows) or a local Linux file system through your own import agent."],
   ["S3-compatible object storage", "Customer-run", "Import a selected bucket and prefix while credentials stay with your agent."],
 ] as const;
 

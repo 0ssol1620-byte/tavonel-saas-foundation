@@ -1,7 +1,7 @@
 "use client";
 
 import { Cloud, Link2, Server, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { trackFunnelOnce } from "@/lib/funnel-events";
@@ -95,8 +95,21 @@ async function sessionToken() {
   return data.session?.access_token ?? null;
 }
 
+/*
+  WO-REL-4. The OAuth providers this deployment can connect, read on the server by the workspace layout
+  (configuredOAuthProviders, the fact /api/v1/oauth-connectors reports as `configured`) and provided
+  here, so the workspace's source choices name only those. Where no server said, no provider is named.
+*/
+const ConfiguredOAuthProviders = createContext<readonly OAuthProvider[] | null>(null);
+export function OAuthProviderAvailability({ providers, children }: { providers: readonly OAuthProvider[]; children?: ReactNode }) {
+  return <ConfiguredOAuthProviders.Provider value={providers}>{children}</ConfiguredOAuthProviders.Provider>;
+}
+export function useConfiguredOAuthProviders(): readonly OAuthProvider[] {
+  return useContext(ConfiguredOAuthProviders) ?? [];
+}
+
 function providerLabel(provider: Connection["provider"]) {
-  return provider === "file_server" ? "Mounted file server" : provider === "r2" ? "Cloudflare R2" : provider === "minio" ? "MinIO" : "Amazon S3";
+  return provider === "file_server" ? "Local folder" : provider === "r2" ? "Cloudflare R2" : provider === "minio" ? "MinIO" : "Amazon S3";
 }
 
 function oauthProviderLabel(provider: OAuthProvider) {
@@ -352,7 +365,7 @@ export default function ConnectionsPanel() {
           </button>
         ))}
         {oauthProviders.length === 0 ? <p className="field-help">{readFailed ? "Provider availability could not be confirmed. Refresh state to retry." : "Reading OAuth provider availability."}</p> : null}
-        {oauthProviders.length > 0 && readyProviders.length === 0 ? <p className="field-help">No provider account can be connected from this workspace. The local source agent below reads a mounted share without one.</p> : null}
+        {oauthProviders.length > 0 && readyProviders.length === 0 ? <p className="field-help">No provider account can be connected from this workspace. The local source agent below reads a local folder or an S3-compatible bucket without one.</p> : null}
       </div>
       <div className="connection-layout">
         <form className="connection-form" onSubmit={create}>
@@ -361,7 +374,7 @@ export default function ConnectionsPanel() {
             const next = event.target.value as Connection["provider"];
             setProvider(next);
           }}>
-            <option value="file_server">Mounted SMB / NFS / SFTP share</option>
+            <option value="file_server">Local folder</option>
             <option value="s3">Amazon S3</option>
             <option value="r2">Cloudflare R2</option>
             <option value="minio">MinIO</option>
@@ -377,7 +390,7 @@ export default function ConnectionsPanel() {
               <small className="field-help">The local agent uses your existing AWS profile, workload role, or provider environment. Credential values never enter TAVONEL.</small>
             </>
           ) : (
-            <p className="field-help">Mount the share with Windows, macOS, Linux, or an SFTP filesystem. The local agent reads that mount; TAVONEL never receives the mount password. <a href="/developer/tavonel-source-agent.py" download>Download source agent</a>.</p>
+            <p className="field-help">Choose a folder on a local NTFS or ReFS drive (Windows) or a local Linux file system. The local agent reads it on your machine, and no credential for it reaches TAVONEL. <a href="/developer/tavonel-source-agent.py" download>Download source agent</a>.</p>
           )}
           <label htmlFor="connection-name">Name this connection <small>optional</small></label>
           <input id="connection-name" maxLength={100} value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={providerLabel(provider)} />

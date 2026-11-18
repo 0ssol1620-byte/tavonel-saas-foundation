@@ -34,7 +34,7 @@ export const HERO = {
 
 export const TASKS = {
   title: "What your team can do",
-  lead: "Turn approved manuals, contracts, policies and reports into a versioned World. Every answer can return to its source, and your reviewers control what becomes active.",
+  lead: "Turn approved manuals, contracts, policies and reports into a versioned World. Every answer can return to its source, and a person on your side decides what becomes active.",
   items: [
     ["Find answers in approved material", "Search the active World and open the source version and exact region behind an answer."],
     ["Review what changed", "Compare a candidate with the active World before a person decides whether it becomes available."],

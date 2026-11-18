@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS, PRICE_BOOK_EXTRA } from "./billing-catalog";
 import { PRODUCT_NOUNS } from "./site-navigation";
+import { CUSTOMER_RUN } from "@/components/v34/routes/connect/connect-sources";
 
 /*
   WO-REL-1, closing round. The class: public text that names a plan outside PB-2026-11-V22, or says a
@@ -189,4 +190,157 @@ describe("public plan names (WO-REL-1 closing round)", () => {
     const used = new Set(hits.map(allowed));
     expect(Object.keys(ALLOWED).filter((key) => !used.has(key)), "an allow-list entry that excuses nothing").toEqual([]);
   }, 60_000); // parses every source file: ~5 s alone, longer beside other suites
+});
+
+/*
+  WO-REL-4. The class: a public sentence that offers a way in the product refuses or has switched off.
+  /connect and the workspace Connections panel offered SMB, NFS and SFTP mounts and macOS, which the
+  import agent refuses before it lists anything (U1, U5); /connect, /solutions, /personal, the route
+  metadata and llms.txt promised PKCE sign-in, a URL or any MCP client while the remote MCP endpoint,
+  the only path that has any of them, is switched off (U3, U4, U9).
+
+  Neither list is typed here. What the agent refuses is its own runbook's sentence that names it
+  (public/developer/source-agent-operations.md, shipped beside the script), anchored to the refusal
+  codes the script raises. The remote markers are the remote endpoint's own: the sign-in method
+  lib/remote-mcp.ts refuses an authorization without, and the path its route file answers on.
+
+  A file whose remote-MCP text is rendered only behind the switch (it reads remoteMcpEnabled, the
+  workspace's RemoteMcpAvailability or the connect page's remoteOpen) is checked by rendering it
+  switched off, not by reading it: the connect page in routes-connect.test.ts, the Connect AI panel in
+  connect-ai-panel.test.ts, /docs/mcp in docs-content.test.ts. Its refused-transport text is not
+  switched and is still read here. The remote endpoint's own files answer 404 while it is off, and API
+  and security records are not page text.
+*/
+const AGENT_SCRIPT = readFileSync(join(ROOT, "public/developer/tavonel-source-agent.py"), "utf8");
+const AGENT_RUNBOOK = readFileSync(join(ROOT, "public/developer/source-agent-operations.md"), "utf8");
+const REMOTE_MCP_MODULE = readFileSync(join(ROOT, "lib/remote-mcp.ts"), "utf8");
+
+/** The ways in the agent refuses, from its runbook: "...; SMB, NFS and SFTP mounts, other file systems and macOS are refused before anything is listed". */
+function refusedByAgent(runbook: string): string[] {
+  const clause = /;\s*([^;.]+?) are refused before anything is listed/.exec(runbook)?.[1];
+  if (!clause) throw new Error("the agent runbook no longer names what the agent refuses");
+  // Each item's proper name: "SFTP mounts" -> SFTP; "other file systems" names no system and gives no token.
+  return clause.split(/,\s*|\s+and\s+/).map((item) => item.trim().split(/\s+/)[0]!).filter((name) => /[A-Z]/.test(name));
+}
+
+/** The Windows file systems the agent accepts, from the script's own allowlist. */
+function windowsFileSystemsAccepted(script: string): string[] {
+  const set = /SUPPORTED_FILESYSTEMS = frozenset\(\{([^}]*)\}\)/.exec(script)?.[1];
+  if (!set) throw new Error("the agent script no longer declares SUPPORTED_FILESYSTEMS");
+  return [...set.matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
+}
+
+/** The sign-in method the remote endpoint refuses an authorization without, read from its refusal. */
+function remoteSignIn(module: string): string {
+  const method = /"(\w+) with code_challenge_method=S256 is required\."/.exec(module)?.[1];
+  if (!method) throw new Error("lib/remote-mcp.ts no longer names the sign-in method it requires");
+  return method;
+}
+const REMOTE_PATH_SEGMENTS = ["api", "mcp"];
+const REMOTE_PATH = `/${REMOTE_PATH_SEGMENTS.join("/")}`;
+/** A sentence about how a source gets in: a refused name in any other sentence (a sha256 command "on macOS") is not an offer. */
+const CONNECTOR_CONTEXT = /\b(?:agent|mount(?:ed|s)?|share|folder|file[- ]server|connections?|connectors?|import)\b/i;
+
+type Claim = { file: string; sentence: string; why: string };
+
+/** The two findings for one file's text: a refused way in offered as a source, and a remote-MCP way in named as page text. */
+function capabilityClaims(file: string, source: string, refused: readonly string[], signIn: string): Claim[] {
+  const claims: Claim[] = [];
+  for (const text of visibleStrings(file, source)) {
+    for (const sentence of sentencesOf(text)) {
+      const names = refused.filter((name) => word(name).test(sentence));
+      // A protocol (SMB, NFS, SFTP) is an offer wherever it is named; a platform (macOS) only where a source gets in.
+      if (names.some((name) => /^[A-Z]+$/.test(name)) || (names.length && CONNECTOR_CONTEXT.test(sentence))) claims.push({ file, sentence, why: `the import agent refuses ${names.join(", ")}` });
+      const mcp = /\bMCP\b/.test(sentence);
+      if (mcp && word(signIn).test(sentence)) claims.push({ file, sentence, why: `${signIn} is the switched-off remote endpoint's sign-in` });
+      else if (sentence.includes(REMOTE_PATH)) claims.push({ file, sentence, why: `${REMOTE_PATH} is the switched-off remote endpoint` });
+      else if (mcp && /\bURL\b/.test(sentence)) claims.push({ file, sentence, why: "a URL is the switched-off remote endpoint's transport" });
+      else if (/\bany\b[^.]{0,20}\bMCP client/i.test(sentence)) claims.push({ file, sentence, why: "a client that attaches only by URL has no way in while the remote endpoint is off" });
+    }
+  }
+  return claims;
+}
+
+/** Files whose remote-MCP text sits behind the switch, by what they read. */
+const SWITCHED = /\bremoteMcpEnabled\(|\bRemoteMcpAvailability\b|\bremoteOpen\b/;
+/** The remote endpoint itself (404 while off), the API's own documents and the security records: not page text. */
+const NOT_PAGE_TEXT = /^(?:app\/api\/|app\/oauth\/|app\/\.well-known\/|lib\/remote-mcp[\w-]*\.ts$|lib\/security\/)/;
+
+/*
+  Sentences left, each with its reason, under the rules of ALLOWED above: a key is one sentence, and a
+  key that matches nothing fails. The sweep and the reason for each are in receipts/WO-REL-4.
+*/
+const CLAIMS_LEFT: Record<string, string> = {
+  "lib/api-error-codes.ts :: The token is a remote MCP connection's (`tvnl_mcp_`): it works only through the MCP endpoint, /api/mcp, never against the REST API directly.":
+    "the meaning of an error code (/docs/errors) that only a remote MCP token can produce; it explains a refusal and offers nothing",
+  "lib/changelog.ts :: /docs/mcp has a section on the remote MCP endpoint, for clients that connect by URL instead of launching a local process, such as ChatGPT connectors and other web agents: how to connect, the OAuth flow step by step and the read-only scopes a connection gets.":
+    "a dated changelog entry whose title says the endpoint is switched off on tavonel.com; a published history record is not rewritten",
+};
+
+describe("public capability claims (WO-REL-4)", () => {
+  it("takes the refused list from the agent and the remote markers from the remote endpoint", () => {
+    expect(refusedByAgent(AGENT_RUNBOOK)).toEqual(["SMB", "NFS", "SFTP", "macOS"]);
+    expect(AGENT_SCRIPT).toContain('raise UnsupportedSafeTraversal("remote_volume")');
+    expect(AGENT_SCRIPT).toContain('raise UnsupportedSafeTraversal("platform_not_supported")');
+    expect(() => refusedByAgent("The agent reads everything.")).toThrow();
+    expect(remoteSignIn(REMOTE_MCP_MODULE)).toBe("PKCE");
+    expect(() => remoteSignIn("export {};")).toThrow();
+    expect(existsSync(join(ROOT, "app", ...REMOTE_PATH_SEGMENTS, "route.ts")), `${REMOTE_PATH} is the remote endpoint's route`).toBe(true);
+    expect(REMOTE_MCP_MODULE).toContain('env.TAVONEL_REMOTE_MCP_ENABLED === "true"');
+  });
+
+  it("fails each sentence the audit found, and passes its replacement", () => {
+    const refused = refusedByAgent(AGENT_RUNBOOK);
+    const signIn = remoteSignIn(REMOTE_MCP_MODULE);
+    const hits = (sentence: string) => capabilityClaims("x.ts", `const s = ${JSON.stringify(sentence)};`, refused, signIn);
+    for (const old of [
+      "Read an SMB, NFS or SFTP-backed mounted directory through your own import agent.",
+      "Mounted SMB / NFS / SFTP share",
+      "Mount the share with Windows, macOS, Linux, or an SFTP filesystem.",
+      "Configuration steps for reading a World from an MCP client over stdio or through the HTTP API, with PKCE sign-in and read-only tools.",
+      "Read a World from code with read-only MCP tools, authorize with PKCE, manage API keys and call the HTTP API.",
+      "Any MCP client can read the World, and you can revoke its API key whenever you like.",
+      "One URL for any MCP client that signs in with OAuth.",
+      "Add the MCP server at https://tavonel.com/api/mcp.",
+      "Works with your NFS server.",
+      "Connect a folder from macOS.",
+    ]) expect(hits(old), old).not.toEqual([]);
+    for (const ok of [
+      CUSTOMER_RUN.find(([name]) => name === "Local folder")![1],
+      "Configuration steps for reading a World from an MCP client through a local stdio server or the HTTP API, with an API key and read-only tools.",
+      "An MCP client that runs the local server reads the World with an API key from a paid plan, and you can revoke that key whenever you like.",
+      "Compute its sha256: shasum -a 256 on macOS, certutil on Windows.",
+      "The authorization is single-use and PKCE, and it fails closed.",
+    ]) expect(hits(ok), ok).toEqual([]);
+  });
+
+  it("names the agent's own Windows file systems where it offers a local folder", () => {
+    const row = CUSTOMER_RUN.find(([name]) => name === "Local folder");
+    expect(row, "the connector list offers a local folder").toBeDefined();
+    const accepted = windowsFileSystemsAccepted(AGENT_SCRIPT);
+    expect(accepted.length).toBeGreaterThan(0);
+    for (const fileSystem of accepted) expect(row![1]).toContain(fileSystem);
+  });
+
+  it("finds no refused way in and no switched-off remote MCP way in, in any public content source", () => {
+    const refused = refusedByAgent(AGENT_RUNBOOK);
+    const signIn = remoteSignIn(REMOTE_MCP_MODULE);
+    // The developer README is served as it is at /developer/README.md, so its sentences are page text too.
+    const files = [...SCANNED_DIRS.flatMap((dir) => [...walk(join(ROOT, dir))]), ...[...EXTRA_FILES, "public/developer/README.md"].map((file) => join(ROOT, file))];
+    const named = files.map((path) => ({ path, file: relative(ROOT, path).split(sep).join("/") }));
+    for (const reached of ["public/developer/README.md", "lib/v34/routes.ts", "components/v34/routes/connect/connect-sources.ts", "components/connections-panel.tsx", "app/workspace/page.tsx", "lib/billing-catalog.ts", "public/llms.txt"]) {
+      expect(named.some(({ file }) => file === reached), `the scan reached ${reached}`).toBe(true);
+    }
+    const claims = named
+      .filter(({ file }) => !QUOTED_SOURCE_TEXT.test(file) && !NOT_PAGE_TEXT.test(file))
+      .flatMap(({ path, file }) => {
+        const source = readFileSync(path, "utf8");
+        const found = capabilityClaims(file, source, refused, signIn);
+        return SWITCHED.test(source) ? found.filter((claim) => claim.why.startsWith("the import agent")) : found;
+      });
+    const key = (claim: Claim) => `${claim.file} :: ${claim.sentence}`;
+    expect(claims.filter((claim) => !(key(claim) in CLAIMS_LEFT)).map((claim) => `${key(claim)} [${claim.why}]`)).toEqual([]);
+    const used = new Set(claims.map(key));
+    expect(Object.keys(CLAIMS_LEFT).filter((entry) => !used.has(entry)), "a left sentence that matches nothing").toEqual([]);
+  }, 60_000);
 });

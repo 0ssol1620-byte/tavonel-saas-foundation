@@ -901,10 +901,10 @@ describe("public copy", () => {
       '{ name: "Google Drive", availability: "Beta" }'
     );
     expect(workspace).toContain(
-      '{ name: "Google Drive", availability: "Read-only" }'
+      '{ name: "Google Drive", availability: "Read-only", provider: "google_drive" }'
     );
     expect(workspace).toContain(
-      '{ name: "File Server", availability: "Assisted setup" }'
+      '{ name: "Local folder", availability: "Assisted setup", provider: null }'
     );
   });
 

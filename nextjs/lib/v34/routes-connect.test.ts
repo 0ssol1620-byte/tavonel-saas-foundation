@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import { h1Text, typedCounts } from "./route-test-support";
 import { activationPolicy } from "@/lib/activation-policy";
 import { BILLING_OFFERS } from "@/lib/billing-catalog";
-import { OAUTH_CONNECTOR_PROVIDERS } from "@/lib/connector-oauth";
+import { OAUTH_CONNECTOR_PROVIDERS, type OAuthConnectorProvider } from "@/lib/connector-oauth";
+import { configuredOAuthProviders } from "@/lib/connector-oauth-secrets";
 import { FIRST_CALL_SNIPPETS } from "@/lib/developer-snippets";
 import { MCP_TOOLS, MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { ConnectBody } from "@/components/v34/routes/connect/connect";
@@ -90,7 +91,26 @@ describe("computed, not typed", () => {
 
   it("has a row for every OAuth provider the product connects to, and no other", () => {
     expect(CONNECTORS.map((c) => c.provider).sort()).toEqual([...OAUTH_CONNECTOR_PROVIDERS].sort());
-    for (const connector of CONNECTORS) expect(open).toContain(connector.name);
+    const all = plain(renderToStaticMarkup(createElement(ConnectBody, { remoteOpen: true, oauthProviders: OAUTH_CONNECTOR_PROVIDERS })));
+    for (const connector of CONNECTORS) expect(all).toContain(connector.name);
+  });
+
+  /*
+    WO-REL-4 (U2): /connect listed Dropbox and OneDrive / SharePoint as read-only connectors whatever
+    the deployment held. A card now follows the `configured` fact /api/v1/oauth-connectors reports.
+  */
+  it("shows a provider card only for a provider this deployment can connect, and none by default here", () => {
+    const only = (providers: readonly OAuthConnectorProvider[]) => plain(renderToStaticMarkup(createElement(ConnectBody, { remoteOpen: false, oauthProviders: providers })));
+    const drive = only(["google_drive"]);
+    expect(drive).toContain("Google Drive");
+    for (const connector of CONNECTORS.filter((c) => c.provider !== "google_drive")) expect(drive).not.toContain(connector.description);
+    const none = only([]);
+    for (const connector of CONNECTORS) expect(none).not.toContain(connector.description);
+    expect(none, "the read-only legend goes with its cards").not.toContain("We hold an OAuth grant");
+    expect(drive).toContain("We hold an OAuth grant");
+    // The test env configures no provider, so the page's own default (configuredOAuthProviders) shows none.
+    expect(configuredOAuthProviders()).toEqual([]);
+    for (const connector of CONNECTORS) expect(closed).not.toContain(connector.description);
   });
 
   it("states the agent's minimum Python as the distribution record does", () => {
@@ -100,12 +120,21 @@ describe("computed, not typed", () => {
 });
 
 describe("remote endpoint state", () => {
-  it("is Available when the endpoint is open and Closed on this site when it is not", () => {
+  /*
+    WO-REL-4 (U9, and the PKCE row): switched off, the page used to print the remote row (a URL,
+    "OAuth with PKCE") and a by-URL column marked Closed. It now names only what a client can use here.
+  */
+  it("lists the remote endpoint and its by-URL column only while the endpoint is open", () => {
+    expect(open).toContain("Remote endpoint (HTTP)");
+    expect(open).toContain("OAuth with PKCE");
+    expect(open).toContain(">By URL<");
+    expect(closed).not.toContain("Remote endpoint (HTTP)");
+    expect(closed).not.toMatch(/\bPKCE\b|By URL|A URL your client|over a local process or a URL/);
+    expect(closed).not.toContain("Closed on this site");
+    // The local server is Available in both states.
     expect(open).toContain(">Available</td>");
-    expect(open).not.toContain("Closed on this site");
-    expect(closed).toContain("Closed on this site");
-    // Local server is always Available; the remote row and every by-URL cell follow the switch.
-    expect(closed.match(/Closed on this site/g)!.length).toBeGreaterThan(1);
+    expect(closed).toContain(">Available</td>");
+    expect(closed).toContain("Local server (stdio)");
   });
 
   it("shows by-URL setup only while the endpoint is open", () => {

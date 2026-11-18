@@ -44,7 +44,7 @@ function FirstQuestions() {
     },
     {
       question: "What can I bring?",
-      answer: <>{formats}, as files, folders or a ZIP, plus connected sources. Every accepted format is sanitized to PDF and read the same way, so each passage keeps its page and region. <Link className={s.inline} href={retained(RETAINED.sources)} prefetch={false}>Supported sources</Link></>,
+      answer: <>{formats}, as files, folders or a ZIP. A paid plan adds source connections. Every accepted format is sanitized to PDF and read the same way, so each passage keeps its page and region. <Link className={s.inline} href={retained(RETAINED.sources)} prefetch={false}>Supported sources</Link></>,
     },
     {
       question: "Can I compile my own files today?",

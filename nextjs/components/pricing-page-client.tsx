@@ -334,7 +334,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
     [
       "What differs by plan",
-      `${DEVELOPER.label} adds scoped developer keys to ${PERSONAL.label}, with the larger monthly allowance its card states. ${TEAM.label} and ${BUSINESS.label} add the review queue and version history, at ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} included pages. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every plan includes Google Drive and file-server connections.`,
+      `${DEVELOPER.label} adds scoped developer keys to ${PERSONAL.label}, with the larger monthly allowance its card states. ${TEAM.label} and ${BUSINESS.label} add the review queue and version history, at ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} included pages. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every plan includes Google Drive and local-folder connections.`,
     ],
     [
       "What does not consume pages",

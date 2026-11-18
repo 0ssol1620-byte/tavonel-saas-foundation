@@ -59,7 +59,7 @@ import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
-import ConnectionsPanel from "@/components/connections-panel";
+import ConnectionsPanel, { useConfiguredOAuthProviders } from "@/components/connections-panel";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
@@ -198,14 +198,18 @@ type GroundedAnswer = {
   These are action labels, not qualification claims. Workspace tells a user how access works;
   /integrations owns the evidence-backed support level and provider-specific limitations.
 */
+/*
+  WO-REL-4: a choice with an OAuth `provider` is shown only where this deployment can connect that
+  provider (useConfiguredOAuthProviders, read on the server), the same fact the Connections panel shows.
+*/
 const WORKSPACE_SOURCE_CHOICES = [
-  { name: "Google Drive", availability: "Read-only" },
-  { name: "Dropbox", availability: "Read-only" },
-  { name: "OneDrive", availability: "Read-only" },
-  { name: "File Server", availability: "Assisted setup" },
-  { name: "Amazon S3", availability: "Assisted setup" },
-  { name: "Cloudflare R2", availability: "Assisted setup" },
-  { name: "MinIO", availability: "Assisted setup" },
+  { name: "Google Drive", availability: "Read-only", provider: "google_drive" },
+  { name: "Dropbox", availability: "Read-only", provider: "dropbox" },
+  { name: "OneDrive", availability: "Read-only", provider: "microsoft_graph" },
+  { name: "Local folder", availability: "Assisted setup", provider: null },
+  { name: "Amazon S3", availability: "Assisted setup", provider: null },
+  { name: "Cloudflare R2", availability: "Assisted setup", provider: null },
+  { name: "MinIO", availability: "Assisted setup", provider: null },
 ] as const;
 
 /** One shape for the billing card and the post-checkout wait (journey A4) that refreshes it. */
@@ -314,6 +318,7 @@ export default function WorkspacePage() {
   const notifyCheckout = useCallback((text: string, tone: NoticeTone) => setNotice(tone === "alert" ? { alert: text } : text), []);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
   const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
+  const configuredOAuthProviders = useConfiguredOAuthProviders();
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   /** Why a closed workspace is closed, as the shell read it from the v2 bootstrap; "legacy" on v1. */
   const [sourcePending, setSourcePending] = useState<SourcePendingReason | "legacy">("legacy");
@@ -3226,10 +3231,11 @@ export default function WorkspacePage() {
                   provider-specific limits stay on /integrations.
                 */}
                 <div className="workspace-source-choices" aria-label="Available source connections">
-                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
+                  {WORKSPACE_SOURCE_CHOICES.filter((source) => source.provider === null || configuredOAuthProviders.includes(source.provider)).map((source) => (
                     <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
                       <span>{source.name}</span>
-                      <small>{source.availability}</small>
+                      {/* Connections are a paid-plan feature (lib/self-service-trial.ts), and the tile says so where it applies. */}
+                      <small>{accessSource === "trial" || accessSource === "unentitled" ? "Paid plan" : source.availability}</small>
                     </button>
                   ))}
                 </div>
@@ -4120,8 +4126,8 @@ export default function WorkspacePage() {
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Google Drive and file-server connections are included in every paid plan. The free evaluation works with files you upload directly."
-                : "Google Drive and file-server connections are included in every paid plan. This workspace has no active plan."}</p>
+                ? "Google Drive and local-folder connections are included in every paid plan. The free evaluation works with files you upload directly."
+                : "Google Drive and local-folder connections are included in every paid plan. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"

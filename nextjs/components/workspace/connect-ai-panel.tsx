@@ -66,10 +66,11 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
 
   return (
     <section className={styles.panel} aria-labelledby="connect-ai-title" data-testid="connect-ai-panel">
-      <Heading id="connect-ai-title">Connect Claude or ChatGPT</Heading>
+      {/* WO-REL-4: switched off, the panel names what a client can use here, the local bridge, and no hosted client. */}
+      <Heading id="connect-ai-title">{enabled === false ? "Connect an MCP client" : "Connect Claude or ChatGPT"}</Heading>
       {enabled === false ? (
         <>
-          <p role="status">The hosted MCP endpoint is not switched on here yet. Until it is, use the local MCP bridge with an API key.</p>
+          <p role="status">An MCP client reads your active World through the local MCP bridge, with an API key from a paid plan.</p>
           <Link className="btn btn-ghost" href="/docs/mcp">Local MCP setup</Link>
         </>
       ) : (

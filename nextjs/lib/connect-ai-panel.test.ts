@@ -22,11 +22,15 @@ describe("Connect AI panel (W1-A1)", () => {
 
   it("takes availability from the server, so a switched-off deployment shows the local bridge and makes no 404 request", () => {
     const off = renderToStaticMarkup(createElement(RemoteMcpAvailability, { enabled: false }, createElement(ConnectAiPanel)));
-    expect(off).toContain("not switched on here yet");
+    // WO-REL-4: switched off, it names the local bridge and no hosted client (was "not switched on here yet").
+    const localBridge = "An MCP client reads your active World through the local MCP bridge, with an API key from a paid plan.";
+    expect(off).toContain(localBridge);
+    expect(off).toContain(">Connect an MCP client<");
+    expect(off).not.toMatch(/ChatGPT|Claude/);
     expect(off).toContain('class="btn btn-ghost" href="/docs/mcp"');
     expect(off).not.toContain("/api/mcp");
     const on = renderToStaticMarkup(createElement(RemoteMcpAvailability, { enabled: true }, createElement(ConnectAiPanel)));
     expect(on).toContain("https://tavonel.com/api/mcp");
-    expect(on).not.toContain("not switched on");
+    expect(on).not.toContain(localBridge);
   });
 });

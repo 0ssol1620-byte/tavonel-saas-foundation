@@ -1,3 +1,5 @@
+import { OAUTH_CONNECTOR_PROVIDERS, readOAuthProviderRuntime, type OAuthConnectorProvider } from "./connector-oauth";
+
 const SECRET_REFERENCE = /^(vercel|aws-sm|gcp-sm|azure-kv|vault):\/\/[A-Za-z0-9._/@:+-]{3,500}$/;
 
 type SecretBrokerConfig = { url: string; authorization: string };
@@ -9,6 +11,19 @@ export function readOAuthSecretBrokerConfig(
   const authorization = env.TAVONEL_OAUTH_SECRET_BROKER_TOKEN?.trim() ?? "";
   if (!url.startsWith("https://") || authorization.length < 32) return null;
   return { url, authorization };
+}
+
+/*
+  WO-REL-4. The one server-side fact of which OAuth providers a customer can connect: the provider's
+  client and the secret broker are both configured, the two things the authorize route needs before it
+  starts anything. /api/v1/oauth-connectors reports it as `configured`, and every connector tile (the
+  /connect cards, the workspace source choices) shows a provider only while it holds.
+*/
+export function configuredOAuthProviders(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): OAuthConnectorProvider[] {
+  if (readOAuthSecretBrokerConfig(env) === null) return [];
+  return OAUTH_CONNECTOR_PROVIDERS.filter((provider) => readOAuthProviderRuntime(provider, env) !== null);
 }
 
 async function brokerRequest(config: SecretBrokerConfig, path: string, body: Record<string, unknown>) {

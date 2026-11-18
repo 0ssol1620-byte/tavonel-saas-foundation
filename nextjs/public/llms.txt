@@ -24,7 +24,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Methods](https://tavonel.com/methods): Follow the method from source file to evidence region, record and relationship, including how supported formats are read and how each step is checked.
 - [Capabilities](https://tavonel.com/capabilities): Every capability listed with its current state, from the compiler contract clauses to supported formats.
 - [Reference walkthrough](https://tavonel.com/studio): Step through compiling a small sample into a World, from source file to evidence region to a cited answer.
-- [Connect](https://tavonel.com/connect): Configuration steps for reading a World from an MCP client over stdio or through the HTTP API, with PKCE sign-in and read-only tools.
+- [Connect](https://tavonel.com/connect): Configuration steps for reading a World from an MCP client through a local stdio server or the HTTP API, with an API key and read-only tools.
 - [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
 - [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.
 - [Personal](https://tavonel.com/personal): Compile your own PDFs into a World of your own, cite answers back to the page they came from and revoke any API key at any time.

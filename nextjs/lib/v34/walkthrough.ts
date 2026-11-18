@@ -74,7 +74,7 @@ export const WALKTHROUGH_STEPS: readonly WalkthroughStep[] = [
   {
     label: "Use with AI",
     heading: "Give your agent the evidence.",
-    body: "A scoped agent response can return the source and explain what is known, and what still requires review.",
+    body: "A scoped answer returns the source passages it rests on, each with its location in the source.",
     record: {
       kind: WALKTHROUGH_ANSWER_LABEL,
       title: "SA-24 was added in Release 5.2.0.",
