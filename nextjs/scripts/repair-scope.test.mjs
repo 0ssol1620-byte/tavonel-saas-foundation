@@ -8553,7 +8553,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-repointed-specs', 2, '5d4a583b1fe39ef9', 0, 'e3b0c44298fc1c14', ['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts'], {}],
   ['v34-qa-harness', 10, '0fc4323c29acf1c5', 0, 'e3b0c44298fc1c14', ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'],
     { 'e2e/v34-matrix.spec.ts': v34MatrixJob('v34-chromium'), 'e2e/v34-support.selftest.spec.ts': v34MatrixJob('v34-selftest') }],
-  ['db-harness', 15, 'e1ec5d332b30aaf2', 7, 'd37c1fb696c86f9e', [], {}],
+  // Round 8: WO-CAT-8's plan-allowance race joins (15 -> 17 paths, 7 -> 8 Node suites).
+  ['db-harness', 17, '1da7e8b49a015cc0', 8, '2aa2e1825aad2ec0', [], {}],
   ['agent-proposals', 5, '3169e14af02855ea', 2, '777d8d8269835876', [], {}],
   ['proposals-decision-path', 3, 'db1504de4a1b9f29', 6, 'a26a71baeb81f76d', [], {}],
   ['agent-grants', 6, 'ff6e8a683eb77229', 5, '281a9e72832c855e', [], {}],
@@ -8563,6 +8564,17 @@ const V34_OWNER_PINS = Object.freeze([
   ['agent-mcp-route', 6, '7de747c49dbec65c', 7, 'a9a732c5350f063a', [], {}],
   // Round 6: WO-CI-6C merged; its key guard spec joined WO-CI-6B's group as Product QA's claim at 1440 (the only project its skip allows).
   ['v34-retained-shell', 2, '923aa0f0cdd019c2', 1, '96c34fcc763756a6', [], { 'e2e/explore-shell-keys.spec.ts': v34ProductQa('1440') }],
+  // Round 8: the release head's 28 unowned paths (e9364899), in eight owners; one-path.spec.ts is Product QA's claim on its four width
+  // projects (its screenshots land in an unignored folder the affected checkout guard refuses, so it has no Repair row).
+  ['catalog-meters', 8, 'b4a556d75cb9a9b6', 4, '92cf17b8c09736a7', [], {}],
+  ['workspace-e2e-fixtures', 2, '279a5861f68b0bfd', 0, 'e3b0c44298fc1c14', ['e2e/billing-lifecycle.spec.ts', 'e2e/connection-sync-status.spec.ts', 'e2e/contrast-zoom-audit.spec.ts', 'e2e/dialog-focus-audit.spec.ts', 'e2e/failure-states-audit.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/recipe-continuation.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts'],
+    { 'e2e/one-path.spec.ts': V34_CHANGE_PROPOSALS_CLAIM }],
+  ['page-meter-cohort', 3, '4e53dbe11df63088', 4, 'dba6ae19c9e222f6', [], {}],
+  ['sale-opening', 2, 'c365a9e5bc27d9ac', 7, '1867b312c0ca17e9', [], {}],
+  ['sitemap-shallow', 1, '464a87b552d32ad9', 1, '464a87b552d32ad9', [], {}],
+  ['v34-held-feature', 3, 'a89767cf98a9d2c6', 3, '3852904d96f1827e', ['e2e/film-line-stability.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/visual-refinement.spec.ts'], {}],
+  ['v34-in-sentence-guard', 4, '0016458fb1e67a3e', 5, '048903ee5ea32aa4', ['e2e/mobile-landing.spec.ts', 'e2e/p4-followups.spec.ts'], {}],
+  ['v34-frame', 3, '3d16097bbf3b034b', 2, '22f3cd846a30de7c', ['e2e/docs-reading-layout.spec.ts'], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8570,7 +8582,7 @@ const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billi
 const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
 const v34Executed = map => map.unitFiles.length + map.browserFiles.length + map.databaseTests.length;
 const DB_HARNESS_SUITES = ['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs',
-  'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
+  'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
 test('affected v34 program owners: every owner keeps its exact paths, at least one executed suite and its external claims', () => {
   assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
   for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {
@@ -8702,8 +8714,13 @@ test('affected v34 program owners: the whole program delta maps with no failure,
   const external = [...new Map(V34_OWNER_PINS.flatMap(([, , , , , , claims]) => Object.entries(claims))).entries()].sort(([a], [b]) => a.localeCompare(b));
   assert.deepEqual(map.externalChecks.map(check => [check.file, check.runner]), external);
   for (const check of map.externalChecks) assert.ok(!map.unitFiles.includes(check.file) && (!map.browserFiles.includes(check.file) || v34RepairRunsPart(check.file)) && /^claim read at head/.test(check.status), check.file);
-  assert.deepEqual(map.browserFiles, ['e2e/compiler-contract.spec.ts', 'e2e/contrast-zoom-audit.spec.ts', 'e2e/home-v34.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/login-capability.spec.ts',
-    'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts', 'e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']);
+  // Round 8: the eight new owners add eighteen specs (12 -> 30), each a Repair row that imports or renders one of their paths.
+  assert.deepEqual(map.browserFiles, ['e2e/billing-lifecycle.spec.ts', 'e2e/compiler-contract.spec.ts', 'e2e/connection-sync-status.spec.ts', 'e2e/contrast-zoom-audit.spec.ts',
+    'e2e/dialog-focus-audit.spec.ts', 'e2e/docs-reading-layout.spec.ts', 'e2e/failure-states-audit.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/home-v34.spec.ts',
+    'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/login-capability.spec.ts',
+    'e2e/marketing-story.spec.ts', 'e2e/mobile-landing.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/recipe-continuation.spec.ts',
+    'e2e/resources-filter.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/v34-matrix.spec.ts',
+    'e2e/v34-support.selftest.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
   for (const file of DB_HARNESS_SUITES) assert.ok(map.unitFiles.includes(file), file);
   assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
   const plan = affectedAskPlan(map);
@@ -8890,8 +8907,9 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
 });
 // WO-CI-7 round 3 (L8): owners for paths two running lanes add, ready before the files exist.
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
-  // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too, so none is in flight.
-  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
+  // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too. Round 8: WO-CI-16 is in
+  // flight (codex/v34-ci-16 at 2c52aa89) and adds the shell's current() and its client-weight suite.
+  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), ['v34-shell-client-weight']);
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
     for (const path of owner.paths) {
@@ -9102,13 +9120,16 @@ test('affected v34 claim grammar: no scalar hides a step or a key, a trigger fil
   const jobName = '    name: V34 matrix (chromium, drawer pass)\n', fakeStep = `    name: |\n      V34 matrix\n      - name: fake\n${env}        run: ${V34_MATRIX_RUN}\n`;
   const quotedName = quote => `      - name: ${quote}Run the V34\n        run: ${V34_MATRIX_RUN}\n        id: x${quote}\n`;
   const filter = (between, line) => edits(['  pull_request:\n  push:\n', `  pull_request:\n${between}${line}  push:\n`]);
+  // Round 8: the line a refusal names is read from the workflow at head (WO-CI-17 added steps above the V34 step: 320 -> 346).
+  const lineOf = needle => { assert.equal(text.split(needle).length, 2, needle); return text.slice(0, text.indexOf(needle)).split('\n').length; };
+  const stepLine = lineOf(stepName), jobLine = lineOf(jobName);
   const cases = [
     // The review's shapes (receipts/review-WO-CI-7/r20/r5/adv-probe2): A and B hide a run in a double- or single-quoted step name, D and F a
     // whole step in a literal job name; js-yaml reads no step running the claim (A, B, D) or one in production mode (F).
-    ['A: a double-quoted name hides a run; the real run sets V34_SERVER_MODE', edits([step, `${quotedName('"')}${env}        run: V34_SERVER_MODE=production ${V34_MATRIX_RUN}\n`]), /\(line 320: a quoted scalar that does not close on its line\)/],
-    ['B: a single-quoted name hides a run; the real run greps nothing', edits([step, `${quotedName("'")}${env}        run: ${V34_MATRIX_RUN} --grep @nothing\n`]), /\(line 320: a quoted scalar that does not close on its line\)/],
-    ['D: a literal job name holds a step; the real step is removed', edits([jobName, fakeStep], [step, '']), /line 288: a block scalar at jobs\.v34-matrix\.name,/],
-    ['F: a literal job name holds a step; the real step (a quoted run) runs in production mode', edits([jobName, fakeStep], [step, `${stepName}${env.replace('          V34_QA_OUT', '          V34_SERVER_MODE: production\n          V34_QA_OUT')}        run: "${V34_MATRIX_RUN}"\n`]), /line 288: a block scalar at jobs\.v34-matrix\.name,/],
+    ['A: a double-quoted name hides a run; the real run sets V34_SERVER_MODE', edits([step, `${quotedName('"')}${env}        run: V34_SERVER_MODE=production ${V34_MATRIX_RUN}\n`]), new RegExp(`\\(line ${stepLine}: a quoted scalar that does not close on its line\\)`)],
+    ['B: a single-quoted name hides a run; the real run greps nothing', edits([step, `${quotedName("'")}${env}        run: ${V34_MATRIX_RUN} --grep @nothing\n`]), new RegExp(`\\(line ${stepLine}: a quoted scalar that does not close on its line\\)`)],
+    ['D: a literal job name holds a step; the real step is removed', edits([jobName, fakeStep], [step, '']), new RegExp(`line ${jobLine}: a block scalar at jobs\\.v34-matrix\\.name,`)],
+    ['F: a literal job name holds a step; the real step (a quoted run) runs in production mode', edits([jobName, fakeStep], [step, `${stepName}${env.replace('          V34_QA_OUT', '          V34_SERVER_MODE: production\n          V34_QA_OUT')}        run: "${V34_MATRIX_RUN}"\n`]), new RegExp(`line ${jobLine}: a block scalar at jobs\\.v34-matrix\\.name,`)],
     // The same class on other keys and levels: a block scalar anywhere a claim reads but a step's run or with input, a quote left open anywhere.
     ['a folded step name', edits([stepName, '      - name: >-\n          Run the V34 matrix\n']), /a block scalar at jobs\.v34-matrix\.steps\[\d+\]\.name,/],
     ['a literal workflow name', edits(['name: Launch QA\n', 'name: |\n  Launch QA\n']), /line 1: a block scalar at name,/],

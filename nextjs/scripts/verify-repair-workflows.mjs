@@ -126,6 +126,22 @@ assert(affectedDbBody.includes('AFFECTED_REQUESTED_HEAD')&&affectedDbBody.includ
   'affected DB lane must bind current head, apply full migrations once and run only selected pgTAP fixtures with observed two-session exclusion');
 const nativeDbCondition=nativeDbBody.match(/    if: >-\n([\s\S]*?)    runs-on:/)?.[1]?.replace(/\s+/g,' ').trim();
 assert(nativeDbCondition==="always() && needs.collector-only-eligibility.result == 'success' && ((needs.collector-only-eligibility.outputs.native_database == 'true' && needs.collector-only-eligibility.outputs.intended == 'true' && needs.collector-only-eligibility.outputs.eligible == 'false') || (needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'))", 'DB requires an exact native fresh-execution or a normal decision, and an affected pull request runs the full job beside its selected-fixture lane (review 3, CI-TI-2)');
+// WO-CI-7 round 8: the stage rollback rehearsal is a job of its own, last in the file, gated exactly as db-rehearsal is. It pairs every
+// migration after the pinned production boundary with exactly one draft, applies them all, runs the drafts newest-first (deleting each
+// tracker row as the drafts' headers tell the operator to), and fails on any fingerprint line but the four rollback-20261117120000 keeps;
+// then the CLI applies the same migrations again and the fingerprint must equal the released one. No remote push, no secret.
+const rollbackBody=dbRehearsal.slice(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n'));
+const rollbackCondition=rollbackBody.match(/    if: >-\n([\s\S]*?)    runs-on:/)?.[1]?.replace(/\s+/g,' ').trim();
+assert(dbRehearsal.indexOf('\n  stage-rollback-rehearsal:\n')>dbRehearsal.indexOf('\n  browser-storage-transport:\n')&&rollbackCondition===nativeDbCondition
+  &&rollbackBody.includes('needs: [collector-only-eligibility]')&&rollbackBody.includes('ROLLBACK_BOUNDARY: "20261110040000"')
+  &&rollbackBody.includes('drafts=(supabase/drafts/rollback-"$version"-*.sql)')&&rollbackBody.includes('if [ "${#drafts[@]}" -ne 1 ]; then')
+  &&rollbackBody.includes('mapfile -t pairs < <(tac /tmp/rollback-pairs.tsv)')&&rollbackBody.includes('psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$draft"')
+  &&rollbackBody.includes("delete from supabase_migrations.schema_migrations where version = '$version';")
+  &&rollbackBody.includes("if grep -v -E $'^[<>] (column|constraint)\\tfoundation_compute_reservations\\t' rollback-fingerprints/rolled-back.diff; then")
+  &&rollbackBody.includes('test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4')&&rollbackBody.includes('supabase migration up --local')
+  &&rollbackBody.includes('diff rollback-fingerprints/released.tsv rollback-fingerprints/reapplied.tsv')&&rollbackBody.includes('set -euo pipefail')
+  &&!rollbackBody.includes('secrets.')&&!rollbackBody.includes('supabase db push')&&!rollbackBody.includes('--linked')&&!rollbackBody.includes('continue-on-error'),
+  'the stage rollback rehearsal must run every draft newest-first under db-rehearsal\'s gate, admit only the four rows draft 4 keeps, and end on the released schema');
 assert(dbRehearsal.includes("needs.collector-only-eligibility.outputs.affected != 'true' && needs.collector-only-eligibility.outputs.intended == 'false'"), 'unrelated transport must not run for an affected integration head');
 assert(dbRehearsal.includes('Require an explicit collector classifier decision') && dbRehearsal.includes('path: collector-only-failure-receipt.json'), 'classifier protocol failures must retain an explicit failed/unqualified receipt');
 assert(dbRehearsal.includes('receipt.pendingFullDebt') && dbRehearsal.includes("receipt.databaseObservation = 'not executed; inherited evidence unaccepted'") && dbRehearsal.includes('receipt.inheritedChecks = {}'), 'failed or missing classifier outputs must preserve release debt and reject inheritance');
@@ -228,7 +244,7 @@ assert(dbRehearsal.includes("if: always() && steps.completed-read-draft.outputs.
 assert(planner.includes("COMPLETED_READ_PRODUCER_PREDECESSOR_SHA = '3a5be63e0901f9f1972f6793cac7891bf064af9e'") && planner.includes('COMPLETED_READ_PRODUCER_BLOBS = Object.freeze(') && planner.includes('verifyCompletedReadProducerScopeEvidence'), 'producer must bind all fifteen exact draft source files');
 assert(planner.includes('completedReadProducerVerification?.eligible && Object.hasOwn(COMPLETED_READ_PRODUCER_BLOBS, path)'), 'OCR safety overrides may require only complete producer evidence');
 for (const path of ['lib/api-error-codes.test.ts', 'lib/settle-route.test.ts', 'lib/completed-read-proof.test.ts']) assert(planner.includes(`'${path}'`), 'producer must select genuine Vitest tests: ' + path);
-assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
+assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
 assert((repair.match(/npm ci --ignore-scripts --no-audit --no-fund/g) ?? []).length === 1 && repair.includes('CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}'), 'producer must reuse one normal worker install/test/types step and its strict actual-outcome gate');
 assert(intakeStage > asyncStage, 'intake triage draft must stage only after ACL and async authority');
 assert(dbRehearsal.includes('supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql') && dbRehearsal.includes('supabase/drafts/tests/foundation_intake_triage_binding.sql'), 'intake rehearsal must source only the two reviewed drafts');
@@ -1127,17 +1143,21 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
 // Node runner registers it), and every external check is a claim that the named workflow job's exact step runs the file, read here
 // from that workflow, the Playwright config, the Vitest include and the spec itself at this head. A pending owner holds paths a running
 // lane adds: a suite it names that is absent at this head must be one of its own paths, so only the change that adds it can select it.
-// None is pending at this head: every lane that had one has merged, and pendingPins stays empty until a running lane adds an owner.
+// Round 8: one is pending, WO-CI-16's (its two new paths); it leaves pendingPins when that lane merges.
 {
   const pins = [['v34-shell', 47, 23, 3, 0], ['v34-route-registry', 6, 55, 2, 0], ['v34-world', 18, 22, 2, 0], ['v34-route-bodies', 258, 60, 3, 0],
     ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 1, 0], ['proposals-library', 18, 11, 0, 1],
     ['workspace-journey', 8, 3, 0, 1], ['compile-pipeline', 15, 12, 0, 2], ['world-temporal-lens', 13, 6, 0, 2], ['control-plane', 5, 3, 0, 0],
     ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
     ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 6, 12, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
-    ['v34-qa-harness', 10, 0, 2, 2], ['db-harness', 15, 7, 0, 0], ['agent-proposals', 5, 2, 0, 0],
+    ['v34-qa-harness', 10, 0, 2, 2], ['db-harness', 17, 8, 0, 0], ['agent-proposals', 5, 2, 0, 0],
     ['proposals-decision-path', 3, 6, 0, 0], ['agent-grants', 6, 5, 0, 0], ['proposal-executors', 5, 4, 0, 0], ['agent-access-panel', 3, 1, 0, 1],
-    ['agent-mcp-route', 6, 7, 0, 0], ['v34-retained-shell', 2, 1, 0, 1]];
-  const pendingPins = [];
+    ['agent-mcp-route', 6, 7, 0, 0], ['v34-retained-shell', 2, 1, 0, 1],
+    // Round 8: the release head's 28 unowned paths, in eight owners (db-harness took the plan-allowance race: 15 -> 17 paths, 7 -> 8 suites).
+    ['catalog-meters', 8, 4, 0, 0], ['workspace-e2e-fixtures', 2, 0, 11, 1], ['page-meter-cohort', 3, 4, 0, 0], ['sale-opening', 2, 7, 0, 0],
+    ['sitemap-shallow', 1, 1, 0, 0], ['v34-held-feature', 3, 3, 6, 0], ['v34-in-sentence-guard', 4, 5, 2, 0], ['v34-frame', 3, 2, 1, 0]];
+  // Round 8: WO-CI-16 (in flight) adds components/v34/shell/current.ts and lib/v34/shell-client-weight.test.ts.
+  const pendingPins = [['v34-shell-client-weight', 2, 2, 0, 0]];
   // Paths another owner keeps that also select a program owner's suite (round 5: WO-CI-6B's shell suite for the /explore page and stage).
   const boundPins = { 'v34-retained-shell': ['app/explore/page.tsx', 'components/explore/explore-stage.module.css', 'components/explore/explore-stage.tsx'] };
   const nodeRegistry = runner.split('\n').find(line => line.startsWith('const nodeUnitTestPaths = new Set(')) ?? '';
@@ -1145,7 +1165,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
   // Repair runs only part of the file: every planned run of it carries a grep or a grep-invert.
   const repairRunsPart = file => { const runs = planBrowserRuns([file], false); return runs.length > 0 && runs.every(run => run.grep || run.grepInvert); };
   assert(JSON.stringify(Object.keys(V34_PROGRAM_AFFECTED_OWNERS)) === JSON.stringify(pins.map(([group]) => group))
-    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the twenty-seven reviewed groups and no pending one');
+    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the thirty-five reviewed groups and the one pending WO-CI-16 group');
   for (const [pending, [group, pathCount, unitCount, browserCount, externalCount]] of [...pins.map(pin => [false, pin]), ...pendingPins.map(pin => [true, pin])]) {
     const declared = (pending ? V34_PROGRAM_PENDING_OWNERS : V34_PROGRAM_AFFECTED_OWNERS)[group], owners = AFFECTED_GROUPS.filter(owner => owner.group === group), [owner] = owners;
     const external = Object.keys(owner?.externalChecks ?? {});
@@ -1197,4 +1217,4 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     && planner.includes('name different runners for one external check: ') && planner.includes('externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource)'),
     'page-meter must own the ledger replay without an unrun claim, database-contract must select the five program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
 }
-console.log('V34 program owners: twenty-seven exact owners (one binding the /explore paths to its checks, the /explore key spec a verified Product QA claim) and none pending, every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
+console.log('V34 program owners: thirty-five exact owners (one binding the /explore paths to its checks, the /explore key spec and the one-path spec verified Product QA claims) and one pending (WO-CI-16), every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
