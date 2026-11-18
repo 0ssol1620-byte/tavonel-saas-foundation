@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ConsentText, copyCredential, createOutcome, revealAfter, TokenReveal } from "../components/workspace/agent-access-panel";
+import { activityLine, ConsentText, copyCredential, GrantActivity, createOutcome, revealAfter, TokenReveal } from "../components/workspace/agent-access-panel";
 import { AGENT_PROPOSAL_CONSENT } from "./agent-consent";
 
 // A made-up value that only has the shape of a credential; no real one is used anywhere.
@@ -63,5 +63,26 @@ describe("Agent access panel (WO-AN-6)", () => {
     expect(imports).toContain("@/lib/agent-consent");
     expect(imports.filter((specifier) => /^@\/lib\/agent-access(\/|$)/.test(specifier) || /^(node:|crypto$|fs$)/.test(specifier))).toEqual([]);
     expect(source).not.toMatch(/localStorage|sessionStorage|document\.cookie/);
+  });
+});
+
+describe("Agent access activity (WO-AN-10)", () => {
+  const row = { proposalId: "00000000-0000-4000-8000-000000000001", actionType: "library_label", state: "executed",
+    createdAt: "2026-11-18T09:00:00.000Z", decidedAt: "2026-11-18T09:30:45.000Z", receiptAvailable: true } as const;
+
+  it("a line carries type, state, both times in UTC and whether a signed receipt is stored, and nothing else", () => {
+    expect(activityLine(row)).toBe("Label · Done · proposed 2026-11-18 09:00 UTC · decided 2026-11-18 09:30 UTC · signed receipt stored");
+    expect(activityLine({ ...row, state: "proposed", decidedAt: null, receiptAvailable: false })).toBe("Label · Proposed · proposed 2026-11-18 09:00 UTC");
+    expect(activityLine({ ...row, actionType: "compile_plan", state: "failed" })).toContain("Compile · Failed");
+  });
+  it("an action type or state this build does not know is shown plainly, never as markup", () => {
+    expect(activityLine({ ...row, actionType: "<img>" as never, state: "later" as never })).toContain("Change · later");
+    expect(renderToStaticMarkup(createElement(GrantActivity, { grantId: row.proposalId }))).toContain("Reading activity");
+  });
+  it("source: the panel offers Activity per grant, with the export and Show more, and no localStorage", () => {
+    const source = readFileSync(new URL("../components/workspace/agent-access-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain("?format=ndjson");
+    expect(source).toContain("Show more");
+    expect(source).toMatch(/aria-expanded=\{openActivity === grant\.grantId\}/);
   });
 });

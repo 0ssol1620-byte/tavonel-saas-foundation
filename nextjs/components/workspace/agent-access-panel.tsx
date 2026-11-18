@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { AGENT_CLIENT_LABEL_UNVERIFIED, AGENT_PROPOSAL_CONSENT } from "@/lib/agent-consent";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { saveAsFile } from "@/components/change-proposals-panel";
+import type { GrantActivityRow } from "@/lib/change-proposals";
 import styles from "./agent-access-panel.module.css";
 
 /*
@@ -34,6 +36,73 @@ async function api(path: string, init: RequestInit = {}) {
   const token = client ? (await client.auth.getSession()).data.session?.access_token ?? null : null;
   return fetch(path, { ...init, cache: "no-store", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init.body ? { "Content-Type": "application/json" } : {}) } });
+}
+
+const STATE_WORD: Record<string, string> = {
+  proposed: "Proposed", confirmed: "Confirmed", executed: "Done", rejected: "Rejected",
+  expired: "Expired", stale: "Out of date", failed: "Failed", undone: "Undone", withdrawn: "Withdrawn",
+};
+const TYPE_WORD: Record<string, string> = { library_label: "Label", compile_plan: "Compile", ontology_label_patch: "Label correction" };
+const ISO = (iso: string) => new Date(iso).toISOString().slice(0, 16).replace("T", " ");
+
+/** One activity line, from the row alone: type, state, created, decided (UTC, so it reads the same everywhere). */
+export function activityLine(row: GrantActivityRow): string {
+  return `${TYPE_WORD[row.actionType] ?? "Change"} · ${STATE_WORD[row.state] ?? row.state} · proposed ${ISO(row.createdAt)} UTC`
+    + (row.decidedAt ? ` · decided ${ISO(row.decidedAt)} UTC` : "") + (row.receiptAvailable ? " · signed receipt stored" : "");
+}
+
+const isActivityRow = (r: unknown): r is GrantActivityRow => Boolean(r) && typeof (r as GrantActivityRow).proposalId === "string"
+  && typeof (r as GrantActivityRow).state === "string" && typeof (r as GrantActivityRow).actionType === "string"
+  && Number.isFinite(Date.parse((r as GrantActivityRow).createdAt))
+  && ((r as GrantActivityRow).decidedAt === null || Number.isFinite(Date.parse((r as GrantActivityRow).decidedAt as string)));
+
+/** What one grant's agent proposed: a page at a time, and the same rows as an NDJSON download. A malformed answer shows nothing. */
+export function GrantActivity({ grantId }: { grantId: string }) {
+  const [rows, setRows] = useState<GrantActivityRow[] | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [busy, setBusy] = useState(false);
+  const base = `/api/agent-grants/${encodeURIComponent(grantId)}/activity`;
+
+  const read = useCallback(async (cursor: string | null) => {
+    setBusy(true);
+    try {
+      const response = await api(cursor ? `${base}?cursor=${encodeURIComponent(cursor)}` : base);
+      const body = await response.json().catch(() => null) as { activity?: unknown[]; nextCursor?: unknown } | null;
+      if (!response.ok || !body || !Array.isArray(body.activity) || !body.activity.every(isActivityRow)) { setState("unavailable"); return; }
+      setRows((current) => [...(cursor ? current ?? [] : []), ...(body.activity as GrantActivityRow[])]);
+      setNext(typeof body.nextCursor === "string" ? body.nextCursor : null);
+      setState("ready");
+    } catch {
+      setState("unavailable");
+    } finally {
+      setBusy(false);
+    }
+  }, [base]);
+  useEffect(() => { void read(null); }, [read]);
+
+  if (state === "loading") return <p className={styles.muted} aria-busy="true">Reading activity…</p>;
+  if (state === "unavailable") {
+    return <p className={styles.muted} role="status">Activity could not be read. <button type="button" className={styles.link} onClick={() => { setState("loading"); void read(null); }}>Try again</button></p>;
+  }
+  return (
+    <div className={styles.activity}>
+      {rows && rows.length > 0 ? (
+        <ul className={styles.list} aria-label="Activity">
+          {rows.map((row) => <li key={row.proposalId} className={styles.activityRow}>{activityLine(row)}</li>)}
+        </ul>
+      ) : <p className={styles.muted}>This connection has not proposed anything.</p>}
+      <div className={styles.actions}>
+        {next ? <button type="button" className={styles.action} disabled={busy} onClick={() => void read(next)}>Show more</button> : null}
+        {rows && rows.length > 0 ? (
+          <button type="button" className={styles.action} disabled={busy}
+            onClick={() => { void saveAsFile(`${base}?format=ndjson`, `agent-activity-${grantId}.ndjson`).then((ok) => { if (!ok) setState("unavailable"); }); }}>
+            Export these rows
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 const isGrant = (g: unknown): g is Grant => Boolean(g) && typeof (g as Grant).grantId === "string" && typeof (g as Grant).clientLabel === "string"
@@ -99,6 +168,7 @@ export default function AgentAccessPanel() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openActivity, setOpenActivity] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [token, dispatch] = useReducer(revealAfter, null as Reveal);
 
@@ -184,9 +254,14 @@ export default function AgentAccessPanel() {
                   {!grant.revokedAt ? (grant.lastUsedAt ? ` · last used ${day(grant.lastUsedAt)}` : " · not used yet") : ""}
                 </p>
               </div>
-              {!grant.revokedAt ? (
-                <button type="button" className={styles.action} disabled={busy} aria-label={`Disconnect “${grant.clientLabel}”`} onClick={() => void disconnect(grant)}>Disconnect</button>
-              ) : null}
+              <div className={styles.actions}>
+                <button type="button" className={styles.action} aria-expanded={openActivity === grant.grantId} aria-label={`Activity of “${grant.clientLabel}”`}
+                  onClick={() => setOpenActivity(openActivity === grant.grantId ? null : grant.grantId)}>Activity</button>
+                {!grant.revokedAt ? (
+                  <button type="button" className={styles.action} disabled={busy} aria-label={`Disconnect “${grant.clientLabel}”`} onClick={() => void disconnect(grant)}>Disconnect</button>
+                ) : null}
+              </div>
+              {openActivity === grant.grantId ? <GrantActivity grantId={grant.grantId} /> : null}
             </li>
           ))}
         </ul>
