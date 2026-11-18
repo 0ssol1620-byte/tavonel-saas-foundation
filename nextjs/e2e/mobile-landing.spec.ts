@@ -575,10 +575,24 @@ async function checkInSentenceLinks(page: import("@playwright/test").Page, route
 */
 for (const [route, v34Class] of Object.entries(V34_IN_SENTENCE)) {
   test(`a link inside a sentence on ${route} is judged by what it is, plain or hit area, and a V34 one is plain`, async ({ page }, testInfo) => {
-    test.skip(!["1440", "768", "390", "360"].includes(testInfo.project.name), "measured at 1440, 768, 390 and 360");
+    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360; 768 has its own rows below");
     await checkInSentenceLinks(page, route, v34Class);
   });
 }
+
+// The width projects CI runs (launch-qa.yml) do not include `768`, so 768 is a row of the 1440 project with its own
+// viewport, the way the coarse rows get their pointer; the row asserts the width it measured.
+test.describe("at 768", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+  for (const [route, v34Class] of Object.entries(V34_IN_SENTENCE)) {
+    test(`a link inside a sentence on ${route} meets the same contract at 768`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "the 768 rows run once, under the 1440 project, which CI runs");
+      await page.goto(route);
+      expect(await page.evaluate(() => innerWidth), "this context is 768 px wide").toBe(768);
+      await checkInSentenceLinks(page, route, v34Class);
+    });
+  }
+});
 
 test.describe("with a coarse pointer", () => {
   test.use({ hasTouch: true, isMobile: true });

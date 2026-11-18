@@ -186,12 +186,15 @@ describe("decision 23: a row link never sits inside a sentence", () => {
     ["platform", PlatformBody],
     ["journal", JournalBody],
     ["world", WorldBody],
-  ] as const)("/%s has no row link inside a sentence", (route, Body) => {
+  ] as const)("/%s has no row link inside a sentence, in its own sheet or in a sheet its body imports", async (route, Body) => {
     const html = renderToStaticMarkup(createElement(Body));
-    // Not vacuous: the render has links and the sheet has row classes for the rule to apply to.
+    // The body reaches many more sheets than its own (journal/covers, proof-line, world.module.css ...).
+    const sheets = await reachedSheets(`components/v34/routes/${route}/${route}.tsx`);
+    // Not vacuous: the render has links and the sheets have row classes for the rule to apply to.
     expect(linksInContext(html).length).toBeGreaterThan(0);
-    expect(renderedRowClasses(SHEETS[route]).size).toBeGreaterThan(0);
-    expect(rowLinksInSentences(html, SHEETS[route])).toEqual([]);
+    expect(sheets.length, "the body reaches its own sheet and at least one more").toBeGreaterThan(1);
+    expect(renderedRowClasses(sheets).size).toBeGreaterThanOrEqual(renderedRowClasses(SHEETS[route]).size);
+    expect(rowLinksInSentences(html, sheets)).toEqual([]);
   });
 
   it("/research ends the measured sentence before the /benchmarks link, which is its own row", () => {
