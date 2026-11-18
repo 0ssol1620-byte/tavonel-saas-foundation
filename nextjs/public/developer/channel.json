@@ -8,7 +8,7 @@
   "assets": {
     "cli": {
       "url": "https://tavonel.com/developer/tavonel-cli.mjs",
-      "sha256": "sha256:67c24a554df7f3dc6260933b31ceec8043322b7b6b917e98abe8e7795074b9bb"
+      "sha256": "sha256:fea455a338703d8de2e720859d9654a2ba5d9885bbe713ec13024c4ff8ccf8fd"
     },
     "mcp": {
       "url": "https://tavonel.com/developer/tavonel-mcp.mjs",
