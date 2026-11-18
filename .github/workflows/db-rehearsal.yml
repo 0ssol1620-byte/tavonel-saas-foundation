@@ -1357,6 +1357,9 @@ jobs:
             echo "the rollback left a difference no draft states"; exit 1
           fi
           test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4
+          # Operating rule this step encodes: a migration whose rollback draft has run is not applied again in the
+          # same window; after a rollback of 20261117120000 or anything before it, the forward path is a new
+          # migration version. So the job resets and compares instead of re-applying on the rolled-back database.
           supabase db reset
           fingerprint reset
           diff rollback-fingerprints/released.tsv rollback-fingerprints/reset.tsv
