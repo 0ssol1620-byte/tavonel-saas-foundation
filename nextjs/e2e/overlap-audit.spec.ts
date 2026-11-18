@@ -61,7 +61,21 @@ for (const width of WIDTHS) {
         });
         for (const finding of await page.evaluate(measureOverlap)) {
           if (allowed(route, finding)) continue;
-          failures.push(`${route} ${finding.kind}: ${finding.a} | ${finding.b} ${finding.text} [${finding.box}]`);
+          /* A sideways page scroll names no element by itself (WO-CI-41: the hosted run reported one the same build
+             does not show locally). Say which elements end right of the viewport and whether a stylesheet was
+             still loading, so the failure can be fixed where it is. The finding still fails the audit. */
+          const offenders = finding.kind !== "page-scroll" ? "" : await page.evaluate(() => {
+            const edge = document.documentElement.clientWidth;
+            const wide = [...document.querySelectorAll<HTMLElement>("body *")]
+              .map(element => ({ element, right: Math.round(element.getBoundingClientRect().right) }))
+              .filter(({ right }) => right > edge + 1);
+            const deepest = wide.filter(({ element }) => !wide.some(other => other.element !== element && element.contains(other.element)));
+            const names = deepest.slice(0, 5).map(({ element, right }) =>
+              `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}.${String(element.className).trim().split(/\s+/).slice(0, 2).join(".")}@${right}`);
+            const pendingSheets = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].filter(link => !link.sheet).length;
+            return ` offenders(${wide.length}; clientWidth ${edge}, innerWidth ${window.innerWidth}, pending stylesheets ${pendingSheets}, ${document.readyState}): ${names.join(", ") || "none"}`;
+          });
+          failures.push(`${route} ${finding.kind}: ${finding.a} | ${finding.b} ${finding.text} [${finding.box}]${offenders}`);
         }
       }
     } finally {
