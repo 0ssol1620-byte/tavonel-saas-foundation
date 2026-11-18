@@ -1049,6 +1049,44 @@ describe("a re-compile of a collection that already has an active World", () => 
   });
 });
 
+describe("a requested blueprint (WO-C-C1)", () => {
+  function coreAnswers() {
+    readyWorkspace();
+    fetched.mockResolvedValue({ ok: true, json: ocrResult("tavonel.ocr_result.v2", [{
+      regionId: "native-p0001", pageIndex0: 0, pageNumber1: 1, order: 0, blockType: "paragraph",
+      bbox1000: [0, 0, 1000, 1000], text: "The pump was inspected and the reading stayed inside the policy limits.",
+      confidence: 1, authority: "official",
+    }]) });
+    put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
+  }
+
+  it("is handed to the dispatch as given, and is absent when none was asked for", async () => {
+    coreAnswers();
+    dispatched.mockResolvedValue({ ok: true, result: { status: "completed", runtime: "tavonel-python-core-v2",
+      candidate: { worldStateId: "world-2", reviewReasons: [] },
+      receipt: { requestId: "request-2", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false } } });
+
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, undefined, undefined, "legal-contracts");
+    expect(dispatched.mock.calls[0]?.[9]).toBe("legal-contracts");
+
+    dispatched.mockClear();
+    await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(dispatched.mock.calls[0]?.[9]).toBeUndefined();
+  });
+
+  it("shows a Core refusal of it as a 422 that names the value, and writes nothing", async () => {
+    coreAnswers();
+    dispatched.mockResolvedValue({ ok: false, code: "CORE_REQUEST_INVALID" });
+
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, undefined, undefined, "research-library");
+
+    expect(run).toMatchObject({ ok: false, status: 422, code: "CORE_REQUEST_INVALID", payload: { requestedBlueprint: "research-library" } });
+    // Refused once: the compile is not repeated with another blueprint.
+    expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(put).not.toHaveBeenCalled();
+  });
+});
+
 describe("private global compile admission and release binding", () => {
   const key = `global-corpus/corpus-${"a".repeat(32)}`;
   function qualifySource(releaseDigest: string) {

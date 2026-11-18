@@ -13,6 +13,7 @@ import {
 import { CORE_CLIENT_TIMEOUT_MS, CORE_MAX_LATENCY_MS } from "./execution-budget";
 import { canonicalJsonWireField } from "./canonical-json-wire";
 import { readBoundedSourceBody } from "./bounded-source-body";
+import { isCoreBlueprintId, type CoreBlueprintId } from "./core-blueprint-choice";
 
 export const PRODUCT_CORE_REQUEST_SCHEMA = "tavonel.product_core.compile_request.v2" as const;
 export const PRODUCT_CORE_RESPONSE_SCHEMA = "tavonel.product_core.compile_response.v2" as const;
@@ -86,6 +87,8 @@ export type ProductCoreV2CompileRequest = {
   workspaceId: string;
   collectionId: string;
   requestedAt: string;
+  /** Only present when the caller chose one of the ids Core accepts; absent means Core picks. */
+  requestedBlueprint?: CoreBlueprintId;
   route: {
     /*
       The two literals `contracts.py` accepts for this caller, and the rule that binds them.
@@ -284,13 +287,17 @@ export function buildProductCoreV2Request(
   customerDataGate?: CustomerDataAuthorization,
   expectedSourceScope?: CustomerDataScope,
   logicalCollectionKey?: string,
+  requestedBlueprint?: CoreBlueprintId,
 ): ProductCoreV2CompileRequest {
+  if (requestedBlueprint !== undefined && !isCoreBlueprintId(requestedBlueprint)) throw new Error("CORE_BLUEPRINT_INVALID");
   const nativeIds = documents.map(document => document.logicalSourceId ?? document.documentId);
   if (nativeIds.some(id => !IDENTIFIER.test(id)) || new Set(nativeIds).size !== nativeIds.length) {
     throw new Error("COLLECTION_SOURCE_IDENTITY_INVALID");
   }
   const binding = productCoreV2RevisionId(workspaceId, documents, logicalCollectionKey);
   const collectionId = productCoreV2CollectionId(workspaceId, documents, logicalCollectionKey);
+  const workIdentity = previousActiveWorld
+    ? `${binding}\n${previousActiveWorld.worldStateId}\n${previousActiveWorld.manifestDigest}` : binding;
   return {
     schemaVersion: PRODUCT_CORE_REQUEST_SCHEMA,
     requestId,
@@ -310,13 +317,17 @@ export function buildProductCoreV2Request(
       refused. A revision compile *from a named prior World* is different work than the initial
       compile of the same documents, and the key now says so.
     */
-    idempotencyKey: `compile-${sha256(
-      previousActiveWorld ? `${binding}\n${previousActiveWorld.worldStateId}\n${previousActiveWorld.manifestDigest}` : binding,
-    ).slice(0, 40)}`,
+    /*
+      A different requested blueprint is different work on the same documents, and Core answers
+      CORE_IDEMPOTENCY_CONFLICT for one key with two bodies, so it joins the key -- only when
+      set, which keeps every no-field key byte-identical to what it was.
+    */
+    idempotencyKey: `compile-${sha256(requestedBlueprint ? `${workIdentity}\nrequested-blueprint:${requestedBlueprint}` : workIdentity).slice(0, 40)}`,
     tenantId: workspaceId,
     workspaceId,
     collectionId,
     requestedAt: now.toISOString(),
+    ...(requestedBlueprint ? { requestedBlueprint } : {}),
     route: {
       operationClass: previousActiveWorld ? "incremental_recompile" : "initial_compile",
       qualityRequirement: "high_assurance",
@@ -419,6 +430,22 @@ const NOT_PROJECTED_KINDS = new Set([
 const CORE_RELATION_PREDICATES = new Set(["mentions"]);
 const CONTRADICTION_REASONS = new Set(["numeric_disagreement", "polarity_disagreement"]);
 
+/**
+ * The blueprint id Core says it compiled with: `validation/report.json` of its own package
+ * (`compiler.py` writes `architecture.blueprint` there), which every `ontology_term` object it
+ * emitted must agree with. Null when it does not say, says something outside the seven ids, or
+ * contradicts itself.
+ */
+function readCoreBlueprintUsed(candidate: ProductCoreV2Candidate, objects: Array<Record<string, unknown>>): CoreBlueprintId | null {
+  const report = candidate.package.files.find((file) => file.path === "validation/report.json");
+  let id: unknown;
+  try { id = JSON.parse(report?.content ?? "").blueprint; } catch { return null; }
+  if (!isCoreBlueprintId(id)) return null;
+  const terms = objects.filter((item) => item.kind === "ontology_term")
+    .map((item) => (item.payload as Record<string, unknown> | null | undefined)?.blueprint);
+  return terms.every((term) => term === id) ? id : null;
+}
+
 export function projectProductCoreV2Candidate(
   result: ProductCoreV2CompileResponse,
   documents: CollectionOcrInput[],
@@ -432,6 +459,8 @@ export function projectProductCoreV2Candidate(
   */
   keepRevisionSnapshot = false,
   workspaceId?: string,
+  /** What the caller asked Core for; when set, Core's own answer must name the same blueprint. */
+  requestedBlueprint?: CoreBlueprintId,
 ): CollectionCandidateArtifact | null {
   if (documents.some((document) => document.ocrSchemaVersion === "tavonel.ocr_result.v3") && !workspaceId) return null;
   if (result.status === "rejected" || result.candidate.lifecycle === "rejected") return null;
@@ -463,6 +492,14 @@ export function projectProductCoreV2Candidate(
   const collectionId = typeof model.collectionId === "string" ? model.collectionId : "";
   const objects = Array.isArray(model.objects) ? model.objects as Array<Record<string, unknown>> : [];
   if (!IDENTIFIER.test(collectionId) || objects.length === 0) return null;
+  /*
+    What Core actually compiled with, read from Core's own answer and never from a constant or
+    from the request. A missing, unknown or self-contradicting answer refuses the projection:
+    a label that is a guess is the defect this replaces (the artifact used to say
+    generic-mixed-corpus for a compile Core had run as corporate-filings).
+  */
+  const coreBlueprintId = readCoreBlueprintUsed(result.candidate, objects);
+  if (!coreBlueprintId || (requestedBlueprint && coreBlueprintId !== requestedBlueprint)) return null;
   /*
     An object whose kind this projection has never been taught refuses the compile.
 
@@ -614,6 +651,7 @@ export function projectProductCoreV2Candidate(
       graph/relationships.csv that used it.
     */
     blueprint: { ...GENERIC_MIXED_CORPUS_BLUEPRINT, ontologyRelations: advertisedOntologyRelations(edges) },
+    coreBlueprintId,
     sourceDocuments: [...documents]
       .sort((left, right) => left.documentId.localeCompare(right.documentId))
       .map((document) => ({
@@ -749,6 +787,7 @@ export async function dispatchProductCoreV2(
   expectedSourceScope?: CustomerDataScope,
   logicalCollectionKey?: string,
   remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS,
+  requestedBlueprint?: CoreBlueprintId,
 ): Promise<
   | { ok: true; result: ProductCoreV2CompileResponse }
   | { ok: false; code: string; sizeLimit?: { object: "core-request"; bytes: number; bound: number }
@@ -758,6 +797,7 @@ export async function dispatchProductCoreV2(
   if (customerDataGate && !authorizationAdmitsCustomerData(customerDataGate, workspaceId, workspaceId, now, expectedSourceScope)) {
     return { ok: false, code: "CUSTOMER_DATA_GATE_DECISION_INVALID" };
   }
+  if (requestedBlueprint !== undefined && !isCoreBlueprintId(requestedBlueprint)) return { ok: false, code: "CORE_BLUEPRINT_INVALID" };
   const envelope = buildProductCoreV2Request(
     workspaceId,
     documents,
@@ -767,6 +807,7 @@ export async function dispatchProductCoreV2(
     customerDataGate,
     expectedSourceScope,
     logicalCollectionKey,
+    requestedBlueprint,
   );
   if (!Number.isSafeInteger(remainingLatencyMs) || remainingLatencyMs < 1000) return { ok: false, code: "CORE_V2_TIME_BUDGET_INVALID" };
   envelope.route.maxLatencyMs = Math.min(envelope.route.maxLatencyMs, remainingLatencyMs);

@@ -192,7 +192,7 @@ function packageFiles(overrides: Record<string, string> = {}) {
     "rag/documents.jsonl": `${JSON.stringify({ documentId: SRC, title: "Acceptance test report" })}\n`,
     "rag/chunks.jsonl": `${JSON.stringify(CHUNK_ROW)}\n`,
     "provenance/activities.jsonl": `${JSON.stringify({ sequence: 1, type: "document.ocr.verified", documentId: SRC })}\n`,
-    "validation/report.json": `${JSON.stringify({ status: "passed", matchingPolicy: "legacy", candidatePromotion: false, reviewReasons: [] })}\n`,
+    "validation/report.json": `${JSON.stringify({ status: "passed", matchingPolicy: "legacy", candidatePromotion: false, blueprint: "generic-mixed-corpus", reviewReasons: [] })}\n`,
     ...overrides,
   };
   return Object.entries(contents).map(([path, content]) => packageFile(path, content));

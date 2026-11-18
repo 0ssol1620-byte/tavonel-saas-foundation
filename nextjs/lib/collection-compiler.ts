@@ -8,6 +8,7 @@ import {
 import { validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
 import { judgeCompileSet } from "./compile-limits";
 import { csvCell } from "./csv-cell";
+import type { CoreBlueprintId } from "./core-blueprint-choice";
 
 export const COLLECTION_CANDIDATE_SCHEMA = "tavonel.collection_candidate.v1" as const;
 export const GENERIC_MIXED_CORPUS_BLUEPRINT = {
@@ -214,6 +215,12 @@ export type CollectionCandidateArtifact = {
   blueprint: Omit<typeof GENERIC_MIXED_CORPUS_BLUEPRINT, "ontologyRelations"> & {
     ontologyRelations: readonly string[];
   };
+  /**
+   * The blueprint Core reported compiling with (WO-C-C1). `blueprint` above stays the package
+   * vocabulary the customer verifier (SUPPORTED_BLUEPRINTS) reads; this is what Core used.
+   * Absent on the fallback compiler and on candidates stored before this field: not stated, not generic.
+   */
+  coreBlueprintId?: CoreBlueprintId;
   sourceDocuments: Array<{
     documentId: string;
     versionKey: string;

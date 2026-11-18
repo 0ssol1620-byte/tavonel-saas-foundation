@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -23,6 +24,7 @@ import {
   readRevisionCompileSnapshot,
   revisionCompileEnabled,
 } from "./core-runtime-v2";
+import { CORE_BLUEPRINT_IDS, readBlueprintChoice } from "./core-blueprint-choice";
 
 /** One reader for the source files these tests assert against, rather than four inline URLs. */
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -114,7 +116,7 @@ async function candidateFixture() {
   const collectionId = productCoreV2CollectionId("pilot", inputs());
   const files = await Promise.all(requiredPaths.map(async (path) => {
     const content = path === "validation/report.json"
-      ? `${JSON.stringify({ status: "passed", reviewReasons: [] })}\n`
+      ? `${JSON.stringify({ status: "passed", blueprint: "generic-mixed-corpus", reviewReasons: [] })}\n`
       : path === "source/collection-files.json"
         // A v2 Core manifest row: no OCR v3 reader metadata.
         ? `${JSON.stringify(inputs().map((input) => ({
@@ -425,7 +427,7 @@ describe("Python Product-Core v2 dispatch", () => {
   it("projects review-required Core output for signed inspection without making it promotable", async () => {
     const baseCandidate = await candidateFixture();
     const reviewReasons = ["CONTRADICTION_CANDIDATE:claim-a:claim-b"];
-    const validationContent = `${JSON.stringify({ status: "review_required", reviewReasons })}\n`;
+    const validationContent = `${JSON.stringify({ status: "review_required", blueprint: "generic-mixed-corpus", reviewReasons })}\n`;
     const candidate = {
       ...baseCandidate,
       lifecycle: "review_required" as const,
@@ -493,7 +495,7 @@ describe("the Core's validation record is projected rather than replaced", () =>
   async function reviewRequiredResponse(validation: Record<string, unknown>) {
     const baseCandidate = await candidateFixture();
     const reviewReasons = ["SOURCE_COVERAGE_INCOMPLETE"];
-    const validationContent = `${JSON.stringify({ status: "review_required", reviewReasons })}\n`;
+    const validationContent = `${JSON.stringify({ status: "review_required", blueprint: "generic-mixed-corpus", reviewReasons })}\n`;
     return {
       schemaVersion: PRODUCT_CORE_RESPONSE_SCHEMA,
       status: "review_required" as const,
@@ -611,12 +613,12 @@ describe("Core-computed relations and contradictions survive the projection", ()
     }),
     // Kinds the Core emits that this artifact shape has no place for: skipped, never refused.
     object("block", "block-1", [], { text: "The pump ran at 42 bar.", blockType: "paragraph" }),
-    object("ontology_term", "ontology-term-1", [], { term: "Equipment" }),
+    object("ontology_term", "ontology-term-1", [], { term: "Equipment", blueprint: "generic-mixed-corpus" }),
   ];
 
   async function response(objects: unknown[], reviewReasons = [`CONTRADICTION_CANDIDATE:${CONTRADICTION}`]) {
     const base = await candidateFixture();
-    const validationContent = `${JSON.stringify({ status: "review_required", reviewReasons })}\n`;
+    const validationContent = `${JSON.stringify({ status: "review_required", blueprint: "generic-mixed-corpus", reviewReasons })}\n`;
     return {
       schemaVersion: PRODUCT_CORE_RESPONSE_SCHEMA,
       status: "review_required" as const,
@@ -1016,4 +1018,120 @@ describe("K04 verified incremental response lineage", () => {
       else expect(result).toEqual({ ok: false, code: "CORE_V2_RECEIPT_INVALID" });
     },
   );
+});
+
+describe("a requested blueprint on the wire (WO-C-C1)", () => {
+  const SEVEN = ["corporate-filings", "course-materials", "generic-mixed-corpus", "legal-contracts", "personal-knowledge", "research-library", "technical-documentation"] as const;
+  const ENV = { url: "https://core-v2.example", hmac: "x".repeat(32) };
+  const when = new Date("2026-11-18T00:00:00Z");
+
+  it("offers exactly the seven ids the live Core accepts, and 'generic' means no field", () => {
+    expect([...CORE_BLUEPRINT_IDS]).toEqual([...SEVEN]);
+    expect(readBlueprintChoice(undefined)).toEqual({ ok: true, blueprint: undefined });
+    expect(readBlueprintChoice("generic")).toEqual({ ok: true, blueprint: undefined });
+    for (const id of SEVEN) expect(readBlueprintChoice(id)).toEqual({ ok: true, blueprint: id });
+    // The two ids Core answers 422 for, a case variant, padding, and wrong types: all refused.
+    for (const bad of ["creative-works", "team-workspace", "", "Generic", "LEGAL-CONTRACTS", " legal-contracts", null, 7, {}, ["legal-contracts"]]) {
+      expect(readBlueprintChoice(bad)).toEqual({ ok: false, code: "BLUEPRINT_UNSUPPORTED" });
+    }
+  });
+
+  it("leaves a request without a blueprint byte-identical, and puts the choice into the idempotency key", () => {
+    const none = buildProductCoreV2Request("pilot", inputs(), when, "request-1");
+    expect(JSON.stringify(none)).not.toContain("equestedBlueprint");
+    // The key as it was before this field existed: sha256 of the binding alone.
+    const legacyKey = `compile-${createHash("sha256").update(productCoreV2RevisionId("pilot", inputs())).digest("hex").slice(0, 40)}`;
+    expect(none.idempotencyKey).toBe(legacyKey);
+    const keys = new Set([none.idempotencyKey]);
+    for (const id of SEVEN) {
+      const request = buildProductCoreV2Request("pilot", inputs(), when, "request-1", null, undefined, undefined, undefined, id);
+      expect(request.requestedBlueprint).toBe(id);
+      keys.add(request.idempotencyKey);
+    }
+    // Same documents, eight different bodies: eight different keys, or Core answers CORE_IDEMPOTENCY_CONFLICT.
+    expect(keys.size).toBe(8);
+  });
+
+  it("never builds or sends a value outside the seven, and never replaces it", async () => {
+    const fetchCore = vi.fn();
+    vi.stubGlobal("fetch", fetchCore);
+    for (const bad of ["creative-works", "team-workspace", "generic", "", "x"]) {
+      expect(() => buildProductCoreV2Request("pilot", inputs(), when, "request-1", null, undefined, undefined, undefined, bad as never))
+        .toThrow("CORE_BLUEPRINT_INVALID");
+      await expect(dispatchProductCoreV2(ENV, "pilot", inputs(), when, null, undefined, undefined, undefined, undefined, bad as never))
+        .resolves.toEqual({ ok: false, code: "CORE_BLUEPRINT_INVALID" });
+    }
+    expect(fetchCore).not.toHaveBeenCalled();
+  });
+
+  it("sends the chosen id in the body of a real dispatch, and nothing when none was chosen", async () => {
+    const bodies: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      return Response.json({ code: "CORE_REQUEST_INVALID" }, { status: 422 });
+    }));
+    for (const id of [undefined, ...SEVEN]) {
+      const refused = await dispatchProductCoreV2(ENV, "pilot", inputs(), when, null, undefined, undefined, undefined, undefined, id);
+      expect(refused).toEqual({ ok: false, code: "CORE_REQUEST_INVALID" });
+    }
+    expect(bodies).toHaveLength(8);
+    expect("requestedBlueprint" in JSON.parse(bodies[0]!)).toBe(false);
+    expect(bodies.slice(1).map((body) => JSON.parse(body).requestedBlueprint)).toEqual([...SEVEN]);
+  });
+
+  async function answer(report: unknown, objects: Array<Record<string, unknown>> = []) {
+    const base = await candidateFixture();
+    const content = typeof report === "string" ? report : `${JSON.stringify(report)}\n`;
+    const files = base.package.files
+      .filter((file) => file.path !== "validation/report.json" || report !== null)
+      .map((file) => file.path === "validation/report.json"
+        ? { ...file, content, sizeBytes: Buffer.byteLength(content, "utf8") } : file);
+    return {
+      schemaVersion: PRODUCT_CORE_RESPONSE_SCHEMA,
+      status: "completed" as const,
+      runtime: "tavonel-python-core-v2" as const,
+      candidate: {
+        ...base,
+        canonicalKnowledgeModel: { ...base.canonicalKnowledgeModel, objects: [...base.canonicalKnowledgeModel.objects, ...objects] },
+        package: { ...base.package, files },
+      },
+      artifacts: [],
+      receipt: { requestId: "r", inputSha256: sha("1"), outputSha256: sha("2"), coreReleaseDigest: sha("3"), matchingPolicy: "legacy" as const,
+        candidatePromotion: false as const, equivalence: "not_run" as const, totalArtifacts: 0, rebuiltArtifacts: 0, workAvoidedArtifacts: 0 },
+    };
+  }
+  const term = (blueprint: unknown) => ({ stableId: `term-${String(blueprint)}`, kind: "ontology_term", payload: { term: "Equipment", blueprint }, sourceRefs: [{ documentId: "doc-1" }], links: [] });
+
+  it("labels the artifact with what Core reported, for each of the seven, not with the generic constant", async () => {
+    for (const id of SEVEN) {
+      const projected = projectProductCoreV2Candidate(await answer({ status: "passed", blueprint: id, reviewReasons: [] }, [term(id)]), inputs());
+      expect(projected?.coreBlueprintId).toBe(id);
+      // The package vocabulary the customer verifier reads is a different field and is not rewritten.
+      expect(projected?.blueprint.id).toBe(GENERIC_MIXED_CORPUS_BLUEPRINT.id);
+    }
+    // No field was sent and Core chose corporate-filings: the label says so.
+    expect(projectProductCoreV2Candidate(await answer({ status: "passed", blueprint: "corporate-filings" }), inputs())?.coreBlueprintId)
+      .toBe("corporate-filings");
+  });
+
+  it("refuses to label when Core's answer is missing, unknown, unreadable or contradicts itself", async () => {
+    const refused = [
+      await answer(null),
+      await answer({ status: "passed" }),
+      await answer({ status: "passed", blueprint: "creative-works" }),
+      await answer({ status: "passed", blueprint: "generic" }),
+      await answer({ status: "passed", blueprint: 7 }),
+      await answer("not json"),
+      await answer("null"),
+      await answer({ status: "passed", blueprint: "legal-contracts" }, [term("legal-contracts"), term("corporate-filings")]),
+      await answer({ status: "passed", blueprint: "legal-contracts" }, [term(undefined)]),
+    ];
+    for (const result of refused) expect(projectProductCoreV2Candidate(result, inputs())).toBeNull();
+  });
+
+  it("refuses an answer that names a different blueprint than the one requested", async () => {
+    const result = await answer({ status: "passed", blueprint: "corporate-filings" });
+    expect(projectProductCoreV2Candidate(result, inputs(), false, undefined, "legal-contracts")).toBeNull();
+    expect(projectProductCoreV2Candidate(result, inputs(), false, undefined, "corporate-filings")?.coreBlueprintId).toBe("corporate-filings");
+  });
 });

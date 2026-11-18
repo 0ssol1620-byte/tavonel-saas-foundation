@@ -28,6 +28,7 @@ import {
   PRODUCT_CORE_RESPONSE_SCHEMA,
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
+import type { CoreBlueprintId } from "./core-blueprint-choice";
 import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from "./customer-data-admission";
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
@@ -83,6 +84,8 @@ export type CollectionCompileSuccess = {
     receipt: Record<string, unknown> & { requestId: string; outputSha256: string; candidatePromotion: false };
   };
   blueprint: CollectionCandidateArtifact["blueprint"];
+  /** What Core reported compiling with; absent on the fallback compiler. */
+  coreBlueprintId?: CoreBlueprintId;
   directoryPlan: CollectionCandidateArtifact["directoryPlan"];
   ontology: CollectionCandidateArtifact["ontology"];
   validation: CollectionCandidateArtifact["validation"];
@@ -129,6 +132,8 @@ export async function runCollectionCompile(
   observationPrincipal?: CompileObservationPrincipal,
   /** The invocation's wall clock, when a scheduler tick owns it: Core is given what is left of it minus the settlement reserve. */
   deadlineAt?: number,
+  /** One of the ids Core accepts; undefined = the field is not sent and Core chooses. */
+  requestedBlueprint?: CoreBlueprintId,
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
   // An invocation identity, distinct from a durable job (which can have several attempts).
@@ -458,12 +463,16 @@ export async function runCollectionCompile(
     currentGate.scope,
     logicalCollectionKey,
     remainingMs,
+    requestedBlueprint,
   );
   if (!compiled.ok) {
     // CORE_OUTPUT_TOO_LARGE is deterministic -- a retry gets the same answer -- so 422, as Core says, not a retryable 503.
-    const status = compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413 : compiled.code === "CORE_OUTPUT_TOO_LARGE" ? 422 : 503;
+    // A refused blueprint is deterministic too: the same value gets the same answer, and is never replaced by another.
+    const blueprintRefused = requestedBlueprint !== undefined && (compiled.code === "CORE_REQUEST_INVALID" || compiled.code === "CORE_BLUEPRINT_INVALID");
+    const status = compiled.code === "COMPILE_INPUT_TOO_LARGE" ? 413
+      : compiled.code === "CORE_OUTPUT_TOO_LARGE" || blueprintRefused ? 422 : 503;
     return { ok: false, status, code: compiled.code,
-      payload: sizeLimitPayload(compiled) };
+      payload: { ...sizeLimitPayload(compiled), ...(blueprintRefused ? { requestedBlueprint } : {}) } };
   }
   if (globalCollection && compiled.result.receipt.coreReleaseDigest !== process.env.TAVONEL_GLOBAL_COLLECTION_CORE_RELEASE_SHA256) {
     return { ok: false, status: 502, code: "GLOBAL_COLLECTION_CORE_RELEASE_MISMATCH", payload: {} };
@@ -480,7 +489,7 @@ export async function runCollectionCompile(
       },
     };
   }
-  const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled(), workspaceId);
+  const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled(), workspaceId, requestedBlueprint);
   if (!projected) return { ok: false, status: 502, code: "CORE_V2_PROJECTION_INVALID", payload: {} };
   const artifact: CollectionCandidateArtifact = projected;
   const coreExecution: CollectionCompileSuccess["coreExecution"] = {
@@ -634,6 +643,7 @@ export async function runCollectionCompile(
       sourceDocuments: artifact.sourceDocuments,
       coreExecution,
       blueprint: artifact.blueprint,
+      ...(artifact.coreBlueprintId ? { coreBlueprintId: artifact.coreBlueprintId } : {}),
       directoryPlan: artifact.directoryPlan,
       ontology: artifact.ontology,
       validation: artifact.validation,

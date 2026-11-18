@@ -3,6 +3,7 @@ import { runCollectionCompile } from "@/lib/collection-compile-run";
 import { COMPILE_MAX_DOCUMENTS, judgeCompileSet } from "@/lib/compile-limits";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { readBoundedJson } from "@/lib/enterprise-http";
+import { readBlueprintChoice } from "@/lib/core-blueprint-choice";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { DOCUMENT_ID_PATTERN } from "@/lib/immutable-keys";
 import { assertFoundationIntakeCompileSet } from "@/lib/compute-reservation";
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     { code: parsed.code === "REQUEST_TOO_LARGE" ? "METADATA_ONLY_ENDPOINT" : "INVALID_JSON" },
     { status: parsed.code === "REQUEST_TOO_LARGE" ? 415 : 400, headers: { "Cache-Control": "no-store" } },
   );
-  const body = parsed.value as { documentIds?: unknown };
+  const body = parsed.value as { documentIds?: unknown; blueprint?: unknown };
   if (!Array.isArray(body.documentIds)) {
     return NextResponse.json({ code: "DOCUMENT_IDS_REQUIRED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
   if (documentIds.some((id) => !DOCUMENT_ID_PATTERN.test(id))) {
     return NextResponse.json({ code: "DOCUMENT_SET_UNQUALIFIED" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
+  // "generic" or no field: nothing is sent and Core chooses. Anything outside the seven ids is refused, never replaced.
+  const choice = readBlueprintChoice(body.blueprint);
+  if (!choice.ok) return NextResponse.json({ code: choice.code }, { status: 400, headers: { "Cache-Control": "no-store" } });
   const verdict = judgeCompileSet(documentIds.length);
   if (!verdict.ok) {
     return NextResponse.json(
@@ -68,7 +72,7 @@ export async function POST(request: Request) {
   const run = await runCollectionCompile(auth.principal.workspaceKey, documentIds, undefined, undefined, {
     userId: auth.principal.userId, provenance: "authenticated_request",
     authorizationRevision: auth.principal.authorizationRevision,
-  });
+  }, undefined, choice.blueprint);
   if (!run.ok) {
     const headers: Record<string, string> = { "Cache-Control": "no-store" };
     if (run.retryAfterSeconds) headers["Retry-After"] = String(run.retryAfterSeconds);
