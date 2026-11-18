@@ -177,11 +177,27 @@ describe("compile input manifest", () => {
   it("stops splitting as soon as the chunk count passes its bound", () => {
     // 200,000 regions of ~400 bytes at a 1,000-byte ceiling is one chunk per region: refused after the
     // 10,001st chunk, not after building and hashing all 200,000.
-    const region = { ...input.documents[0]!.regions[0]!, text: "y".repeat(300) };
-    const doc: CompileInputDocument = { ...input.documents[0]!, regions: new Array(200_000).fill(region) };
-    const started = Date.now();
-    expect(() => buildCompileInputManifest({ ...input, documents: [doc] }, { chunkBytesMax: 1_000 })).toThrow(/bounds/);
-    expect(Date.now() - started).toBeLessThan(1_000);
+    // The bound is asserted by count, not by wall clock (hosted runners took 1.07 s and 1.59 s where this
+    // machine takes about 0.6 s). `text` is a getter: every canonical() of the region reads it once, so the
+    // read count is the number of region serialisations. The whole-document size pass reads each region once
+    // (200,000); the splitter then reads PER_REGION (2, measured: 220,002 reads in all) per region it
+    // consumes. Stopping at the bound means about 10,001 regions more, not 200,000 more (600,000 reads).
+    const PER_REGION = 2;
+    const total = 200_000;
+    let reads = 0;
+    const region = { ...input.documents[0]!.regions[0]!, text: undefined as unknown as string };
+    Object.defineProperty(region, "text", { enumerable: true, get: () => (reads++, "y".repeat(300)) });
+    const doc: CompileInputDocument = { ...input.documents[0]!, regions: new Array(total).fill(region) };
+    let thrown: unknown;
+    try {
+      buildCompileInputManifest({ ...input, documents: [doc] }, { chunkBytesMax: 1_000 });
+    } catch (error) {
+      thrown = error;
+    }
+    const consumedBySplitter = reads - total;
+    expect(consumedBySplitter).toBeGreaterThanOrEqual(PER_REGION * COMPILE_INPUT_MANIFEST_MAX_ENTRIES);
+    expect(consumedBySplitter).toBeLessThanOrEqual(PER_REGION * (COMPILE_INPUT_MANIFEST_MAX_ENTRIES + 10));
+    expect(String(thrown)).toMatch(/more than 10000 chunks/);
   });
 
   it("never builds a manifest the verifier would refuse for its size: ids and list lengths are bounded", () => {
