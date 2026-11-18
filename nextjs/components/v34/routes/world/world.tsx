@@ -51,7 +51,7 @@ export function WorldBody() {
         />
         <p className={s.tableNote}>
           {loaded.length.toLocaleString("en-US")} of {stats.sources.total.toLocaleString("en-US")} sources
-          are documents the records were read from. The other {stats.sources.referenceOnly.toLocaleString("en-US")} are
+          are documents the curated records cite. The other {stats.sources.referenceOnly.toLocaleString("en-US")} are
           catalog entries that name a public data publisher.
         </p>
       </Section>

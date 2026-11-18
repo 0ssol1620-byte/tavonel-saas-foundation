@@ -22,33 +22,37 @@ export const SOURCE_AGENT_FILE = "/developer/tavonel-source-agent.py";
 export const SOURCE_AGENT_RUNBOOK = "/developer/source-agent-operations.md";
 
 export const HERO = {
-  figure: "A client reaches a World through read-only tools, over a local process or a URL, with one key that can be revoked.",
+  figure: "A client reaches a World through read-only tools, with one key that can be revoked.",
   primary: { href: MCP_DOCS_HREF, label: "Open the MCP steps" },
   secondary: { href: to("developers"), label: "Build on the API" },
 } as const;
 
+/*
+  WO-REL-4. The remote row and the by-URL column exist only while the remote endpoint is switched on
+  (lib/remote-mcp.ts). Switched off, the page names the local server alone: it describes what a
+  client can connect to here, and a URL or a sign-in method that answers 404 is neither.
+*/
 export const TRANSPORTS = {
-  eyebrow: "Two transports",
-  title: "Pick how your client connects.",
+  eyebrow: "Transports",
+  title: "How your client connects.",
   table: "The ways a client connects and the state of each",
   columns: ["Transport", "Where it runs", "Sign-in", "State"],
   local: ["Local server (stdio)", "A process your client launches from tavonel-mcp.mjs on your machine", "An API key in the server's env block", "Available"],
-  remote: ["Remote endpoint (HTTP)", "A URL your client connects to", "OAuth with PKCE, or an API key that holds only the read scopes"],
-  remoteOpen: "Available",
-  remoteClosed: "Closed on this site",
+  remote: ["Remote endpoint (HTTP)", "A URL your client connects to", "OAuth with PKCE, or an API key that holds only the read scopes", "Available"],
 } as const;
 
 export const CLIENTS = {
   eyebrow: "Client by client",
   title: "Where each client reads its setup.",
   lead: "The steps follow each client's own documentation. The MCP page carries the full procedure.",
-  table: "Setup location for each client, local and by URL",
-  columns: ["Client", "Local server", "By URL"],
+  table: "Setup location for each client",
+  columns: ["Client", "Local server"],
+  urlColumn: "By URL",
   rows: [
     ["Claude Desktop", "claude_desktop_config.json, read when the app starts", "Settings, Connectors, Add custom connector, then sign in"],
     ["Claude Code", ".mcp.json at the root of the project you open", "claude mcp add with the http transport, then /mcp to sign in"],
     ["Cursor", "The same config object, under the client's own path", ".cursor/mcp.json with the URL and a key in the Authorization header"],
-    ["Any MCP client", "The same config object, under the client's own path", "A custom remote server with OAuth as its authentication"],
+    ["Another MCP client", "The same config object, under the client's own path", "A custom remote server with OAuth as its authentication"],
   ],
 } as const;
 
@@ -57,7 +61,7 @@ export const STEPS = {
   title: "From download to first read, step by step.",
   items: [
     { title: "Download the server", text: "Take tavonel-mcp.mjs from the published files and check it against the sha256 in the distribution record before it runs." },
-    { title: "Create a read key", text: "In the workspace, open Developers and create an API key with read scopes. The server reads with this key." },
+    { title: "Create a read key", text: "On a paid plan, open Developers in the workspace and create an API key with read scopes. The server reads with this key." },
     { title: "Register it", text: "Add the block below to the client's config with the absolute path to the file. The key goes in the env block, which keeps it out of process listings." },
     { title: "Check it", text: "Run node tavonel-mcp.mjs --doctor. It checks the key, the distribution pin and one real read, and names which of the three failed. Restart the client afterwards, because it reads its config at launch." },
     { title: "Read a World", text: "List the tools the client now offers and read an active World with them. Every result carries its source version and the location inside it." },
@@ -76,7 +80,7 @@ export const TOOLS = {
 export const SOURCES = {
   eyebrow: "Source systems",
   title: "Bring sources in.",
-  lead: "A connector reads your files and writes nothing back. You start each import, and nothing compiles until you start the compile. Connection health, whether configured, expired or unreachable, is reported in your workspace, where you can act on it.",
+  lead: "A connector reads your files and writes nothing back. You start each import, and nothing compiles until you start the compile. Connection health, whether configured, expired or unreachable, is reported in your workspace, where you can act on it. Source connections come with a paid plan.",
   gate: "Connecting your own sources is arranged with us.",
   request: "Discuss your sources",
   explore: "Open the public Compiled World",

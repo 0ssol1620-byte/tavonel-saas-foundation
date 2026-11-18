@@ -47,7 +47,7 @@ export const MARKETS_BLOCKS: readonly ArticleBlock[] = [
   { kind: "h2", text: "What did you know at the decision date?" },
   { kind: "p", text: "Financial research can look rigorous while using information that had yet to be released. Macroeconomic series are revised, corporate filings can be amended, and publication times differ from the fiscal period they report. A result built on the latest data everywhere can make an in-sample simulation look better than it was. The answer is to record availability, version and source in the data itself, because a warning beside a chart leaves the data unchanged." },
   { kind: "h2", text: "Use the original sources" },
-  { kind: "p", text: "The St. Louis Fed's ALFRED service archives vintages, and its real-time period documentation explains how to request the information available over a historical date range. The SEC's EDGAR interfaces expose filing histories and extracted XBRL facts. Preserve the accession number, filing timestamp, period and units, and treat the latest company fact as today's value and a separate fact from the historical observation. Both are listed under Sources." },
+  { kind: "p", text: "The SEC's EDGAR interfaces expose filing histories and extracted XBRL facts, and its filing search holds the official record of each filing and its timestamp. Preserve the accession number, filing timestamp, period and units, and treat the latest company fact as today's value and a separate fact from the historical observation. Both are listed under Sources." },
   {
     kind: "figure",
     node: (

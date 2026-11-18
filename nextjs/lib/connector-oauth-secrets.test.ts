@@ -1,7 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { putOAuthSecret, readOAuthSecret, readOAuthSecretBrokerConfig } from "./connector-oauth-secrets";
+import { configuredOAuthProviders, putOAuthSecret, readOAuthSecret, readOAuthSecretBrokerConfig } from "./connector-oauth-secrets";
 
 afterEach(() => vi.unstubAllGlobals());
+
+/*
+  WO-REL-4: the one fact every connector tile follows. A provider counts only with its client, a managed
+  secret reference, an https public origin and the broker; any one missing or malformed leaves it out.
+*/
+describe("configuredOAuthProviders", () => {
+  const broker = { TAVONEL_OAUTH_SECRET_BROKER_URL: "https://vault.test", TAVONEL_OAUTH_SECRET_BROKER_TOKEN: "x".repeat(40) };
+  const drive = { TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_ID: "client-id", TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF: "vault://oauth/google", TAVONEL_PUBLIC_ORIGIN: "https://tavonel.com" };
+
+  it("names a provider only when its client and the broker are both configured", () => {
+    expect(configuredOAuthProviders({})).toEqual([]);
+    expect(configuredOAuthProviders({ ...broker, ...drive })).toEqual(["google_drive"]);
+    expect(configuredOAuthProviders(drive), "no broker, no provider").toEqual([]);
+    expect(configuredOAuthProviders({ ...broker, ...drive, TAVONEL_OAUTH_GOOGLE_DRIVE_CLIENT_SECRET_REF: "plain-secret" }), "an unmanaged secret").toEqual([]);
+    expect(configuredOAuthProviders({ ...broker, ...drive, TAVONEL_PUBLIC_ORIGIN: "http://tavonel.com" }), "a non-https origin").toEqual([]);
+    expect(configuredOAuthProviders({ ...broker, ...drive, TAVONEL_OAUTH_DROPBOX_CLIENT_ID: "dropbox-id" }), "a Dropbox id without its secret").toEqual(["google_drive"]);
+    expect(configuredOAuthProviders({ ...broker, ...drive, TAVONEL_OAUTH_DROPBOX_CLIENT_ID: "dropbox-id", TAVONEL_OAUTH_DROPBOX_CLIENT_SECRET_REF: "vault://oauth/dropbox" })).toEqual(["google_drive", "dropbox"]);
+  });
+});
 
 describe("OAuth secret broker", () => {
   it("requires HTTPS and a non-trivial broker credential", () => {

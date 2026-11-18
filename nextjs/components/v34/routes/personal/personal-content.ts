@@ -22,7 +22,7 @@ export const HOLDS = {
   items: [
     { title: "Your PDFs", text: "Course notes, books, papers, plans and records, added when you decide to add them." },
     { title: "Cited answers", text: "Ask a question and read the answer next to the pages it was taken from." },
-    { title: "Your AI of choice", text: "Any MCP client can read the World, and you can revoke its API key whenever you like." },
+    { title: "Your MCP client", text: "An MCP client that runs the local server reads the World with an API key from a paid plan, and you can revoke that key whenever you like." },
   ],
 } as const;
 

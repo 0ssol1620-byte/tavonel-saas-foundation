@@ -13,7 +13,8 @@ import { Section } from "@/components/v34/ui/section";
 import { Tag } from "@/components/v34/ui/tag";
 import { ToolList } from "@/components/v34/ui/tool-list";
 import { activationPolicy } from "@/lib/activation-policy";
-import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES } from "@/lib/connector-oauth";
+import { OAUTH_CONNECTOR_PROVIDERS, OAUTH_CONNECTOR_SCOPES, type OAuthConnectorProvider } from "@/lib/connector-oauth";
+import { configuredOAuthProviders } from "@/lib/connector-oauth-secrets";
 import { FIRST_CALL_SNIPPETS } from "@/lib/developer-snippets";
 import { MCP_TOOLS, MCP_TOOL_COUNT_WORD } from "@/lib/mcp-tools";
 import { remoteMcpEnabled } from "@/lib/remote-mcp";
@@ -37,13 +38,17 @@ function stdioConfig(): string {
   return snippet.body;
 }
 
-/** A provider the product connects to has a row here, or the page stops: the list cannot drift from the product. */
-function connectorRows() {
+/**
+ * A provider the product connects to has a row here, or the page stops: the list cannot drift from the product.
+ * WO-REL-4: a card is shown only for a provider this deployment can connect (`configured`), the same fact
+ * /api/v1/oauth-connectors reports and the workspace panel already follows.
+ */
+function connectorRows(configured: readonly OAuthConnectorProvider[]) {
   return OAUTH_CONNECTOR_PROVIDERS.map((provider) => {
     const row = CONNECTORS.find((connector) => connector.provider === provider);
     if (!row) throw new Error(`/connect has no row for the OAuth provider "${provider}"`);
     return row;
-  });
+  }).filter((row) => configured.includes(row.provider));
 }
 
 /**
@@ -84,11 +89,15 @@ function ClientToWorld() {
 }
 
 /** The page body, without the V34 frame, so it can be rendered on its own. */
-export function ConnectBody({ remoteOpen }: { remoteOpen: boolean }) {
+export function ConnectBody({ remoteOpen, oauthProviders = configuredOAuthProviders() }: {
+  remoteOpen: boolean;
+  oauthProviders?: readonly OAuthConnectorProvider[];
+}) {
   const record = v34Route("connect");
   const countWord = MCP_TOOL_COUNT_WORD;
   const gateClosed = !activationPolicy.customerData.enabled;
-  const remoteState = remoteOpen ? TRANSPORTS.remoteOpen : TRANSPORTS.remoteClosed;
+  const connectors = connectorRows(oauthProviders);
+  const legend = connectors.length ? SOURCES.legend : SOURCES.legend.filter(([term]) => term !== "Read-only");
   return (
     <>
       <Hero
@@ -109,12 +118,12 @@ export function ConnectBody({ remoteOpen }: { remoteOpen: boolean }) {
         surface="light"
         eyebrow={TRANSPORTS.eyebrow}
         title={TRANSPORTS.title}
-        lead={`The same ${countWord} read-only tools are served either way.`}
+        lead={remoteOpen ? `The same ${countWord} read-only tools are served either way.` : `The local server serves the ${countWord} read-only tools.`}
       >
         <ScrollTable
           label={TRANSPORTS.table}
           columns={TRANSPORTS.columns}
-          rows={[TRANSPORTS.local, [...TRANSPORTS.remote, remoteState]]}
+          rows={remoteOpen ? [TRANSPORTS.local, TRANSPORTS.remote] : [TRANSPORTS.local]}
         />
       </Section>
 
@@ -122,8 +131,8 @@ export function ConnectBody({ remoteOpen }: { remoteOpen: boolean }) {
         <p className={s.tagRow}><Tag kind="Configuration steps" /></p>
         <ScrollTable
           label={CLIENTS.table}
-          columns={CLIENTS.columns}
-          rows={CLIENTS.rows.map(([client, local, url]) => [client, local, remoteOpen ? url : TRANSPORTS.remoteClosed])}
+          columns={remoteOpen ? [...CLIENTS.columns, CLIENTS.urlColumn] : CLIENTS.columns}
+          rows={CLIENTS.rows.map(([client, local, url]) => (remoteOpen ? [client, local, url] : [client, local]))}
         />
       </Section>
 
@@ -164,7 +173,7 @@ export function ConnectBody({ remoteOpen }: { remoteOpen: boolean }) {
           </p>
         ) : null}
         <dl className={s.legend}>
-          {SOURCES.legend.map(([term, meaning]) => (
+          {legend.map(([term, meaning]) => (
             <div key={term} className={s.legendItem}>
               <dt className={s.legendTerm}>{term}</dt>
               <dd className={s.legendMeaning}>{meaning}</dd>
@@ -172,7 +181,7 @@ export function ConnectBody({ remoteOpen }: { remoteOpen: boolean }) {
           ))}
         </dl>
         <div className={s.cards}>
-          {connectorRows().map((connector) => (
+          {connectors.map((connector) => (
             <RecordCard key={connector.provider} kind="Read-only" label={connector.name}>
               <p className={s.cardText}>{connector.description}</p>
               <details className={s.technical}>

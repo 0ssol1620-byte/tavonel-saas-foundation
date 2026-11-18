@@ -510,13 +510,38 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
     expect(offers(html)).toEqual([]);
   }, RENDER_TIMEOUT);
 
+  /*
+    WO-REL-4 (release review B5): "What differs by plan" sold scoped developer keys on Developer and the review queue
+    and version history on Team and Business; Personal has both (same access level, same key route, the review queue at
+    the observer level). The row now says what is enforced, every figure read from the catalog, in both sale states.
+  */
+  it("says what differs by plan from the catalog, and sells no feature a cheaper plan already has", async () => {
+    const { BILLING_OFFERS } = await import("./billing-catalog");
+    const { personal, developer, team, business } = BILLING_OFFERS;
+    const n = (value: number) => value.toLocaleString("en-US");
+    for (const prices of ["both", "none"] as const) {
+      const html = decode(await pricingHtml({ delivered: true, prices }));
+      const row = /What differs by plan\s*([^\n]*?Every paid plan includes local-folder connections\.)/.exec(html)?.[1];
+      expect(row, `${prices}: the row is rendered`).toBeDefined();
+      expect(row).toContain(`${developer.label} differs from ${personal.label} in its monthly knowledge queries: ${n(developer.included.kqu)} KQU against ${n(personal.included.kqu)}.`);
+      expect(row).toContain(`${n(team.includedPages)} and ${n(business.includedPages)} pages, ${n(team.included.seats)} and ${n(business.included.seats)} seats`);
+      expect(row).not.toMatch(/scoped developer keys|review queue|version history|Google Drive/i);
+      expect(html).not.toMatch(/Review queue and version history/);
+    }
+  }, RENDER_TIMEOUT);
+
   it("no body renders an overage figure next to a Buy action, and no plan card names automation, SSO, an SLA or federation", async () => {
     for (const prices of ["both", "none"] as const) {
       const html = await pricingHtml({ delivered: true, prices });
       const start = html.indexOf('id="pricing-overage-title"');
       expect(start, "the overage table is rendered").toBeGreaterThan(0);
       const overage = html.slice(start, html.indexOf("</table>", start));
-      for (const rate of ["$0.04 / unit", "$0.006 / unit", "$0.20 / GB-month", "$15 / seat-month"]) expect(decode(overage)).toContain(rate);
+      for (const rate of ["$0.04 / unit", "$0.006 / unit"]) expect(decode(overage)).toContain(rate);
+      // WO-REL-4 (lead decision C3): a rate is published only for a meter that measures it. Nothing measures GB-months,
+      // and a second person cannot be added to a workspace, so the storage and extra-seat rows are gone.
+      const meters = [...overage.matchAll(/<th scope="row">([^<]*)/g)].map((row) => decode(row[1]).trim());
+      expect(meters).toEqual(["PCU", "KQU"]);
+      expect(decode(overage)).not.toMatch(/GB-month|seat-month|Storage|Extra seat/);
       expect(decode(overage), "the overage rows offer Request access and nothing to buy").not.toMatch(/\bBuy\b/);
       expect(decode(overage)).toContain("Request access");
       expect(decode(block(html, 'class="plans"', "div"))).not.toMatch(/automation|\bSSO\b|\bSLA\b|federation/i);
@@ -524,7 +549,7 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
       const kquRow = [...overage.matchAll(/<tr\b[\s\S]*?<\/tr>/g)].map((row) => decode(row[0])).find((row) => row.startsWith("KQU"));
       expect(kquRow).toContain("A KQU is one bounded knowledge retrieval request.");
       // N6: a meter is not a plan. Every overage row's Request access goes to the contact page with no plan named.
-      expect(anchors(overage)).toEqual(Array.from({ length: 4 }, () => ({ href: "/contact", label: "Request access" })));
+      expect(anchors(overage)).toEqual(Array.from({ length: 2 }, () => ({ href: "/contact", label: "Request access" })));
     }
   }, RENDER_TIMEOUT);
 

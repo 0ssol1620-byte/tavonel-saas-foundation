@@ -56,8 +56,13 @@ test("integration marketing copy uses access modes instead of beta badges", asyn
     once more than the rows that carry it: three managed connectors plus the legend's own <dt>,
     two customer-run rows plus its <dt>. The contract is the one this always measured -- every row
     declares who holds the credential, and none of them says "Beta".
+
+    WO-REL-4: /integrations redirects to /connect, whose managed-connector cards (and the legend's
+    Read-only term with them) are shown only for a provider the deployment can connect
+    (configuredOAuthProviders). The fixture build configures no OAuth provider, so none is shown;
+    the configured case is rendered in lib/v34/routes-connect.test.ts.
   */
-  await expect(main.getByText("Read-only", { exact: true })).toHaveCount(4);
+  await expect(main.getByText("Read-only", { exact: true })).toHaveCount(0);
   await expect(main.getByText("Customer-run", { exact: true })).toHaveCount(3);
 });
 

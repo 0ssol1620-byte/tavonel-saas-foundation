@@ -330,11 +330,14 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // caller owns the workspace. Delegated decision, 2026-09-11; the row is read off the
     // entitlement function, so it cannot say more than the code admits.
     // SD-02 (G2-002). This row used to end "Team keeps shared membership and roles", which
-    // What differs between plans is volume, developer keys and guided review, which is what this row says.
     // Identity and team-access requirements stay in Enterprise scoping rather than plan copy.
+    // WO-REL-4 (release review B5): Personal and Developer carry the same access level (observer_access),
+    // so the same keys and the same review; what is enforced between them is the KQU allowance
+    // (`included.kqu`, lib/kqu-meter.ts). Team and Business add pages and seats. Every figure is the
+    // catalog's; connections are a paid-plan level (a trial is refused with TRIAL_FEATURE_NOT_INCLUDED).
     [
       "What differs by plan",
-      `${DEVELOPER.label} adds scoped developer keys to ${PERSONAL.label}, with the larger monthly allowance its card states. ${TEAM.label} and ${BUSINESS.label} add the review queue and version history, at ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} included pages. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every plan includes Google Drive and file-server connections.`,
+      `${DEVELOPER.label} differs from ${PERSONAL.label} in its monthly knowledge queries: ${grouped(DEVELOPER.included.kqu)} KQU against ${grouped(PERSONAL.included.kqu)}. ${TEAM.label} and ${BUSINESS.label} add included pages and seats: ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} pages, ${grouped(TEAM.included.seats)} and ${grouped(BUSINESS.included.seats)} seats. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every paid plan includes local-folder connections.`,
     ],
     [
       "What does not consume pages",
@@ -444,7 +447,8 @@ function planDifferences(availability: PlanAvailabilityByCode, checkoutOpen: boo
     row("Included standard pages each month", (offer) => grouped(offer.includedPages)),
     row("Seats", (offer) => grouped(offer.included.seats)),
     row("How you get it", (_offer, code) => howYouGet(availabilityOf(availability, code), checkoutOpen)),
-    row("Review queue and version history", (offer) => offer.features.some((feature) => feature.includes("Review queue")) ? "Included" : "—"),
+    // WO-REL-4: "Review queue and version history" was read off a feature bullet and printed "—" for Personal and
+    // Developer, which reach the review queue at the observer level like every plan. It differs on no plan, so no row.
   ];
 }
 
@@ -1437,6 +1441,8 @@ export default function PricingPageClient({
               control. Automation runs, curated Worlds and the marketplace fee are not products and have no row.
               WO-CAT-2 N4: KQU is defined in its own row, one of the two places a not_sold meter may be named. N6: a
               meter is not a plan, so its Request access link carries no `plan` and goes to the contact page as is.
+              WO-REL-4 (lead decision C3): the storage and extra-seat rows are gone. Nothing measures GB-months, and a
+              second person cannot be added to a workspace today, so neither rate has a meter behind it.
             */}
             <h3 id="pricing-overage-title">Capacity past an allowance</h3>
             <div className="table-scroll">
@@ -1452,8 +1458,6 @@ export default function PricingPageClient({
                 {([
                   ["PCU", `${rate(METER_RATES_USD.pcu)} / unit`, null],
                   ["KQU", `${rate(METER_RATES_USD.kqu)} / unit`, "A KQU is one bounded knowledge retrieval request."],
-                  ["Storage", `${rate(METER_RATES_USD.storageGbMonth)} / GB-month`, null],
-                  ["Extra seat", `${rate(METER_RATES_USD.seatMonth)} / seat-month`, null],
                 ] as const).map(([meter, price, definition]) => (
                   <tr key={meter}>
                     <th scope="row">
