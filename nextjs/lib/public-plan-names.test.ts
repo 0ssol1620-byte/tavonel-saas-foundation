@@ -23,7 +23,13 @@ import { PRODUCT_NOUNS } from "./site-navigation";
 */
 
 const ROOT = join(__dirname, "..");
-const SCANNED_DIRS = ["app", "lib", "components", "content"];
+/*
+  r4: the /guide videos are public too. Their captions are served as public/guide/*.vtt (built from
+  scripts/guide/GUIDE-SCRIPTS.json), and the terminal scenes film scripts/guide/terminal/<session>.json
+  verbatim, so a sentence recorded there reaches a public page as pixels. Both directories are read.
+  The recorder's own .mjs (locators) is not public text and is not read.
+*/
+const SCANNED_DIRS = ["app", "lib", "components", "content", "scripts/guide", "public/guide"];
 const EXTRA_FILES = ["public/llms.txt"];
 
 const V22_NAMES = new Set<string>([
@@ -45,6 +51,21 @@ const word = (name: string) => new RegExp(`(?<![\\w-])${name}(?![\\w-])`);
 
 /** Every user-visible string of one source file: literals, template parts and JSX text. Comments are trivia and never reach here. */
 function visibleStrings(fileName: string, source: string): string[] {
+  /*
+    r4: JSON is read decoded, the way a page or a replay prints it. Read raw, an escaped "\nPro" put the
+    "n" of the escape before the name, the word boundary never matched, and the name was missed. A file
+    that does not parse throws: it fails the scan rather than being skipped.
+  */
+  if (fileName.endsWith(".json")) {
+    const out: string[] = [];
+    const collect = (value: unknown): void => {
+      if (typeof value === "string") out.push(value);
+      else if (Array.isArray(value)) value.forEach(collect);
+      else if (value && typeof value === "object") for (const [key, inner] of Object.entries(value)) { out.push(key); collect(inner); }
+    };
+    collect(JSON.parse(source));
+    return out;
+  }
   if (!/\.(?:ts|tsx|mts)$/.test(fileName)) return [source];
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, false, fileName.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const out: string[] = [];
@@ -89,7 +110,7 @@ function* walk(dir: string): Generator<string> {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name !== "node_modules") yield* walk(path);
-    } else if (/\.(?:ts|tsx|mts|md|mdx|json)$/.test(entry.name) && !/\.(?:test|spec|selftest)\.tsx?$/.test(entry.name)) {
+    } else if (/\.(?:ts|tsx|mts|md|mdx|json|vtt)$/.test(entry.name) && !/\.(?:test|spec|selftest)\.tsx?$/.test(entry.name)) {
       yield path;
     }
   }
@@ -137,10 +158,30 @@ describe("public plan names (WO-REL-1 closing round)", () => {
     ]) expect(findHits("x.ts", sentence.startsWith("//") ? sentence : JSON.stringify(sentence)), sentence).toEqual([]);
   });
 
+  it("reads a recorded terminal capture the way its replay prints it, at every position a name can sit", () => {
+    // The shape of scripts/guide/terminal/<session>.json: CLI stdout, itself JSON, stored as an escaped string.
+    const capture = (stdout: string) => JSON.stringify({ steps: [{ command: "node tavonel-cli.mjs status", stdout }] }, null, 2);
+    for (const name of ["Starter", "Pro", "Observer"]) {
+      for (const stdout of [
+        `{\n  "reason": "${name} can be bought online."\n}\n`,
+        `${name}\n`,
+        `x\n${name} plan\n`,
+        `"${name}"`,
+        `\t${name}\r\n`,
+      ]) expect(findHits("scripts/guide/terminal/api.json", capture(stdout)).flatMap((hit) => hit.names), JSON.stringify(stdout)).toContain(name);
+    }
+    expect(findHits("scripts/guide/terminal/api.json", capture('{\n  "reason": "Purchasing does not enable customer document processing today."\n}\n'))).toEqual([]);
+    expect(() => findHits("scripts/guide/terminal/api.json", "{ not json")).toThrow();
+  });
+
   it("finds no retired plan name, and no foreign plan name in a buy claim, in any public content source", () => {
     const files = [...SCANNED_DIRS.flatMap((dir) => [...walk(join(ROOT, dir))]), ...EXTRA_FILES.map((file) => join(ROOT, file))];
     expect(files.length, "the scan reached the sources").toBeGreaterThan(500);
     const named = files.map((path) => ({ path, file: relative(ROOT, path).split(sep).join("/") }));
+    const reached = new Set(named.map(({ file }) => file));
+    for (const guideFile of ["scripts/guide/GUIDE-SCRIPTS.json", "scripts/guide/terminal/api.json", "scripts/guide/terminal/mcp.json", "public/guide/guide-3-api-desktop.en.vtt"]) {
+      expect(reached.has(guideFile), `the scan reached ${guideFile}`).toBe(true);
+    }
     expect(named.filter(({ file }) => QUOTED_SOURCE_TEXT.test(file)).length, "the quoted-source exception names files that exist").toBeGreaterThan(0);
     const hits = named.filter(({ file }) => !QUOTED_SOURCE_TEXT.test(file)).flatMap(({ path, file }) => findHits(file, readFileSync(path, "utf8")));
     const unexcused = hits.filter((hit) => !allowed(hit)).map((hit) => `${hit.file} :: ${hit.sentence} [${hit.names.join(", ")}]`);

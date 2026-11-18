@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import EvaluationPage from "./evaluation-page";
+import { activationPolicy } from "@/lib/activation-policy";
 vi.mock("@/components/public-site-chrome", () => ({PublicSitePage: ({children}: {children: import("react").ReactNode}) => <main>{children}</main>}));
 describe("bounded evaluation funnel", () => {
   it("keeps only three required fields and discloses the processing boundary", () => {
@@ -8,7 +9,8 @@ describe("bounded evaluation funnel", () => {
     expect((html.match(/ required=""/g) ?? []).length).toBe(3);
     expect(html).toContain("An inquiry does not start processing");
     expect(html).toContain("Do not attach or paste customer documents here");
-    expect(html).toContain("rather than enabled by a plan purchase");
+    // WO-REL-1 r4: the page renders the policy's own sentence; pinned to the constant so a rewording cannot strand this test.
+    expect(html).toContain(activationPolicy.customerData.reason);
   });
   it("renders the complete evaluation path in English (/ko/evaluation redirects with a 308)", () => {
     const html = renderToStaticMarkup(<EvaluationPage />);

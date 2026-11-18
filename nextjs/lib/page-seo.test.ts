@@ -4,6 +4,7 @@ import { activationPolicy } from "./activation-policy";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { LANDING_V2_COPY } from "./landing-v2-copy";
 import { pageMetadata, type PageSeoRecord } from "./page-seo";
+import { KO_CHROME } from "./site-navigation";
 
 /*
   The failure paths are the point of this file.
@@ -176,7 +177,9 @@ describe("the Korean entry page stands on a fact, not a translation", () => {
       literally. The gate is still stated, still in Korean, still once.
     */
     expect(LANDING_V2_COPY.ko.start.microtext, "the Korean close states the gate in the reader's language")
-      .toContain("열린 뒤에는 요금제마다 바로 구매할 수 있는지, 저희와 함께 정하는지 요금제 페이지에 표시됩니다");
+      .toBe(KO_CHROME.customerDataGate);
+    // WO-REL-1 r4: pinned to the constant (a rewording cannot strand it); "in the reader's language" is kept as its own check.
+    expect(KO_CHROME.customerDataGate).toMatch(/^[^A-Za-z]*[가-힣]/);
     expect(copyDeck, "and the English close is the policy's own sentence, not a paraphrase")
       .toContain("microtext: activationPolicy.customerData.reason");
     expect(copyDeck, "the Korean close reads the site's one spelling of the gate, not a second one")
