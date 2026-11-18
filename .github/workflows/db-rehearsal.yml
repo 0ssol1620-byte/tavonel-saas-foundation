@@ -763,11 +763,16 @@ jobs:
       # their function bodies for uploaded sources. Replaying them after that create-once migration
       # would silently restore connector-only inventory logic. The first pass and pgTAP suite still
       # exercise the complete migration chain.
+      # 20260911130000 left the replay for the same reason when 20261117140000 arrived: that migration
+      # supersedes its `apply_foundation_billing_event_v4` body, so replaying the older file restores a
+      # body that refuses every v2 offer code (measured: hosted run at 60f1aae5, catalog_v2_offer_codes
+      # stopped at `billing_allowance_contract_invalid`). The glob is `2026091112*`: the three
+      # 2026-09-11 files that production did receive twice. 20260911130000 is create-once from here on.
       - name: Apply the repair migrations a second time and re-run the suite
         id: pgtap-second
         run: |
           eval "$(supabase status --output env | grep '^DB_URL=')"
-          for file in supabase/migrations/005[245]_*.sql supabase/migrations/20260911*_*.sql \
+          for file in supabase/migrations/005[245]_*.sql supabase/migrations/2026091112*_*.sql \
                       supabase/migrations/20260929152100_*.sql \
                       supabase/migrations/20261002110000_*.sql \
                       supabase/migrations/20261002130000_*.sql; do
