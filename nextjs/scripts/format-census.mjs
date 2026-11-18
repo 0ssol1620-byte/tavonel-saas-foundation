@@ -24,13 +24,14 @@ import { PROCESSING_CEILING } from "../../shared/intakeCeiling.ts";
 import { validateQualifiedDocumentInput } from "../../shared/qualifiedDocumentInputs.ts";
 import { MAX_FILES, MAX_SYNC_ARCHIVE_BYTES, expandArchive, inspectCentralDirectory } from "../lib/archive-expand.ts";
 import { listOAuthSourcePage } from "../lib/connector-oauth-adapters.ts";
+import { listGoogleDriveLifecyclePage } from "../lib/google-drive-lifecycle.ts";
 import { verifySourceSignature } from "../lib/magic-bytes.ts";
 import { importDescriptor } from "../lib/source-import.ts";
 import { quoteIntakeFile } from "../lib/usage-pricing.ts";
 import { prepareWorkspaceSelection } from "../lib/workspace-intake.ts";
 
 export const CENSUS_SCHEMA = "tavonel.format-census.v1";
-export const PATHS = ["upload", "archive", "source_agent", "connector"];
+export const PATHS = ["upload", "archive", "source_agent", "connector_dropbox", "connector_microsoft_graph", "connector_google_drive"];
 const NEXTJS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /*
@@ -105,6 +106,7 @@ export const realDeps = {
   prepareSelection: prepareWorkspaceSelection,
   describeImport: importDescriptor,
   listSource: listOAuthSourcePage,
+  listGoogle: listGoogleDriveLifecyclePage,
   liveManifest: CAPABILITY_MANIFEST,
   declaredManifest: DECLARED_INPUT_MANIFEST,
   readText: (relative) => {
@@ -181,25 +183,85 @@ async function archiveMemberVerdict(deps, stratum, ext, mime) {
   return uploadVerdict(deps, stratum, ext, member.file.type, member.file.name);
 }
 
-async function archiveContainerVerdict(deps, ext, mime) {
-  if (ext !== "zip") return notAccepted(deps, mime, "selection_unsupported");
+/** The container itself: the manifest row decides the verdict; what expansion did is a separate field, not a verdict. */
+async function archiveContainerVerdict(deps, stratum, ext, mime) {
+  const name = `census-synthetic.${ext}`;
+  const content = ext === "zip" ? zipOf("census-synthetic.pdf", bytes(HEADERS.pdf)) : bytes(ascii("synthetic"));
+  let selection;
   try {
-    await deps.prepareSelection([new File([zipOf("census-synthetic.pdf", bytes(HEADERS.pdf))], "census-synthetic.zip")]);
+    selection = await deps.prepareSelection([new File([content], name)]);
   } catch (error) {
     return { verdict: `not_computed:container_expansion_failed:${errorCode(error)}` };
   }
-  return { verdict: "accepted_best_effort", code: "expanded_in_browser_members_revalidated" };
+  if (selection.unsupported.includes(name)) return notAccepted(deps, mime, "selection_unsupported");
+  if (selection.files.length === 0) return { verdict: "not_computed:container_neither_expanded_nor_skipped" };
+  return { ...accepted(deps, stratum, mime), expansion: `expanded:${selection.files.length}_member` };
 }
 
-function connectorVerdict(deps, stratum, ext, mime) {
-  const name = `census-synthetic.${ext}`;
-  const descriptor = deps.describeImport({
-    nativeId: "synthetic", name, revision: "synthetic", mimeType: mime, sizeBytes: 1, modifiedAt: null, kind: "file",
+/** Synthetic provider pages, one row per probe extension, served to the real list readers through an injected fetcher. */
+const jsonResponse = (value) => new Response(JSON.stringify(value), { status: 200, headers: { "content-type": "application/json" } });
+const GOOGLE_PAGE = 25; // the reader refuses pages over 25 rows
+
+function dropboxPage(probes) {
+  return {
+    entries: probes.map((p, i) => ({ ".tag": "file", id: `id:${i}`, name: p.name, path_lower: `/${p.name}`, rev: "a1c10ce0dd78", size: 1, server_modified: "2026-01-01T00:00:00Z" })),
+    cursor: "census-cursor", has_more: false,
+  };
+}
+
+function graphPage(probes) {
+  return {
+    value: probes.map((p, i) => ({ id: `g${i}`, name: p.name, eTag: "e1", size: 1, lastModifiedDateTime: "2026-01-01T00:00:00Z", file: { mimeType: p.mime } })),
+    "@odata.deltaLink": "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=census",
+  };
+}
+
+function googleFetcher(probes) {
+  return async (url) => {
+    const u = new URL(String(url));
+    if (u.pathname.endsWith("/changes/startPageToken")) return jsonResponse({ startPageToken: "census-start" });
+    const from = Number(u.searchParams.get("pageToken") ?? 0);
+    const rows = probes.slice(from, from + GOOGLE_PAGE).map((p, i) => ({ id: `f${from + i}`, name: p.name, mimeType: p.mime, version: "1", size: "1", modifiedTime: "2026-01-01T00:00:00Z" }));
+    return jsonResponse({ files: rows, ...(from + GOOGLE_PAGE < probes.length ? { nextPageToken: String(from + GOOGLE_PAGE) } : {}) });
+  };
+}
+
+/** name -> listed item as the real reader produced it, or { failed } when the reader itself failed. */
+async function listedByProvider(deps, probes) {
+  const byName = (items) => new Map(items.map((item) => [item.name, item]));
+  const out = {};
+  const attempt = async (provider, run) => {
+    try { out[provider] = { items: byName(await run()) }; } catch (error) { out[provider] = { failed: errorCode(error) }; }
+  };
+  await attempt("dropbox", async () =>
+    (await deps.listSource({ provider: "dropbox", accessToken: "synthetic", cursor: null, fetcher: async () => jsonResponse(dropboxPage(probes)) })).items);
+  await attempt("microsoft_graph", async () =>
+    (await deps.listSource({ provider: "microsoft_graph", accessToken: "synthetic", cursor: null, fetcher: async () => jsonResponse(graphPage(probes)) })).items);
+  await attempt("google_drive", async () => {
+    const fetcher = googleFetcher(probes);
+    const items = [];
+    let cursor = null;
+    for (let guard = 0; guard < probes.length + 3 && items.length < probes.length; guard += 1) {
+      const page = await deps.listGoogle({ accessToken: "synthetic", cursor, fetcher });
+      items.push(...page.items);
+      cursor = page.cursor;
+    }
+    return items;
   });
-  if (descriptor) return accepted(deps, stratum, descriptor.mimeType);
-  // The descriptor is null on every refusal; the code comes from the gate it called.
-  const decision = deps.validateInput({ originalFilename: name, declaredMimeType: mime });
-  return decision.valid ? { verdict: "not_computed:descriptor_null_but_gate_accepts" } : notAccepted(deps, mime, decision.code);
+  return out;
+}
+
+/** One provider's verdict: the item the real list reader produced, through the real descriptor. */
+function connectorVerdict(deps, stratum, ext, mime, listed) {
+  if (listed.failed) return { verdict: `not_computed:connector_list_failed:${listed.failed}` };
+  const item = listed.items.get(`census-synthetic.${ext}`);
+  if (!item) return { verdict: "not_computed:probe_not_in_listed_page" };
+  const descriptor = deps.describeImport(item);
+  const note = { listedMimeType: item.mimeType };
+  if (descriptor) return { ...accepted(deps, stratum, descriptor.mimeType), ...note };
+  // The descriptor is null on every refusal; the code comes from the gate it called, on the MIME the listing carried.
+  const decision = deps.validateInput({ originalFilename: item.name, declaredMimeType: item.mimeType ?? "" });
+  return { ...(decision.valid ? { verdict: "not_computed:descriptor_null_but_gate_accepts" } : notAccepted(deps, mime, decision.code)), ...note };
 }
 
 function agentVerdict(deps, facts, stratum, ext) {
@@ -310,14 +372,22 @@ export async function computeCensus(deps = realDeps) {
   }
   const agent = sourceAgentFacts(deps);
   const strata = [];
+  const seen = new Map();
+  for (const stratum of STRATA) for (const { ext, mime } of stratum.exts) seen.set(ext, { name: `census-synthetic.${ext}`, mime });
+  const listed = await listedByProvider(deps, [...seen.values()]);
   for (const stratum of STRATA) {
     const rows = [];
     for (const { ext, mime } of stratum.exts) {
-      const archive = stratum.id === 15 ? await archiveContainerVerdict(deps, ext, mime) : await archiveMemberVerdict(deps, stratum, ext, mime);
+      const archive = stratum.id === 15 ? await archiveContainerVerdict(deps, stratum, ext, mime) : await archiveMemberVerdict(deps, stratum, ext, mime);
       const upload = uploadVerdict(deps, stratum, ext, mime);
       rows.push({
         ext, probeMime: mime,
-        paths: { upload, archive, source_agent: agentVerdict(deps, agent, stratum, ext), connector: connectorVerdict(deps, stratum, ext, mime) },
+        paths: {
+          upload, archive, source_agent: agentVerdict(deps, agent, stratum, ext),
+          connector_dropbox: connectorVerdict(deps, stratum, ext, mime, listed.dropbox),
+          connector_microsoft_graph: connectorVerdict(deps, stratum, ext, mime, listed.microsoft_graph),
+          connector_google_drive: connectorVerdict(deps, stratum, ext, mime, listed.google_drive),
+        },
         conditions: upload.verdict.startsWith("accepted") ? { upload: uploadConditions(deps, stratum, ext, mime) } : null,
       });
     }
@@ -360,7 +430,7 @@ export async function computeCensus(deps = realDeps) {
     notRun: [
       "gmail adapter: not examined (metadata-only per CIP; no entry-path function was called)",
       "byte ceiling: inline in the quote route, not callable (see over_bytes rows)",
-      "dropbox and microsoft_graph list readers: need network, not called",
+      "provider list pages are synthetic, in each provider's documented response shape, served to the real list readers through an injected fetcher; Dropbox lists no MIME, Graph and Google list the probe MIME, which a real provider may report differently",
       "stratum 1 and 2 share one extension: intake cannot tell a text PDF from a scan, so both rows are the same call",
       "probe MIME types are plausible browser values, not measured ones; a client that declares another MIME for the same extension is a different input",
     ],

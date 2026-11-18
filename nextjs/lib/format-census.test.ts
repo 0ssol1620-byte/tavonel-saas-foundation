@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeCensus, conditionLines, matrixLines, realDeps, renderMarkdown, STRATA } from "../scripts/format-census.mjs";
+import { computeCensus, conditionLines, matrixLines, PATHS, realDeps, renderMarkdown, STRATA } from "../scripts/format-census.mjs";
 
 /*
   The census is computed from the code, so this pins what the code does today. A change that adds,
@@ -9,48 +9,48 @@ import { computeCensus, conditionLines, matrixLines, realDeps, renderMarkdown, S
   Fixtures are synthetic; nothing here is a measured corpus result.
 */
 const PINNED_MATRIX = [
-  "1/pdf_text_layer/pdf upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "2/pdf_image_only/pdf upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "3/docx/docx upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "4/xlsx/xlsx upload=accepted_structure_lost archive=accepted_structure_lost source_agent=accepted_structure_lost connector=accepted_structure_lost",
-  "5/pptx/pptx upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "6/html/html upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector=declared_withheld",
-  "6/html/htm upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector=declared_withheld",
-  "7/subtitles/srt upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "7/subtitles/vtt upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "8/csv/csv upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector=declared_withheld",
-  "9/plain_text_markdown/txt upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector=declared_withheld",
-  "9/plain_text_markdown/md upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "10/raster_image/png upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "10/raster_image/jpg upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "10/raster_image/jpeg upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "10/raster_image/webp upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "10/raster_image/tif upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "10/raster_image/tiff upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "10/raster_image/gif upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "11/opendocument/odt upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "11/opendocument/ods upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "11/opendocument/odp upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector=accepted_best_effort",
-  "12/legacy_macro_office/doc upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "12/legacy_macro_office/xls upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "12/legacy_macro_office/ppt upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "12/legacy_macro_office/docm upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "12/legacy_macro_office/xlsm upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "12/legacy_macro_office/pptm upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "13/hwp_family/hwp upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "13/hwp_family/hwpx upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "13/hwp_family/hml upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "14/email/eml upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "14/email/msg upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "15/archive/zip upload=refused_typed:UNQUALIFIED_MIME archive=accepted_best_effort source_agent=refused_typed:unsupported_file_type connector=refused_typed:UNQUALIFIED_MIME",
-  "15/archive/rar upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "15/archive/7z upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "16/everything_else/json upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "16/everything_else/exe upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "16/everything_else/mp4 upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "16/everything_else/bin upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "16/everything_else/svg upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
-  "16/everything_else/rtf upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector=absent",
+  "1/pdf_text_layer/pdf upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "2/pdf_image_only/pdf upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "3/docx/docx upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "4/xlsx/xlsx upload=accepted_structure_lost archive=accepted_structure_lost source_agent=accepted_structure_lost connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_structure_lost connector_google_drive=accepted_structure_lost",
+  "5/pptx/pptx upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "6/html/html upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector_dropbox=declared_withheld connector_microsoft_graph=declared_withheld connector_google_drive=declared_withheld",
+  "6/html/htm upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector_dropbox=declared_withheld connector_microsoft_graph=declared_withheld connector_google_drive=declared_withheld",
+  "7/subtitles/srt upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "7/subtitles/vtt upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "8/csv/csv upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector_dropbox=declared_withheld connector_microsoft_graph=declared_withheld connector_google_drive=declared_withheld",
+  "9/plain_text_markdown/txt upload=declared_withheld archive=declared_withheld source_agent=refused_typed:unsupported_file_type connector_dropbox=declared_withheld connector_microsoft_graph=declared_withheld connector_google_drive=declared_withheld",
+  "9/plain_text_markdown/md upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "10/raster_image/png upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "10/raster_image/jpg upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "10/raster_image/jpeg upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "10/raster_image/webp upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "10/raster_image/tif upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "10/raster_image/tiff upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "10/raster_image/gif upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "11/opendocument/odt upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "11/opendocument/ods upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "11/opendocument/odp upload=accepted_best_effort archive=accepted_best_effort source_agent=accepted_best_effort connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=accepted_best_effort connector_google_drive=accepted_best_effort",
+  "12/legacy_macro_office/doc upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "12/legacy_macro_office/xls upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "12/legacy_macro_office/ppt upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "12/legacy_macro_office/docm upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "12/legacy_macro_office/xlsm upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "12/legacy_macro_office/pptm upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "13/hwp_family/hwp upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "13/hwp_family/hwpx upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "13/hwp_family/hml upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "14/email/eml upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "14/email/msg upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "15/archive/zip upload=refused_typed:UNQUALIFIED_MIME archive=not_computed:unmapped_status:UNSUPPORTED source_agent=refused_typed:unsupported_file_type connector_dropbox=refused_typed:UNQUALIFIED_MIME connector_microsoft_graph=refused_typed:UNQUALIFIED_MIME connector_google_drive=refused_typed:UNQUALIFIED_MIME",
+  "15/archive/rar upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "15/archive/7z upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "16/everything_else/json upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "16/everything_else/exe upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "16/everything_else/mp4 upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "16/everything_else/bin upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "16/everything_else/svg upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
+  "16/everything_else/rtf upload=absent archive=absent source_agent=refused_typed:unsupported_file_type connector_dropbox=absent connector_microsoft_graph=absent connector_google_drive=absent",
 ];
 
 const PINNED_CONDITIONS = [
@@ -193,9 +193,9 @@ describe("format census", () => {
     expect(census.strata.map((s: { id: number }) => s.id)).toEqual(STRATA.map((s) => s.id));
     expect(census.strata).toHaveLength(16);
     for (const stratum of census.strata) for (const row of stratum.rows) {
-      for (const path of ["upload", "archive", "source_agent", "connector"]) expect((row.paths as Record<string, { verdict: string }>)[path].verdict).toMatch(VERDICT);
+      for (const path of PATHS) expect((row.paths as Record<string, { verdict: string }>)[path].verdict).toMatch(VERDICT);
     }
-    for (const path of ["upload", "archive", "source_agent", "connector"]) {
+    for (const path of PATHS) {
       const { denominator_extension_probes: n, counts } = census.summary[path];
       expect(Object.values(counts as Record<string, number>).reduce((a, b) => a + b, 0)).toBe(n);
     }
@@ -230,5 +230,57 @@ describe("format census", () => {
   it("reports a fixture baseline that the real signature check refuses as an error, not a row", async () => {
     const mutated = mutate({ verifySignature: () => ({ ok: false, code: "SOURCE_SIGNATURE_UNRECOGNISED" }) });
     await expect(computeCensus(mutated)).rejects.toThrow("CENSUS_FIXTURE_BASELINE_REFUSED");
+  });
+
+  it("Dropbox verdicts come from the real list reader: it lists no MIME, so no extension is qualified", async () => {
+    const census = await computeCensus();
+    for (const stratum of census.strata) for (const row of stratum.rows) {
+      expect((row.paths.connector_dropbox as { listedMimeType?: unknown }).listedMimeType).toBeNull();
+      expect(row.paths.connector_dropbox.verdict).not.toMatch(/^accepted/);
+    }
+    const pdf = census.strata[0].rows[0].paths;
+    expect(pdf.connector_dropbox.verdict).toBe("refused_typed:UNQUALIFIED_MIME");
+    expect(pdf.connector_microsoft_graph.verdict).toBe("accepted_best_effort");
+    expect(pdf.connector_google_drive.verdict).toBe("accepted_best_effort");
+  });
+
+  it("a list reader that does hand back a MIME changes the connector verdict (not typed by hand)", async () => {
+    const withMime = mutate({
+      listSource: async (input: Parameters<typeof realDeps.listSource>[0]) => {
+        const page = await realDeps.listSource(input);
+        return { ...page, items: page.items.map((item: { name: string }) => ({ ...item, mimeType: "application/pdf" })) };
+      },
+    });
+    const pdf = (await computeCensus(withMime)).strata[0].rows[0].paths;
+    expect(pdf.connector_dropbox.verdict).toBe("accepted_best_effort");
+  });
+
+  it("a provider whose list reader fails is not_computed for every row, never a verdict", async () => {
+    const census = await computeCensus(mutate({ listGoogle: async () => { throw new Error("DRIVE_REQUEST_FAILED"); } }));
+    for (const stratum of census.strata) for (const row of stratum.rows) {
+      expect(row.paths.connector_google_drive.verdict).toBe("not_computed:connector_list_failed:DRIVE_REQUEST_FAILED");
+    }
+  });
+
+  it("the zip container verdict is the manifest row's, and expansion is a separate field outside the verdict counts", async () => {
+    const census = await computeCensus();
+    const [zip, rar, sevenZ] = census.strata.find((s: { id: number }) => s.id === 15)!.rows;
+    expect(zip.paths.archive.verdict).toBe("not_computed:unmapped_status:UNSUPPORTED");
+    expect((zip.paths.archive as { expansion?: string }).expansion).toBe("expanded:1_member");
+    expect((census.summary.archive.counts as Record<string, number>).accepted_best_effort).toBe(13);
+    expect(JSON.stringify(census.summary.archive.counts)).not.toContain("expanded");
+    expect(rar.paths.archive.verdict).toBe("absent");
+    expect(sevenZ.paths.archive.verdict).toBe("absent");
+  });
+
+  it("rar and 7z are judged by the real selection function: a selection that stages one is not a refusal", async () => {
+    const staged = mutate({
+      prepareSelection: async (files: File[]) => ({ files: files.map((file) => ({ file, relativePath: file.name })), unsupported: [], warnings: [], archiveCount: 0 }),
+    });
+    const census = await computeCensus(staged);
+    const [, rar] = census.strata.find((s: { id: number }) => s.id === 15)!.rows;
+    expect(rar.paths.archive.verdict).not.toBe("absent");
+    const none = await computeCensus(mutate({ prepareSelection: async () => ({ files: [], unsupported: [], warnings: [], archiveCount: 0 }) }));
+    expect(none.strata.find((s: { id: number }) => s.id === 15)!.rows[1].paths.archive.verdict).toBe("not_computed:container_neither_expanded_nor_skipped");
   });
 });
