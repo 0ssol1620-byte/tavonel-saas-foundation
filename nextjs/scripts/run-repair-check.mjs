@@ -22,8 +22,8 @@ const registeredUnitTestPaths = new Set([
   'eval/ask-quality/e2/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
-// The seven scripts/db suites (WO-CI-7 L5/L7) run without a DSN and with no skip: each refuses or fails closed when no PostgreSQL answers.
-const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
+// The eight scripts/db suites (WO-CI-7 L5/L7, round 8) run without a DSN and with no skip: each refuses or fails closed when no PostgreSQL answers.
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);

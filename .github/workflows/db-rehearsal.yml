@@ -1258,3 +1258,119 @@ jobs:
         run: |
           export TAVONEL_LOCAL_SEAWEED_EXE="$RUNNER_TEMP/tavonel-transport-runtime/weed"
           node scripts/journey/local-browser-storage-transport-journey.mjs
+
+  # Release stage 1 rollback rehearsal (WO-CI-7 round 8, from WO-REL-3's proposal). Every migration after the production
+  # boundary is applied, then rolled back newest-first by its own reviewed draft under supabase/drafts (each draft run as
+  # the operator runs it, then its tracker row deleted as the draft's header tells the operator to), and the schema must
+  # equal the boundary schema except the four foundation_compute_reservations column/constraint lines that
+  # rollback-20261117120000 keeps on purpose (its header: the metered columns hold what was charged). Then the local
+  # database is reset and its schema must equal the released one, so the job ends on the released schema. The migrations
+  # are not applied again onto the rolled-back schema: 20261117120000 cannot apply there by design (the kept check
+  # constraints meet its unguarded `add constraint`; its draft says a re-release is a new migration version). Any other
+  # difference, a draft that refuses, a migration without exactly one draft, or a reset that differs stops the job red. A separate job, so a red rollback rehearsal is never confused with a red chain (db-rehearsal).
+  # Same gate as db-rehearsal: it runs exactly when that job runs. No secret, no project ref, no remote database.
+  stage-rollback-rehearsal:
+    name: Stage rollback rehearsal (drafts newest-first, then reset to the released schema)
+    needs: [collector-only-eligibility]
+    if: >-
+      always() && needs.collector-only-eligibility.result == 'success' &&
+      ((needs.collector-only-eligibility.outputs.native_database == 'true' && needs.collector-only-eligibility.outputs.intended == 'true' && needs.collector-only-eligibility.outputs.eligible == 'false') ||
+       (needs.collector-only-eligibility.outputs.native_database == 'false' && needs.collector-only-eligibility.outputs.intended == 'false' && needs.collector-only-eligibility.outputs.eligible == 'false'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # The last migration production applied before release stage 1 (origin/main dbf52077). A boundary fact, pinned like
+      # HISTORY_BOUNDARY; it moves only with the release that moves production past it.
+      ROLLBACK_BOUNDARY: "20261110040000"
+    steps:
+      - name: Keep the local stack ports out of this runner's ephemeral range
+        run: |
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          key=/proc/sys/net/ipv4/ip_local_reserved_ports
+          before="$(cat "$key")"
+          sudo sysctl -w net.ipv4.ip_local_reserved_ports="${before:+$before,}54320-54329"
+          ss -Htanp '( sport >= :54320 and sport <= :54329 )' || true
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+      - name: Use the official Docker Hub image registry for the local stack
+        run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io" >> "$GITHUB_ENV"
+      - name: Create the local stack config
+        run: |
+          test -f supabase/config.toml || supabase init
+          grep -qx 'major_version = 17' supabase/config.toml
+      # A tree with no migration after the boundary has nothing to roll back (state=absent, said in the log). Otherwise every
+      # such migration must have exactly one draft named rollback-<version>-*.sql: a missing or a second draft fails here.
+      - name: Pair every migration after the boundary with exactly one rollback draft
+        id: pairs
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          : > /tmp/rollback-pairs.tsv
+          for file in supabase/migrations/*.sql; do
+            version="$(basename "$file" | sed -E 's/^([0-9]+)_.*/\1/')"
+            if [[ ! "$version" > "$ROLLBACK_BOUNDARY" ]]; then continue; fi
+            drafts=(supabase/drafts/rollback-"$version"-*.sql)
+            if [ "${#drafts[@]}" -ne 1 ]; then echo "migration $file has ${#drafts[@]} rollback drafts, not exactly one"; exit 1; fi
+            printf '%s\t%s\t%s\n' "$version" "$file" "${drafts[0]}" >> /tmp/rollback-pairs.tsv
+          done
+          count="$(wc -l < /tmp/rollback-pairs.tsv)"
+          cat /tmp/rollback-pairs.tsv
+          echo "migrations after $ROLLBACK_BOUNDARY: $count"
+          if [ "$count" -eq 0 ]; then echo "state=absent" >> "$GITHUB_OUTPUT"; else echo "state=present" >> "$GITHUB_OUTPUT"; fi
+      - name: Apply the chain up to the boundary and fingerprint it
+        if: steps.pairs.outputs.state == 'present'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rollback-parked rollback-fingerprints
+          cut -f2 /tmp/rollback-pairs.tsv | while read -r file; do mv "$file" /tmp/rollback-parked/; done
+          supabase db start
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          # Sorted: the file orders by (kind, object) only and two overloads can share a 63-byte object key, so its row order is not defined.
+          psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql | LC_ALL=C sort > rollback-fingerprints/boundary.tsv
+          mv /tmp/rollback-parked/*.sql supabase/migrations/
+          echo "boundary fingerprint rows: $(wc -l < rollback-fingerprints/boundary.tsv)"
+      - name: Apply every migration, roll back newest-first with the drafts, then reset and compare with the released schema
+        if: steps.pairs.outputs.state == 'present'
+        run: |
+          set -euo pipefail
+          supabase db reset
+          eval "$(supabase status --output env | grep '^DB_URL=')"
+          fingerprint() { psql "$DB_URL" -X -v ON_ERROR_STOP=1 -At -F "$(printf '\t')" -f nextjs/scripts/db/catalog-fingerprints.sql | LC_ALL=C sort > "rollback-fingerprints/$1.tsv"; }
+          fingerprint released
+          mapfile -t pairs < <(tac /tmp/rollback-pairs.tsv)
+          for pair in "${pairs[@]}"; do
+            IFS=$'\t' read -r version file draft <<< "$pair"
+            echo "rolling back $version with $draft"
+            psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$draft"
+            psql "$DB_URL" -X -v ON_ERROR_STOP=1 -c "delete from supabase_migrations.schema_migrations where version = '$version';"
+          done
+          fingerprint rolled-back
+          # Every changed line, either side, must be one of the four rows rollback-20261117120000 keeps on purpose.
+          diff rollback-fingerprints/boundary.tsv rollback-fingerprints/rolled-back.tsv | grep '^[<>]' > rollback-fingerprints/rolled-back.diff || true
+          cat rollback-fingerprints/rolled-back.diff
+          if grep -v -E $'^[<>] (column|constraint)\tfoundation_compute_reservations\t' rollback-fingerprints/rolled-back.diff; then
+            echo "the rollback left a difference no draft states"; exit 1
+          fi
+          test "$(wc -l < rollback-fingerprints/rolled-back.diff)" -eq 4
+          # Operating rule this step encodes: a migration whose rollback draft has run is not applied again in the
+          # same window; after a rollback of 20261117120000 or anything before it, the forward path is a new
+          # migration version. So the job resets and compares instead of re-applying on the rolled-back database.
+          supabase db reset
+          fingerprint reset
+          diff rollback-fingerprints/released.tsv rollback-fingerprints/reset.tsv
+          echo "rolled back $(wc -l < /tmp/rollback-pairs.tsv) migrations to the boundary schema; the reset database has the released schema"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.pairs.outputs.state == 'present'
+        with:
+          name: stage-rollback-fingerprints-${{ github.event.pull_request.head.sha || github.sha }}
+          path: rollback-fingerprints/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Stop only the runner's disposable local stack
+        if: always()
+        run: supabase stop --no-backup
