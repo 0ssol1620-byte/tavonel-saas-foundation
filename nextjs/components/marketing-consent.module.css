@@ -41,6 +41,31 @@
   color: var(--text-hi);
   font: inherit;
 }
+/*
+  WO-CI-36: the card is fixed over the foot of the page, so while it is open it covers whatever the document puts
+  there -- measured at 360, 390, 768 and 1440 with the page scrolled to its end: the footer's legal row (Privacy,
+  Terms, Refunds, Subprocessors and the reopen control at 360 and 390; the Explore row and the security address at
+  1440). A visitor could not reach those links without answering the card. While the card is open the page gets
+  room after its footer, on the footer's own ground (`:has` on the card's class, so the room goes when the card does; the
+  footer's box, and the height budget it is held to, do not change). The room is the most the card can occupy -- its
+  `max-height` of a quarter of the viewport plus its inset -- so no copy length can put the card back over a row.
+  Home from 900px seats the card in a row under the header, over nothing at the end of the page, and gets none.
+  CSS only: nothing measures the card.
+*/
+:global(body):has(.panel) :global([data-v34-site])::after {
+  content: "";
+  display: block;
+  height: calc(25vh + max(16px, env(safe-area-inset-bottom)));
+  background: var(--v34-forest);
+}
+@supports (height: 1dvh) {
+  :global(body):has(.panel) :global([data-v34-site])::after {
+    height: calc(25dvh + max(16px, env(safe-area-inset-bottom)));
+  }
+}
+@media (min-width: 900px) {
+  :global(body:has([data-home-ia])):has(.panel) :global([data-v34-site])::after { display: none; }
+}
 /* Home sets Wanted Sans on its own wrapper; this card mounts outside it, so it would fall back to the root Geist. */
 /*
   FINAL-SPEC 2026-10-26 §3.3: on /ko the sheet's Hangul is drawn from the same preloaded KO Home subset as the
