@@ -240,17 +240,76 @@ describe("tokens, targets and states", () => {
     }
   });
 
-  it("gives every link class a 24px target, a hover and a focus state", () => {
+  /*
+    Lead decision 23 (WO-CI-29; replaces decision 22). A link alone in a row keeps a floor-sized target. A
+    link inside a sentence is a plain inline box whose target is its text (WCAG 2.5.8 excepts it) at every
+    width: a 44px box inside a 19 to 30px line reaches into the lines above and below whatever the width,
+    where it shares tap area with a link on the next line or covers that line's words. So, inside any media
+    or other at-rule block as well as outside, nothing may grow its box, its line or move it:
+    - outside any condition: no display but inline, no min-height or height, no own line-height or
+      vertical-align, no block padding, no top, bottom or block border, no position, offset, float,
+      transform, translate, scale, rotate or zoom;
+    - inside any condition (a media query at any width or pointer, a nested block, forced colours): only
+      paint -- colour, outline, background and text decoration.
+    IN_SENTENCE names the classes rendered mid-sentence, with the lines that render them; every other link
+    class stands alone, so no class is in neither group, and a name or a line here that the sources no longer
+    bear fails.
+  */
+  const BOX = /^(?:display|min-height|height|max-height|line-height|vertical-align|position|top|bottom|left|right|inset(?:-[a-z]+)*|float|transform|translate|scale|rotate|zoom|padding(?:-top|-bottom|-block(?:-start|-end)?)?|border(?:-top|-bottom|-block(?:-start|-end)?)?(?:-width|-style)?)$/;
+  const PAINT = /^(?:color|outline(?:-color|-style|-width|-offset)?|background(?:-color|-clip)?|text-decoration(?:-[a-z]+)?|text-underline-offset|forced-color-adjust)$/;
+  // Every style rule with the at-rule conditions that hold it ("" outside any); nested blocks are walked.
+  const cssRules = (css: string, condition = ""): { condition: string; selector: string; declarations: [string, string][] }[] => {
+    const out: { condition: string; selector: string; declarations: [string, string][] }[] = [];
+    for (let i = 0, open = css.indexOf("{"); open >= 0; open = css.indexOf("{", i)) {
+      let depth = 1;
+      let j = open + 1;
+      for (; j < css.length && depth > 0; j++) depth += css[j] === "{" ? 1 : css[j] === "}" ? -1 : 0;
+      expect(depth, "the sheet's braces balance").toBe(0);
+      const prelude = css.slice(i, open).split(/[;}]/).at(-1)!.trim().replace(/\s+/g, " ");
+      const body = css.slice(open + 1, j - 1);
+      if (prelude.startsWith("@")) out.push(...cssRules(body, condition ? `${condition} ${prelude}` : prelude));
+      else {
+        const declarations = body.split(";").map((d) => d.trim().replace(/\s+/g, " ")).filter(Boolean).map((d): [string, string] => {
+          const colon = d.indexOf(":");
+          expect(colon, `${prelude}: "${d}" is a declaration`).toBeGreaterThan(0);
+          return [d.slice(0, colon).trim().toLowerCase(), d.slice(colon + 1).trim()];
+        });
+        out.push({ condition, selector: prelude, declarations });
+      }
+      i = j;
+    }
+    return out;
+  };
+  const IN_SENTENCE: Record<string, { file: string; lines: number[] }> = {
+    inline: { file: "components/v34/routes/security/security.tsx", lines: [121, 127, 129] },
+  };
+
+  it("gives every link class alone in a row a 24px target, every link class inside a sentence a plain inline box at every width, and each a hover and a focus state", () => {
     const sheet = stripped(styles).map((f) => f.text).join("\n");
     const linkClasses = [...new Set([...sheet.matchAll(/\.(\w*(?:[lL]ink|inline|source))\s*\{/g)].map((m) => m[1]!))];
     expect(linkClasses.length).toBeGreaterThan(0);
+    for (const [name, { file, lines }] of Object.entries(IN_SENTENCE)) {
+      expect(linkClasses, `.${name} is listed as inside a sentence but no rule defines it`).toContain(name);
+      const source = readFileSync(join(root, file), "utf8").split(/\r?\n/);
+      for (const line of lines) expect(source[line - 1], `${file}:${line} renders .${name}`).toContain(`className={s.${name}}`);
+      const own = cssRules(sheet).filter((r) => new RegExp(`\\.${name}(?![\\w-])`).test(r.selector));
+      expect(own.filter((r) => r.condition === "").length, `.${name} rules outside any condition`).toBeGreaterThan(0);
+      for (const { condition, selector, declarations } of own) {
+        for (const [property, value] of declarations) {
+          if (condition !== "") expect(property, `${condition} { ${selector} } may only paint`).toMatch(PAINT);
+          else if (property === "display") expect(value, `${selector}: display`).toBe("inline");
+          else expect(property, `${selector} changes or moves the box that holds the link`).not.toMatch(BOX);
+        }
+      }
+    }
     for (const name of linkClasses) {
+      expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
+      expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
+      if (name in IN_SENTENCE) continue;
       const rule = sheet.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))![1]!;
       const min = rule.match(/min-height:\s*([\d.]+)(px|rem)/);
       expect(min, `.${name} has no min-height`).not.toBeNull();
       expect(Number(min![1]) * (min![2] === "rem" ? 16 : 1), `.${name} target`).toBeGreaterThanOrEqual(24);
-      expect(sheet, `.${name}:hover`).toMatch(new RegExp(`\\.${name}:hover`));
-      expect(sheet, `.${name}:focus-visible`).toMatch(new RegExp(`\\.${name}:focus-visible`));
     }
   });
 });

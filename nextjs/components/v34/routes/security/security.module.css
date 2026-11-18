@@ -263,10 +263,10 @@
   line-height: 1.6;
 }
 
+/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
+   change the line that holds it. */
 .inline {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  display: inline;
   color: var(--v34-fg-link);
   font-weight: 600;
   text-underline-offset: 3px;

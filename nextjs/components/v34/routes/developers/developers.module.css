@@ -70,6 +70,15 @@
   color: var(--v34-fg);
 }
 
+/* Inside a sentence (lead decision 21): the gate notice and the sample note. A plain inline box whose
+   target is its text; the floor above does not apply to an inline box and is reset so the computed style
+   says so. The same class alone in a row (.sectionLink, .fileLinks) keeps the 44 px box above. */
+.notice .inlineLink,
+.sampleNote .inlineLink {
+  display: inline;
+  min-height: 0;
+}
+
 .inlineLink:focus-visible {
   outline: 3px solid var(--v34-fg-focus);
   outline-offset: 4px;

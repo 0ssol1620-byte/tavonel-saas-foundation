@@ -85,12 +85,22 @@
 
 .textLink,
 .inlineLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
   color: var(--v34-fg-link);
   font-weight: 600;
   text-underline-offset: 3px;
+}
+
+/* Alone in a row: a 44 px box (lead decision 14). */
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
+   change the line that holds it. */
+.inlineLink {
+  display: inline;
 }
 
 .textLink:hover,
