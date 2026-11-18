@@ -32,6 +32,19 @@ describe("the sheet reader", () => {
     ]);
   });
 
+  it("reads an escaped quote and a comment-like text inside a string as text, and a nested selector list item by item", () => {
+    expect(cssRules('.a { content: "x\\"}"; padding: 9px; }')).toEqual([
+      { condition: "", selector: ".a", declarations: [["content", '"x\\"}"'], ["padding", "9px"]] },
+    ]);
+    expect(cssRules('.a { content: "/*"; } .b { color: red; } /* closed */')).toEqual([
+      { condition: "", selector: ".a", declarations: [["content", '"/*"']] },
+      { condition: "", selector: ".b", declarations: [["color", "red"]] },
+    ]);
+    expect(cssRules(".x { .y, .a { color: red; } }")[0]!.selector).toBe(":is(.x) .y, :is(.x) .a");
+    expect(() => cssRules('.a { content: "x\\" }')).toThrow(/unterminated string/);
+    expect(() => cssRules(".a { color: red; } /* open")).toThrow(/unterminated comment/);
+  });
+
   it("refuses a sheet it cannot read instead of passing it", () => {
     expect(() => cssRules(".a { color: red")).toThrow(/unbalanced/);
     expect(() => cssRules(".a { color: red } }")).toThrow(/unbalanced/);
@@ -71,8 +84,27 @@ describe("what makes an in-sentence link class plain", () => {
     ["display other than inline", ".a { display: inline-block; }"],
     ["a transform", `${PLAIN}.a { transform: translateY(-4px); }`],
     ["a selector list naming the class", `${PLAIN}.x, .a { display: flex; }`],
+    ["a nested selector list whose second item is the class", `${PLAIN}.x { .y, .a { min-height: 44px; } }`],
+    ["an element selector in a context, which reaches every link there", `${PLAIN}.notice a { padding-block: 12px; }`],
+    ["an element selector with a state", `${PLAIN}.notice a:hover { display: inline-flex; }`],
+    ["an element selector inside a nested rule", `${PLAIN}.notice { a { min-height: 44px; } }`],
+    ["a box rule after an escaped quote, which the old reader threw on or skipped", `${PLAIN}.a { content: "x\\"}"; padding: 9px; }`],
+    ["a box rule after a comment opener inside a string", `${PLAIN}.a { content: "/*"; } .a { padding: 9px; } /* */`],
   ])("names %s", (_what, css) => {
     expect(inSentenceViolations(css, "a").length, css).toBeGreaterThan(0);
+  });
+
+  it("does not take a rule for the link because its selector merely contains an element letter a", () => {
+    expect(inSentenceViolations(`${PLAIN}.card { padding: 12px; } .notice span.abc { padding: 4px; } .x:not(a) { padding: 3px; }`, "a")).toEqual([]);
+    // A paint-only rule on every link is not a violation.
+    expect(inSentenceViolations(`${PLAIN}.notice a { color: blue; }`, "a")).toEqual([]);
+  });
+
+  it("needs the bare class as the base rule: a state alone does not define a plain link", () => {
+    expect(inSentenceViolations(".a:hover { color: red; }", "a")).toEqual([".a: no rule outside every condition defines it"]);
+    expect(inSentenceViolations(".x .a { color: red; }", "a")).toEqual([".a: no rule outside every condition defines it"]);
+    // The bare class inside a list is a base rule.
+    expect(inSentenceViolations(".b, .a { display: inline; color: red; }", "a")).toEqual([]);
   });
 
   it("is not fooled by a class whose name only starts like the one asked for", () => {

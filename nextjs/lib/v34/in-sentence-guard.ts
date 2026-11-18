@@ -21,16 +21,57 @@ export const PAINT =
 
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 
+/** Index of the quote closing the string opened at `open`; a backslash escapes the next character. Throws when there is none. */
+function stringEnd(css: string, open: number): number {
+  const quote = css[open]!;
+  for (let i = open + 1; i < css.length; i++) {
+    if (css[i] === "\\") i++;
+    else if (css[i] === quote) return i;
+  }
+  throw new Error("unterminated string in the sheet");
+}
+
+/** The sheet without its comments; a `/*` inside a string is text, not a comment. */
+function stripComments(css: string): string {
+  let out = "";
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i]!;
+    if (c === '"' || c === "'") {
+      const end = stringEnd(css, i);
+      out += css.slice(i, end + 1);
+      i = end;
+    } else if (c === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      if (end < 0) throw new Error("unterminated comment in the sheet");
+      i = end + 1;
+    } else out += c;
+  }
+  return out;
+}
+
+/** Splits at commas outside parentheses and strings: the items of a selector list. */
+function splitList(list: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i]!;
+    if (c === '"' || c === "'") i = stringEnd(list, i);
+    else if (c === "(" || c === "[") depth++;
+    else if (c === ")" || c === "]") depth--;
+    else if (c === "," && depth === 0) { items.push(list.slice(from, i).trim()); from = i + 1; }
+  }
+  items.push(list.slice(from).trim());
+  return items;
+}
+
 /** Index of the brace closing the one at `open`, skipping strings and parentheses; throws when there is none. */
 function closing(css: string, open: number): number {
   let depth = 0;
   for (let i = open; i < css.length; i++) {
     const c = css[i]!;
-    if (c === '"' || c === "'") {
-      const end = css.indexOf(c, i + 1);
-      if (end < 0) throw new Error("unterminated string in the sheet");
-      i = end;
-    } else if (c === "{") depth++;
+    if (c === '"' || c === "'") i = stringEnd(css, i);
+    else if (c === "{") depth++;
     else if (c === "}" && --depth === 0) return i;
   }
   throw new Error("unbalanced braces in the sheet");
@@ -60,8 +101,7 @@ function walk(css: string, condition: string, selector: string | null, out: CssR
   for (let i = 0; i < css.length; i++) {
     const c = css[i]!;
     if (c === '"' || c === "'") {
-      const end = css.indexOf(c, i + 1);
-      if (end < 0) throw new Error("unterminated string in the sheet");
+      const end = stringEnd(css, i);
       buffer += css.slice(i, end + 1);
       i = end;
     } else if (c === "(") { parens++; buffer += c; }
@@ -76,7 +116,9 @@ function walk(css: string, condition: string, selector: string | null, out: CssR
       if (/^@(?:font-face|page|property|counter-style)(?![\w-])/.test(prelude)) { /* declarations of no style rule */ }
       else if (prelude.startsWith("@")) walk(body, condition ? `${condition} ${prelude}` : prelude, selector, out);
       else {
-        const own = selector === null ? prelude : prelude.includes("&") ? prelude.replaceAll("&", `:is(${selector})`) : `:is(${selector}) ${prelude}`;
+        // Each item of a selector list is resolved on its own: `.x { .y, .a { } }` is `.x .y` and `.x .a`.
+        const own = selector === null ? prelude : splitList(prelude)
+          .map((item) => (item.includes("&") ? item.replaceAll("&", `:is(${selector})`) : `:is(${selector}) ${item}`)).join(", ");
         walk(body, condition, own, out);
       }
       i = end;
@@ -89,7 +131,7 @@ function walk(css: string, condition: string, selector: string | null, out: CssR
 
 export function cssRules(css: string): CssRule[] {
   const out: CssRule[] = [];
-  walk(css.replace(/\/\*[\s\S]*?\*\//g, ""), "", null, out);
+  walk(stripComments(css), "", null, out);
   return out;
 }
 
@@ -100,9 +142,15 @@ export function cssRules(css: string): CssRule[] {
  */
 export function inSentenceViolations(css: string, name: string): string[] {
   const named = new RegExp(`\\.${name}(?![\\w-])`);
-  const own = cssRules(css).filter((rule) => named.test(rule.selector));
+  // A rule reaches the link when it names the class, or when an item of its list ends in the element `a`
+  // (`.notice a { padding: 12px }` applies to every link in the notice, this one among them).
+  const reaches = (item: string) => named.test(item) || /^a(?![\w-])/.test(/[^\s>+~]*$/.exec(item)![0]);
+  const own = cssRules(css).filter((rule) => splitList(rule.selector).some(reaches));
   const found: string[] = [];
-  if (!own.some((rule) => rule.condition === "")) found.push(`.${name}: no rule outside every condition defines it`);
+  // The base rule is the bare class (alone or in a list): `.a:hover { }` does not define a link's plain state.
+  if (!own.some((rule) => rule.condition === "" && splitList(rule.selector).includes(`.${name}`))) {
+    found.push(`.${name}: no rule outside every condition defines it`);
+  }
   for (const { condition, selector, declarations } of own) {
     for (const [property, value] of declarations) {
       if (condition !== "") {
