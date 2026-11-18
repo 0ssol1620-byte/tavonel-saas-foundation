@@ -3403,7 +3403,10 @@
          second after the motion it was pacing is already gone. */
       animation-delay: 0ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      /* 0s, not 0.01ms: a 0.01ms transition still runs for a frame, and a child inheriting a colour starts its own
+         a frame after its parent's has ended, so a label lags its fill by one frame (WO-CI-31: the /world camera
+         control, 1.08:1 for one frame on every press in Chromium and WebKit). Nothing listens for transitionend. */
+      transition-duration: 0s !important;
       /* Staggered delays would otherwise hold the end state back by half a second after the
          motion they were pacing is gone. */
       transition-delay: 0ms !important;

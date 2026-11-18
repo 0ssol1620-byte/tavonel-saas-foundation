@@ -20,6 +20,8 @@ export type ReceiptEntry = {
   violations: Violation[];
   reported?: Violation[];
   excepted?: (Violation & { rationale: string })[];
+  /** How many elements each pass measured (contrast: text, controls, and both again with the content details open). */
+  checked?: Record<string, number>;
   screenshot?: string;
   screenshotSha256?: string;
   commit: string;

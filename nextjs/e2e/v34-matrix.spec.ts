@@ -28,12 +28,13 @@ import {
   layoutPass,
   openContext,
   openZoomedContext,
+  pressedFramesPass,
   reducedMotionPass,
   statePass,
   textStructurePass,
   type Violation,
 } from "./support/v34-passes";
-import { contrastPass, controlContrastPass, openContentDetails } from "./support/v34-contrast";
+import { contrastPass, controlContrast, controlContrastPass, openContentDetails } from "./support/v34-contrast";
 import { DRAWER_MAX_WIDTH, DRAWER_TRIGGER, drawerPass, moreMenuPass, tapUntilOpen } from "./support/v34-drawer";
 import { keyboardWalk } from "./support/v34-keyboard";
 import { assertWorldAgreement, forceWorldMode, readWorldState, staticSvgCounts, WORLD_ROOT, type WorldMode, type WorldState } from "./support/v34-world";
@@ -183,7 +184,10 @@ for (const { path: route, release, rootScheme = "light" } of routes) {
         try {
           await settle(page, route);
           const text = await contrastPass(page);
-          const controls = await controlContrastPass(page);
+          const measured = await controlContrast(page);
+          const controls = measured.violations;
+          // How many elements each pass measured, so a row that passes on next to nothing shows it in the receipt.
+          const checked: Record<string, number> = { text: text.checked, controls: measured.checked };
           // Text and controls inside a closed <details> body are not painted, so both passes above skip them (an unpainted box samples whatever lies beneath).
           // Open the content disclosures in main and measure both again; the text pass is scoped to the disclosures so its sample cap is spent on them.
           const closed = await openContentDetails(page);
@@ -191,15 +195,18 @@ for (const { path: route, release, rootScheme = "light" } of routes) {
           const excepted = [...text.excepted];
           if (closed > 0) {
             const seen = new Set(controls.map(v => `${v.selector} ${v.detail}`));
-            controls.push(...(await controlContrastPass(page)).filter(v => !seen.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));
+            const again = await controlContrast(page);
+            checked.controlsDetailsOpen = again.checked;
+            controls.push(...again.violations.filter(v => !seen.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));
             const seenText = new Set(text.violations.map(v => `${v.selector} ${v.detail}`));
             const opened = await contrastPass(page, { scope: "main details" });
+            checked.textDetailsOpen = opened.checked;
             text.violations.push(...opened.violations.filter(v => !seenText.has(`${v.selector} ${v.detail}`)).map(v => ({ ...v, detail: `details open: ${v.detail}` })));
             reported.push(...opened.reported);
             excepted.push(...opened.excepted);
           }
           const violations = [...text.violations, ...controls];
-          record({ route, width, engine: browserName, colorScheme: scheme, pass: "contrast", violations, reported, excepted });
+          record({ route, width, engine: browserName, colorScheme: scheme, pass: "contrast", violations, reported, excepted, checked });
           all.push(...violations.map(v => ({ ...v, detail: `${scheme}: ${v.detail}` })));
         } finally {
           await ctx.close();
@@ -240,7 +247,10 @@ for (const { path: route, release, rootScheme = "light" } of routes) {
         await settle(page, route);
         const motion = await reducedMotionPass(page);
         const forced = await forcedColorsPass(page);
-        const violations = [...motion, ...forced];
+        // Last: it presses every aria-pressed control (and back), which a segmented choice does not undo.
+        await page.emulateMedia({ forcedColors: "none" });
+        const pressed = await pressedFramesPass(page);
+        const violations = [...motion, ...forced, ...pressed];
         record({ route, width, engine: browserName, colorScheme: "light", pass: "motion-forced-colors", violations });
         expect(violations, report(route, width, violations)).toEqual([]);
       } finally {
