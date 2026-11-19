@@ -1,0 +1,144 @@
+/*
+  /research/program only. Colours come from --v34-* tokens and nothing else; the bands set their
+  own surface, so the rules here read --v34-fg* from the band they sit in. No animation.
+*/
+
+.areas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.area {
+  display: grid;
+  min-width: 0;
+}
+
+.rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.rule {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 22px 0 26px;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.ruleNo {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.ruleTitle {
+  margin: 0;
+  font-size: clamp(1.3rem, 1.9vw, 1.7rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+}
+
+.ruleText {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.also {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 28px;
+  margin: 0;
+}
+
+/*
+  The shared TrustNext step is legacy global markup (h3, .fine, .btn) that reads the dark site's
+  names. Set here to this surface's tokens, or its words are dark-ground text on paper. Its heading
+  is this Section's sub-heading (lead decision 17, WO-CI-24), so the size the global h3 rule reads
+  (--t-6) is the V34 sub-heading size.
+*/
+.next {
+  --t-6: var(--v34-h3);
+  --text-hi: var(--v34-fg);
+  --text-mid: var(--v34-fg-muted);
+  --text-lo: var(--v34-fg-muted);
+  --text-max: var(--v34-header-btn-hover);
+  --hairline-hi: var(--v34-fg-border);
+  --ground: var(--v34-surface);
+  --g1: var(--v34-fg-hover);
+  --verified: var(--v34-fg-focus);
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.textLink,
+.inlineLink {
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+/* Alone in a row: a 44 px box (lead decision 14). */
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Inside a sentence (lead decision 21): a plain inline box. Its target is its text; nothing here may
+   change the line that holds it. */
+.inlineLink {
+  display: inline;
+}
+
+.textLink:hover,
+.inlineLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.textLink:focus-visible,
+.inlineLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+/* Inside a sentence the ring sits closer than the row link's 3px: at 3px it reached 0.58 to 0.92px into the line above (WO-CI-30). */
+.inlineLink:focus-visible {
+  outline-offset: 2px;
+}
+
+@media (max-width: 1000px) {
+  .areas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .areas,
+  .rules {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .textLink:focus-visible,
+  .inlineLink:focus-visible {
+    outline-color: Highlight;
+  }
+}

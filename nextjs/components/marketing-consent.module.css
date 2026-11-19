@@ -41,6 +41,32 @@
   color: var(--text-hi);
   font: inherit;
 }
+/*
+  WO-CI-36: the card is fixed over the foot of the page, so while it is open it covers whatever the document puts
+  there -- measured at 360, 390, 768 and 1440 with the page scrolled to its end: the footer's legal row (Privacy,
+  Terms, Refunds, Subprocessors and the reopen control at 360 and 390; the Explore row and the security address at
+  1440). A visitor could not reach those links without answering the card. While the card is open the page gets
+  room after its footer, on the footer's own ground (`:has` on the card's class, so the room goes when the card does; the
+  footer's box, and the height budget it is held to, do not change). The room is the most the card can occupy -- its
+  `max-height` of a quarter of the viewport plus its inset -- so no copy length can put the card back over a row. Only the wrapper that holds the footer gets it: /explore has a
+  box-less (`display: contents`) wrapper around the header too, and its ::after would push the stage down.
+  Home from 900px seats the card in a row under the header, over nothing at the end of the page, and gets none.
+  CSS only: nothing measures the card.
+*/
+:global(body):has(.panel) :global([data-v34-site]:has(> footer))::after {
+  content: "";
+  display: block;
+  height: calc(25vh + max(16px, env(safe-area-inset-bottom)));
+  background: var(--v34-forest);
+}
+@supports (height: 1dvh) {
+  :global(body):has(.panel) :global([data-v34-site]:has(> footer))::after {
+    height: calc(25dvh + max(16px, env(safe-area-inset-bottom)));
+  }
+}
+@media (min-width: 900px) {
+  :global(body:has([data-home-ia])):has(.panel) :global([data-v34-site]:has(> footer))::after { display: none; }
+}
 /* Home sets Wanted Sans on its own wrapper; this card mounts outside it, so it would fall back to the root Geist. */
 /*
   FINAL-SPEC 2026-10-26 §3.3: on /ko the sheet's Hangul is drawn from the same preloaded KO Home subset as the
@@ -63,6 +89,14 @@
   .panel p a { color: var(--tv-action) !important; }
   /* On Home the accent is not a link colour: the notice link is ink with its underline. */
   :global(body:has([data-home-ia])) .panel p a { color: var(--text-hi) !important; }
+  /*
+    The notice link had no hover at all: both colour rules above are !important, so a hover has to be
+    one too, and as specific as the Home rule. --text-lo is #555b62 here, 6.9:1 on the white card.
+  */
+  @media (hover: hover) and (pointer: fine) {
+    .panel p a:hover,
+    :global(body:has([data-home-ia])) .panel p a:hover { color: var(--text-lo) !important; }
+  }
   .panel .actions button { font-weight: 510 !important; }
 }
 
@@ -79,7 +113,14 @@
   max-height: 25dvh;
   overflow-y: auto;
   padding: 14px 16px;
-  border: 1px solid var(--hairline-hi);
+  /*
+    WO-CI-14: the edge is a boundary a visitor needs to see (WCAG 1.4.11, >= 3:1). --hairline-hi here is
+    rgb(21 25 29 / 0.22), 1.6:1 on the white card; --tv-ink-muted (#4c545d) is the answers' own edge, 7.68:1 on
+    the card and above 3:1 on the light page grounds (7.20:1 at 1920px after a 300px scroll, where the repository
+    test measures). Over Home's dark hero ground at scroll 0, rgb(6 16 13), it measures 2.51:1 (the old edge was
+    1.02:1 there). One edge colour for the card and its two answers.
+  */
+  border: 1px solid var(--tv-ink-muted);
   border-radius: 8px;
   background: var(--g2);
   box-shadow: 0 6px 24px rgb(21 25 29 / 0.12);
@@ -138,12 +179,16 @@
   are not equally easy to press when only one of them looks like a control. Identical geometry,
   identical border, identical colour -- if a reader has to look twice to tell which is which,
   that is the correct outcome for a choice the site is not entitled to nudge.
+
+  The shared edge is --tv-ink-muted (#4c545d, 7.68:1 on the white card; it was a stray #6b737b at
+  4.82:1): the panel's hairline measured 1.60:1 as a control boundary, under the 3:1 non-text floor.
+  Hover darkens it to --text-hi.
 */
 .actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; flex: 0 0 auto; gap: 8px; }
 .actions button {
   min-height: 44px;
   padding: 10px 16px;
-  border: 1px solid var(--hairline-hi);
+  border: 1px solid var(--tv-ink-muted);
   border-radius: var(--r-inst, 6px);
   background: var(--g2);
   color: var(--text-hi);
@@ -153,7 +198,7 @@
   cursor: pointer;
 }
 @media (hover: hover) and (pointer: fine) {
-  .actions button:hover { border-color: var(--text-lo); }
+  .actions button:hover { border-color: var(--text-hi); }
 }
 
 /*
@@ -193,6 +238,11 @@
 .settings:focus-visible { color: var(--text-hi); }
 @media (hover: hover) and (pointer: fine) {
   .settings:hover { color: var(--text-hi); }
+}
+
+/* Forced colors drop the underline's colour and the control has no box: give it one. */
+@media (forced-colors: active) {
+  .settings { border: 1px solid ButtonText; padding-inline: 6px; }
 }
 
 .floating {
@@ -251,7 +301,7 @@
     box-shadow: none;
   }
   :global(body:has([data-home-ia])) .inner { flex-direction: row; align-items: center; gap: 24px; }
-  :global(body:has([data-home-ia])) .actions button { border-color: #6b737b; }
+  :global(body:has([data-home-ia])) .actions button { border-color: var(--tv-ink-muted); }
 }
 /* A fine pointer takes a 36px answer (over the 24px WCAG 2.5.8 floor); a coarse one keeps 44px. */
 @media (min-width: 900px) and (pointer: fine) {

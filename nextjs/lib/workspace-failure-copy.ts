@@ -48,6 +48,10 @@ const FAILURE_COPY: Record<string, string> = {
   */
   BILLING_LAUNCH_PENDING: "Plan purchase is not open, so nothing was charged. Access is arranged with us through the contact page.",
   BILLING_NOT_CONFIGURED: "Online payment is not configured, so nothing was charged. Access is arranged with us through the contact page.",
+  BILLING_PLAN_ALREADY_ACTIVE: "This workspace already has this plan, so nothing was opened or charged. Manage it from Usage & billing in your workspace.",
+  BILLING_SUBSCRIPTION_NEEDS_PORTAL: "This workspace's subscription is past due or paused, so nothing was opened or charged. Update the payment method or resume it in the subscription portal.",
+  BILLING_RESUBSCRIBE_CONTACT: "This workspace's earlier subscription has ended, and a new one is set up with us so nothing is charged twice. Nothing was opened or charged. Write to support@tavonel.com and we will set it up.",
+  BILLING_PLAN_CHANGE_REQUIRED: "This workspace already has a plan, so nothing was opened or charged. A different plan waits until the current one ends, or is arranged with us through the contact page.",
   BILLING_OFFER_CONTACT_REQUIRED: "This plan is arranged with us rather than bought online, so nothing was charged. Use the contact page to set it up.",
   PROCESSING_QUALIFICATION_NOT_BILLABLE: "This workspace's source access covers a processing check, not paid use, so nothing was charged. Request source access for paid use before retrying.",
   PILOT_ACCESS_REQUIRED: "This account is not admitted to a TAVONEL workspace. Access is arranged with us through the contact page.",
@@ -79,6 +83,9 @@ const FAILURE_COPY: Record<string, string> = {
   TRIAL_LIMIT_REACHED: "Your free evaluation has reached one of its limits.",
   TRIAL_NOT_ACTIVE: "Your free evaluation has ended.",
   TRIAL_AI_ACCESS_CHECK_FAILED: "We could not check your free evaluation limits, so nothing ran. Try again in a minute.",
+  /* WO-CAT-8: the plan meters. Each says which allowance it was and what changes the answer; no number is stated here. */
+  STORAGE_ALLOWANCE_EXHAUSTED: "This workspace has used its plan's storage allowance, so this file was not added. Delete sources the workspace no longer needs to make room.",
+  KQU_ALLOWANCE_EXHAUSTED: "This workspace has used its plan's knowledge queries for this month, so nothing was asked. The allowance renews on the first day of next month (UTC).",
 };
 
 /** Refusals a plan can lift. Their sentence is shown with a link to /pricing. */

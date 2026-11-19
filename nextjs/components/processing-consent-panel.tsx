@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useDialogFocus } from "./world-visual/use-dialog-focus";
 import styles from "./processing-consent-panel.module.css";
 
 /*
@@ -176,16 +177,12 @@ export function ProcessingTermsForm({ offer, agreed, submitting, error, onAgreed
 
 type Stage = "closed" | "loading" | "load_failed" | "review" | "submitting" | "accepted";
 
-type Props = {
-  getToken: () => Promise<string | null>;
-  /** Re-reads workspace access; the grant, not this receipt, decides whether intake opens. */
-  onAccepted: () => void | Promise<void>;
-  /** The other actions in the row, e.g. the public example link. */
-  children?: ReactNode;
-};
-
-export default function ProcessingConsentPanel({ getToken, onAccepted, children }: Props) {
-  const regionId = useId();
+/*
+  The review-and-accept sequence, once. The workspace panel and the /pricing dialog (one-step buy,
+  2026-11-10) both run it, so the offer they show, the version they post and the sentences they
+  answer with cannot drift apart. `onAccepted` runs only after the server answered with a receipt.
+*/
+function useProcessingTerms(getToken: () => Promise<string | null>, onAccepted: () => void | Promise<void>) {
   const [stage, setStage] = useState<Stage>("closed");
   const [offer, setOffer] = useState<ProcessingTermsOffer | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -200,11 +197,6 @@ export default function ProcessingConsentPanel({ getToken, onAccepted, children 
     if (result.ok) { setOffer(result.offer); setAgreed(false); setStage("review"); return; }
     setError(termsLoadErrorSentence(result));
     setStage("load_failed");
-  };
-
-  const toggle = () => {
-    if (stage === "closed") { if (receipt) setStage("accepted"); else if (offer) setStage("review"); else void load(); }
-    else if (stage !== "submitting") setStage("closed");
   };
 
   const submit = async () => {
@@ -230,6 +222,55 @@ export default function ProcessingConsentPanel({ getToken, onAccepted, children 
     setStage("review");
   };
 
+  return { stage, setStage, offer, agreed, setAgreed, error, receipt, load, submit };
+}
+
+/** Loading, a load failure, or the form: every stage before a receipt. */
+function TermsSteps({ flow }: { flow: ReturnType<typeof useProcessingTerms> }) {
+  const { stage, offer, agreed, error } = flow;
+  return (
+    <>
+      {stage === "loading" ? <p role="status">Loading the published terms…</p> : null}
+      {stage === "load_failed" ? (
+        <>
+          <p className={styles.error} role="alert">{error}</p>
+          <div className={styles.actions}>
+            <button type="button" className="btn" onClick={() => void flow.load()}>Load the terms again</button>
+          </div>
+        </>
+      ) : null}
+      {(stage === "review" || stage === "submitting") && offer ? (
+        <ProcessingTermsForm
+          offer={offer}
+          agreed={agreed}
+          submitting={stage === "submitting"}
+          error={error}
+          onAgreedChange={flow.setAgreed}
+          onSubmit={() => void flow.submit()}
+        />
+      ) : null}
+    </>
+  );
+}
+
+type Props = {
+  getToken: () => Promise<string | null>;
+  /** Re-reads workspace access; the grant, not this receipt, decides whether intake opens. */
+  onAccepted: () => void | Promise<void>;
+  /** The other actions in the row, e.g. the public example link. */
+  children?: ReactNode;
+};
+
+export default function ProcessingConsentPanel({ getToken, onAccepted, children }: Props) {
+  const regionId = useId();
+  const flow = useProcessingTerms(getToken, onAccepted);
+  const { stage, setStage, offer, receipt } = flow;
+
+  const toggle = () => {
+    if (stage === "closed") { if (receipt) setStage("accepted"); else if (offer) setStage("review"); else void flow.load(); }
+    else if (stage !== "submitting") setStage("closed");
+  };
+
   const open = stage !== "closed";
   return (
     <>
@@ -240,25 +281,7 @@ export default function ProcessingConsentPanel({ getToken, onAccepted, children 
         {children}
       </div>
       <section id={regionId} className={styles.panel} hidden={!open} aria-label="Processing terms">
-        {stage === "loading" ? <p role="status">Loading the published terms…</p> : null}
-        {stage === "load_failed" ? (
-          <>
-            <p className={styles.error} role="alert">{error}</p>
-            <div className={styles.actions}>
-              <button type="button" className="btn" onClick={() => void load()}>Load the terms again</button>
-            </div>
-          </>
-        ) : null}
-        {(stage === "review" || stage === "submitting") && offer ? (
-          <ProcessingTermsForm
-            offer={offer}
-            agreed={agreed}
-            submitting={stage === "submitting"}
-            error={error}
-            onAgreedChange={setAgreed}
-            onSubmit={() => void submit()}
-          />
-        ) : null}
+        <TermsSteps flow={flow} />
         {stage === "accepted" && receipt ? (
           <div role="status">
             <p>
@@ -274,5 +297,61 @@ export default function ProcessingConsentPanel({ getToken, onAccepted, children 
         ) : null}
       </section>
     </>
+  );
+}
+
+/*
+  One-step buy (2026-11-10). The same terms step, in a modal dialog over /pricing, for a buyer whose
+  checkout was refused because the terms are still owed. Same offer read, same POST, same consent
+  record and the same words as the workspace panel. Only the frame differs.
+
+  A native modal `<dialog>`: the page behind it is inert, Escape closes it (the `cancel` event, held
+  while an agreement is being recorded), and `useDialogFocus` keeps Tab inside and hands focus back
+  to the Buy control on close. The terms load as it opens. `onAccepted` runs once a receipt is back,
+  and the caller closes the dialog there.
+*/
+export function ProcessingTermsDialog({
+  title,
+  lead,
+  getToken,
+  onAccepted,
+  onClose,
+}: {
+  title: string;
+  lead: string;
+  getToken: () => Promise<string | null>;
+  onAccepted: () => void | Promise<void>;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const titleId = useId();
+  const flow = useProcessingTerms(getToken, onAccepted);
+  const busy = flow.stage === "submitting";
+  // Declared before the effect that opens the dialog, so it records the Buy control as the opener.
+  useDialogFocus(dialogRef);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    headingRef.current?.focus();
+    void flow.load();
+    // Opens once per mount. The caller unmounts the dialog to close it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className={styles.dialog}
+      aria-labelledby={titleId}
+      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+    >
+      <div className={styles.dialogHead}>
+        <h2 id={titleId} ref={headingRef} tabIndex={-1}>{title}</h2>
+        <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>Close</button>
+      </div>
+      <p className={styles.lead}>{lead}</p>
+      <TermsSteps flow={flow} />
+    </dialog>
   );
 }

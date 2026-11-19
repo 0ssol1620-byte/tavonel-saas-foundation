@@ -227,12 +227,24 @@ describe("spendTrialSessionQuery (the Ask routes' one spend)", () => {
   });
 
   it("is called by both Ask routes after the body is validated and before the active World is read", () => {
-    for (const [route, lastCheck] of [["ask", '"QUESTION_INVALID"'], ["search", '"LIMIT_INVALID"']] as const) {
-      const source = readFileSync(new URL(`../app/api/collections/[id]/${route}/route.ts`, import.meta.url), "utf8");
-      const spend = source.indexOf("await spendTrialSessionQuery(auth.principal)");
-      expect(spend, route).toBeGreaterThan(source.indexOf(lastCheck));
-      expect(spend, route).toBeLessThan(source.indexOf("getFoundationActiveWorld("));
+    const ask = readFileSync(new URL("../app/api/collections/[id]/ask/route.ts", import.meta.url), "utf8");
+    const askSpend = ask.indexOf("await spendTrialSessionQuery(auth.principal)");
+    expect(askSpend).toBeGreaterThan(ask.indexOf('"QUESTION_INVALID"'));
+    expect(askSpend).toBeLessThan(ask.indexOf("getFoundationActiveWorld("));
+  });
+
+  it("search spends after its last time refusal and before any retrieval or content read; admission reads World metadata only", () => {
+    const source = readFileSync(new URL("../app/api/collections/[id]/search/route.ts", import.meta.url), "utf8");
+    const spend = source.indexOf("await spendTrialSessionQuery(auth.principal)");
+    expect(spend).toBeGreaterThan(source.indexOf('"LIMIT_INVALID"'));
+    expect(spend).toBeGreaterThan(source.indexOf('"HISTORICAL_INDEX_UNAVAILABLE"'));
+    const admission = source.slice(source.indexOf('"LIMIT_INVALID"'), spend);
+    // World metadata only: version rows, activation log, index state. Never the pipeline or content.
+    for (const call of ["resolveWorldAtKnownAt(", "getFoundationActiveWorld(", "listFoundationWorldVersions(", "readRetrievalIndexState("]) {
+      expect(admission).toContain(call);
     }
+    expect(admission).not.toMatch(/runRetrievalPipeline\(|resolveConfiguredProductionRetrievalRuntime\(|persistRetrievalModelAttempt\(|resolveBoundSnapshot\(|[Uu]nits?\(|[Ee]vidence\(|[Cc]ontent\(/);
+    expect(source.indexOf("runRetrievalPipeline(")).toBeGreaterThan(spend);
   });
 });
 

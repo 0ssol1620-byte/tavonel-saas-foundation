@@ -1,0 +1,357 @@
+/*
+  V34 tokens and surfaces.
+
+  Everything V34 draws reads the --v34-* tokens declared on `.site`, the wrapper <V34Page> renders.
+  Nothing is declared on :root, so a soft navigation from a V34 page into /workspace carries no
+  V34 value with it. The one rule that reaches above the wrapper is the html:has() rule at the
+  end, which only matches a document that contains the wrapper.
+
+  A surface class (.paper, .dark, .world ...) declares BOTH `color` and `background` itself and
+  never leans on what a parent happened to inherit. It also declares the role variables the
+  components read -- --v34-fg, --v34-fg-muted, --v34-fg-link, --v34-fg-border, --v34-fg-rule,
+  --v34-fg-hover, --v34-fg-focus, the --v34-fg-action trio, --v34-surface -- so a component asks for "the muted text colour
+  of the surface I am on" and cannot pick a pair nobody checked. `lib/v34/tokens.test.ts` parses
+  this file and computes the contrast of every pair named there.
+
+  Not in this file by design: a descendant selector on an element type, any @import, any
+  `font-size` under 12px (`scripts/check-type-floor.mjs`), and --v34-line used as a text colour.
+  --v34-line is a decorative rule colour and fails 3:1 against every surface it sits on.
+*/
+
+.site {
+  /* ink and text on light */
+  --v34-ink: #18241e;
+  --v34-muted: #465b4e;
+  --v34-body: #3e5145;
+  --v34-label: #415d4b;
+  --v34-link: #205135;
+
+  /* light grounds */
+  --v34-paper: #f7f8f4;
+  --v34-white: #ffffff;
+  --v34-green: #ebf0e7;
+  --v34-cases: #e9eee4;
+  --v34-route-foot: #e5ede0;
+  --v34-bridge: #e6ece3;
+  --v34-final: #cce7bc;
+
+  /* decoration only: never a text colour */
+  --v34-line: #d8ded5;
+  --v34-rule: #cbd3c8;
+  --v34-rule-dark: #496254;
+
+  /* dark grounds and their text */
+  --v34-forest: #0b1713;
+  --v34-dark: #102922;
+  --v34-connect: #10281e;
+  --v34-world: #07100e;
+  --v34-on-dark: #eff6ef;
+  --v34-on-dark-muted: #b8ccc0;
+  --v34-lime: #c9f2a5;
+  --v34-lime-hover: #d8f7bd;
+  --v34-lime-ink: #172920;
+
+  /* the home hero: three stops of one radial gradient, each of which text must clear */
+  --v34-hero-a: #142d23;
+  --v34-hero-b: #0a1712;
+  --v34-hero-c: #06100d;
+  --v34-hero-ink: #f3f7f0;
+  --v34-hero-muted: #b8cbbd;
+  --v34-hero-lime: #c6f0ab;
+
+  /* controls */
+  --v34-header-btn: #0b1b15;
+  --v34-header-btn-hover: #245338;
+  --v34-step-bg: #143629;
+  --v34-step-small: #c8e6d3;
+  --v34-secondary-hover: #dce8db;
+  --v34-control-border: #6b8374;
+  --v34-disabled-fg: #52665a;
+  --v34-disabled-bg: #e7ebe5;
+
+  /* state */
+  --v34-error: #952d2b;
+  --v34-ok: #256b39;
+  --v34-focus: #4880ba;
+  --v34-focus-dark: #8ae0bc;
+
+  /* layout: the container (--v34-max, --v34-gutter, --v34-shell, --chrome-*) is the `.site, .container` rule below */
+  --v34-header-h: 66px;
+  --v34-radius-pill: 100px;
+  --v34-radius-panel: 8px;
+  --v34-radius-art: 6px;
+
+  /* type: the self-hosted faces the site already ships, no new font bytes */
+  --v34-font: var(--f-sans, "Wanted Sans Variable", system-ui, sans-serif);
+  --v34-mono: var(--f-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  /* The lower bound of each display size is capped by viewport width so the longest word fits at 320px. */
+  --v34-h1-home: clamp(min(3.3rem, 11vw), 5.15vw, 6rem);
+  --v34-h1-sub: clamp(min(2.8rem, 11vw), 5.6vw, 5.6rem);
+  --v34-h1-split: clamp(min(2.6rem, 11vw), 4.5vw, 4.75rem);
+  --v34-h2: clamp(min(2rem, 9.5vw), 4.3vw, 4.2rem);
+  --v34-h3: clamp(1.25rem, 2vw, 1.7rem);
+  --v34-lead: clamp(1.06rem, 1.3vw, 1.25rem);
+  --v34-text: 1rem;
+  --v34-small: 0.875rem;
+  --v34-eyebrow: 0.75rem;
+  --v34-track-display: -0.04em;
+  --v34-track-h2: -0.03em;
+
+  /* motion: state changes only, and zero under reduced motion */
+  --v34-move: 140ms;
+
+  color-scheme: light;
+  color: var(--v34-ink);
+  background: var(--v34-paper);
+  font-family: var(--v34-font);
+  font-size: var(--v34-text);
+  line-height: 1.6;
+  font-synthesis: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  min-height: 100vh;
+}
+
+/*
+  The container: one edge for the header, every body and the footer (R1, e2e/site-alignment.spec.ts).
+  `.container` carries these and nothing else -- no colour, no colour scheme, no font -- for a part of
+  a page that keeps the type and colours it inherits from the document but stands on the V34 edge:
+  the /explore workbench (app/explore/page.tsx; WO-CI-19, lead decision 1).
+
+  Retained public bodies (docs, legal, status, solutions ...) render inside the wrapper but read the
+  legacy container names (app/chrome-v2.css, app/tavonel.css). They are pointed at the shell's
+  container here, so a retained body starts on the same edge as the V34 header above it. Batch E
+  re-skins those bodies; until then this is where their container comes from inside the V34 frame.
+  Outside the wrapper nothing changes.
+
+  Only the legacy chrome names are re-pointed. A `--tv-*` name is never declared here: app/tavonel.css
+  is the one sheet that declares them, so no later copy can shadow a brand token
+  (lib/brand-tokens.test.ts). A retained body sizes itself from `--v34-shell`, never `--tv-page-w`.
+*/
+.site, .container {
+  --v34-max: 1260px;
+  --v34-gutter: 36px;
+  --v34-shell: min(var(--v34-max), 100% - 2 * var(--v34-gutter));
+  --chrome-measure: var(--v34-max);
+  --chrome-gutter: var(--v34-gutter);
+  --chrome-edge: max(var(--v34-gutter), calc((100% - var(--v34-max)) / 2));
+}
+
+/*
+  Role variables, shared by the light grounds and by the dark ones. The per-surface blocks below
+  add the two declarations that must be explicit on every surface: `background` and `color`.
+*/
+.paper, .light, .green, .cases, .routeFoot, .bridge, .final, .nestedLight {
+  --v34-fg: var(--v34-ink);
+  --v34-fg-muted: var(--v34-muted);
+  --v34-fg-link: var(--v34-link);
+  --v34-fg-border: var(--v34-control-border);
+  --v34-fg-rule: var(--v34-rule);
+  --v34-fg-hover: var(--v34-secondary-hover);
+  --v34-fg-focus: var(--v34-focus);
+  /* the filled action on this ground: ButtonLink `.primary` (read by the retained `.btn` rule below) */
+  --v34-fg-action: var(--v34-header-btn);
+  --v34-fg-action-hover: var(--v34-header-btn-hover);
+  --v34-fg-action-ink: var(--v34-white);
+  /* The site-wide h1-h3 rule (app/tavonel.css) colours headings with --text-hi, near-white for the
+     dark legacy site. On a V34 surface a heading takes the surface's own text colour instead. */
+  --text-hi: var(--v34-fg);
+  color-scheme: light;
+}
+
+.dark, .connect, .forest, .heroHome, .world {
+  --v34-fg: var(--v34-on-dark);
+  --v34-fg-muted: var(--v34-on-dark-muted);
+  --v34-fg-link: var(--v34-lime);
+  --v34-fg-border: var(--v34-on-dark-muted);
+  --v34-fg-rule: var(--v34-rule-dark);
+  --v34-fg-hover: var(--v34-step-bg);
+  --v34-fg-focus: var(--v34-focus-dark);
+  /* ButtonLink `.onDark` */
+  --v34-fg-action: var(--v34-lime);
+  --v34-fg-action-hover: var(--v34-lime-hover);
+  --v34-fg-action-ink: var(--v34-lime-ink);
+  --text-hi: var(--v34-fg);
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- light paper and its pale kin */
+
+.paper {
+  background: var(--v34-paper);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-paper);
+}
+
+.light {
+  background: var(--v34-white);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-white);
+}
+
+/* pale-green band */
+.green {
+  background: var(--v34-green);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-green);
+}
+
+.cases {
+  background: var(--v34-cases);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-cases);
+}
+
+.routeFoot {
+  background: var(--v34-route-foot);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-route-foot);
+}
+
+.bridge {
+  background: var(--v34-bridge);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-bridge);
+}
+
+.final {
+  background: var(--v34-final);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-final);
+  --v34-fg-muted: var(--v34-body);
+}
+
+/*
+  A light panel nested inside a dark scene (the walkthrough record, a source card). It restates
+  its own pair: a child of .dark would otherwise inherit light-on-dark text onto a paper ground.
+*/
+.nestedLight {
+  background: var(--v34-paper);
+  color: var(--v34-ink);
+  --v34-surface: var(--v34-paper);
+}
+
+/* ------------------------------------------------------------------- dark instrument scenes */
+
+.dark {
+  background: var(--v34-dark);
+  color: var(--v34-on-dark);
+  --v34-surface: var(--v34-dark);
+}
+
+.connect {
+  background: var(--v34-connect);
+  color: var(--v34-on-dark);
+  --v34-surface: var(--v34-connect);
+}
+
+.forest {
+  background: var(--v34-forest);
+  color: var(--v34-on-dark);
+  --v34-surface: var(--v34-forest);
+}
+
+/* the trailing colour is the stop the gradient falls back to where images are dropped */
+.heroHome {
+  background: radial-gradient(ellipse at 75% 40%, var(--v34-hero-a) 0%, var(--v34-hero-b) 35%, var(--v34-hero-c) 70%) var(--v34-hero-c);
+  color: var(--v34-hero-ink);
+  --v34-fg: var(--v34-hero-ink);
+  --v34-fg-muted: var(--v34-hero-muted);
+  --v34-fg-link: var(--v34-hero-lime);
+  --v34-surface: var(--v34-hero-a);
+}
+
+.world {
+  background: var(--v34-world);
+  color: var(--v34-on-dark);
+  --v34-fg-muted: var(--v34-hero-muted);
+  --v34-surface: var(--v34-world);
+}
+
+/* ------------------------------------------------------------ retained bodies' legacy buttons */
+
+/*
+  One accent inside the V34 frame (WO-CI-19, D17). Retained bodies still render the legacy `.btn`
+  (app/tavonel.css, components layer), which fills with the page's --text-hi: ink on /contact, the
+  paper-product near-black on /pricing, and the legacy #005bb3 wherever a route sheet repaints it.
+  Rather than edit every retained body (batch E moves them to ButtonLink), the wrapper paints them
+  with ButtonLink's own values (ui/button-link.module.css): the filled kinds take the ground's
+  --v34-fg-action trio (`.primary` on a light surface, `.onDark` in a dark scene, `.primary` where
+  no surface is set), the outlined kinds take `.secondary`. Danger and disabled keep their faces.
+
+  The wrapper is named by its class and its marker attribute (V34Page, /pricing and /explore all
+  render both). With the chained :not()s that outweighs a retained route's own `.surface .btn:not(.ghost)`
+  repaint (app/solutions/solutions.module.css), whatever order the two sheets load in.
+*/
+.site[data-v34-site] :global(:is(.btn, .btn-primary):not(.ghost):not(.btn-ghost):not(.btn-secondary):not(.btn-danger):not(:disabled):not([aria-disabled="true"])) {
+  border-color: var(--v34-fg-action, var(--v34-header-btn));
+  background: var(--v34-fg-action, var(--v34-header-btn));
+  color: var(--v34-fg-action-ink, var(--v34-white));
+}
+
+.site[data-v34-site] :global(:is(.btn, .btn-primary):not(.ghost):not(.btn-ghost):not(.btn-secondary):not(.btn-danger):not(:disabled):not([aria-disabled="true"]):hover) {
+  border-color: var(--v34-fg-action-hover, var(--v34-header-btn-hover));
+  background: var(--v34-fg-action-hover, var(--v34-header-btn-hover));
+  color: var(--v34-fg-action-ink, var(--v34-white));
+}
+
+.site[data-v34-site] :global(.btn.ghost:not(:disabled):not([aria-disabled="true"])),
+.site[data-v34-site] :global(.btn-ghost:not(:disabled):not([aria-disabled="true"])),
+.site[data-v34-site] :global(.btn-secondary:not(:disabled):not([aria-disabled="true"])) {
+  border-color: var(--v34-fg-border, var(--v34-control-border));
+  background: transparent;
+  color: var(--v34-fg, var(--v34-ink));
+}
+
+.site[data-v34-site] :global(.btn.ghost:not(:disabled):not([aria-disabled="true"]):hover),
+.site[data-v34-site] :global(.btn-ghost:not(:disabled):not([aria-disabled="true"]):hover),
+.site[data-v34-site] :global(.btn-secondary:not(:disabled):not([aria-disabled="true"]):hover) {
+  border-color: var(--v34-fg-border, var(--v34-control-border));
+  background: var(--v34-fg-hover, var(--v34-secondary-hover));
+  color: var(--v34-fg, var(--v34-ink));
+}
+
+/* ------------------------------------------------------------------------- environment cases */
+
+/*
+  Dark OS. The palette does not follow OS appearance (the site is one designed light page with
+  dark scenes), and this block says so rather than leaving it to inheritance.
+*/
+@media (prefers-color-scheme: dark) {
+  .site {
+    color-scheme: light;
+    color: var(--v34-ink);
+    background: var(--v34-paper);
+  }
+}
+
+/*
+  Forced colours. No global forced-color-adjust: the system palette replaces ours, and the only
+  thing re-pointed is the focus ring so it uses the colour the user chose for it. Gradient
+  heroes lose their image and fall back to Canvas, which is what the user asked for.
+*/
+@media (forced-colors: active) {
+  .site {
+    --v34-focus: Highlight;
+    --v34-focus-dark: Highlight;
+  }
+}
+
+/* The bar behind the overscroll area matches the page, and only on documents that hold a V34 wrapper. */
+:global(html):has(.site) {
+  background: #f7f8f4;
+  color-scheme: light;
+}
+
+@media (max-width: 760px) {
+  .site, .container { --v34-gutter: 18px; }
+  .site { --v34-header-h: 60px; }
+}
+
+@media (max-width: 360px) {
+  .site, .container { --v34-gutter: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site { --v34-move: 0ms; }
+}

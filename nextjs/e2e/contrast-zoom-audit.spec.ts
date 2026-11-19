@@ -28,10 +28,18 @@ import { fixtureDocument, installFixtureSession, installWorkspaceRoutes } from "
 const CONTRAST_ROUTES = [
   "/",
   "/pricing",
-  "/product",
-  "/product/compiled-world",
-  "/product/continuous-knowledge",
-  "/product/document-understanding",
+  /*
+    V34 (D33 §4): the four routes that replaced /product and its three children, and the V34 core routes.
+    The pixel-level pass over every live route is the V34 harness's; this keeps the walk the old way.
+  */
+  "/platform",
+  "/world",
+  "/changes",
+  "/compiler",
+  "/evidence",
+  "/connect",
+  "/methods",
+  "/journal",
   "/docs",
   "/sources",
   /*
@@ -212,7 +220,11 @@ for (const route of ["/", "/pricing", "/docs"] as const) {
       );
       expect(overflow, `${route} scrolls ${overflow}px sideways at 200% zoom`).toBeLessThanOrEqual(1);
       if (route === "/") {
-        const explore = page.locator('main a[href^="/explore?"]').first();
+        /*
+          V34 (WO-CI-5a): V34 Home's public, no-login evidence action is "Inspect the World" -> /world
+          (CI-TRIAGE section 3), not an /explore deep link. Same promise: visible and whole at 200% zoom.
+        */
+        const explore = page.locator('main a[href^="/world"]').first();
         await expect(explore).toBeVisible();
         const box = await explore.boundingBox();
         expect(box, "the public evidence action has no box at 200% zoom").not.toBeNull();

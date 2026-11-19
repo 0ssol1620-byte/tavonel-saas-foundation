@@ -443,7 +443,7 @@ export function homeSpecimens(
     try {
       result = readFixtureSpecimens(process.cwd());
     } catch (error) {
-      console.error("[TAVONEL] specimen fixtures could not be read; none render", error);
+      console.error("[TAVONEL] specimen fixtures could not be read; none render", error instanceof Error ? error.name : "unknown");
       return [];
     }
   } else if (specimenStripLive(env, rollout) || (committed && isFixtureServer(env))) {

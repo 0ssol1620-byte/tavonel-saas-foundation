@@ -1,67 +1,26 @@
-import type { Metadata, Route } from "next";
-import Link from "next/link";
-import { PublicPageShell } from "@/components/public-page-shell";
-import SolutionProofSample from "@/components/solution-proof-sample";
-import DesignPartners from "@/components/design-partners";
-import PublicPrimaryCta from "@/components/public-primary-cta";
-import { SOLUTIONS } from "./[slug]/page";
-import styles from "./solutions.module.css";
-import { EXPLORE_CTA } from "@/lib/site-navigation";
+import RouteJsonLd from "@/components/v34/shell/route-json-ld";
+import V34Page from "@/components/v34/shell/v34-page";
+import { SolutionsBody } from "@/components/v34/routes/solutions/solutions";
+import { releaseGate } from "@/lib/v34/release";
+import { routeMetadata, routeViewport } from "@/lib/v34/route-metadata";
 
-export const metadata: Metadata = {
-  title: "Solutions: start with the work you need to do — TAVONEL",
-  description: "Choose a document workflow by its input, the action you need and the result you can inspect. Five uses, each with sample evidence and its published limits.",
-  alternates: { canonical: "/solutions" },
-  openGraph: { url: "/solutions" },
-};
+/*
+  /solutions in V34: registry metadata, the release gate, then the body. The five workflow pages
+  under /solutions/[slug] are unchanged; the body reads their SOLUTIONS record for its cards.
 
-// One record owns the task choice, audience and destination on both hub and detail.
-const ENTRIES = Object.entries(SOLUTIONS);
+  The primary action is commercial state, resolved by `primaryCallToAction()` on the server, so the
+  page renders on each request, as the home page does, and the label never swaps after hydration.
+*/
+export const metadata = routeMetadata("solutions");
+export const viewport = routeViewport();
+export const dynamic = "force-dynamic";
 
-export default function SolutionsPage() {
+export default async function SolutionsPage() {
+  await releaseGate("solutions");
   return (
-    <PublicPageShell template="T1">
-      <section className={`scene doc ${styles.surface}`}><div className="shell">
-        <div className={styles.hubIntro}>
-          <h1 className="document-title">Start with the work you need to do.</h1>
-          <p className="lede">
-            Five ways teams put the compiler to work. Choose the input you have and the output
-            you need, then inspect the workflow, sample evidence and limits.
-          </p>
-        </div>
-        <div className={`tiles ${styles.hubList}`}>
-          {ENTRIES.map(([slug, solution]) => (
-            <article className={`tile ${styles.card}`} key={slug}>
-              <div className={styles.cardIntro}>
-                <p className="n">{solution.eyebrow}</p>
-                <h2 className={styles.cardTitle}>
-                  <Link href={`/solutions/${slug}` as Route}>{solution.title}</Link>
-                </h2>
-                <p className={styles.audience}>For: {solution.audience}</p>
-              </div>
-              <dl className={styles.task} aria-label="Input, action and output">
-                <div><dt>Input</dt><dd>{solution.task.input}</dd></div>
-                <div><dt>Action</dt><dd>{solution.task.action}</dd></div>
-                <div><dt>Output</dt><dd>{solution.task.output}</dd></div>
-              </dl>
-              <div className={styles.cardProof}>
-                <SolutionProofSample pick={solution.proof} variant="thumb" />
-                <p>Sample source · inspect the workflow →</p>
-              </div>
-            </article>
-          ))}
-        </div>
-        <DesignPartners className={styles.partnership} />
-        <div className="actions">
-          <PublicPrimaryCta className="btn" />
-          <Link className="btn ghost" href={EXPLORE_CTA.href as Route}>{EXPLORE_CTA.label}</Link>
-        </div>
-        <p className="fine">
-          Next: the guides, samples and research in the <Link href="/resources">resources hub</Link>,
-          or the exact product contract in the <Link href="/docs">documentation</Link>.
-          These five pages describe how the compiler is used, not completed customer engagements.
-        </p>
-      </div></section>
-    </PublicPageShell>
+    <V34Page route="solutions">
+      <RouteJsonLd route="solutions" />
+      <SolutionsBody />
+    </V34Page>
   );
 }

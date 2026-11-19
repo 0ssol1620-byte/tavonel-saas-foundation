@@ -27,11 +27,17 @@ describe("compute settlement callback", () => {
       fetcher as typeof fetch,
       () => new Date("2026-08-29T12:00:00Z"),
       () => "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      { meter: { pages: 7 } },
     );
     assert.ok(captured);
     const call = captured as { url: string; init: RequestInit };
     assert.equal(call.url, "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle");
     assert.equal(new Headers(call.init.headers).has("authorization"), false);
+    // The page meter travels beside the per-document figure a pre-meter site still reads.
+    assert.deepEqual(JSON.parse(String(call.init.body)), {
+      workspaceKey: "pilot-test", documentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      outcome: "settled", actualCredits: 2, reasonCode: "OCR_COMPLETED", pages: 7,
+    });
     assert.match(String(new Headers(call.init.headers).get("x-tavonel-billing-signature")), /^[A-Za-z0-9_-]{43}$/u);
   });
 
@@ -74,6 +80,7 @@ describe("compute settlement callback", () => {
       () => dispatchComputeSettlement(
         ...args,
         async () => Response.json({ code: "COMPUTE_RESERVATION_NOT_FOUND" }, { status: 503 }),
+        undefined, undefined, { meter: { pages: 1 } },
       ),
       /HTTP 503 \(COMPUTE_RESERVATION_NOT_FOUND\)/,
     );
@@ -81,8 +88,41 @@ describe("compute settlement callback", () => {
       () => dispatchComputeSettlement(
         ...args,
         async () => Response.json({ code: "customer-specific detail" }, { status: 503 }),
+        undefined, undefined, { meter: { pages: 1 } },
       ),
       /^RetryableError: compute settlement returned HTTP 503$/,
     );
+  });
+
+  it("never settles a read without its page count, and sends none on a release", async () => {
+    const env = {
+      FOUNDATION_BILLING_SETTLEMENT_URL: "https://tavonel-saas-foundation.vercel.app/api/internal/billing/settle",
+      FOUNDATION_BILLING_SETTLEMENT_HMAC: "s".repeat(40),
+    };
+    const key = "quarantine/pilot-test/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/source";
+    const bodies: Record<string, unknown>[] = [];
+    const fetcher = async (_input: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response("{}", { status: 200 });
+    };
+    for (const meter of [undefined, { pages: null }, { pages: 0 }, { pages: 2.5 }]) {
+      await assert.rejects(
+        dispatchComputeSettlement(env, key, "settled", 2, "OCR_COMPLETED", fetcher as typeof fetch, undefined, undefined,
+          meter ? { meter } : {}),
+        /^RetryableError: compute settlement page meter facts are missing or invalid$/,
+      );
+    }
+    await assert.rejects(
+      dispatchComputeSettlement(env, key, "operator_review", 2, "OCR_RESPONSE_INVALID", fetcher as typeof fetch),
+      /page meter facts are missing or invalid/,
+    );
+    assert.equal(bodies.length, 0);
+
+    // A read that could not be counted is reviewed, not charged: the null travels as a fact.
+    await dispatchComputeSettlement(env, key, "operator_review", 2, "PAGE_COUNT_UNKNOWN", fetcher as typeof fetch,
+      undefined, undefined, { meter: { pages: null } });
+    await dispatchComputeSettlement(env, key, "released", 0, "GPU_NOT_DISPATCHED", fetcher as typeof fetch);
+    assert.equal(bodies[0].pages, null);
+    assert.equal(Object.hasOwn(bodies[1], "pages"), false);
   });
 });

@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { ROUTE_TEMPLATES } from "../lib/v34/route-templates";
+import { v34Route, type V34RouteKey } from "../lib/v34/routes";
 
 for (const route of ["/docs/quickstart", "/docs/ask", "/docs/cli", "/docs/mcp"]) {
   test(`${route} places the title above a readable article instead of an empty middle column`, async ({ page }) => {
@@ -126,7 +128,7 @@ test("MCP reading controls and title clear the shared header with either consent
 
   const expectReadingPosition = async (consentVisible: boolean) => {
     const layout = await page.evaluate(() => {
-      const header = document.querySelector<HTMLElement>("header.nav.chrome-v2-header");
+      const header = document.querySelector<HTMLElement>("[data-v34-header]");
       const search = document.querySelector<HTMLElement>('.docs-reading-surface input[aria-label="Search every documentation page, including page bodies"]');
       const title = document.querySelector<HTMLElement>(".docs-reading-surface .document-title");
       const summary = document.querySelector<HTMLElement>(".docs-reading-surface .docs-body > .lede");
@@ -216,7 +218,9 @@ test("MCP reading controls and title clear the shared header with either consent
   R1 on the docs routes, inside the docs owner's own browser suite (Phase 4 follow-ups (g), DELTA-REVIEW-2026-10-19 N-3).
 
   UX-PLAN-2026-10-17 section 5.3 R1: the header wordmark, the H1 and the content under it share one left edge (+/-1px), the one
-  the tokens define (`--tv-page-w`: min(1320px, 100% - 2 x clamp(24px, 5vw, 72px)), centred). e2e/site-alignment.spec.ts
+  the tokens define. V34 (WO-CI-5a): the docs pages render in the V34 shell, so the header is `[data-v34-header]`, the
+  wordmark is its home link (accessible name "TAVONEL home") and the container is the shell's `--v34-shell` token
+  (components/v34/tokens.module.css), centred, read off the page through a probe rather than typed here. e2e/site-alignment.spec.ts
   measures it on every public route, but the Repair-scope `docs` owner did not select that suite, so a change to only
   app/docs/[section]/page.tsx or components/docs/* could move the /docs title row off the edge (the B-09 layout) and pass.
   The owner's paths sit in the 5dd95ed8 affected-integration fixtures, where site-alignment.spec.ts did not exist yet, so
@@ -227,7 +231,6 @@ test("MCP reading controls and title clear the shared header with either consent
 */
 const R1_DOCS_ROUTES = ["/docs", "/docs/quickstart", "/docs/mcp"] as const;
 const R1_WIDTHS = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
-const containerEdge = (viewport: number) => Math.max(Math.min(Math.max(viewport * 0.05, 24), 72), (viewport - 1320) / 2);
 
 /** Runs in the page; self-contained because Playwright serialises it. */
 function docsEdges() {
@@ -238,10 +241,22 @@ function docsEdges() {
     return style.visibility !== "hidden" && style.display !== "none";
   };
   const replaced = new Set(["IMG", "SVG", "VIDEO", "CANVAS", "PICTURE", "INPUT", "SELECT", "TEXTAREA", "IFRAME"]);
-  const header = [...document.querySelectorAll("header")].find((el) => !el.closest("footer") && el.querySelector(".wordmark") && visible(el));
-  const wordmark = header ? [...header.querySelectorAll(".wordmark")].find(visible) : undefined;
+  const header = [...document.querySelectorAll("[data-v34-header]")].find((el) => !el.closest("footer") && visible(el));
+  const wordmark = header ? [...header.querySelectorAll("a[aria-label=\"TAVONEL home\"]")].filter((el) => !el.closest("dialog")).find(visible) : undefined;
   const h1 = [...document.querySelectorAll("main h1")].find(visible);
-  if (!wordmark || !h1) return { viewport: document.documentElement.clientWidth, wordmark: null, h1: null, content: null, from: "missing wordmark or H1" };
+  // The container edge as the `--v34-shell` token resolves inside the V34 page root.
+  const site = header?.closest("[data-v34-site]");
+  let edge: number | null = null;
+  if (site) {
+    const probe = document.createElement("div");
+    probe.style.setProperty("width", "var(--v34-shell)");
+    probe.style.setProperty("margin-inline", "auto");
+    probe.style.setProperty("visibility", "hidden");
+    site.prepend(probe);
+    edge = probe.getBoundingClientRect().left;
+    probe.remove();
+  }
+  if (!wordmark || !h1) return { viewport: document.documentElement.clientWidth, edge, wordmark: null, h1: null, content: null, from: "missing wordmark or H1" };
   const main = h1.closest("main")!;
   const outOfFlow = (el: Element, root: Element) => {
     for (let at: Element | null = el; at && at !== root; at = at.parentElement) {
@@ -288,7 +303,7 @@ function docsEdges() {
       from = `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/)[0] : ""}`;
     }
   }
-  return { viewport: document.documentElement.clientWidth, wordmark: wordmark.getBoundingClientRect().left, h1: h1.getBoundingClientRect().left, content, from };
+  return { viewport: document.documentElement.clientWidth, edge, wordmark: wordmark.getBoundingClientRect().left, h1: h1.getBoundingClientRect().left, content, from };
 }
 
 test.describe("R1 on the docs routes: wordmark, H1 and content on the container edge", () => {
@@ -303,8 +318,9 @@ test.describe("R1 on the docs routes: wordmark, H1 and content on the container 
         expect(response?.status(), `${route} answers`).toBeLessThan(400);
         await page.evaluate(() => document.fonts.ready);
         const m = await page.evaluate(docsEdges);
-        const edge = containerEdge(m.viewport);
-        const at = `${route} @${m.viewport}: wordmark ${m.wordmark}, H1 ${m.h1}, content ${m.content} (${m.from}), edge ${edge}`;
+        const at = `${route} @${m.viewport}: wordmark ${m.wordmark}, H1 ${m.h1}, content ${m.content} (${m.from}), edge ${m.edge}`;
+        expect(m.edge, `no V34 container token. ${at}`).not.toBeNull();
+        const edge = m.edge!;
         expect(m.wordmark, at).not.toBeNull();
         expect(m.h1, at).not.toBeNull();
         expect(m.content, at).not.toBeNull();
@@ -321,5 +337,104 @@ test.describe("R1 on the docs routes: wordmark, H1 and content on the container 
     await page.locator("main h1").first().evaluate((h1) => { (h1 as HTMLElement).style.marginLeft = "24px"; });
     const m = await page.evaluate(docsEdges);
     expect(Math.abs(m.h1! - m.wordmark!)).toBeGreaterThan(1);
+  });
+});
+
+/*
+  WO-CI-28 (lead decision 18): retained T5 bodies inside the V34 frame set their H1 where a V34-native T5
+  page does. The V34 header is sticky and in flow; the policy document's and the /reproducibility hero's
+  top padding were sized for a fixed header over them, and put the H1 174px (policies) and 242px
+  (/reproducibility) under the header at 1440, 110 and 123 at 390, where the V34 T5 pages set it at 76-124.
+
+  The reference is measured in the same run, never typed: every live registry route the inventory gives
+  T5 (`ROUTE_TEMPLATES`, lib/v34/route-templates.ts). Their header-to-H1 distance is the hero's top padding
+  plus its eyebrow line, and at desktop the split hero also centres its copy column against a taller art
+  column, by an amount that depends on the art (/evidence 0, /security about 7px, /enterprise about 21px at
+  1440). So the template's distance is each reference's distance less its own copy column's centring; the
+  references must agree on it to 1px, and each retained route's distance must equal it to 1px (sub-pixel
+  rounding of the vw clamps). Driven at the six widths of OPENING_WIDTHS from the 1440 project.
+*/
+const T5_RETAINED = ["/status", "/privacy", "/terms", "/refunds", "/subprocessors", "/reproducibility", "/trust"] as const;
+// WO-CI-32: the framed 404 is the same policy-page opening; it answers 404 on purpose.
+const FRAMED_404 = "/not-a-page-wo-ci-32";
+const T5_V34 = (Object.keys(ROUTE_TEMPLATES) as V34RouteKey[])
+  .filter((key) => ROUTE_TEMPLATES[key] === "T5" && v34Route(key).release === "live")
+  .map((key) => v34Route(key).path);
+// 1280 and 1101 are inside the two-column hero (1,101-1,439 px), where a longer /reproducibility summary used to push the H1 down.
+const OPENING_WIDTHS = [1440, 1280, 1101, 768, 390, 360] as const;
+
+/** Runs in the page; self-contained because Playwright serialises it. */
+function openingDistance() {
+  const header = [...document.querySelectorAll<HTMLElement>("[data-v34-header]")]
+    .find((el) => !el.closest("footer") && el.getBoundingClientRect().height > 0);
+  const titles = [...document.querySelectorAll<HTMLElement>("main h1")];
+  if (!header || titles.length !== 1) throw new Error(`expected the V34 header and one main h1, got header ${Boolean(header)} and ${titles.length} h1`);
+  const h1 = titles[0];
+  // A V34 Hero's H1 sits in its copy column (`.copy`), a cell of the hero's grid (`.shell`, no padding).
+  const column = h1.parentElement!;
+  const row = column.parentElement!;
+  return {
+    inFrame: Boolean(h1.closest("[data-v34-site]")),
+    v34Hero: h1.id === "v34-title",
+    distance: h1.getBoundingClientRect().top - header.getBoundingClientRect().bottom,
+    centring: column.getBoundingClientRect().top - row.getBoundingClientRect().top,
+  };
+}
+
+async function openingAt(page: Page, route: string, status: "ok" | "404" = "ok") {
+  const response = await page.goto(route);
+  if (status === "404") expect(response?.status(), `${route} answers 404`).toBe(404);
+  else expect(response?.status(), `${route} answers`).toBeLessThan(400);
+  await page.evaluate(() => document.fonts.ready);
+  return page.evaluate(openingDistance);
+}
+
+/** The V34 T5 template's header-to-H1 distance at the current width, from every V34-native T5 page. */
+async function t5TemplateDistance(page: Page) {
+  expect(T5_V34.length, "no live V34 route is T5 in ROUTE_TEMPLATES").toBeGreaterThan(0);
+  const readings: string[] = [];
+  const flows: number[] = [];
+  for (const route of T5_V34) {
+    const m = await openingAt(page, route);
+    expect(m.v34Hero, `${route} opens with the V34 Hero`).toBe(true);
+    expect(m.centring, `${route}: a copy column above its row`).toBeGreaterThanOrEqual(-1);
+    flows.push(m.distance - m.centring);
+    readings.push(`${route} distance ${m.distance.toFixed(2)} centring ${m.centring.toFixed(2)}`);
+  }
+  const template = flows[0];
+  for (const flow of flows) expect(Math.abs(flow - template), `the V34 T5 pages disagree: ${readings.join("; ")}`).toBeLessThanOrEqual(1);
+  return { template, readings };
+}
+
+test.describe("T5 openings: a retained body sets its H1 where the V34 T5 template does", () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(testInfo.project.name !== "1440", "drives the six widths of OPENING_WIDTHS from the 1440 project");
+  });
+  for (const width of OPENING_WIDTHS) {
+    test(`header to H1 at ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: width <= 390 ? 844 : 900 });
+      const { template, readings } = await t5TemplateDistance(page);
+      for (const route of T5_RETAINED) {
+        const m = await openingAt(page, route);
+        readings.push(`${route} distance ${m.distance.toFixed(2)}`);
+        expect(m.inFrame, `${route} renders inside the V34 frame`).toBe(true);
+        expect.soft(Math.abs(m.distance - template), `${route} @${width}: H1 ${m.distance.toFixed(2)}px under the header, T5 template ${template.toFixed(2)}px`).toBeLessThanOrEqual(1);
+      }
+      const missing = await openingAt(page, FRAMED_404, "404");
+      readings.push(`${FRAMED_404} distance ${missing.distance.toFixed(2)}`);
+      expect(missing.inFrame, `${FRAMED_404} renders inside the V34 frame`).toBe(true);
+      expect.soft(Math.abs(missing.distance - template), `${FRAMED_404} @${width}: H1 ${missing.distance.toFixed(2)}px under the header, T5 template ${template.toFixed(2)}px`).toBeLessThanOrEqual(1);
+      await test.info().attach(`t5-openings-${width}`, { body: readings.join("\n"), contentType: "text/plain" });
+    });
+  }
+
+  test("the measurement catches a title moved off the template's distance", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const { template } = await t5TemplateDistance(page);
+    await page.goto("/privacy");
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator("main h1").first().evaluate((h1) => { (h1 as HTMLElement).style.marginTop = "24px"; });
+    const m = await page.evaluate(openingDistance);
+    expect(Math.abs(m.distance - template)).toBeGreaterThan(1);
   });
 });

@@ -1,0 +1,282 @@
+/*
+  Methods page only. Colours come from --v34-* tokens and nothing else. The bands themselves
+  (Hero, Section, FinalCta) set their own surface, so a rule here reads --v34-fg* from the band it
+  sits in. Dark art colours are stated on the figure's own panel, which is always the dark ground.
+  No animation: nothing on this page moves.
+*/
+
+/* ---- illustration ----------------------------------------------------------------------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.layer {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.spine {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.line {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.region {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.link {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.node {
+  fill: var(--v34-lime);
+}
+
+.tick {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.mark {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.label {
+  fill: var(--v34-on-dark);
+  font-family: var(--v34-font);
+  font-size: 22px;
+}
+
+/* ---- the six stages --------------------------------------------------------------------- */
+
+.stages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 36px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage,
+.outcome {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 2px solid var(--v34-fg);
+}
+
+.kicker {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.45;
+}
+
+.output {
+  color: var(--v34-fg);
+  font-weight: 650;
+}
+
+.stageTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.stageText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.check {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--v34-fg-rule);
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.checkLabel {
+  margin-right: 6px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.textLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.textLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* ---- under the surface ------------------------------------------------------------------ */
+
+.phases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0 0 32px;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.phase {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 16px 12px 16px 0;
+}
+
+.phaseName {
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+}
+
+.phaseDetail {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+}
+
+.items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+}
+
+.itemText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.6;
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+/* ---- outcomes --------------------------------------------------------------------------- */
+
+.outcomes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- narrower screens ------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .outcomes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .stages,
+  .outcomes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .phases {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .phase {
+    padding: 12px 0;
+    border-top: 1px solid var(--v34-fg-rule);
+  }
+
+  .phase:first-child {
+    border-top: 0;
+  }
+}

@@ -134,7 +134,9 @@ export const RECIPE_START: Record<RecipeId, "/workspace/sources" | "/workspace/d
  * Where a confirmed session goes next, given the intents that were consumed to get there.
  *
  * Checkout keeps precedence because it is the narrower, paying one -- except for an owner, whose
- * access never reaches checkout. A recipe goes to the sign-in page's continuation step, rebuilt
+ * access never reaches checkout. One-step buy (2026-11-10): a held offer returns to /pricing, where
+ * the purchase continues on the page it started on -- the processing terms in a dialog there if
+ * they are still owed, then the checkout -- instead of in the workspace. A recipe goes to the sign-in page's continuation step, rebuilt
  * from the validated intent rather than from anything stored verbatim; that page renders the
  * preflight and waits for a click, and it never redirects a signed-in recipe again, so the hop
  * cannot loop. `checkout` is typed to the closed offer list, and every runtime caller passes a
@@ -150,7 +152,7 @@ export function resumeDestination({
   ownerBillingExempt?: boolean;
   recipe: RecipeIntent | null;
 }): string {
-  if (checkout && !ownerBillingExempt) return `/workspace?checkout=${encodeURIComponent(checkout)}`;
+  if (checkout && !ownerBillingExempt) return `/pricing?checkout=${encodeURIComponent(checkout)}`;
   const safe = parseRecipeIntent(recipe);
   return safe ? loginUrlForRecipe(safe.recipeId, safe.returnTo) : "/workspace";
 }

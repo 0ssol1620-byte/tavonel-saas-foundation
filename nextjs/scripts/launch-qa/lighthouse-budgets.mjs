@@ -200,6 +200,17 @@ try {
       summary.over.push(miss);
       if (enforced) failures.push(miss);
     }
+    /* What the LCP figure is made of, from the first sample: a miss then names its own cause (WO-CI-16c could not tell from
+       the hosted log whether `/` waits for a stylesheet or for its hero image). Output only: no budget reads these. */
+    const lcpAudits = samples[0].audits;
+    const lcpElement = lcpAudits['largest-contentful-paint-element']?.details?.items ?? [];
+    summary.lcpDiagnostics = {
+      firstContentfulPaint: median(samples.map((report) => report.audits['first-contentful-paint']?.numericValue ?? 0)),
+      element: lcpElement[0]?.items?.[0]?.node?.selector ?? lcpAudits['lcp-breakdown-insight']?.details?.items?.find?.((item) => item?.type === 'node')?.selector ?? null,
+      phases: (lcpElement[1]?.items ?? lcpAudits['lcp-breakdown-insight']?.details?.items?.find?.((item) => Array.isArray(item?.items))?.items ?? [])
+        .map((phase) => [phase.phase ?? phase.label ?? phase.subpart ?? null, Math.round(phase.timing ?? phase.duration ?? 0)]),
+      renderBlocking: (lcpAudits['render-blocking-resources']?.details?.items ?? lcpAudits['render-blocking-insight']?.details?.items ?? []).length,
+    };
     process.stdout.write(`${JSON.stringify(summary)}\n`);
     // The script ratchet already went to `failures`; only the misses that really are ignored print here.
     const ignored = summary.over.filter((item) => !failures.includes(item));

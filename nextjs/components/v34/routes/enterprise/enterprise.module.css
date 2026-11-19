@@ -1,0 +1,294 @@
+/* ---- drawing: tokens only, on the dark crop the Figure paints ------------------------------ */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sheet,
+.sheetBack,
+.panel,
+.panelActive {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.sheetBack {
+  stroke-dasharray: 4 4;
+}
+
+.panelActive {
+  stroke: var(--v34-lime);
+  stroke-width: 2.5;
+}
+
+.rule,
+.mark,
+.arrow,
+.tick,
+.edge {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mark,
+.tick {
+  stroke: var(--v34-lime);
+  stroke-width: 4;
+}
+
+.region {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2.5;
+}
+
+.gate {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2.5;
+}
+
+.node,
+.nodeActive {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.nodeActive {
+  fill: var(--v34-lime);
+  stroke: var(--v34-lime);
+}
+
+.lab {
+  fill: var(--v34-on-dark);
+  font-family: var(--v34-font);
+  font-size: 20px;
+  font-weight: 560;
+}
+
+/* ---- what your team can do ------------------------------------------------------------------- */
+
+.tasks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 clamp(20px, 3vw, 40px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task,
+.item {
+  min-width: 0;
+  padding: 20px 0 24px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.taskTitle,
+.itemTitle {
+  margin: 0 0 8px;
+  font-size: var(--v34-h3);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.taskBody,
+.itemBody {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.6;
+}
+
+/* ---- numbered chains (the trace and the pilot) ------------------------------------------------ */
+
+.chain {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 clamp(18px, 2.4vw, 32px);
+  margin: clamp(28px, 4vw, 44px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  min-width: 0;
+  padding: 18px 0 8px;
+  border-top: 2px solid var(--v34-fg);
+}
+
+.stepNo {
+  margin: 0 0 14px;
+  color: var(--v34-fg-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+}
+
+.stepTitle {
+  margin: 0 0 8px;
+  font-size: var(--v34-h3);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.stepBody {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- how it is run ---------------------------------------------------------------------------- */
+
+.items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 clamp(28px, 6vw, 88px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- scoped with you --------------------------------------------------------------------------- */
+
+.scoped {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scopedCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-panel);
+}
+
+.scopedLabel {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scopedTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.scopedBody {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- running text ------------------------------------------------------------------------------ */
+
+.prose {
+  max-width: 68ch;
+  margin: 22px 0 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.6;
+}
+
+.proseTight {
+  max-width: 68ch;
+  margin: 0 0 14px;
+  color: var(--v34-fg-muted);
+  line-height: 1.6;
+}
+
+/* Inside a sentence (lead decisions 23 and 25): a plain inline box whose target is its text. Nothing here may
+   change the line that holds it; the page's jump index and rows keep the 44 px floor. */
+.inline {
+  display: inline;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.inline:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.inline:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+/*
+  Page jump index (lead decision 11): the /security pills, one per row, so each target is its own
+  row of the index and no two touch targets share a line.
+*/
+.jump {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 clamp(28px, 4vw, 44px);
+  padding: 0;
+  list-style: none;
+}
+
+.jumpLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-pill);
+  background: transparent;
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.jumpLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.jumpLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1000px) {
+  .chain {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scoped {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .tasks,
+  .items,
+  .chain {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

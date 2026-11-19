@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getFoundationAccountGrant } from "@/lib/account-grants";
 import { createCheckoutBinding } from "@/lib/billing-binding";
 import { billingSecret } from "@/lib/billing-secrets";
-import { isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
-import { issueFoundationCheckoutIntent } from "@/lib/billing-store";
+import { BILLING_OFFERS, isBillingOfferCode, readConfiguredBillingOffers, readPaddleBrowserConfig } from "@/lib/billing-catalog";
+import { getFoundationBillingAccount, issueFoundationCheckoutIntent } from "@/lib/billing-store";
+import { quoteCheckout } from "@/lib/checkout-quote";
 import { readCommercialState } from "@/lib/commercial-state";
-import { decideCheckoutPolicy, decideOfferCheckoutPolicy } from "@/lib/checkout-policy";
+import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChange } from "@/lib/checkout-policy";
 import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { readPublicStatusV2 } from "@/lib/public-status";
@@ -41,16 +42,18 @@ export async function POST(request: Request) {
   if (!isBillingOfferCode(body.offerCode)) {
     return NextResponse.json({ code: "BILLING_OFFER_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  // The offer policy runs first: a plan that is not sold online answers 403 whether or not its price env
+  // is set, so an unset v2 price is the same refusal as an undelivered one, never 503 BILLING_NOT_CONFIGURED.
+  const offerPolicy = decideOfferCheckoutPolicy({ code: body.offerCode, saleChannel: BILLING_OFFERS[body.offerCode].saleChannel });
+  if (!offerPolicy.allowed) {
+    return NextResponse.json({ code: offerPolicy.code }, { status: 403, headers: NO_STORE });
+  }
   const paddle = readPaddleBrowserConfig();
   const offer = readConfiguredBillingOffers().get(body.offerCode);
   // The one reader: a value with surrounding whitespace is refused, never trimmed (lib/billing-secrets.ts).
   const secret = billingSecret("FOUNDATION_BILLING_HMAC");
   if (!paddle || !offer || !secret) {
     return NextResponse.json({ code: "BILLING_NOT_CONFIGURED" }, { status: 503, headers: NO_STORE });
-  }
-  const offerPolicy = decideOfferCheckoutPolicy(offer);
-  if (!offerPolicy.allowed) {
-    return NextResponse.json({ code: offerPolicy.code }, { status: 403, headers: NO_STORE });
   }
   const commercial = readCommercialState();
   const checkoutPolicy = decideCheckoutPolicy(
@@ -63,6 +66,11 @@ export async function POST(request: Request) {
   const access = foundationPilotAccess(user.id);
   if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
   const { membership } = access;
+  // One subscription per workspace: a live one refuses a second checkout (see `decideSubscriptionChange`).
+  const billing = await getFoundationBillingAccount(membership.workspaceId, user.id);
+  if (!billing.ok) return NextResponse.json({ code: billing.code }, { status: 503, headers: NO_STORE });
+  const change = decideSubscriptionChange(billing.account, body.offerCode);
+  if (!change.allowed) return NextResponse.json({ code: change.code }, { status: 409, headers: NO_STORE });
   // A deployment-wide launch switch is not permission for this customer's sources. In live mode
   // refuse payment before creating a durable checkout intent unless the same workspace receipt
   // that intake and compilation require is current and valid. Sandbox qualification remains
@@ -77,6 +85,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: "PROCESSING_QUALIFICATION_NOT_BILLABLE" }, { status: 403, headers: NO_STORE });
     }
   }
+  // The quote is computed before anything is signed or recorded: a quote that cannot be made leaves no
+  // intent behind, because `use-checkout` opens no overlay without one and the intent would be orphaned.
+  const quote = await quoteCheckout(offer);
   const customData = createCheckoutBinding(
     { userId: user.id, workspaceId: membership.workspaceId, offerCode: body.offerCode },
     secret,
@@ -95,6 +106,7 @@ export async function POST(request: Request) {
     environment: paddle.environment,
     clientToken: paddle.clientToken,
     offer: { code: offer.code, kind: offer.kind, label: offer.label, priceId: offer.priceId, credits: offer.credits },
+    quote,
     customer: user.email ? { email: user.email } : undefined,
     customData,
   }, { headers: NO_STORE });

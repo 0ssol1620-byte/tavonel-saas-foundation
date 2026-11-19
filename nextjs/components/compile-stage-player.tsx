@@ -1,5 +1,7 @@
 "use client";
 
+// `.compile-film-viewport` / `.compile-film-panes`: no longer global (WO-CI-16b).
+import "@/app/one-path.css";
 import dynamic from "next/dynamic";
 import { EMPTY_IMAGE } from "@/lib/hero-phone-mode";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";

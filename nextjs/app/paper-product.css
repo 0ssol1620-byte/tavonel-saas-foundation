@@ -52,6 +52,8 @@
 }
 @media(prefers-reduced-motion:reduce) { .paper-product *, .paper-product *::before, .paper-product *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 .paper-product { --g1:#fff; --verified-deep:#eaf4ed; --changed-deep:#fff0bc; --paper:#fff; }
+/* /evaluation is paper under the dark site root (app/tavonel.css): the document says so too, for the scrollbar and the overscroll. */
+html:has(.evaluation-page) { color-scheme: light; }
 .evaluation-shell { max-width:1280px; margin:0 auto; padding:56px 32px 80px; }
 .evaluation-intro { max-width:760px; }
 /* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): the T2 H1 role in tavonel.css sets its type. */
@@ -114,6 +116,32 @@
 .pricing-page .paper-purchase-boundary p { font-size: 14px; line-height: 1.5; }
 .pricing-page .pricing-utility-links { display: flex; flex-wrap: wrap; gap: 0 16px; margin-top: 4px; font-size: 14px; }
 .pricing-page .pricing-utility-links a { min-height: 44px; text-underline-offset: 4px; }
+/* A link answers the pointer (v34 matrix state-hover): the underlined utility links drop the underline, and the
+   evaluation card's plain secondary link takes one, as body links do on /evaluation. */
+@media (hover: hover) and (pointer: fine) {
+  .pricing-page .pricing-utility-links a:hover { text-decoration-line: none; }
+  .pricing-page .plan-action .pricing-secondary-link:hover { text-decoration-line: underline; }
+}
+/*
+  WO-CI-14: fine print that carries more than one link ("Before you buy: ... · ... · ...").
+  The 44px floor in tavonel.css (same media query) grows an inline link 12.5px above and below its line and
+  pulls the margin back so the paragraph does not reflow. That is sound for one link in a sentence; two links
+  on adjacent lines sit one line (about 22px) apart, so each grown box covered half of the other and a tap
+  there opened the wrong page (v34 matrix: 128x25 at 390 and 412, and at 1440 under 200% zoom).
+
+  WO-CI-36, lead decisions 23 and 25: WO-CI-14 answered with an atomic 44px box per link. A 44px box inside a 22px
+  line makes that line 44px against 22.40px for the next one (measured at 360, 390, 768, 1079 and 1440 with a coarse
+  pointer: "(1) the line that holds it measures 44.00px against the paragraph's next line 22.40px", 10 of 12 rows), and
+  the target-size criterion does not ask it of a link inside a sentence. Here each link is a plain inline box: its
+  target is its text, no two links can share a line's height, and the paragraph reads as one sentence. Same selector
+  as WO-CI-14's, unlayered, so it outranks the floor; the page's own actions (the plan buttons, the utility row, the
+  overage table) are rows of their own and keep 44px above.
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .pricing-page .fine:has(> a ~ a) > a { display: inline; min-height: 0; padding-block: 0; margin-block: 0; }
+}
+/* WO-CI-23: the overage table's "Request access" links are controls, 44px at every width (lead decision 14). */
+.pricing-page table[aria-labelledby="pricing-overage-title"] td a { display: inline-flex; align-items: center; min-height: 44px; }
 /* Direction C (2026-11-04): the four plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
 .pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
 .pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 32px 28px 28px; border: 0; border-right: 1px solid var(--tv-rule); border-radius: 0; background: transparent; box-shadow: none; }
@@ -129,6 +157,13 @@
 .pricing-page .plan-features { min-width: 0; }
 .pricing-page .plan-action { align-self: end; }
 .pricing-page .plan-action .btn { min-height: 44px; }
+/* One-step buy (2026-11-10): the checkout sentence sits in its card, and the paid outcome above the cards. */
+.pricing-page .pricing-buy-notice { margin: 0; padding: 12px 14px; font-size: 14px; line-height: 1.5; text-align: left; overflow-wrap: anywhere; }
+.pricing-page .pricing-purchase { margin: 0 0 24px; padding: 20px; border-top: 3px solid var(--tv-action); }
+.pricing-page .pricing-purchase h2 { margin: 0 0 6px; font-size: 20px; line-height: 1.3; color: #171c20; }
+.pricing-page .pricing-purchase p { margin: 0 0 12px; }
+.pricing-page .pricing-purchase .pricing-purchase-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 0; }
+.pricing-page .pricing-purchase .btn { min-height: 44px; }
 @media (max-width: 1023px) {
   .pricing-page .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pricing-page .plan:nth-child(2) { border-right: 0; }

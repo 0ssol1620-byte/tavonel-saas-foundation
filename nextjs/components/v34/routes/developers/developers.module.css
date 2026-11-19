@@ -1,0 +1,344 @@
+/*
+  Developers page only. Colours come from --v34-* tokens and nothing else. The bands set their own
+  surface, so a rule here that paints a background also states its foreground. No animation.
+*/
+
+/* ---- hero art: a request with its key, and result rows pinned to pages of their source ---- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.request,
+.row,
+.page {
+  fill: none;
+  stroke: var(--v34-on-dark);
+  stroke-width: 2;
+}
+
+.rule {
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.keyHead {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.keyShaft {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.flow {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.pin {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.mark {
+  fill: var(--v34-lime);
+}
+
+/* ---- shared small pieces -------------------------------------------------------------------- */
+
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.inlineLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+/* Inside a sentence (lead decisions 23 and 25): the gate notice and the sample note. A plain inline box
+   whose target is its text, a class of its own -- the 44 px floor above belongs to the links that stand
+   alone in a row (.sectionLink, .fileLinks) and is never reset here. */
+.sentenceLink {
+  display: inline;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.sentenceLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+/* Inside a sentence the ring sits closer than the row link's 4px: at 4px it reached 0.41 to 1.2px into the line above (WO-CI-30). */
+.sentenceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 2px;
+}
+
+.inlineLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.inlineCode {
+  font-family: var(--v34-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+
+.path {
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  overflow-wrap: anywhere;
+}
+
+.sectionLink {
+  margin: 24px 0 0;
+}
+
+/* ---- three ways in -------------------------------------------------------------------------- */
+
+.paths {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cardText {
+  margin: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.cardNote {
+  margin: 12px 0 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* ---- journey -------------------------------------------------------------------------------- */
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 8px 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.stepNo {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepBody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.2;
+}
+
+.stepText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.notice {
+  margin: 28px 0 0;
+  padding: 16px 18px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: var(--v34-paper);
+  color: var(--v34-ink);
+  line-height: 1.55;
+}
+
+/* ---- first request -------------------------------------------------------------------------- */
+
+.samples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.sampleNote {
+  margin: 24px 0 0;
+  max-width: 70ch;
+  color: var(--v34-fg-muted);
+  line-height: 1.6;
+}
+
+/* ---- published files ------------------------------------------------------------------------ */
+
+.files {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.file {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: 4px 24px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.fileLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+
+.fileLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.fileLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.filePurpose {
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.fileLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- next ----------------------------------------------------------------------------------- */
+
+.next {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nextItem {
+  min-width: 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.nextLink {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 18px 0 22px;
+  color: var(--v34-fg);
+  text-decoration: none;
+}
+
+.nextTitle {
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 600;
+}
+
+.nextText {
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.nextLink:hover {
+  background: var(--v34-fg-hover);
+  color: var(--v34-fg);
+}
+
+.nextLink:hover .nextTitle {
+  color: var(--v34-fg-link);
+  text-decoration: underline;
+}
+
+.nextLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 2px;
+}
+
+/* ---- narrow --------------------------------------------------------------------------------- */
+
+@media (max-width: 1000px) {
+  .paths {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .samples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .next {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .file {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .next {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

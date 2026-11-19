@@ -1,0 +1,434 @@
+/*
+  /changes only. Colours come from --v34-* tokens and nothing else. The bands (Hero, Section, Bridge,
+  FinalCta) set their own surface, so a rule here that paints a background also states its foreground,
+  and the rest read --v34-fg* from the band they sit in. No animation.
+*/
+
+/* ---- hero drawing ----------------------------------------------------------------------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.artPanel { fill: var(--v34-step-bg); stroke: var(--v34-on-dark-muted); stroke-width: 1; }
+.artTitle { fill: var(--v34-on-dark-muted); }
+.artBar { fill: var(--v34-rule-dark); }
+.artChanged { fill: var(--v34-rule-dark); stroke: var(--v34-lime); stroke-width: 2; }
+.artGone { fill: none; stroke: var(--v34-on-dark-muted); stroke-width: 2; stroke-dasharray: 6 4; }
+.artAdded { fill: var(--v34-lime); }
+.artRoute { fill: none; stroke: var(--v34-on-dark-muted); stroke-width: 2; }
+.artDot { fill: var(--v34-on-dark); }
+.artDotChanged { fill: var(--v34-lime); }
+
+/* ---- shared small pieces ---------------------------------------------------------------- */
+
+.tagRow {
+  margin-bottom: 20px;
+}
+
+.kicker,
+.when {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.itemText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.textLink,
+.sourceLink {
+  position: relative;
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.textLink {
+  min-height: 44px;
+}
+
+.textLink:hover,
+.sourceLink:hover {
+  color: var(--v34-fg);
+}
+
+.textLink:focus-visible,
+.sourceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+
+/* ---- the revision ----------------------------------------------------------------------- */
+
+.path {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 40px;
+  margin: 0 0 40px;
+  padding: 0;
+  list-style: none;
+}
+
+.pathItem,
+.cover {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
+}
+
+.sources {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 4px 24px;
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.sourceName {
+  font-weight: 650;
+}
+
+.sourceNote {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.45;
+}
+
+/* ---- versions of the sample World ------------------------------------------------------- */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepItem {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-panel);
+  background: var(--v34-white);
+  color: var(--v34-ink);
+}
+
+.stepHead {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.stepName {
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.stepArrival {
+  color: var(--v34-muted);
+  font-size: var(--v34-small);
+}
+
+.rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: 4px 16px;
+}
+
+.rowName {
+  color: var(--v34-muted);
+  font-size: var(--v34-small);
+}
+
+.rowValue {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+}
+
+.digests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  color: var(--v34-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  overflow-wrap: anywhere;
+}
+
+.stepsLink {
+  margin: 20px 0 0;
+}
+
+/* ---- what a comparison covers, and the decision ----------------------------------------- */
+
+.covers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- narrow ----------------------------------------------------------------------------- */
+
+@media (max-width: 1000px) {
+  .covers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .path {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .source {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .covers {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- the Compiler Contract -------------------------------------------------------------- */
+
+.key {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 28px;
+}
+
+.keyRow {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 4px 16px;
+  align-items: baseline;
+}
+
+.keyMeaning {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.clauses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clause {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.clauseHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+/* The chip is the one place a colour is a claim: a demonstrated clause takes the forest pair, a direction stays neutral. */
+.state {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-pill);
+  color: var(--v34-fg-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+[data-state="demonstrated"] .state {
+  border-color: var(--v34-forest);
+  color: var(--v34-forest);
+}
+
+.detail {
+  min-width: 0;
+}
+
+.summary {
+  display: list-item;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 12px 4px;
+  color: var(--v34-fg-link);
+  cursor: pointer;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.summary:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+.detailBody {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 4px 0 12px;
+}
+
+.where {
+  display: block;
+  font-size: var(--v34-eyebrow);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.flow {
+  min-width: 0;
+  /* The legacy drawing reads its own custom properties; they are pointed at the page's tokens here. */
+  --text-hi: var(--v34-ink);
+  --text-mid: var(--v34-fg-muted);
+  --text-lo: var(--v34-fg-muted);
+  --hairline: var(--v34-fg-rule);
+  --hairline-hi: var(--v34-fg-muted);
+  --g1: var(--v34-white);
+  --f-mono: var(--v34-mono);
+  --verified: var(--v34-ok);
+  --verified-dim: var(--v34-ok);
+  --unresolved: var(--v34-error);
+  --unresolved-dim: var(--v34-error);
+  --changed: var(--v34-link);
+  --changed-dim: var(--v34-link);
+  --reused: var(--v34-forest);
+}
+
+.formats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+
+.formatName {
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  letter-spacing: 0.08em;
+}
+
+.formatPath {
+  margin: 4px 0 0;
+  color: var(--v34-fg-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  overflow-wrap: anywhere;
+}
+
+.standards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.standard {
+  display: grid;
+  grid-template-columns: 8rem 9rem minmax(0, 1fr);
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.standard .state {
+  justify-self: start;
+}
+
+@media (max-width: 900px) {
+  .clauses {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .formats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .standard,
+  .keyRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

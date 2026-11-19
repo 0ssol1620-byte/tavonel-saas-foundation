@@ -1,8 +1,7 @@
 import Link from "next/link";
 import LegalOperatorDisclosure from "@/components/legal-operator-disclosure";
-import Logomark from "@/components/logomark";
 import PolicyJumpIndex, { IndexedPolicyBody } from "@/components/policy-jump-index";
-import { PublicSiteHeader } from "@/components/public-site-chrome";
+import { PublicSitePage } from "@/components/public-site-chrome";
 
 type PolicyDocumentProps = {
   title: string;
@@ -21,8 +20,8 @@ type PolicyDocumentProps = {
  * inherited the legal chrome with it -- a seven-link row ending in "Questions about this policy",
  * on a page that is not a policy and that every other route links to from the Trust group. It
  * renders this inside `PublicSitePage` now and gets the site footer, BRAND_LINE and the five
- * groups like every other public route. The four real policies keep `PolicyLayout` below, which
- * is this document plus the legal header and footer, so nothing about them changed.
+ * groups like every other public route. The four real policies use `PolicyLayout` below, which
+ * is this document in the same frame, closed by the policy contact line and the operator disclosure.
  */
 export function PolicyDocument({
   title,
@@ -71,25 +70,25 @@ export function PolicyDocument({
   );
 }
 
-export default function PolicyLayout(props: PolicyDocumentProps) {
-  return (
-    <div className="page" data-template="T5">
-      {/*
-        The site's header, not a two-link one of its own.
+export default function PolicyLayout({ children, ...document }: PolicyDocumentProps) {
+  /*
+    WO-CI-21 (D1): `/privacy`, `/terms`, `/refunds` and `/subprocessors` render inside the V34 frame
+    through `PublicSitePage`, as /status does, so their header, container edge and footer are the
+    site's. That page root declares T5; this component no longer declares a second one.
 
-        `/privacy`, `/terms`, `/refunds` and `/subprocessors` are pages a reader lands on from a
-        search result or a contract, and the nav here offered them two links and no way back into
-        the product -- the fourth chrome `site-navigation.ts` describes, still standing. The two
-        destinations it did carry, Service status and Contact, moved into the legal footer below
-        so nothing on these pages became harder to reach.
-      */}
-      {/* BA-232 (nav-global CROSS-LANE 1): the header's action is resolved here now. The
-          placeholder-then-replace client fallback that used to supply it is gone. */}
-      <PublicSiteHeader />
-      <main id="main" tabIndex={-1}>
-        <PolicyDocument {...props} />
-      </main>
-      <footer className="site"><div className="shell"><span className="wordmark"><Logomark /><b>TAVONEL</b></span><nav className="site-links" aria-label="Legal"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/refunds">Refunds</Link><Link href="/subprocessors">Subprocessors</Link><Link href="/security">Security</Link><Link href="/status">Service status</Link><Link href="/contact">Contact</Link></nav><LegalOperatorDisclosure compact /><p className="fine">Questions about this policy: <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a></p></div></footer>
-    </div>
+    The legal footer this replaced was a second chrome: a wordmark and a seven-link row (Privacy,
+    Terms, Refunds, Subprocessors, Security, Service status, Contact), every one of which the V34
+    footer carries in its groups or its legal row (`lib/v34/nav.ts`). Its two lines that are not
+    navigation -- where to send a question about the policy, and the operator disclosure -- now close
+    the document itself, so nothing a reader could find on these pages before is gone.
+  */
+  return (
+    <PublicSitePage template="T5">
+      <PolicyDocument {...document}>
+        {children}
+        <p className="fine">Questions about this policy: <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a></p>
+        <LegalOperatorDisclosure compact />
+      </PolicyDocument>
+    </PublicSitePage>
   );
 }

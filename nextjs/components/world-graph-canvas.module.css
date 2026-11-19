@@ -118,3 +118,7 @@
   .edge:hover { stroke: var(--graph-ink); }
   .table button:hover { color: var(--graph-accent); }
 }
+
+/* A collapsed cluster: one hollow mark that says how many objects it stands for. */
+.node[data-type="Cluster"] circle { fill: none; stroke: var(--graph-muted); stroke-width: 2.5; stroke-dasharray: 5 4; }
+.node[data-type="Cluster"] text { fill: var(--graph-ink); }

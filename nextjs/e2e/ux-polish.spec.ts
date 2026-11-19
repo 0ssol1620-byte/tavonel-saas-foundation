@@ -1,4 +1,4 @@
-import { primaryCallToAction } from "../lib/commercial-state";
+import { createWorldAction } from "../components/v34/ui/create-world";
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
@@ -97,14 +97,16 @@ test("product page shows the product path before secondary product surfaces", as
   // its purchasePlan also needs sign-in readiness, which the CTA does not read.)
   const statusResponse = await page.request.get("/api/status/v2");
   expect(statusResponse.ok()).toBe(true);
-  const expectedCta = primaryCallToAction();
+  const expectedCta = createWorldAction();
+  // V34 (D33 1.1): /product answers 308 to /platform.
   await page.goto("/product");
+  await expect(page).toHaveURL(/\/platform$/);
   // Output uses follow the actual World; the old duplicate process/card wall stays retired.
   await expect(page.locator(".product-flow, .product-surface-grid")).toHaveCount(0);
-  const outcomes = page.getByRole("heading", { name: "Inspect the evidence", exact: true }).locator("..").locator("..");
-  await expect(outcomes.locator(":scope > section")).toHaveCount(3);
-  await expect(outcomes.getByRole("heading")).toHaveText(["Inspect the evidence", "Keep versions readable", "Give your AI the output"]);
-  await expect(outcomes.getByRole("link")).toHaveCount(3);
+  // The three output uses (evidence, changes, the AI connection) are offered from the body.
+  for (const href of ["/evidence", "/changes", "/connect"]) {
+    await expect(page.locator('main a[href="' + href + '"]').first(), href).toBeVisible();
+  }
   /*
     The page's own CTA, not "a Start free somewhere on the document". `PublicSiteHeader` renders
     the same runtime-derived `PublicPrimaryCta` on every public route (both arrived in `e5eb77c`),
@@ -112,7 +114,7 @@ test("product page shows the product path before secondary product surfaces", as
     before it can check either. Scoping to `#main` is what this test's name already claims to be
     checking, and it still fails if the product path loses its call to action.
   */
-  const cta = page.locator("#main").getByRole("link", { name: expectedCta.label, exact: true });
+  const cta = page.locator("main").getByRole("link", { name: expectedCta.label, exact: true }).first();
   await expect(cta).toBeVisible();
   await expect(cta).toHaveAttribute("href", expectedCta.href);
 });

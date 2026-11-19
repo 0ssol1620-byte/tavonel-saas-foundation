@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { measureOverflow } from "./support/overflow";
+import { measureInSentenceLinks } from "./in-sentence-links";
 import { activationPolicy } from "../lib/activation-policy";
 
 /*
@@ -56,6 +57,24 @@ function overlaps(boxes: Box[]): string[] {
   return found;
 }
 
+/**
+ * Heights of the links in <main> that are NOT inside a sentence. Lead decision 26: the 24px floor of WCAG 2.5.8 is asked of
+ * a link that stands on its own; a link inside a sentence is excepted by that criterion and is governed by decision 23 (a
+ * plain inline box, measured by e2e/mobile-landing.spec.ts). The split is the classifier that file uses, never a selector.
+ */
+async function standaloneHeights(page: Page): Promise<number[]> {
+  const inSentence = new Set((await page.evaluate(measureInSentenceLinks)).map((link) => link.index));
+  const heights = await page.locator("main a[href]").evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+  return heights.filter((_, index) => !inSentence.has(index));
+}
+
+/** The 24px floor of a link that stands on its own, with the list non-empty so an empty split cannot pass. */
+async function expectStandaloneFloor(page: Page) {
+  const standalone = await standaloneHeights(page);
+  expect(standalone.length).toBeGreaterThan(8);
+  for (const height of standalone) expect(height, "link target outside a sentence").toBeGreaterThanOrEqual(24);
+}
+
 test.describe("(a) /developers link targets", () => {
   for (const width of PHONES) {
     test(`do not overlap at ${width}px`, async ({ page }) => {
@@ -65,29 +84,55 @@ test.describe("(a) /developers link targets", () => {
       expect(boxes.length).toBeGreaterThan(8);
       expect(overlaps(boxes)).toEqual([]);
 
-      // The two gate actions and the reference sentences are the rows that overlapped. The gate
-      // note (and its actions) renders only while customer data is closed; D-12 opened it 2026-11-09.
-      const rows = activationPolicy.customerData.enabled ? [".dev-refs a"] : [".dev-actions a", ".dev-refs a"];
-      if (activationPolicy.customerData.enabled) await expect(page.locator(".dev-actions")).toHaveCount(0);
-      for (const selector of rows) {
-        const heights = await page.locator(selector).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
-        expect(heights.length, selector).toBeGreaterThan(1);
-        for (const height of heights) expect(height, selector).toBeGreaterThanOrEqual(44);
-      }
+      // V34: the rows that overlapped are the published-file list and the reference links under it.
+      // The gate note renders only while customer data is closed; D-12 opened it 2026-11-09.
+      if (activationPolicy.customerData.enabled) await expect(page.locator('[data-capability-gate="customerData"]')).toHaveCount(0);
+      // A list of files is a list of block targets: the 44px floor. A link that stands on its own keeps the 24px
+      // floor of WCAG 2.5.8; a link inside a sentence is excepted by it (decision 26) and is measured elsewhere.
+      const heightsOf = (selector: string) => page.locator(selector).evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+      const fileRows = await heightsOf("main ul[aria-label] a");
+      expect(fileRows.length, "the published-file list").toBeGreaterThan(1);
+      for (const height of fileRows) expect(height, "published-file link").toBeGreaterThanOrEqual(44);
+      await expectStandaloneFloor(page);
+      // The split must be exercised: this page does render a link inside a sentence, and it is not in the list above.
+      const total = await page.locator("main a[href]").count();
+      expect(total - (await standaloneHeights(page)).length, "links inside a sentence on /developers").toBeGreaterThan(0);
       const overflow = await page.evaluate(measureOverflow);
       expect(overflow.documentOverflow).toBeLessThanOrEqual(0);
       expect(overflow.offenders).toEqual([]);
     });
   }
 
+  test("the floor still fails a standalone link of 20px and does not ask 24px of a link inside a sentence", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/developers");
+    await expectStandaloneFloor(page);
+    await page.locator("main h2").first().evaluate((heading) => {
+      const alone = document.createElement("div");
+      alone.id = "planted-alone";
+      alone.innerHTML = '<a href="/planted-alone" style="display:block;height:20px">planted standalone link</a>';
+      const sentence = document.createElement("p");
+      sentence.innerHTML = 'Some words around <a href="/planted-in-sentence" style="display:inline">a planted link</a> and some after it.';
+      heading.before(alone, sentence);
+    });
+    // The standalone 20px link fails the row's own assertion ...
+    await expect(expectStandaloneFloor(page)).rejects.toThrow("link target outside a sentence");
+    // ... and with it removed, the planted link inside a sentence (about 18px high) is not asked for 24px.
+    await page.locator("#planted-alone").evaluate((element) => element.remove());
+    await expectStandaloneFloor(page);
+  });
+
   test("the measurement finds an overlap when two targets are planted on adjacent lines", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/developers");
-    await page.locator(".dev-refs").first().evaluate((list) => {
+    await page.locator("main h2").first().evaluate((list) => {
       const p = document.createElement("p");
       p.className = "fine";
       p.style.width = "120px";
-      p.innerHTML = '<a href="/one">first planted link</a> <a href="/two">second planted link</a>';
+      // V34 links carry no tap-floor padding, so the overlap is planted by construction: two 30px
+      // targets on adjacent lines, the second pulled 10px into the first.
+      p.innerHTML = '<a href="/one" style="display:block;height:30px">first planted link</a>' +
+        '<a href="/two" style="display:block;height:30px;margin-top:-10px;position:relative">second planted link</a>';
       list.before(p);
     });
     expect(overlaps(await linkBoxes(page)).some((line) => line.includes("planted"))).toBe(true);

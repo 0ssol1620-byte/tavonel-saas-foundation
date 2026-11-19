@@ -89,6 +89,12 @@ jobs:
             node --test scripts/repair-scope.test.mjs
           fi
       - run: pnpm install --frozen-lockfile
+      # The held-pairs reader parses specs with the installed `typescript` package, so its five tests skip in the
+      # dependency-free selector step above and run here, where a missing parser is a failure.
+      - name: Run the held-pairs reader tests with dependencies installed
+        env:
+          REPAIR_HELD_READER_REQUIRED: '1'
+        run: node --test --test-name-pattern='^affected held pairs' scripts/repair-scope.test.mjs
       - name: Scan repository secrets
         id: secrets
         run: pnpm scan:secrets

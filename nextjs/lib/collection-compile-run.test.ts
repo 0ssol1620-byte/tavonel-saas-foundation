@@ -321,7 +321,7 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
         status: "completed",
         runtime: "tavonel-python-core-v2",
         candidate: { worldStateId: "world-1", reviewReasons: [] },
-        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
       },
     });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
@@ -423,6 +423,29 @@ describe("signed and audited compile receipts (gate preconditions 8 and 12)", ()
     expect(JSON.stringify(event.details)).not.toMatch(/"(content|text|secret|password|token|credential|private[_-]?key)"\s*:|pump/i);
     expect(audited.mock.invocationCallOrder[0]).toBeLessThan(put.mock.invocationCallOrder[0]!);
     expect(JSON.parse(String(put.mock.calls[0]?.[3]))).toMatchObject({ signedReceipt: receipt });
+  });
+
+  it("binds the caller's authorization revision as the receipt epoch, and null when it has none", async () => {
+    const epochOf = (run: Awaited<ReturnType<typeof runCollectionCompile>>) =>
+      run.ok ? (JSON.parse(run.payload.signedReceipt.payloadJson) as { authorizationEpoch: unknown }).authorizationEpoch : "refused";
+    const actor = "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a";
+    compilableSource();
+    expect(epochOf(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID,
+      { userId: actor, provenance: "durable_job", authorizationRevision: 7 }))).toBe(7);
+    expect(epochOf(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID,
+      { userId: actor, provenance: "durable_job", authorizationRevision: null }))).toBeNull();
+    expect(epochOf(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID,
+      { userId: actor, provenance: "durable_job", authorizationRevision: 0 }))).toBeNull();
+    expect(epochOf(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID))).toBeNull();
+  });
+
+  it("refuses with 503 and persists nothing when the source scope cannot be read at signing", async () => {
+    compilableSource();
+    classifySources.mockResolvedValue({ ok: false, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, status: 503, code: "COMPILE_JOB_AUTHORITY_UNAVAILABLE" });
+    expect(audited).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
   });
 
   it("carries a qualification grant from admission through dispatch into the signed, audited receipt", async () => {
@@ -784,7 +807,7 @@ describe("a source read before region capture", () => {
         status: "completed",
         runtime: "tavonel-python-core-v2",
         candidate: { worldStateId: "world-1", reviewReasons: [] },
-        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+        receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
       },
     });
 
@@ -870,7 +893,7 @@ describe("a re-compile of a collection that already has an active World", () => 
         status: "completed",
         runtime: "tavonel-python-core-v2",
         candidate: { worldStateId: "world-2", reviewReasons: [] },
-        receipt: { requestId: "request-2", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+        receipt: { requestId: "request-2", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
       },
     });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
@@ -1106,7 +1129,7 @@ describe("exact-duplicate annotation at compile intake", () => {
     dispatched.mockResolvedValue({ ok: true, result: {
       status: "completed", runtime: "tavonel-python-core-v2",
       candidate: { worldStateId: "world-1", reviewReasons: [] },
-      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
     } });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }
@@ -1204,7 +1227,7 @@ describe("library organize proposals at compile intake", () => {
     dispatched.mockResolvedValue({ ok: true, result: {
       status: "completed", runtime: "tavonel-python-core-v2",
       candidate: { worldStateId: "world-1", reviewReasons: [] },
-      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, candidatePromotion: false },
+      receipt: { requestId: "request-1", outputSha256: `sha256:${"f".repeat(64)}`, coreReleaseDigest: `sha256:${"e".repeat(64)}`, candidatePromotion: false },
     } });
     put.mockResolvedValue({ ok: true, status: "written", bytes: 1 });
   }

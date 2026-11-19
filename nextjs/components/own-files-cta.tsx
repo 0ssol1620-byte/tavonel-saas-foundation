@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { primaryCallToAction } from "@/lib/commercial-state";
-import { BILLING_OFFERS } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, planAvailability, type PlanAvailability } from "@/lib/billing-catalog";
 import { SELF_SERVE_CTA, START_FREE_LABEL, TRIAL_ALLOWANCE } from "@/lib/site-navigation";
 
 /*
@@ -13,14 +13,19 @@ import { SELF_SERVE_CTA, START_FREE_LABEL, TRIAL_ALLOWANCE } from "@/lib/site-na
   that cannot sell offers the access request instead, and the free allowance is not printed there.
   Every number is read from `TRIAL_ALLOWANCE` (pinned to the trial policy migration) and the
   billing catalog.
+
+  WO-REL-4 (release review non-blocker 8): the Personal price is stated only while Personal can be
+  bought (`planAvailability`, computed on the server); while it is Request access the note is the free
+  evaluation alone.
 */
-export function ownFilesCopy(start: { href: string; label: string }) {
+export function ownFilesCopy(start: { href: string; label: string }, personal: PlanAvailability) {
   const live = start.href === SELF_SERVE_CTA.href;
-  const developer = BILLING_OFFERS.observer_access;
+  const entry = BILLING_OFFERS.personal;
+  const price = personal === "purchasable" ? ` ${entry.label} is $${entry.priceUsd}/month for ${entry.includedPages.toLocaleString("en-US")} standard pages.` : "";
   return {
     heading: "Run this on your own files",
     note: live
-      ? `Free for ${TRIAL_ALLOWANCE.days} days with up to ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} standard pages, no card. ${developer.label} is $${developer.priceUsd}/month for ${developer.includedPages.toLocaleString("en-US")} standard pages.`
+      ? `Free for ${TRIAL_ALLOWANCE.days} days with up to ${TRIAL_ALLOWANCE.files} files and ${TRIAL_ALLOWANCE.pages} standard pages, no card.${price}`
       : "Tell us about your sources and we will scope an evaluation with you.",
     primary: { href: start.href, label: live ? START_FREE_LABEL : start.label },
     // The access request already goes to /contact, so a second link there would be the same action twice.
@@ -29,7 +34,7 @@ export function ownFilesCopy(start: { href: string; label: string }) {
 }
 
 export function OwnFilesCta() {
-  const copy = ownFilesCopy(primaryCallToAction());
+  const copy = ownFilesCopy(primaryCallToAction(), planAvailability("personal"));
   return (
     <div className="stack trust-next own-files-cta" data-own-files-cta="">
       <h2>{copy.heading}</h2>

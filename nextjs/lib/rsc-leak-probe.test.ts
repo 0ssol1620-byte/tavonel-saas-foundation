@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, userInfo } from "node:os";
 import { dirname, join } from "node:path";
@@ -42,12 +42,25 @@ const CLEAN = {
   "server/app/docs/mcp.segments/_tree.segment.rsc": '0:{"buildId":"abc","tree":{"segment":"docs"}}',
 };
 
-function runCli(dir: string, env: Record<string, string | undefined>) {
-  const result = spawnSync(process.execPath, [script, "--dir", dir], {
-    encoding: "utf8",
-    env: { NODE_ENV: "test", PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT, ...env },
+/*
+  Awaited, never spawnSync (WO-CI-38): these tests run the CLI back to back, and synchronous children
+  chained across them held this worker's event loop for up to 58.2 s on this machine -- the edge of
+  vitest's 60 s worker RPC window, past which the run exits 1 on `Timeout calling "onTaskUpdate"` with
+  every test green. A child that cannot start rejects; it is never read as an exit code.
+*/
+function runCli(dir: string, env: Record<string, string | undefined>): Promise<{ code: number | null; out: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [script, "--dir", dir], {
+      env: { NODE_ENV: "test", PATH: process.env.PATH, SYSTEMROOT: process.env.SYSTEMROOT, ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => resolve({ code, out: `${stdout}${stderr}` }));
   });
-  return { code: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
 describe("the RSC-leak probe", () => {
@@ -57,16 +70,16 @@ describe("the RSC-leak probe", () => {
     ["a macOS home", "server/app/guide.html", "<p>/Users/someone/notes</p>", "a macOS home path"],
     ["a Linux home", "server/app/guide.html", "<p>/home/ci/work</p>", "a Linux home path"],
     ["the user name alone", "server/app/ko/guide.html", `<p>recorded by ${USER.toUpperCase()}</p>`, "the OS user name"],
-  ])("fails on %s, and passes once it is gone", (_name, file, leak, label) => {
+  ])("fails on %s, and passes once it is gone", async (_name, file, leak, label) => {
     const leaky = plantBuild({ ...CLEAN, [file]: leak });
     const found = scanBuild(leaky, { userName: USER });
     expect(found.hits.map((hit) => hit.label)).toContain(label);
     expect(found.hits[0].file).toBe(file);
-    expect(runCli(leaky, { USER }).code).toBe(1);
+    expect((await runCli(leaky, { USER })).code).toBe(1);
 
     const clean = plantBuild(CLEAN);
     expect(scanBuild(clean, { userName: USER })).toEqual({ scanned: 4, hits: [] });
-    expect(runCli(clean, { USER }).code).toBe(0);
+    expect((await runCli(clean, { USER })).code).toBe(0);
   });
 
   it("reads HTML and RSC payloads, segment payloads included, and leaves the build cache alone", () => {
@@ -92,13 +105,13 @@ describe("the RSC-leak probe", () => {
     fail a page for "a test runner". That one account name is matched only inside a path; a real path still fails, through
     the path needles and through the name between separators, and every other account name is still a leak as a bare word.
   */
-  it("passes the hosted CI account's name as a word and still fails a real path on that machine", () => {
+  it("passes the hosted CI account's name as a word and still fails a real path on that machine", async () => {
     const [, , , [, pattern]] = leakPatterns("runner");
     expect("built by runner on CI".match(pattern)).toBeNull();
     expect("/opt/runner/work".match(pattern)).toHaveLength(1);
     const prose = plantBuild({ ...CLEAN, "server/app/docs/cli.html": "<p>Run it from a test runner or a task Runner.</p>" });
     expect(scanBuild(prose, { userName: "runner" }).hits).toEqual([]);
-    expect(runCli(prose, { USER: "runner" }).code).toBe(0);
+    expect((await runCli(prose, { USER: "runner" })).code).toBe(0);
     for (const [leak, label] of [
       ['0:["$","li","C:/Users/runner/work/x",{}]', "a drive-letter path"],
       [`0:["$","li","D:${BACKSLASH}${BACKSLASH}a${BACKSLASH}${BACKSLASH}runner${BACKSLASH}${BACKSLASH}x",{}]`, "a drive-letter path"],
@@ -107,24 +120,24 @@ describe("the RSC-leak probe", () => {
     ]) {
       const leaky = plantBuild({ ...CLEAN, "server/app/benchmarks.rsc": leak });
       expect(scanBuild(leaky, { userName: "runner" }).hits.map((hit) => hit.label), leak).toContain(label);
-      expect(runCli(leaky, { USER: "runner" }).code, leak).toBe(1);
+      expect((await runCli(leaky, { USER: "runner" })).code, leak).toBe(1);
     }
     // Any other account name is still a leak as a bare word.
     expect(scanBuild(prose, { userName: "task" }).hits.map((hit) => hit.label)).toEqual(["the OS user name"]);
   });
 
-  it("fails closed: no user name to look for, no build, or nothing to read", () => {
+  it("fails closed: no user name to look for, no build, or nothing to read", async () => {
     expect(userNameFromEnv({})).toBeNull();
     expect(userNameFromEnv({ USERNAME: " someone " })).toBe("someone");
     expect(() => leakPatterns(null)).toThrow("no OS user name");
     const clean = plantBuild(CLEAN);
     // Empty rather than absent: Windows (libuv) copies USERNAME into a child that lacks it.
     const nameless = { USER: "", USERNAME: "", LOGNAME: "" };
-    expect(runCli(clean, nameless).out).toContain("no OS user name in USER, USERNAME or LOGNAME");
-    expect(runCli(clean, nameless).code).toBe(1);
-    expect(runCli(join(clean, "missing"), { USER }).code).toBe(1);
+    expect((await runCli(clean, nameless)).out).toContain("no OS user name in USER, USERNAME or LOGNAME");
+    expect((await runCli(clean, nameless)).code).toBe(1);
+    expect((await runCli(join(clean, "missing"), { USER })).code).toBe(1);
     const empty = plantBuild({ "server/app/page.js": "" });
-    const run = runCli(empty, { USER });
+    const run = await runCli(empty, { USER });
     expect(run.code).toBe(1);
     expect(run.out).toContain("no HTML or RSC payload");
   });

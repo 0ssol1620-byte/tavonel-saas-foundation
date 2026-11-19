@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BILLING_OFFERS } from "./billing-catalog";
 import { CLAIM_STATE } from "./claim-state";
@@ -50,7 +51,7 @@ function strip(source: string) {
   `app/solutions/[slug]/page.tsx` is one file holding five pages; `lib/docs-content.ts` is the
   whole of /docs. Both are included as files rather than as routes for that reason.
 */
-const CLAIM_SURFACES = [
+const BASE_CLAIM_SURFACES = [
   "app/page.tsx",
   /*
     Landing V2, 2026-09-19. `components/home-page-client.tsx` is deleted; the claims a buyer
@@ -82,6 +83,22 @@ const CLAIM_SURFACES = [
   */
   "lib/cookbook-content.ts",
 ] as const;
+
+/*
+  V34 (D33 §4 #17). Every source file under components/v34 renders on a public page, and so does the
+  walkthrough's copy deck. The rules are unchanged: the same phrases, read the same way. The registry
+  (`lib/v34/routes.ts`) is not here, and that is deliberate: it is scanned by its own test for the
+  rules that apply to descriptions, and the enterprise row has to name single sign-on as scoped.
+*/
+function v34Surfaces(directory = "components/v34"): string[] {
+  return readdirSync(new URL(directory, root)).flatMap((name) => {
+    const path = `${directory}/${name}`;
+    if (statSync(fileURLToPath(new URL(path, root))).isDirectory()) return v34Surfaces(path);
+    return /\.tsx?$/.test(name) ? [path] : [];
+  });
+}
+
+const CLAIM_SURFACES: readonly string[] = [...BASE_CLAIM_SURFACES, ...v34Surfaces(), "lib/v34/walkthrough.ts"];
 
 /*
   Phrases, not words, for the reason `public-copy-purge.test.ts` gives: banning "table" or
@@ -281,7 +298,7 @@ describe("product claims sync", () => {
     later. The fix is the initial value, so that is what this reads.
   */
   it("never paints the pilot badge before /api/status has confirmed the mode", () => {
-    const page = read("app/login/page.tsx");
+    const page = read("app/login/login-client.tsx");
     expect(page, "an unconfirmed commercial mode is null, not pilot")
       .toContain('useState<"pilot" | "live" | null>(null)');
     expect(strip(page), "the old initialiser must not come back")
@@ -316,15 +333,18 @@ describe("product claims sync", () => {
     outlived its gate fails.
   */
   it("discloses the closed customer-data gate on /developers before its authenticated examples", () => {
-    const page = read("app/developers/page.tsx");
+    // V34: the body is components/v34/routes/developers; the samples are stacked CodeBlocks, not tabs.
+    const page = read("components/v34/routes/developers/developers.tsx");
+    const words = read("components/v34/routes/developers/developers-content.ts");
     expect(page, "the gate text comes from the object /api/status serves")
       .toMatch(/import \{[^}]*\bactivationPolicy\b[^}]*\} from "@\/lib\/activation-policy"/);
     expect(page, "the public World action is the site's one constant for it")
       .toMatch(/import \{[^}]*\bEXPLORE_CTA\b[^}]*\} from "@\/lib\/site-navigation"/);
 
     const source = strip(page);
+    expect(source).toContain("const gateClosed = !activationPolicy.customerData.enabled;");
     const gate = source.match(
-      /\{activationPolicy\.customerData\.enabled \? null : \(\s*(<p [^>]*>[\s\S]*?<\/p>)\s*\)\}/,
+      /\{gateClosed \? \(\s*(<p [^>]*>[\s\S]*?<\/p>)\s*\) : null\}/,
     );
     expect(gate, "the note renders only while the gate is closed").not.toBeNull();
     const [block, note] = gate!;
@@ -335,13 +355,14 @@ describe("product claims sync", () => {
     expect(note, "the public World, by its constant")
       .toMatch(/<Link [^>]*href=\{EXPLORE_CTA\.href as Route\}[^>]*>\{EXPLORE_CTA\.label\}<\/Link>/);
     expect(note, "and the conversation about the reader's own sources")
-      .toMatch(/<Link [^>]*href="\/contact"[^>]*>Discuss your sources<\/Link>/);
+      .toMatch(/<Link [^>]*href=\{v34Route\("contact"\)\.path\}[^>]*>\{JOURNEY\.request\}<\/Link>/);
+    expect(words).toContain('request: "Discuss your sources"');
 
     const at = source.indexOf(block);
-    const journey = source.indexOf("{JOURNEY.map(");
-    const examples = source.indexOf("<DocsSnippet snippets={[...FIRST_CALL_SNIPPETS]}");
+    const journey = source.indexOf("{JOURNEY.items.map(");
+    const examples = source.indexOf("{FIRST_CALL_SNIPPETS.map(");
     expect(journey, "the journey is still rendered from JOURNEY").toBeGreaterThan(-1);
-    expect(examples, "the authenticated examples are still the first-call tabs").toBeGreaterThan(-1);
+    expect(examples, "the authenticated examples are still the first-call samples").toBeGreaterThan(-1);
     expect(at, "after the journey list closes").toBeGreaterThan(source.indexOf("</ol>", journey));
     expect(at, "before the first authenticated example").toBeLessThan(examples);
   });
@@ -400,20 +421,23 @@ describe("product claims sync", () => {
     it has no published price (`null`, rendered "Arranged with us").
   */
   it("computes the pricing scenarios from the catalog, and prices no page past the plan", () => {
-    const developer = BILLING_OFFERS.observer_access;
-    const team = BILLING_OFFERS.studio_access;
+    const { personal, team, business } = BILLING_OFFERS;
 
-    expect(monthlyTotalUsd(developer, developer.includedPages)).toBe(developer.priceUsd);
+    expect(monthlyTotalUsd(personal, personal.includedPages)).toBe(personal.priceUsd);
     expect(monthlyTotalUsd(team, team.includedPages)).toBe(team.priceUsd);
+    expect(monthlyTotalUsd(business, business.includedPages)).toBe(business.priceUsd);
     // A volume under the included pages is the subscription and nothing else.
     expect(monthlyTotalUsd(team, 1)).toBe(team.priceUsd);
     // Failure path: one page past the included pages is not given a price.
-    expect(monthlyTotalUsd(developer, developer.includedPages + 1)).toBeNull();
-    expect(monthlyTotalUsd(developer, developer.includedPages * 2)).toBeNull();
+    expect(monthlyTotalUsd(personal, personal.includedPages + 1)).toBeNull();
+    expect(monthlyTotalUsd(personal, personal.includedPages * 2)).toBeNull();
+    expect(monthlyTotalUsd(business, business.includedPages + 1)).toBeNull();
 
     const pricing = read("components/pricing-page-client.tsx");
     expect(pricing, "the volumes are derived from the catalog, not typed")
-      .toContain("BILLING_OFFERS.observer_access.includedPages");
+      .toContain("PERSONAL.includedPages");
+    expect(pricing, "and the catalog is where those names come from")
+      .toContain("personal: PERSONAL, developer: DEVELOPER, team: TEAM, business: BUSINESS } = BILLING_OFFERS");
     expect(pricing, "no scenario dollar figure is written into the page")
       .not.toMatch(/\$\d+\.\d\d/);
   });
@@ -455,16 +479,20 @@ describe("product claims sync", () => {
       .toContain("when the next month's pages are granted, whatever is left of the previous month expires");
     // R1 (delegated decision 2026-11-09): no per-page price past the plan, on any public surface that
     // talks about plans -- neither by name nor as a literal cents figure (review PR201-R1 note 4).
+    // Amendment 2 (founder, 2026-11-16) puts the V22 meter rates on /pricing, and only there: they are read from
+    // `METER_RATES_USD`, never typed, and sit beside Request access. The literal-figure ban below still stands.
+    expect(pricing, "the V22 meter rates on /pricing are the catalog's constants")
+      .toContain("rate(METER_RATES_USD.pcu)");
     const R1_RATE = /per standard page|STANDARD_PAGE_USD|MAXIMUM_PAGE_USD|PROCESSING_UNIT_USD|\$\s?0\.\d/;
     for (const [surface, source] of [
-      ["pricing", pricing], ["docs", read("lib/docs-content.ts")], ["ko pricing", read("app/ko/pricing/page.tsx")],
-      ["enterprise", read("app/enterprise/page.tsx")], ["guide", read("lib/guide-content.ts")], ["integrations", read("app/integrations/page.tsx")],
+      ["pricing", pricing], ["docs", read("lib/docs-content.ts")],
+      ["enterprise", ["enterprise-content.ts", "enterprise.tsx"].map((name) => read(`components/v34/routes/enterprise/${name}`)).join("\n")], ["guide", read("lib/guide-content.ts")], ["integrations", read("app/integrations/page.tsx")],
     ] as const) {
       expect(source, `R1: ${surface} publishes no overage rate`).not.toMatch(R1_RATE);
     }
     expect("Additional pages are $0.04 each", "R1: the guard catches the old lede's literal form").toMatch(R1_RATE);
     expect("Maximum routed cost $0.06 / page", "R1: and the workspace's form").toMatch(R1_RATE);
-    for (const [surface, source] of [["pricing", pricing], ["docs", read("lib/docs-content.ts")], ["ko pricing", read("app/ko/pricing/page.tsx")]] as const) {
+    for (const [surface, source] of [["pricing", pricing], ["docs", read("lib/docs-content.ts")]] as const) {
       expect(source, `R1: ${surface} says where additional volume goes`).toMatch(/arranged with us|저희와 상담해 정합니다/);
     }
     expect(pricing, "P03: whether Ask and search consume pages")
@@ -498,7 +526,7 @@ describe("product claims sync", () => {
     const refunds = read("app/refunds/page.tsx");
     expect(refunds, "the window is the catalog's").toContain("{REFUND_WINDOW_DAYS}");
     expect(refunds, "the share is the catalog's").toContain("Math.round(REFUND_MAX_CONSUMED_FRACTION * 100)");
-    for (const offer of ["observer_access", "studio_access"] as const) {
+    for (const offer of ["personal", "developer", "team", "business"] as const) {
       expect(refunds, `${offer}'s page allowance is derived`).toContain(`refundablePageAllowance(BILLING_OFFERS.${offer})`);
     }
     const copy = strip(refunds);

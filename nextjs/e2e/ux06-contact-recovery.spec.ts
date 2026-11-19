@@ -9,10 +9,11 @@ test("closed pricing CTAs stay on the evaluation/contact path when status is una
   await page.route("**/api/status/v2", route => route.abort());
   await page.goto("/pricing");
 
+  // Catalog v2 (PB-2026-11-V22, WO-CAT-2 N7): every paid plan is requested by its v2 label until it is sold online.
   const developer = page.getByRole("link", { name: "Request Developer access", exact: true });
-  const team = page.getByRole("link", { name: "Talk to us about Team", exact: true });
+  const team = page.getByRole("link", { name: "Request Team access", exact: true });
   const enterprise = page.getByRole("link", { name: "Scope an Enterprise pilot", exact: true }).first();
-  const evaluation = page.getByRole("link", { name: "Explore a Compiled World", exact: true });
+  const evaluation = page.locator("#pricing-plan-0").getByRole("link", { name: "Explore a Compiled World", exact: true });
 
   await expect(developer).toHaveAttribute("href", "/contact?plan=Developer");
   await expect(team).toHaveAttribute("href", "/contact?plan=Team");
@@ -20,6 +21,7 @@ test("closed pricing CTAs stay on the evaluation/contact path when status is una
   await expect(evaluation).toHaveAttribute("href", "/explore");
 
   await developer.click();
+  // The promise kept: a visitor who asks for a plan lands on a form that names it.
   await expect(page).toHaveURL(/\/contact\?plan=Developer$/);
   await expect(page.locator("[data-plan-intent]")).toHaveText("Inquiry about the Developer plan");
   await expect(page.locator('input[name="plan"]')).toHaveValue("Developer");

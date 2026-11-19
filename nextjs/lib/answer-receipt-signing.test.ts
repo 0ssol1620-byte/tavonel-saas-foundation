@@ -278,7 +278,8 @@ describe("the published verifier refuses what it must", () => {
     const compile = signCompileReceipt(compileSigner, {
       tenantId: "t", workspaceId: "t", collectionId: COLLECTION, manifestDigest: DIGEST, lifecycle: "candidate", coreRuntime: "core-v2",
       worldStateId: null, coreRequestId: "req-1", coreOutputSha256: DIGEST, customerDataGateReceiptSha256: DIGEST,
-      sourceDocuments: [{ documentId: "doc-1", versionKey: "a".repeat(64) }], compiledAt: "2026-11-04T00:00:00.000Z",
+      sourceDocuments: [{ documentId: "doc-1", versionKey: "a".repeat(64) }], sourceScope: "direct_upload", authorizationEpoch: null,
+      coreResponseSchema: "tavonel.product_core.compile_response.v2", coreReleaseDigest: DIGEST, compiledAt: "2026-11-04T00:00:00.000Z",
     })!;
     const crossScope = compileSigner.signPayload(Buffer.from(body.signedReceipt.payloadJson, "utf8"));
     expect(compile).not.toBeNull();

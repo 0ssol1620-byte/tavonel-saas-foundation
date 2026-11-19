@@ -282,6 +282,30 @@ export default function ExploreStage({ access, model, layout, change, answers, t
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      /*
+        WO-CI-6B. This listener is on `window`, so it also hears keys the V34 shell above the stage
+        has already handled: Escape that closes the More panel or the navigation drawer, "/" typed
+        while the drawer is open. Those keys are the shell's, not the workbench's -- without this,
+        closing the menu also closed the Evidence act and dropped `evidence=` from the URL. A key
+        pressed inside the site header (its More panel and drawer live there), or while a native
+        modal <dialog> is open (the page behind it is inert), is not handled here. The stage's own
+        overlays are `role="dialog"` elements inside the stage, not <dialog>, so their Escape still is.
+        Focus counts as well as the target: Safari does not focus a button on click, so Escape after
+        a mouse-opened More panel targets <body>, and the panel has already closed and handed focus
+        back to its button (inside the header) by the time the key reaches `window`.
+
+        WO-CI-6C. Where focus sits after a click differs by engine, so focus alone cannot say whose key
+        it is: in WebKit, "/" typed with a mouse-opened More panel targeted <body> and opened Ask behind
+        the panel. A surface the header has open -- any control in it with `aria-expanded="true"` --
+        owns the keyboard as well. `dialog:modal`, not `dialog[open]`: only a modal dialog makes the
+        page behind it inert; a non-modal <dialog open> anywhere must not switch the workbench's keys off.
+      */
+      const inShell = (node: EventTarget | null) => node instanceof Element && node.closest("[data-v34-header]") !== null;
+      if (
+        inShell(event.target) ||
+        inShell(document.activeElement) ||
+        document.querySelector('dialog:modal, [data-v34-header] [aria-expanded="true"]')
+      ) return;
       if (event.key === "/" && act !== "entry" && act !== "ask") {
         const target = event.target as HTMLElement | null;
         if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;

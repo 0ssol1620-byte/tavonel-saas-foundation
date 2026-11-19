@@ -154,7 +154,7 @@ describe("2026-09-05 production hardening", () => {
     expect(css).toContain(".mobile-primary-nav { display: block; }");
     // NAV PANELS 2026-11-09: the rows are the bar's own, rendered by the header into the sheet.
     expect(nav).toContain("{children}");
-    expect(read("components/public-site-chrome.tsx")).toContain("<NavSections korean={korean} sheet />");
+    expect(read("components/public-site-chrome.tsx")).toContain("<NavSections sheet />");
     expect(read("components/public-site-chrome.tsx")).toContain("HEADER_NAV.map");
     /*
       BQ-013. The landmark still has a name; the name is now in the language of the page.
@@ -163,7 +163,7 @@ describe("2026-09-05 production hardening", () => {
       localisation the visible labels had. The guard checks that the label exists in both, rather
       than pinning the English literal and so requiring the Korean page to keep it.
     */
-    expect(nav).toContain('aria-label={korean ? "모바일 섹션" : "Mobile sections"}');
+    expect(nav).toContain('aria-label="Mobile sections"');
     // The accordion is a disclosure, not a dialog: Tab must leave it. A focus trap imported here
     // would pass every geometry assertion in the suite. The import, not the word: both
     // components explain in prose why they do not reach for that hook.
@@ -176,7 +176,7 @@ describe("2026-09-05 production hardening", () => {
     const client = read("components/site-nav/desktop-primary-nav.tsx");
     expect(nav).toContain("HEADER_NAV.map");
     // BQ-013: the landmark keeps its name, in the language of the page it is on.
-    expect(nav).toContain('aria-label={korean ? "섹션" : "Sections"}');
+    expect(nav).toContain('aria-label="Sections"');
     // NAV PANELS 2026-11-09: `aria-expanded`/`aria-controls` on a `<button>`, and no `role="menu"`
     // promising arrow keys this navigation does not implement. The labels stay links.
     expect(nav).toContain('aria-expanded="false"');
@@ -244,7 +244,8 @@ describe("2026-09-05 production hardening", () => {
   it("does not sell collaboration that has not shipped", () => {
     const catalog = read("lib/billing-catalog.ts");
     expect(catalog).not.toContain("Shared workspace onboarding");
-    expect(catalog).toContain("Guided corpus onboarding");
+    // Starter/Pro rename (2026-11-10, founder, intended): guided onboarding is Enterprise only, so it is not a Pro feature.
+    expect(catalog).not.toContain('"Guided corpus onboarding"');
     expect(catalog).toContain('saleChannel: "contact"');
   });
 
@@ -253,7 +254,8 @@ describe("2026-09-05 production hardening", () => {
     expect(redirect).toContain('permanentRedirect("/knowledge-compiler")');
     expect(read("app/sitemap.ts")).not.toContain('"/product/knowledge-compiler"');
     expect(read("app/dev/layout.tsx")).toContain('process.env.VERCEL_ENV === "production"');
-    expect(read("app/film/layout.tsx")).toContain('process.env.VERCEL_ENV === "production"');
+    // /film is a held V34 route: its layout uses the release helper's fail-closed rule (lib/v34/release.ts).
+    expect(read("app/film/layout.tsx")).toContain("if (!heldVisible()) notFound();");
   });
 
   /*
@@ -278,5 +280,23 @@ describe("2026-09-05 production hardening", () => {
       .toContain("arranged with us rather than opened by a checkout");
     expect(llms, "and no self-service compile is offered while it is closed")
       .not.toContain("self-service evaluation");
+  });
+});
+
+/*
+  V34 (D33 §4 #5): a held route answers 404 in production, so the registry's held routes are in no
+  surface that advertises a page. The registry sets `sitemap` from `release`; this reads the files.
+*/
+describe("held V34 routes are advertised nowhere", async () => {
+  const { V34_HELD_ROUTES } = await import("@/lib/v34/routes");
+  const sitemapSource = read("app/sitemap.ts");
+  const llms = read("public/llms.txt");
+  const robots = read("app/robots.ts");
+
+  it.each(V34_HELD_ROUTES.map((route) => [route.path] as const))("%s is not in the sitemap, llms.txt or robots.txt", (path) => {
+    expect(sitemapSource).not.toContain(`"${path}"`);
+    expect(llms).not.toContain(`https://tavonel.com${path})`);
+    // A 404 is not made indexable-or-not by robots.txt, and a Disallow line would announce the route.
+    expect(robots).not.toContain(`"${path}"`);
   });
 });

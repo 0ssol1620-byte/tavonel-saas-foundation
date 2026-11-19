@@ -8,7 +8,6 @@
 import { GuideMedia } from "./guide-media";
 import Link from "next/link";
 import type { Route } from "next";
-import DocumentLangKo from "@/app/ko/document-lang";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
 import { CodeTokens } from "@/components/docs/code-tokens";
 import { withMarks } from "@/components/docs/marks";
@@ -27,14 +26,14 @@ import {
 import styles from "./guide.module.css";
 
 /*
-  /guide and /ko/guide (EN-1). The docs reading surface -- the same `.docs-reading-surface`
+  /guide (EN-1). The docs reading surface -- the same `.docs-reading-surface`
   scene, the same chapter rail and article columns from `docs-toc.module.css`, the same block
   classes `app/docs/[section]/page.tsx` renders -- with the guide's chapters in place of a docs
   section. One page per language with a fragment per chapter, not fourteen routes.
 
   No client component of its own. The rail is the docs rail's two-copies pattern (a `<nav>` that
   CSS shows from 1080px, a closed `<details>` below it), and the recordings are native `<video>`.
-  The one client module is `DocumentLangKo`, which every /ko page already mounts.
+  It mounts no client module.
 */
 
 /* -------------------------------------------------------------------------------- blocks */
@@ -116,8 +115,7 @@ export function GuidePage({ language }: { language: GuideLanguage }) {
     : [{ name: "Resources", path: "/resources" }, { name: ui.title, path: "/guide" }];
 
   return (
-    <PublicSitePage template="T3" korean={korean}>
-      {korean ? <DocumentLangKo /> : null}
+    <PublicSitePage template="T3">
       <BreadcrumbJsonLd trail={trail} />
       <section className="scene doc docs-reading-surface" aria-labelledby="guide-title">
         <div className="shell"><div className={layout.layout}>

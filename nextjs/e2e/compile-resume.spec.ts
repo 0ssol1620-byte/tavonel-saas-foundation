@@ -228,3 +228,78 @@ test("a tab that never started the compile picks it up from the server", async (
   await expect(progress(page)).toContainText("2 of 2 read");
   expect(state.posts, "picking up an open job posted a new compile").toBe(0);
 });
+
+/*
+  WO-D16-5 (M4-05): cancel and failure, in the browser.
+
+  The history here deliberately stops on a running state, so the run is unsettled and the panel
+  offers Cancel; the observer re-asks every 300 ms, which is what a live run looks like. The
+  cancel route is a counter: the assertion that matters is one request per click.
+*/
+const RUNNING: Frame[] = [frame(1, "reading", 0), frame(2, "reading", 1)];
+
+async function startRunningCompile(page: import("@playwright/test").Page, history: Frame[], cancel: { posts: number; status: number; body: Record<string, unknown> }) {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { documents: DOCUMENTS });
+  await page.route("**/api/compile-jobs", route => route.request().method() === "POST"
+    ? route.fulfill({ status: 202, json: { code: "COMPILE_JOB_ACCEPTED", jobId: JOB_ID, state: "preflight", documentsTotal: 2 } })
+    : route.fulfill({ json: { code: "OK", jobs: [] } }));
+  await page.route(`**/api/compile-jobs/${JOB_ID}/events**`, route => {
+    const after = Number(new URL(route.request().url()).searchParams.get("after") ?? "0");
+    return route.fulfill({ status: 200, contentType: "text/event-stream", headers: { "cache-control": "no-store" },
+      body: sseFrames(history.filter(entry => Number(entry.sequence) > after)) });
+  });
+  await page.route(`**/api/compile-jobs/${JOB_ID}/cancel`, route => {
+    cancel.posts += 1;
+    return route.fulfill({ status: cancel.status, json: cancel.body });
+  });
+  await page.goto("/workspace/sources", { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await selectBothAndCompile(page);
+}
+
+test("Cancel during reading posts one cancel, settles on 'Cancelled.' and offers no second cancel", async ({ page }) => {
+  test.setTimeout(90_000);
+  const cancel = { posts: 0, status: 200, body: { code: "COMPILE_JOB_CANCELLED", state: "cancelled" } };
+  await startRunningCompile(page, RUNNING, cancel);
+  await expect(progress(page)).toHaveAttribute("data-state", "reading", { timeout: 20_000 });
+  await progress(page).getByRole("button", { name: "Cancel this compile" }).click();
+  await expect(progress(page)).toHaveAttribute("data-state", "cancelled");
+  await expect(progress(page).getByRole("heading", { name: "Cancelled." })).toBeVisible();
+  await expect(progress(page).getByRole("button", { name: /^Cancel/ })).toHaveCount(0);
+  // Let any stray re-cancel or observer repaint land before counting.
+  await page.waitForTimeout(1_000);
+  expect(cancel.posts, "one click must post one cancel").toBe(1);
+  await expect(progress(page)).toHaveAttribute("data-state", "cancelled");
+});
+
+test("A cancel the server refuses keeps the running state and says so, never 'Cancelled.'", async ({ page }) => {
+  test.setTimeout(90_000);
+  const cancel = { posts: 0, status: 500, body: { code: "INTERNAL_ERROR" } };
+  await startRunningCompile(page, RUNNING, cancel);
+  await expect(progress(page)).toHaveAttribute("data-state", "reading", { timeout: 20_000 });
+  await progress(page).getByRole("button", { name: "Cancel this compile" }).click();
+  await expect(page.getByText(/Cancel failed\./)).toBeVisible();
+  await expect(progress(page)).toHaveAttribute("data-state", "reading");
+  await expect(progress(page).getByRole("heading", { name: "Cancelled." })).toHaveCount(0);
+  expect(cancel.posts).toBe(1);
+  // The run is still cancellable: the failure did not consume the control.
+  await expect(progress(page).getByRole("button", { name: "Cancel this compile" })).toBeEnabled();
+});
+
+test("A failed frame shows the failure sentence, no Cancel, and a reload shows the same settled state", async ({ page }) => {
+  test.setTimeout(90_000);
+  const cancel = { posts: 0, status: 200, body: {} };
+  const failed: Frame[] = [frame(1, "reading", 0), { ...frame(2, "failed", 0), eventType: "state_changed", errorCode: "BLOCKED_DECISION_EXPIRED" }];
+  await startRunningCompile(page, failed, cancel);
+  const sentence = /This compile waited 7 days for a decision/;
+  const assertFailed = async () => {
+    await expect(progress(page)).toHaveAttribute("data-state", "failed", { timeout: 20_000 });
+    await expect(progress(page).getByRole("heading", { name: "This compile stopped." })).toBeVisible();
+    await expect(progress(page).getByText(sentence)).toBeVisible();
+    await expect(progress(page).getByRole("button", { name: /^Cancel/ })).toHaveCount(0);
+  };
+  await assertFailed();
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  await assertFailed();
+  expect(cancel.posts, "a failed run must never post a cancel").toBe(0);
+});

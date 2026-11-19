@@ -1,24 +1,27 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import EvaluationPage from "./evaluation-page";
-vi.mock("@/components/public-site-chrome", () => ({PublicSiteHeader: () => <header />, PublicSiteFooter: () => <footer />}));
+import { activationPolicy } from "@/lib/activation-policy";
+vi.mock("@/components/public-site-chrome", () => ({PublicSitePage: ({children}: {children: import("react").ReactNode}) => <main>{children}</main>}));
 describe("bounded evaluation funnel", () => {
   it("keeps only three required fields and discloses the processing boundary", () => {
     const html = renderToStaticMarkup(<EvaluationPage />);
     expect((html.match(/ required=""/g) ?? []).length).toBe(3);
     expect(html).toContain("An inquiry does not start processing");
     expect(html).toContain("Do not attach or paste customer documents here");
-    expect(html).toContain("rather than enabled by a plan purchase");
+    // WO-REL-1 r4: the page renders the policy's own sentence; pinned to the constant so a rewording cannot strand this test.
+    expect(html).toContain(activationPolicy.customerData.reason);
   });
-  it("localizes the complete evaluation path for Korean readers", () => {
-    const html = renderToStaticMarkup(<EvaluationPage korean />);
-    expect(html).toContain('lang="ko"');
+  it("renders the complete evaluation path in English (/ko/evaluation redirects with a 308)", () => {
+    const html = renderToStaticMarkup(<EvaluationPage />);
+    expect(html).toContain('lang="en"');
     expect(html).toContain('aria-labelledby="evaluation-request-title"');
     expect(html).toContain('<h2 id="evaluation-request-title">');
     expect(html).not.toContain('aria-label="Request a document evaluation"');
-    expect(html).toContain("무엇을 검증하고 싶으신가요?");
-    expect(html).toContain("문의를 보내도 자료 처리");
-    expect(html).toContain('href="/ko/pricing"');
+    expect(html).toContain("Tell us what you want to verify");
+    expect(html).toContain("An inquiry does not start processing");
+    expect(html).toContain('href="/pricing"');
+    expect(html).not.toContain('href="/ko/');
     expect((html.match(/ required=""/g) ?? []).length).toBe(3);
   });
 });

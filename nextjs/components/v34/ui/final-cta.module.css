@@ -1,0 +1,78 @@
+.strip {
+  padding: 35px 0;
+}
+
+.shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 32px;
+  width: var(--v34-shell);
+  margin-inline: auto;
+}
+
+.main {
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+}
+
+.secondary:hover {
+  color: var(--v34-link);
+  text-decoration-thickness: 2px;
+}
+
+.secondary:focus-visible {
+  outline: 3px solid var(--v34-fg-focus, var(--v34-focus));
+  outline-offset: 4px;
+}
+
+/* The home close: a two-line display heading, the action at its foot. */
+.large {
+  padding: clamp(42px, 6vw, 80px) 0;
+}
+
+.large .shell {
+  align-items: flex-end;
+  gap: 24px 48px;
+}
+
+.large .title {
+  max-width: 17ch;
+  font-size: clamp(min(2.25rem, 10vw), 5.2vw, 5.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  text-wrap: wrap;
+}
+
+.title {
+  color: var(--v34-fg);
+  min-width: 0;
+  max-width: 24ch;
+  margin: 0;
+  font-size: clamp(1.65rem, 3.5vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.1;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  text-wrap: balance;
+}

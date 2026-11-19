@@ -1,0 +1,44 @@
+/* Proposals panel -- hairlines, no hue. State is carried by its word, never by colour alone. Text is 12px or larger. */
+
+.surface {
+  --cp-ink: var(--text-hi, #edeae4);
+  --cp-muted: var(--text-lo, #7d878d);
+  --cp-line: var(--hairline, #23282d);
+  --cp-line-hi: var(--hairline-hi, #2e353b);
+  --cp-changed: var(--changed, #f2a65a);
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.intro { display: grid; gap: 6px; }
+.intro h2 { margin: 0; }
+.intro p { margin: 0; max-width: 62ch; color: var(--cp-muted); font-size: 13px; line-height: 1.6; }
+
+.note { margin: 0; color: var(--cp-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.empty { margin: 0; color: var(--cp-muted); font-size: 13px; }
+.problem { margin: 0; padding: 10px 12px; border: 1px solid var(--cp-changed); color: var(--cp-ink); font-size: 13px; }
+
+.list { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; background: var(--cp-line); }
+.row { display: grid; gap: 8px; padding: 12px; background: var(--ground, #08090a); min-width: 0; }
+.state { color: var(--cp-muted); font: 12px var(--f-mono, monospace); letter-spacing: .08em; text-transform: uppercase; }
+.preview { margin: 0; color: var(--cp-ink); font-size: 13px; overflow-wrap: anywhere; }
+.id { font: 12px var(--f-mono, monospace); overflow-wrap: anywhere; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.action {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--cp-line-hi);
+  color: var(--cp-ink);
+  font-size: 12px;
+}
+.action:hover:not(:disabled) { border-color: var(--cp-ink); }
+.action:disabled { opacity: .5; cursor: progress; }
+@media (pointer: coarse) { .action { min-height: 44px; min-width: 44px; } }
+
+.detail { display: grid; gap: 6px; min-width: 0; }
+.ids { display: grid; gap: 2px; min-width: 0; }
+.row:focus-visible { outline: 2px solid var(--cp-ink); outline-offset: 2px; }
+.action:focus-visible { outline: 2px solid var(--cp-ink); outline-offset: 2px; }
+.preview q { overflow-wrap: anywhere; }

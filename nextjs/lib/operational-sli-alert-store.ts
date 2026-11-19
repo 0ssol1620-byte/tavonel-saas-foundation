@@ -77,6 +77,49 @@ export async function persistOperationalSliAlert(
     : { ok: false, code: "SLI_ALERT_STORE_WRITE_FAILED" };
 }
 
+export type WatchCodeReading = { ok: true; code: string | null } | { ok: false };
+
+/**
+ * The code a scheduled check recorded in its most recent persisted evaluation inside
+ * [sinceIso, beforeIso): the hourly checks' only durable memory ("watch" codes, never spend).
+ * `beforeIso` keeps a same-slot retry from reading its own earlier write as history. No row
+ * for the check is `code: null`; an unreadable store is `ok: false`, never null.
+ */
+export async function readLatestWatchCode(
+  check: string,
+  sinceIso: string,
+  beforeIso?: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<WatchCodeReading> {
+  const config = readSupabaseAdminConfig(env);
+  if (!config || Number.isNaN(Date.parse(sinceIso))) return { ok: false };
+  const query = new URLSearchParams({
+    select: "window_started_at,watch:evaluation->watch",
+    and: `(window_started_at.gte.${sinceIso}${beforeIso ? `,window_started_at.lt.${beforeIso}` : ""})`,
+    order: "window_started_at.desc",
+    limit: "24",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_operational_sli_evaluations?${query}`, {
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false };
+    }
+    const rows = await response.json().catch(() => null) as Array<{ watch?: unknown }> | null;
+    if (!Array.isArray(rows)) return { ok: false };
+    for (const row of rows) {
+      if (!Array.isArray(row.watch)) continue;
+      const entry = (row.watch as Array<{ check?: unknown; code?: unknown }>).find((item) => item?.check === check);
+      if (entry && typeof entry.code === "string") return { ok: true, code: entry.code };
+    }
+    return { ok: true, code: null };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export const OPERATIONAL_SLI_RUNBOOK_URL =
   "https://github.com/0ssol1620-byte/tavonel-saas-foundation/blob/main/docs/runbooks/B35_OPERATIONAL_SLI_ALERTS.md";
 
@@ -94,7 +137,7 @@ export type OperationalSliAlertDelivery = {
 
 function isBacklogWarning(entry: OperationalSli["alerts"][number]) {
   return entry.severity === "warning"
-    && entry.reason === "compile_backlog_age_exceeded";
+    && (entry.reason === "compile_backlog_age_exceeded" || entry.reason === "compile_queue_wait_p95_exceeded");
 }
 
 /** One breach per schedule slot: the same slot always yields the same UUID, so a retry is the same breach. */

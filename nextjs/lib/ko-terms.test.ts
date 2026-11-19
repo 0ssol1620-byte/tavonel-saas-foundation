@@ -14,7 +14,7 @@ import { KO_AMBIGUOUS, KO_TERMS, koTermDrift } from "./ko-terms";
 import { KO_CHROME } from "./site-navigation";
 
 /** Every file that renders Korean public copy. Add a surface here as it is translated. */
-const KO_SURFACES = ["../app/ko/page.tsx", "./proof-copy.ts"];
+const KO_SURFACES = ["./proof-copy.ts"];
 
 describe("the Korean term table", () => {
   it("spells each English term exactly one way", () => {
@@ -58,11 +58,7 @@ describe("the Korean term table", () => {
 
   it("is already true of the Korean chrome", () => {
     const chrome = [
-      KO_CHROME.tagline,
-      /* `stateLine` retired with `deploymentStateLine()` on 2026-09-19; see site-navigation.ts. */
-      KO_CHROME.signIn,
       ...Object.values(KO_CHROME.cta),
-      ...Object.values(KO_CHROME.footerGroups),
       /*
         chrome-14 / D36. The footer was Korean headings over 24 English link labels. The labels are
         chrome strings like the rest of this list, so they are held to the same term table -- and

@@ -25,6 +25,17 @@
  * The disclosure machinery is not simply dropped from the file either: the scenario that used to
  * drive it asserts its count is zero, so a revert shows up here rather than in a screenshot.
  *
+ * V34 (WO-CI-5a). Every public page now renders in the V34 shell: the bar is `[data-v34-header]` with
+ * `V34_PRIMARY_NAV` (Product, Solutions, Integrations, Pricing, Journal) as its five links, the More
+ * disclosure carries the other groups, and below 1001px a native `<dialog>` drawer holds the same
+ * links with the More groups as `<details>` accordions. The footer is the page's contentinfo
+ * landmark with `V34_FOOTER_GROUPS`. A route the program moved answers 308 to its V34 page
+ * (`V34_REDIRECTS`), so a trail names the V34 path it lands on. The find-tasks are unchanged and
+ * still answered by clicking: a footer row first, then a link inside `main`. Two legacy behaviours
+ * are not V34 ones and are restated, not dropped: the per-item hover panels became the More
+ * disclosure (opened by its button, closed by Escape or a press outside), and the phone sheet became
+ * the drawer.
+ *
  * Every scenario is written once, as a function over a `Page`, and run twice: in the project's
  * own Chromium and in a WebKit browser this file launches itself. The second run is not
  * decoration -- `<details>`, its summary box and a header that takes its containing block from a
@@ -37,6 +48,7 @@
 
 import { existsSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
+import { v34Route, type V34RouteKey } from "../lib/v34/routes";
 
 /*
   No trace from this file, and that is load-bearing rather than a preference.
@@ -87,8 +99,9 @@ const TASKS = [
     trail: ["/trust"],
   },
   {
+    // V34: /resources answers 308 to /journal; the worked example is its own footer row.
     question: "what worked example can I follow, and what does it produce?",
-    trail: ["/resources", "/explore"],
+    trail: ["/explore"],
   },
   {
     question: "where can I read about ongoing research?",
@@ -96,11 +109,19 @@ const TASKS = [
   },
 ] as const;
 
-/** The four section links; Pricing has its own emphasized header control. */
-const CUSTOMER_HREFS = ["/product", "/how-it-works", "/resources", "/docs"] as const;
+/*
+  The bar's five links, `V34_PRIMARY_NAV` (lib/v34/nav.ts) by registry key. The spec cannot import that
+  module (it reaches next/navigation, which Playwright's loader cannot resolve), so the keys are
+  listed here, the paths come from the registry, a held route is dropped as the shell drops it, and
+  the scenarios below fail if this list and the rendered bar disagree.
+*/
+const PRIMARY_KEYS = ["platform", "solutions", "connect", "pricing", "journal"] as const satisfies readonly V34RouteKey[];
+const CUSTOMER_HREFS = PRIMARY_KEYS.filter((key) => v34Route(key).release !== "held").map((key) => v34Route(key).path as string);
 
-const BAR = 'header.nav nav[aria-label="Sections"]';
-const SHEET = "header.nav details.mobile-primary-nav";
+const HEADER = "[data-v34-header]";
+const BAR = `${HEADER} nav[aria-label="Primary"]`;
+const SHEET = `${HEADER} dialog`;
+const FOOTER = "[data-v34-site] > footer";
 
 /** A route match that tolerates a query or hash the destination adds on arrival. */
 const arrivedAt = (href: string) => new RegExp(`${href.replace(/\//g, "\\/")}(?:[?#].*)?$`);
@@ -120,12 +141,43 @@ const activateLink = async (page: Page, link: ReturnType<Page["locator"]>) => {
   from is the footer every other public page prints, one bar link from Home ("Product"). The rule is the same: every
   destination that left the bar is a footer row, and its second hop is a link inside `main`.
 */
-const DIRECTORY_START = "/product";
+const DIRECTORY_START = "/platform";
+/*
+  WO-CI-22 (lead decision 7): each footer group is a native <details>. On a phone its summary is drawn
+  and the row is one disclosure away -- open the group, then the row. Wider, the summary is not drawn
+  and the stylesheet paints the closed body, so the row is painted with nothing to open. Whether the
+  row is painted is read from the engine (`checkVisibility()`, a box, and a hit test at its centre),
+  not from `toBeVisible()`: Playwright 1.62 treats every descendant of a closed <details> as hidden in
+  WebKit whatever the CSS says (its injected `isElementVisible` skips `checkVisibility` for webkit and
+  reads `details.open` instead), and in WebKit the wide footer's details are closed and painted.
+*/
+const expectPainted = async (link: ReturnType<Page["locator"]>) => {
+  const painted = await link.evaluate((element) => {
+    // Instant: the page scrolls smoothly, and WebKit reads the box before a smooth scroll has moved it.
+    element.scrollIntoView({ block: "center", behavior: "instant" });
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return { visible: element.checkVisibility(), height: box.height, hit: hit !== null && element.contains(hit) };
+  });
+  expect(painted.visible, "the footer row is painted").toBe(true);
+  expect(painted.height, "the footer row has a box").toBeGreaterThan(0);
+  expect(painted.hit, "the footer row takes the pointer at its centre").toBe(true);
+};
 const followTrail = async (page: Page, trail: readonly string[]) => {
   await page.goto(DIRECTORY_START, { waitUntil: "domcontentloaded" });
-  const first = page.locator(`footer.site a[href="${trail[0]}"]`).first();
-  await first.scrollIntoViewIfNeeded();
-  await expect(first).toBeVisible();
+  const first = page.locator(`${FOOTER} a[href="${trail[0]}"]`).first();
+  const group = page.locator(`${FOOTER} nav[aria-label] > details`).filter({ has: page.locator(`a[href="${trail[0]}"]`) });
+  const summary = group.locator(":scope > summary");
+  await page.locator(FOOTER).scrollIntoViewIfNeeded();
+  if (await summary.isVisible()) {
+    expect(page.viewportSize()?.width ?? 0, "the footer groups are disclosures on a phone only").toBeLessThanOrEqual(760);
+    await expect(first, "a closed group's row is not painted").toBeHidden();
+    await summary.click();
+    await expect(group).toHaveAttribute("open", "");
+  } else {
+    expect(page.viewportSize()?.width ?? 0, "a wide footer draws no disclosure").toBeGreaterThan(760);
+  }
+  await expectPainted(first);
   await activateLink(page, first);
   await expect(page).toHaveURL(arrivedAt(trail[0]), { timeout: 15_000 });
   for (const href of trail.slice(1)) {
@@ -138,9 +190,12 @@ const followTrail = async (page: Page, trail: readonly string[]) => {
 };
 
 const openPhoneMenu = async (page: Page) => {
-  // Escape is React-enhanced; wait for hydration before testing its listener.
-  await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
-  await page.locator(`${SHEET} > summary`).click();
+  // The drawer opens from a hydrated handler; a press before hydration does nothing, so press until it opens.
+  const trigger = page.locator(HEADER).getByRole("button", { name: "Open navigation" });
+  await expect(async () => {
+    if (!(await page.locator(SHEET).isVisible())) await trigger.click();
+    await expect(page.locator(SHEET)).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
 };
 const hrefsOf = (locator: ReturnType<Page["locator"]>) =>
   locator.evaluateAll((elements) => elements.map((element) => element.getAttribute("href")));
@@ -154,14 +209,14 @@ const DESKTOP: Scenario[] = [
     run: (page: Page) => followTrail(page, task.trail),
   })),
   {
-    name: "the bar publishes Product, How it works, Resources and Docs, with Pricing as its action",
+    name: "the bar publishes the V34 primary items, Pricing among them",
     width: 1440,
     run: async (page) => {
       await page.goto("/");
-      const links = page.locator(`${BAR} a.site-nav-direct`);
+      const links = page.locator(`${BAR} a`);
       await expect(links).toHaveCount(CUSTOMER_HREFS.length);
       expect(await hrefsOf(links)).toEqual([...CUSTOMER_HREFS]);
-      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
+      await expect(page.locator(`${BAR} a[href="/pricing"]`)).toBeVisible();
     },
   },
   {
@@ -170,9 +225,9 @@ const DESKTOP: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       // Pricing is a destination, not a disclosure: the page owns the answer.
-      await activateLink(page, page.locator('header.nav .nav-actions a[href="/pricing"]'));
+      await activateLink(page, page.locator(`${BAR} a[href="/pricing"]`));
       await expect(page).toHaveURL(/\/pricing$/);
-      await expect(page.locator('header.nav .nav-actions a[href="/pricing"]')).toBeVisible();
+      await expect(page.locator(`${BAR} a[href="/pricing"]`)).toBeVisible();
     },
   },
   {
@@ -180,15 +235,19 @@ const DESKTOP: Scenario[] = [
     name: "the link that owns the page being read is marked, and no other is",
     width: 1440,
     run: async (page) => {
+      // V34 `current()` (lib/v34/nav.ts): the exact page is "page", a page inside the item's section is "true".
       for (const entry of [
-        { path: "/product", owner: "/product", current: "page" },
-        { path: "/how-it-works", owner: "/how-it-works", current: "page" },
-        { path: "/docs/mcp", owner: "/docs", current: "location" },
-        { path: "/research", owner: "/resources", current: "location" },
+        { path: "/platform", owner: "/platform", current: "page" },
+        { path: "/connect", owner: "/connect", current: "page" },
+        { path: "/journal/compiler", owner: "/journal", current: "true" },
+        { path: "/solutions/knowledge-graph", owner: "/solutions", current: "true" },
+        // WO-CI-5a D3: a retained page and the hand-assembled /pricing hand the bar their path on the server.
+        { path: "/solutions/source-grounded-assistants", owner: "/solutions", current: "true" },
+        { path: "/pricing", owner: "/pricing", current: "page" },
       ]) {
         await page.goto(entry.path);
-        // The bar item, not the panel row with the same href (NAV PANELS 2026-11-09).
-        await expect(page.locator(`${BAR} a.site-nav-direct[href="${entry.owner}"]`)).toHaveAttribute("aria-current", entry.current);
+        // The bar item, not the More panel row with the same href.
+        await expect(page.locator(`${BAR} a[href="${entry.owner}"]`)).toHaveAttribute("aria-current", entry.current);
         expect(await page.locator(`${BAR} a[aria-current]`).count(), entry.path).toBe(1);
         expect(await page.locator(`${BAR} a[aria-current="page"]`).count(), entry.path)
           .toBe(entry.current === "page" ? 1 : 0);
@@ -198,17 +257,24 @@ const DESKTOP: Scenario[] = [
         await page.locator(`${BAR} a[aria-current]`).count(),
         "Sources is a footer row and must stay unowned by any primary section",
       ).toBe(0);
-      await expect(page.locator('footer.site a[href="/research"]').first()).toHaveAttribute("href", "/research");
+      await expect(page.locator(`${FOOTER} a[href="/research"]`).first()).toHaveAttribute("href", "/research");
 
-      // Explore intentionally replaces public chrome with its immersive sample header.
-      // Follow the Home entry, prove the current act, then use its named exit back home.
+      // /explore carries the V34 shell (D33 #4). V34 Home does not link the sample from its body;
+      // follow the footer's entry, prove the current act, then use the stage's named exit back home.
       await page.goto("/");
-      await activateLink(page, page.locator('#s1 a[href="/explore"]'));
+      const exploreEntry = page.locator(`${FOOTER} a[href="/explore"]`).first();
+      // Scrolling to the footer raises the analytics consent card over it (Release 2: after 200px); answer it first.
+      await exploreEntry.scrollIntoViewIfNeeded();
+      const consent = page.getByRole("region", { name: "Optional analytics", exact: true });
+      await expect(consent).toBeVisible();
+      await consent.getByRole("button", { name: "No thanks", exact: true }).click();
+      await expect(consent).toBeHidden();
+      await activateLink(page, exploreEntry);
       await expect(page).toHaveURL(arrivedAt("/explore"));
       const stage = page.locator('[data-visual-world="explore"]');
       await expect(stage).toBeVisible();
       await expect(stage).toHaveAttribute("data-world-act", "entry");
-      await expect(page.locator("header.nav")).toHaveCount(0);
+      await expect(page.locator(HEADER)).toHaveCount(1);
       await expect(stage.getByLabel("Selected sample answer").locator("blockquote")).not.toBeEmpty();
       await stage.getByRole("button", { name: "Relations ↗", exact: true }).click();
       await expect(stage).toHaveAttribute("data-world-act", "world");
@@ -219,68 +285,61 @@ const DESKTOP: Scenario[] = [
       await expect(exit).toHaveAttribute("href", "/");
       await activateLink(page, exit);
       await expect(page).toHaveURL(/\/$/);
-      await expect(page.locator('#s1 a[href="/explore"]')).toBeVisible();
       await expect(page.locator(`${BAR} a[aria-current]`)).toHaveCount(0);
     },
   },
   {
     /*
-      NAV PANELS, 2026-11-09: the founder's gesture, hovering a bar item, opens its panel.
-
-      The open state is the toggle's `aria-expanded`, so each step asserts what assistive technology
-      is told as well as what is on screen. The pointer path from the label into the panel is the
-      one a reader takes, and leaving both is what closes it; Escape closes it from anywhere. The
-      keyboard path is the toggle beside the label, and focus comes back to it on Escape.
+      NAV PANELS, 2026-11-09 put the other destinations behind the bar in panels. The V34 bar puts
+      them behind one disclosure, More (components/v34/shell/more-menu.tsx), which a press opens --
+      it does not open on hover. The promise is the same: the panel's open state is its button's
+      `aria-expanded`, so each step asserts what assistive technology is told as well as what is on
+      screen; Escape closes it from anywhere and hands focus back to its button; a press outside
+      closes it; and the bar's labels are links.
     */
-    name: "hovering Product reveals its panel's links, and Escape or leaving it closes it",
+    name: "More reveals the other destinations, and Escape or a press outside closes it",
     width: 1440,
     run: async (page) => {
-      await page.goto("/product");
-      // The panels are driven by a hydrated listener; wait for the header's own one first.
-      await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
-      const label = page.locator(`${BAR} a.site-nav-direct[href="/product"]`);
-      const toggle = page.locator(`${BAR} button[aria-controls="bar-nav-panel-product"]`);
-      const panel = page.locator("#bar-nav-panel-product");
+      await page.goto("/platform");
+      const toggle = page.locator(HEADER).getByRole("button", { name: "More", exact: true });
+      const panel = page.locator(`${HEADER} nav[aria-label="All pages"]`);
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
       await expect(panel).toBeHidden();
 
-      await label.hover();
-      await expect(toggle).toHaveAttribute("aria-expanded", "true");
-      for (const href of ["/product/compiled-world", "/sources", "/solutions/knowledge-graph", "/solutions", "/explore"]) {
+      // The panel opens from a hydrated handler; press until it says it is open.
+      await expect(async () => {
+        if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+        await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
+      for (const href of ["/world", "/evidence", "/changes", "/compiler", "/developers", "/security"]) {
         await expect(panel.locator(`a[href="${href}"]`)).toBeVisible();
       }
       await page.keyboard.press("Escape");
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
       await expect(panel).toBeHidden();
+      await expect(toggle).toBeFocused();
 
-      // Down from the label into the panel keeps it; leaving both closes it. Escape dismissed the
-      // panel under a resting pointer, so the pointer leaves and comes back first.
-      await page.mouse.move(720, 700);
-      await label.hover();
-      const target = panel.locator('a[href="/product/compiled-world"]');
-      await expect(target).toBeVisible();
-      const box = (await target.boundingBox())!;
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+      // A press outside the bar closes it.
+      await toggle.click();
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
-      await page.mouse.move(box.x + box.width / 2, 700, { steps: 4 });
+      await page.mouse.click(720, 700);
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
       await expect(panel).toBeHidden();
 
-      // Keyboard: the toggle opens it, Escape hands focus back to the toggle.
+      // Keyboard: the button opens it, Escape hands focus back to the button.
       await toggle.focus();
       await page.keyboard.press("Enter");
       await expect(toggle).toHaveAttribute("aria-expanded", "true");
-      await expect(target).toBeVisible();
+      await expect(panel.locator('a[href="/world"]')).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(toggle).toHaveAttribute("aria-expanded", "false");
       await expect(toggle).toBeFocused();
 
-      // How it works and Pricing open nothing; the bar marks no item "true", and its labels are links.
-      await expect(page.locator(`${BAR} button[aria-controls]`)).toHaveCount(3);
-      await expect(page.locator(`${BAR} button[data-hub="/how-it-works"]`)).toHaveCount(0);
-      await expect(page.locator('header.nav [aria-current="true"]')).toHaveCount(0);
-      await activateLink(page, page.locator(`${BAR} a.site-nav-direct[href="/resources"]`));
-      await expect(page).toHaveURL(arrivedAt("/resources"));
+      // One disclosure in the bar; on its own page an item is "page", so no bar item is "true"; its labels are links.
+      await expect(page.locator(`${HEADER} > div > :not(dialog) button[aria-expanded]`)).toHaveCount(1);
+      await expect(page.locator(`${BAR} [aria-current="true"]`)).toHaveCount(0);
+      await activateLink(page, page.locator(`${BAR} a[href="/journal"]`));
+      await expect(page).toHaveURL(arrivedAt("/journal"));
     },
   },
 ];
@@ -293,31 +352,30 @@ const PHONE: Scenario[] = [
     run: (page: Page) => followTrail(page, ["/docs", "/docs/mcp"]),
   },
   {
-    name: "the phone sheet offers the same four sections as the bar, with their groups as an accordion",
+    name: "the phone drawer offers the same items as the bar, with the other groups as an accordion",
     width: 390,
     touch: true,
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      const rows = page.locator(`${SHEET} > nav a.mobile-nav-direct`);
-      // Brief 2026-10-15 move 6: the sections, then Pricing as the last row.
-      await expect(rows).toHaveCount(CUSTOMER_HREFS.length + 1);
-      expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS, "/pricing"]);
-      // NAV PANELS: Product, Resources and Docs each carry a toggle; one group is open at a time.
-      const product = page.locator(`${SHEET} button[aria-controls="sheet-nav-panel-product"]`);
-      const docs = page.locator(`${SHEET} button[aria-controls="sheet-nav-panel-developers"]`);
-      await expect(page.locator(`${SHEET} button[aria-controls]`)).toHaveCount(3);
-      await expect(product).toHaveAttribute("aria-expanded", "false");
-      await product.click();
-      await expect(product).toHaveAttribute("aria-expanded", "true");
-      await expect(page.locator('#sheet-nav-panel-product a[href="/sources"]')).toBeVisible();
-      await docs.click();
-      await expect(product).toHaveAttribute("aria-expanded", "false");
-      await expect(page.locator('#sheet-nav-panel-developers a[href="/docs/mcp"]')).toBeVisible();
-      await expect(page.locator('#sheet-nav-panel-product a[href="/sources"]')).toBeHidden();
-      // Sign in is still the sheet's own row; the header row is the wordmark and Menu only.
-      await expect(page.locator(`${SHEET} > nav a.mobile-nav-signin`)).toHaveCount(1);
-      await expect(page.locator("header.nav .nav-actions")).toBeHidden();
+      const rows = page.locator(`${SHEET} nav[aria-label="Site"] > ul > li > a`);
+      await expect(rows).toHaveCount(CUSTOMER_HREFS.length);
+      expect(await hrefsOf(rows)).toEqual([...CUSTOMER_HREFS]);
+      // The More groups are the drawer's accordion: one group open at a time.
+      const groups = page.locator(`${SHEET} nav[aria-label="Site"] details`);
+      expect(await groups.count(), "the drawer carries the More groups").toBeGreaterThanOrEqual(2);
+      const [first, second] = [groups.nth(0), groups.nth(1)];
+      await expect(first).not.toHaveAttribute("open", "");
+      await first.locator(":scope > summary").click();
+      await expect(first).toHaveAttribute("open", "");
+      await expect(first.locator("a").first()).toBeVisible();
+      await second.locator(":scope > summary").click();
+      await expect(second).toHaveAttribute("open", "");
+      await expect(second.locator("a").first()).toBeVisible();
+      await expect(first, "opening a second group closes the first").not.toHaveAttribute("open", "");
+      // Sign in is the drawer's own row; the header row is the wordmark and the drawer trigger only.
+      await expect(page.locator(SHEET).getByRole("link", { name: "Sign in", exact: true })).toHaveCount(1);
+      await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
     },
   },
   {
@@ -327,7 +385,7 @@ const PHONE: Scenario[] = [
     run: async (page) => {
       await page.goto("/");
       await openPhoneMenu(page);
-      await activateLink(page, page.locator(`${SHEET} > nav a.mobile-nav-direct[href="/pricing"]`));
+      await activateLink(page, page.locator(`${SHEET} nav[aria-label="Site"] > ul > li > a[href="/pricing"]`));
       await expect(page).toHaveURL(/\/pricing$/);
     },
   },
@@ -345,12 +403,12 @@ const PHONE: Scenario[] = [
     touch: true,
     run: async (page) => {
       await page.goto("/");
-      const panel = page.locator(`${SHEET} > nav`);
+      const panel = page.locator(SHEET);
       await openPhoneMenu(page);
       await expect(panel).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(panel).toBeHidden();
-      await expect(page.locator(`${SHEET} > summary`)).toBeFocused();
+      await expect(page.locator(HEADER).getByRole("button", { name: "Open navigation" })).toBeFocused();
     },
   },
   {
@@ -361,10 +419,10 @@ const PHONE: Scenario[] = [
       await page.goto("/");
       await openPhoneMenu(page);
       // An open group's rows are thumb targets too.
-      await page.locator(`${SHEET} button[aria-controls="sheet-nav-panel-product"]`).click();
+      await page.locator(`${SHEET} nav[aria-label="Site"] details > summary`).first().click();
       const short = await page.evaluate(() => {
         const found: { text: string; height: number; right: number }[] = [];
-        const panel = document.querySelector("details.mobile-primary-nav");
+        const panel = document.querySelector("[data-v34-header] dialog");
         for (const element of panel?.querySelectorAll("a, summary, button") ?? []) {
           const rect = element.getBoundingClientRect();
           if (rect.width === 0 || rect.height === 0) continue;
@@ -407,6 +465,59 @@ test.describe("chromium", () => {
   }
 });
 
+/*
+  WO-CI-36. The consent card is fixed over the foot of the page; scrolled to the end with the card open, it stood
+  over footer links (hosted run on 4005c787: the click on the "Explore" footer row at 1,440 was intercepted by the
+  card; measured, it also covered the legal row at 360 and 390). A visitor must be able to reach every footer row
+  without answering the card, so the page reserves the card's room at its end while the card is open. The test never
+  dismisses the card: it scrolls to the end of the page with the card open and asks, for every painted footer link
+  and button, whether the CENTRE of its box lies inside the card's box. (The footer's own groups are opened first so
+  a phone's disclosed rows are painted.)
+*/
+test.describe("the consent card never stands over a footer row", () => {
+  for (const [width, height] of [[360, 844], [390, 844], [768, 900], [1440, 900]] as const) {
+    test(`at ${width}px, scrolled to the end with the card open`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport");
+      await page.setViewportSize({ width, height });
+      await page.goto(DIRECTORY_START, { waitUntil: "domcontentloaded" });
+      // The card shows after the first scroll past 200px (CONSENT_REVEAL); it is answered by nobody here.
+      await page.evaluate(() => window.scrollTo(0, 300));
+      const card = page.locator("[data-marketing-consent-panel]");
+      await expect(card, "the consent card is open").toBeVisible();
+      await page.evaluate((selector) => { for (const group of document.querySelectorAll(`${selector} details`)) (group as HTMLDetailsElement).open = true; }, FOOTER);
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+      const seen = await page.evaluate((selector) => {
+        const cardBox = document.querySelector("[data-marketing-consent-panel]")!.getBoundingClientRect();
+        const rows = [...document.querySelectorAll<HTMLElement>(`${selector} a, ${selector} button`)].filter((row) => row.checkVisibility() && row.getBoundingClientRect().height > 0);
+        const under = rows.filter((row) => {
+          const box = row.getBoundingClientRect();
+          const x = box.left + box.width / 2, y = box.top + box.height / 2;
+          return x >= cardBox.left && x <= cardBox.right && y >= cardBox.top && y <= cardBox.bottom;
+        }).map((row) => `${(row.textContent ?? "").trim().slice(0, 30)} (${row.getAttribute("href") ?? "button"})`);
+        return { rows: rows.length, under };
+      }, FOOTER);
+      expect(seen.rows, "footer rows measured").toBeGreaterThan(10);
+      expect(seen.under, "footer rows whose centre is under the open consent card").toEqual([]);
+      await expect(card, "the card was not dismissed to pass").toBeVisible();
+    });
+  }
+});
+
+/*
+  WO-CI-36 (review): the room is reserved after the footer only. /explore has a `display: contents` shell part around the
+  header alone; a pseudo-element on it would sit under the sticky header and push the stage down when the card opens.
+*/
+test("opening the consent card on /explore does not move the page's main", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "1440", "site-nav drives its own viewport");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/explore", { waitUntil: "domcontentloaded" });
+  const top = () => page.evaluate(() => Math.round(document.querySelector("main")!.getBoundingClientRect().top + window.scrollY));
+  const before = await top();
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect(page.locator("[data-marketing-consent-panel]"), "the consent card is open").toBeVisible();
+  expect(await top(), "main's document top with the card open").toBe(before);
+});
+
 const PUBLIC_UI_REVIEW_ROUTES = [
   { path: "/", name: "home" },
   { path: "/pricing", name: "pricing" },
@@ -426,11 +537,12 @@ for (const review of PUBLIC_UI_REVIEW_VIEWPORTS) {
       for (const route of PUBLIC_UI_REVIEW_ROUTES) {
         await page.goto(route.path, { waitUntil: "domcontentloaded" });
         await expect(page).toHaveURL(arrivedAt(route.path));
-        await expect(page.locator("header.nav")).toBeVisible();
+        await expect(page.locator(HEADER)).toBeVisible();
         await expect(page.locator("main h1").first()).toBeVisible();
         if (route.path === "/pricing") {
           const prices = page.locator(".plans .plan .price");
-          await expect(prices).toHaveCount(4);
+          // Six plans since catalog v2 (PB-2026-11-V22: Free, Personal, Developer, Team, Business, Enterprise; WO-CAT); it was four.
+          await expect(prices).toHaveCount(6);
           for (const text of await prices.allTextContents()) {
             if (text.includes("USD")) expect(text.trim(), "amount and USD remain separate readable words").toMatch(/^\$\d+(?:\.\d+)? USD$/);
           }

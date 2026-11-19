@@ -35,7 +35,7 @@
 
 /* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, at every width, so the H1 sits under the wordmark. */
 .hero,
-.story { width: var(--tv-page-w); margin-inline: auto; }
+.story { width: var(--v34-shell); margin-inline: auto; }
 
 .hero { padding: clamp(112px, 15vw, 190px) 0 72px; }
 .disclosure {

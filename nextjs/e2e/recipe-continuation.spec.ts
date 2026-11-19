@@ -64,6 +64,11 @@ async function prepare(page: Page, { processing = true } = {}) {
     contentType: "text/html",
     body: "<!doctype html><title>workspace stub</title><main>workspace stub</main>",
   }));
+  // One-step buy (2026-11-10): a held checkout now resumes on /pricing. Its stub runs no checkout of its own.
+  await page.route((url) => url.pathname === "/pricing", (route) => route.fulfill({
+    contentType: "text/html",
+    body: "<!doctype html><title>pricing stub</title><main>pricing stub</main>",
+  }));
   const writes: string[] = [];
   page.on("request", (request: Request) => {
     const url = new URL(request.url());
@@ -190,7 +195,8 @@ test.describe("recipe continuation across sign-in", () => {
     await seedSessionStorageOnce(page, { [CHECKOUT_KEY]: "observer_access" });
     await prepare(page);
     await page.goto(recipeLogin(RECIPE));
-    await expect(page).toHaveURL(/\/workspace\?checkout=observer_access$/);
+    // One-step buy (2026-11-10, intended): the held checkout resumes on /pricing.
+    await expect(page).toHaveURL(/\/pricing\?checkout=observer_access$/);
     expect(await stored(page, INTENT_KEY), "the losing recipe is consumed too").toBeNull();
   });
 
@@ -228,7 +234,7 @@ test.describe("recipe continuation across sign-in", () => {
     the right document.
   */
   for (const [accessSource, expected, wins, settled] of [
-    ["trial", /\/workspace\?checkout=observer_access$/, "checkout wins", "workspace stub"],
+    ["trial", /\/pricing\?checkout=observer_access$/, "checkout wins", "pricing stub"],
     ["owner", /\/login\?next=recipe&/, "the recipe wins for a billing-exempt owner", "Continue your recipe."],
   ] as const) {
     test(`callback with both intents held, ${accessSource}: ${wins}, and both are consumed`, async ({ page }) => {
@@ -325,7 +331,8 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
     const back = page.getByRole("link", { name: "Back to the recipe" });
     await expect(back).toHaveAttribute("href", "/resources");
     await back.click();
-    await expect(page).toHaveURL((url) => url.pathname === "/resources");
+    // V34 (D33 1.1): /resources answers 308 to /journal. The closed list still carries /resources.
+    await expect(page).toHaveURL((url) => url.pathname === "/journal");
     expect(await stored(page, INTENT_KEY)).toBeNull();
   });
 
@@ -482,7 +489,7 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
   });
 
   for (const [accessSource, expected, mode] of [
-    ["trial", /\/workspace\?checkout=observer_access$/, "resume-checkout"],
+    ["trial", /\/pricing\?checkout=observer_access$/, "resume-checkout"],
     ["owner", /\/login\?next=recipe&/, "resume-recipe"],
   ] as const) {
     test(`access check fails with both intents held, ${accessSource}: Try again keeps both until the precedence applies once`, async ({ page }) => {
@@ -506,7 +513,7 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
       if (accessSource === "owner") {
         await expect(page.getByRole("heading", { level: 1, name: "Continue your recipe." })).toBeVisible();
       } else {
-        await expect(page.getByText("workspace stub")).toBeVisible();
+        await expect(page.getByText("pricing stub")).toBeVisible();
       }
       expect(await stored(page, CHECKOUT_KEY)).toBeNull();
       expect(await stored(page, INTENT_KEY)).toBeNull();
@@ -566,7 +573,7 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
 
     await page.getByRole("link", { name: "Back to the site" }).click();
     await expect(page).toHaveURL((url) => url.pathname === "/");
-    await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
+    await expect(page.locator("main h1")).toHaveCount(1); // the V34 Home heading, not the callback's
     await expect(page.getByRole("heading", { level: 1, name: "Workspace access needs attention." })).toHaveCount(0);
 
     // Release the held success, and wait until the callback's code has read it on this page.
@@ -574,7 +581,7 @@ test.describe("recipe continuation: interruption, duplicates and return navigati
     await page.waitForFunction(() => (window as unknown as { __bootstrapBodiesRead: number }).__bootstrapBodiesRead === 2);
 
     expect(new URL(page.url()).pathname, "the late answer redirects nowhere").toBe("/");
-    await expect(page.locator("h1#lv2-hero-title")).toHaveCount(1);
+    await expect(page.locator("main h1")).toHaveCount(1); // the V34 Home heading, not the callback's
     expect(await stored(page, CHECKOUT_KEY), "the late answer consumes nothing").toBe("observer_access");
     expect(await stored(page, INTENT_KEY)).toBe(intentJson(RECIPE));
     expect((await funnelLog(page)).filter((entry) => entry.event === "signed_in")).toEqual([]);

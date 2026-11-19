@@ -21,47 +21,14 @@ test.describe("visual continuity — locked film side", () => {
     expect(bytes.byteLength).toBe(cut4!.bytes);
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(cut4!.sha256);
 
+    /*
+      V34 Home (WO-CI-5b). The four-cut hero film is not on V34 Home (the /film route is held), so what the Landing V2 page
+      asserted about its tablists and players has no subject. What this test exists to keep is that the retired WORLD landing
+      stage and the One-Path markup do not come back, and that the approved cut stays byte-locked (above). Both absences hold
+      on the V34 page.
+    */
     await page.goto("/");
-    /*
-      Landing V2, 2026-09-19. The retired WORLD landing stage still cannot come back, and the two
-      absences that prove it are unchanged: no retired WORLD stage markup, and no Works film.
-
-      What is dropped is the second half, which read the three output destinations out of the
-      `Out` column of `#sources`'s in/out grid. That grid is Scene 07's P2 visual in V2 and has
-      not been built, so there is no column to read -- `e2e/home-source-routes.spec.ts` and
-      `e2e/premium-craft.spec.ts` carry the note that the row-level assertions return with it.
-      The three docs routes themselves are reachable and pinned elsewhere --
-      `lib/docs-navigation.test.ts` owns the map, `e2e/docs-reading-layout.spec.ts` the pages.
-    */
-    /*
-      THE ABSENCE IS THE RETIRED STAGE, NOT THE ROLE (corrected round 4).
-
-      This asserted zero tabs anywhere on the entry page, which was a proxy for "the WORLD
-      landing stage has not come back" and stopped being one the moment blueprint §12 put a real
-      tablist in Scene 02 -- three grounded questions, each opening its own committed region. The
-      absence is asserted against the retired markup itself, and the tabs that do exist are
-      required to be that scene's rather than a stage wearing the role.
-    */
     await expect(page.locator(".one-path-world-stage, [data-world-stage]")).toHaveCount(0);
-    /*
-      The four locked cuts are direct tabs in the walkthrough (founder 2026-11-10: below the fold, in #walkthrough;
-      Scene 01's one tablist is the hero film's, hero-compile-tabs.tsx). The source-linked specimen follows in
-      Scene 02; Scene 03 presents a source-bound record. The retired One-Path markup
-      (.one-path-world-stage, one-path-works-film) still stays out.
-    */
-    await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
-    await expect(page.locator('#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]')).toHaveCount(1);
-    await expect(page.locator('#walkthrough figure[data-testid="landing-hero-film"]')).toHaveCount(1);
-    await expect(page.locator('#s1 [data-testid="landing-hero-film"]')).toHaveCount(0);
-    await expect(page.locator("header.nav")).toHaveAttribute("data-scrolled", /[01]/);
-    const disclosure = page.getByTestId("landing-hero-film");
-    await expect(disclosure).toBeVisible();
-    await expect(page.locator("#s1").getByRole("tablist")).toHaveCount(1);
-    await expect(disclosure.getByRole("tab")).toHaveText(["Read", "Compile", "Update", "Trace"]);
-    await expect(disclosure.locator(".compile-film-motion-control")).toHaveCount(1);
-    // R3 (D1): below 900px the phone plays the cut's yuv420p twin first (phoneSrc).
-    await expect(disclosure.locator(".compile-film-sequence")).toHaveAttribute("data-video-primary-src", page.viewportSize()!.width < 900 ? "/film/hero-r3-c1-hq.mp4" : "/film/hero-r3-c1.mp4");
-    await expect(disclosure.locator(".compile-film-stage-disclosure")).toHaveCount(0);
     await expect(page.getByTestId("one-path-works-film")).toHaveCount(0);
     await expect(page.locator(".one-path-io-col")).toHaveCount(0);
   });

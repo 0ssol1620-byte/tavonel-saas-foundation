@@ -1,0 +1,106 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--v34-fg);
+  font: inherit;
+  font-size: var(--v34-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  color: var(--v34-header-btn-hover);
+}
+
+.button:focus-visible,
+.link:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.chevron {
+  transition: transform var(--v34-move) ease;
+}
+
+/* The chevron turns to say the state; it is not decoration. */
+.button[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+/* Full width of the bar: positioned against the sticky header, which is the nearest positioned ancestor. */
+.panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  max-height: calc(100dvh - var(--v34-header-h));
+  overflow-y: auto;
+  border-top: 1px solid var(--v34-rule);
+  border-bottom: 1px solid var(--v34-rule);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  width: var(--v34-shell);
+  margin-inline: auto;
+  padding: 24px 0;
+}
+
+.group {
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 6px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-size: 0.94rem;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--v34-header-btn-hover);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.link[aria-current="page"] {
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+@media (forced-colors: active) {
+  /* A bare text button has no affordance once the author colours are gone; give it the system button edge. */
+  .button { border: 1px solid ButtonText; padding-inline: 8px; }
+  .button:focus-visible,
+  .link:focus-visible { outline-color: Highlight; }
+  .link[aria-current="page"] { outline: 2px solid Highlight; outline-offset: 2px; }
+}

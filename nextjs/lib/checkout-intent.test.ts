@@ -9,7 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BILLING_OFFERS } from "./billing-catalog";
+import { BILLING_OFFERS, deliveredForSale, planAvailability, readConfiguredBillingOffers, type PlanAvailability } from "./billing-catalog";
 import {
   checkoutSellable,
   decideCheckoutResume,
@@ -17,11 +17,13 @@ import {
   loginUrlForOffer,
   readOfferParam,
   rememberCheckoutIntent,
+  servedAvailability as served,
   takeCheckoutIntent,
   type ResumeAccess,
 } from "./checkout-intent";
 
 const OFFER_CODES = Object.keys(BILLING_OFFERS) as Array<keyof typeof BILLING_OFFERS>;
+const AVAILABILITIES: readonly PlanAvailability[] = ["purchasable", "request_access", "retired"];
 
 function installStorage() {
   const map = new Map<string, string>();
@@ -37,19 +39,64 @@ function installStorage() {
 
 describe("checkoutSellable: the one predicate /login's notice and H1 both read (B-07)", () => {
   it("promises nothing before the deployment has answered", () => {
-    for (const code of OFFER_CODES) expect(checkoutSellable(code, null)).toBeNull();
+    for (const availability of AVAILABILITIES) expect(checkoutSellable(served(availability), null)).toBeNull();
   });
 
   it("sells nothing on a deployment where no plan can be bought", () => {
-    for (const code of OFFER_CODES) expect(checkoutSellable(code, false)).toBe(false);
+    for (const availability of AVAILABILITIES) expect(checkoutSellable(served(availability), false)).toBe(false);
   });
 
-  it("sells, on an open deployment, exactly the offers whose sale channel is self_serve", () => {
+  it("sells, on an open deployment, only a purchasable plan", () => {
+    expect(checkoutSellable(served("purchasable"), true)).toBe(true);
+    // Failure paths: a plan waiting for its capabilities, and a retired one, are never sold online.
+    expect(checkoutSellable(served("request_access"), true)).toBe(false);
+    expect(checkoutSellable(served("retired"), true)).toBe(false);
+  });
+
+  it("fails closed for every offer with nothing delivered, even with every price configured", () => {
+    const configured = new Map(OFFER_CODES.map((code) => [code, true] as const));
     for (const code of OFFER_CODES) {
-      expect(checkoutSellable(code, true), code).toBe(BILLING_OFFERS[code].saleChannel === "self_serve");
+      expect(planAvailability(code, configured, new Set()), code).not.toBe("purchasable");
+      expect(checkoutSellable(served(planAvailability(code, configured, new Set())), true), code).toBe(false);
     }
-    expect(checkoutSellable("studio_access", true)).toBe(false);
-    expect(checkoutSellable("observer_access", true)).toBe(true);
+  });
+
+  /*
+    WO-REL-1, both price-env states through the real catalog: with the two V22 prices unset no offer is sellable even on
+    an open deployment; with both set exactly Personal and Developer are; with one alone, none is.
+  */
+  it("sells Personal and Developer only with both V22 prices set, in the release as it is", () => {
+    const sellable = (env: Record<string, string>) => OFFER_CODES.filter((code) =>
+      checkoutSellable(served(planAvailability(code, readConfiguredBillingOffers(env), deliveredForSale(env))), true));
+    const retired = { PADDLE_PRICE_OBSERVER_ACCESS: `pri_${"o".repeat(26)}`, PADDLE_PRICE_STUDIO_ACCESS: `pri_${"s".repeat(26)}`, TAVONEL_PAGE_METER_COHORT: "*" };
+    expect(sellable(retired)).toEqual([]);
+    expect(sellable({ ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}` })).toEqual([]);
+    const both = { ...retired, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` };
+    expect(sellable(both)).toEqual(["personal", "developer"]);
+    // WO-REL-5: both prices set while the page meter is not on for every workspace sells nothing.
+    const noCohort = Object.fromEntries(Object.entries(both).filter(([name]) => name !== "TAVONEL_PAGE_METER_COHORT"));
+    for (const cohort of [undefined, "", "pilot-canary01", " *", "*,pilot-canary01"]) {
+      expect(sellable(cohort === undefined ? noCohort : { ...both, TAVONEL_PAGE_METER_COHORT: cohort }), JSON.stringify(cohort)).toEqual([]);
+    }
+  });
+
+  /*
+    WO-CAT-2 N3: the type is the rule. Neither function takes an offer code and resolves it from the runtime's own
+    environment any more, and neither takes a bare availability: only one a server branded (`servedAvailability`).
+    `tsc --noEmit` fails if any of these lines compiles.
+  */
+  it("takes no offer code, and no availability the caller made up (type-level failure paths)", () => {
+    const constant: PlanAvailability = "purchasable";
+    // @ts-expect-error an offer code is not an availability
+    expect(() => checkoutSellable("personal", true)).not.toThrow();
+    // @ts-expect-error a literal is not a server's answer
+    expect(checkoutSellable("purchasable", true)).toBe(true);
+    // @ts-expect-error nor is a PlanAvailability constant
+    expect(checkoutSellable(constant, true)).toBe(true);
+    // @ts-expect-error decideCheckoutResume takes a server's answer or none (null), never an offer code
+    expect(decideCheckoutResume("team", true, null)).toBe("open");
+    // @ts-expect-error nor a constant standing in for the server
+    expect(decideCheckoutResume(constant, true, null)).toBe("hold_release");
   });
 });
 
@@ -134,15 +181,30 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
   it("changes nothing where the plan is not sold online: the request goes out as on main", () => {
     for (const purchaseOpen of [false, null]) {
       for (const access of [newAccount, released, null]) {
-        expect(decideCheckoutResume("observer_access", purchaseOpen, access), String(purchaseOpen)).toBe("open");
+        for (const availability of [...AVAILABILITIES.map(served), null]) {
+          expect(decideCheckoutResume(availability, purchaseOpen, access), `${availability} ${purchaseOpen}`).toBe("open");
+        }
       }
     }
-    // Team is a conversation; its checkout is refused with the contact sentence, never held.
-    expect(decideCheckoutResume("studio_access", true, newAccount)).toBe("open");
+    // A plan that is not purchasable is a conversation; its checkout is refused with the contact sentence, never held.
+    expect(decideCheckoutResume(served("request_access"), true, newAccount)).toBe("open");
+    expect(decideCheckoutResume(served("retired"), true, newAccount)).toBe("open");
+  });
+
+  /*
+    WO-CAT-2 N2. The workspace has no server answer for a carried offer, and passes none (null): a current offer is
+    held exactly as a purchasable one would be, which claims nothing -- the checkout route answers when the hold ends.
+  */
+  it("holds with no server answer (null) exactly as a purchasable plan is held, on an open deployment only", () => {
+    for (const access of [newAccount, released, null, { ...released, source: "owner" as const, billingExempt: true },
+      { ...newAccount, sourcePending: "release_pending" as const }, { ...released, processingStage: "qualification" as const }]) {
+      expect(decideCheckoutResume(null, true, access), JSON.stringify(access)).toBe(decideCheckoutResume(served("purchasable"), true, access));
+    }
+    expect(decideCheckoutResume(null, true, newAccount)).toBe("hold_terms");
   });
 
   it("opens only for production processing in this workspace", () => {
-    expect(decideCheckoutResume("observer_access", true, released)).toBe("open");
+    expect(decideCheckoutResume(served("purchasable"), true, released)).toBe("open");
   });
 
   /*
@@ -153,14 +215,14 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
   */
   it("opens for a released workspace with no entitlement: the trial-refused buyer is not held", () => {
     const unentitledReleased: ResumeAccess = { ...newAccount, sourcePending: null, processingStage: "production" };
-    expect(decideCheckoutResume("observer_access", true, unentitledReleased)).toBe("open");
+    expect(decideCheckoutResume(served("purchasable"), true, unentitledReleased)).toBe("open");
     // Not released: still held, whatever else is true.
-    expect(decideCheckoutResume("observer_access", true, { ...unentitledReleased, processingStage: "qualification" })).toBe("hold_release");
-    expect(decideCheckoutResume("observer_access", true, { ...unentitledReleased, processingStage: null })).toBe("hold_release");
+    expect(decideCheckoutResume(served("purchasable"), true, { ...unentitledReleased, processingStage: "qualification" })).toBe("hold_release");
+    expect(decideCheckoutResume(served("purchasable"), true, { ...unentitledReleased, processingStage: null })).toBe("hold_release");
   });
 
   it("holds for the processing terms before anything else", () => {
-    expect(decideCheckoutResume("observer_access", true, newAccount)).toBe("hold_terms");
+    expect(decideCheckoutResume(served("purchasable"), true, newAccount)).toBe("hold_terms");
   });
 
   it("holds for the launch once the terms are accepted, and fails closed on anything short of production", () => {
@@ -173,21 +235,21 @@ describe("decideCheckoutResume: terms -> launch -> checkout (D-14)", () => {
       { ...released, processingStage: undefined },
     ];
     for (const access of short) {
-      expect(decideCheckoutResume("observer_access", true, access), JSON.stringify(access)).toBe("hold_release");
+      expect(decideCheckoutResume(served("purchasable"), true, access), JSON.stringify(access)).toBe("hold_release");
     }
     // Access could not be read: kept, not spent.
-    expect(decideCheckoutResume("observer_access", true, null)).toBe("hold_release");
+    expect(decideCheckoutResume(served("purchasable"), true, null)).toBe("hold_release");
   });
 
   it("drops the intent for a billing-exempt owner instead of holding it", () => {
-    expect(decideCheckoutResume("observer_access", true, { ...newAccount, source: "owner", billingExempt: true })).toBe("drop_owner");
-    expect(decideCheckoutResume("observer_access", true, { ...released, source: "owner", billingExempt: true })).toBe("drop_owner");
+    expect(decideCheckoutResume(served("purchasable"), true, { ...newAccount, source: "owner", billingExempt: true })).toBe("drop_owner");
+    expect(decideCheckoutResume(served("purchasable"), true, { ...released, source: "owner", billingExempt: true })).toBe("drop_owner");
     // An owner grant that is not billing-exempt buys like anyone else.
-    expect(decideCheckoutResume("observer_access", true, { ...released, source: "owner", billingExempt: false })).toBe("open");
+    expect(decideCheckoutResume(served("purchasable"), true, { ...released, source: "owner", billingExempt: false })).toBe("open");
   });
 
   it("says the live /login hold sentence and nothing it cannot keep (register C4)", () => {
-    expect(heldOfferSentence("observer_access")).toBe("Developer is held for you.");
+    expect(heldOfferSentence("personal")).toBe("Personal is held for you.");
     for (const code of OFFER_CODES) {
       expect(heldOfferSentence(code)).toBe(`${BILLING_OFFERS[code].label} is held for you.`);
       expect(heldOfferSentence(code)).not.toMatch(/opens by itself|once you are in/);

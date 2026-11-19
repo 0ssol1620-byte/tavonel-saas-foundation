@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { expect, test, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import { HOME_SPECIMEN_SLOTS, SPECIMEN_FIXTURE_COOKIE, SPECIMEN_SLOTS, type SpecimenReceipt } from "../lib/specimen-sources";
+import { HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON } from "./support/held-feature";
 
 /*
   P2-08 / UX-L4 (UX-PLAN-2026-10-17 §3.3, §3.4, §3.7; PHASE1-CRITIC-2026-10-17 §5.4): the specimen
@@ -183,6 +184,7 @@ for (const browserName of BROWSERS) {
   for (const [width, height] of VIEWPORTS) {
     for (const path of ["/"]) {
       test(`${browserName} ${width}x${height} ${path}: the strip closes s2 after the workbench, with the fixture's own text`, async ({ playwright, baseURL }, testInfo) => {
+        test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
         fixturesOnly();
         test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
         await withPage({ playwright, baseURL }, browserName, { width, height }, path, async page => {
@@ -221,6 +223,7 @@ for (const browserName of BROWSERS) {
 
   for (const reducedMotion of ["no-preference", "reduce"] as const) {
     test(`${browserName} 390 ${reducedMotion}: a page tab swaps the cell in place, and nothing animates`, async ({ playwright, baseURL }, testInfo) => {
+      test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
       fixturesOnly();
       test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
       await withPage({ playwright, baseURL }, browserName, { width: 390, height: 844 }, "/", async page => {
@@ -269,6 +272,7 @@ for (const browserName of BROWSERS) {
   }
 
   test(`${browserName} 390: "Show full text" opens the whole reader text`, async ({ playwright, baseURL }, testInfo) => {
+    test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
     fixturesOnly();
     test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
     await withPage({ playwright, baseURL }, browserName, { width: 390, height: 844 }, "/", async page => {
@@ -287,6 +291,7 @@ for (const browserName of BROWSERS) {
 
   for (const [width, height] of [[390, 844], [1440, 900]] as const) {
     test(`${browserName} ${width}: the strip's controls count as hero_demo_interact once, with no payload`, async ({ playwright, baseURL }, testInfo) => {
+      test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
       fixturesOnly();
       test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
       await withPage({ playwright, baseURL }, browserName, { width, height }, "/", async page => {
@@ -317,6 +322,7 @@ for (const browserName of BROWSERS) {
   for (const [width, height] of VIEWPORTS) {
     for (const path of ["/"]) {
       test(`${browserName} ${width}x${height} ${path}: the committed pages, crops and reader's text, every region drawn`, async ({ playwright, baseURL }, testInfo) => {
+        test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
         fixturesOnly();
         test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
         await withPage({ playwright, baseURL }, browserName, { width, height }, path, async page => {
@@ -399,6 +405,7 @@ for (const browserName of BROWSERS) {
   }
 
   test(`${browserName} 390: the committed cells' "Show full text" opens the approved full source line`, async ({ playwright, baseURL }, testInfo) => {
+    test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
     fixturesOnly();
     test.skip(testInfo.project.name !== "390", "sets its own browser and viewport");
     for (const [path, lang] of [["/", "en"]] as const) {
@@ -433,6 +440,7 @@ test("the committed cells' run receipts, extracts, crops and pages are served by
 });
 
 test("the test server renders the committed cells for a request that asks, with no script needed to read them", async ({ request }, testInfo) => {
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   fixturesOnly();
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/"]) {
@@ -447,6 +455,7 @@ test("the test server renders the committed cells for a request that asks, with 
 });
 
 test("the server renders the fixture cells for a request that asks, with no script needed to read them", async ({ request }, testInfo) => {
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   fixturesOnly();
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/"]) {
@@ -462,6 +471,7 @@ test("the server renders the fixture cells for a request that asks, with no scri
   the request asks -- never a synthetic fixture.
 */
 test("with the rollout switch on, Home renders the committed cells to a request that does not ask", async ({ request }, testInfo) => {
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/"]) {
     const response = await request.get(path);
@@ -473,6 +483,7 @@ test("with the rollout switch on, Home renders the committed cells to a request 
 });
 
 test("a production server ignores the fixture cookie and renders the committed cells, never a fixture", async ({ request }, testInfo) => {
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   test.skip(!PRODUCTION_SERVER, "needs a server started without PLAYWRIGHT_LOCAL_HTTP; run with SPECIMEN_SERVER=production");
   test.skip(testInfo.project.name !== "390", "one request is enough");
   for (const path of ["/"]) {

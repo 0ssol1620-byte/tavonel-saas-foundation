@@ -1,4 +1,3 @@
-import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { contactErrorCopy } from "../lib/contact-locale";
 
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
@@ -24,36 +23,36 @@ async function revealConsent(page: import("@playwright/test").Page) {
 }
 
 /*
-  Release 3 (2026-10-15): on Home from 900px the prompt is one row directly under the header
-  (components/marketing-consent.module.css). The Release 2 bottom-left card opened over the film's
-  SOURCES pane at 1440 on both triggers, and no bottom placement clears a film that fills the
-  lower half of the first screen. Phones and every other page keep the bottom card.
+  V34 Home (WO-CI-5b). The Landing V2 Home put a one-row prompt under the header from 900px
+  (`body:has([data-home-ia])` in components/marketing-consent.module.css) and kept it off the hero
+  film. V34 Home has neither the marker nor a film, so the prompt is the same bottom card on every
+  width: a 360px card at the bottom left from 900px, a two-row sheet across the foot below it.
+  What this file keeps is what the visitor was promised: nothing on the first paint, the prompt
+  arrives after a scroll or 8 s, and when it is there it never covers the headline, the sentence
+  under it or the hero's two actions. The hero's art is held clear where V34 holds it (from 900px);
+  at 390 and 360 the 8 s sheet does cover it, which is reported with the work order, not asserted.
 */
 type Box = { x: number; y: number; width: number; height: number };
-/*
-  Founder 2026-11-10: the hero film is the tabbed compile slot (hero-compile-tabs.tsx); its stage -- the tab panel -- is
-  the film the prompt must clear. The recorded walkthrough moved below the fold (#walkthrough).
-*/
-const HERO_STAGE = '#s1 [data-testid="hero-compile-tabs"] [role="tabpanel"]';
+const HERO = '[aria-labelledby="v34-title"]';
+/* The hero's own words and actions: the things a prompt must never sit on. */
+const HERO_TARGETS = [
+  `${HERO} h1`,
+  `${HERO} h1 + div`,
+  '[data-analytics="hero-primary"]',
+  '[data-analytics="hero-secondary"]',
+] as const;
+const HERO_ART = "[data-world-instrument]";
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-/*
-  `atReveal`: the moment the row appears (after the 300px scroll, or at 8 s unscrolled) it must
-  not sit on the film stage. Scrolled further, content passes under it as it passes under the
-  header, so only its place is checked then.
-*/
-async function expectHomeRowUnderHeader(page: import("@playwright/test").Page, box: Box, atReveal = true) {
-  const header = await page.locator("header.nav").boundingBox();
-  expect(Math.abs(box.y - (header!.y + header!.height)), "the row starts at the header's foot").toBeLessThanOrEqual(1);
-  expect(box.height, "one row, not a card").toBeLessThanOrEqual(56);
-  if (!atReveal) return;
-  const stage = await page.locator(HERO_STAGE).boundingBox();
-  expect(stage, "the film stage is measured").not.toBeNull();
-  expect(overlaps(box, stage!), "the row does not open over the film stage").toBe(false);
+async function expectClearOf(page: import("@playwright/test").Page, box: Box, targets: readonly string[], when: string) {
+  for (const target of targets) {
+    const rect = await page.locator(target).first().boundingBox();
+    expect(rect, `${target} is measured`).not.toBeNull();
+    expect(overlaps(box, rect!), `${when}: the prompt covers ${target}`).toBe(false);
+  }
 }
 
-test("decision A counts prepared source UI engagement once without source or action identifiers", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
+test("walkthrough engagement is counted once and carries only the step it opens", async ({ page }) => {
   await page.addInitScript(() => {
     const target = window as Window & { __preparedEngagement: Record<string, unknown>[] };
     target.__preparedEngagement = [];
@@ -64,22 +63,21 @@ test("decision A counts prepared source UI engagement once without source or act
   await page.goto("/");
   await revealConsent(page);
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
-  const regions = page.locator("#s2 button[aria-pressed][aria-controls]");
-  await expect(regions).toHaveCount(3);
-  await regions.nth(1).click();
-  await expect(regions.nth(1)).toHaveAttribute("aria-pressed", "true");
-  await regions.nth(2).click();
-  await expect(regions.nth(2)).toHaveAttribute("aria-pressed", "true");
-  const filmTab = page.locator('#walkthrough [data-testid="landing-hero-film"]').getByRole("tab").nth(1);
-  await filmTab.click();
-  await expect(filmTab).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator('#walkthrough [data-testid="landing-hero-film"] video')).toHaveCount(1);
+  const tabs = page.locator("#walkthrough").getByRole("tab");
+  await expect(tabs).toHaveCount(4);
+  await tabs.nth(1).click();
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await tabs.nth(2).click();
+  await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
   const events = await page.evaluate(() =>
     (window as Window & { __preparedEngagement: Record<string, unknown>[] }).__preparedEngagement,
   );
   const engagement = events.filter((event) => event.event === "hero_demo_interact");
-  expect(engagement).toHaveLength(1);
-  expect(Object.keys(engagement[0]).filter((key) => !["event", "variant"].includes(key))).toEqual([]);
+  expect(engagement, "two presses are one engagement").toHaveLength(1);
+  // The one detail is the step index the first press opens (components/v34/routes/home/home-analytics.tsx):
+  // no href, no label, no record id.
+  expect(Object.keys(engagement[0]).filter((key) => !["event", "variant"].includes(key))).toEqual(["scene"]);
+  expect(engagement[0].scene).toBe("1");
   expect(events.filter((event) => event.event === "source_open")).toEqual([]);
 });
 
@@ -106,12 +104,9 @@ test("analytics remains optional, persists refusal, and fits the viewport", asyn
   expect(bounds!.y + bounds!.height, "the card sits inside the viewport").toBeLessThanOrEqual(viewportHeight + 1);
   expect(bounds!.height, "the card is capped at 25% of the viewport").toBeLessThanOrEqual(viewportHeight * 0.25 + 1);
   expect(await page.evaluate(() => getComputedStyle(document.body).paddingBottom)).toBe("0px");
-  if (page.viewportSize()!.width < 900) {
-    expect(bounds!.y + bounds!.height, "the card sits at the bottom").toBeGreaterThan(viewportHeight - 40);
-    expect(bounds!.height, "the phone card is two rows, at most 96px").toBeLessThanOrEqual(96);
-  } else {
-    await expectHomeRowUnderHeader(page, bounds!);
-  }
+  // V34 Home has one placement on every width: at the bottom of the viewport (a card from 900px, a sheet below it).
+  expect(bounds!.y + bounds!.height, "the card sits at the bottom").toBeGreaterThan(viewportHeight - 40);
+  if (page.viewportSize()!.width < 900) expect(bounds!.height, "the phone card is two rows, at most 96px").toBeLessThanOrEqual(96);
   await testInfo.attach("analytics-choice", { body: await page.screenshot(), contentType: "image/png" });
   await page.getByRole("button", { name: "No thanks", exact: true }).click();
   await page.reload();
@@ -131,202 +126,95 @@ test("the consent notice never covers homepage or pricing actions at 1440, 430, 
     if (route === "/") {
       // (d) The first screen has no card at all at scroll 0, so nothing can cover H1, support or action.
       await expect(panel).toHaveCount(0);
-      for (const target of [page.locator("#s1 h1"), page.locator("#s1 .lv2-hero-support"), page.locator('#s1 a[href="/explore"]').first()]) {
-        await expect(target).toBeVisible();
-      }
+      for (const target of HERO_TARGETS) await expect(page.locator(target).first()).toBeVisible();
     }
-    // (e) Once revealed, the card is at the viewport bottom -- or, on Home from 900px, under the header.
-    const homeRow = route === "/" && page.viewportSize()!.width >= 900;
+    // (e) Once revealed, the card is at the viewport bottom.
     await revealConsent(page);
     const panelBox = await panel.boundingBox();
     expect(panelBox).not.toBeNull();
-    if (homeRow) await expectHomeRowUnderHeader(page, panelBox!);
-    else expect(panelBox!.y + panelBox!.height, `${route} card sits at the bottom at ${testInfo.project.name}px`).toBeGreaterThan(page.viewportSize()!.height - 40);
+    expect(panelBox!.y + panelBox!.height, `${route} card sits at the bottom at ${testInfo.project.name}px`).toBeGreaterThan(page.viewportSize()!.height - 40);
+    if (route === "/") await expectClearOf(page, panelBox!, HERO_TARGETS, "once revealed");
 
     await page.evaluate(() => window.scrollTo(0, Math.min(1_000, document.documentElement.scrollHeight - innerHeight)));
     const movedPanel = await panel.boundingBox();
     expect(movedPanel, "the fixed card keeps its box after a scroll").not.toBeNull();
-    if (homeRow) await expectHomeRowUnderHeader(page, movedPanel!, false);
-    else expect(movedPanel!.y + movedPanel!.height, "the card stays at the viewport bottom").toBeGreaterThan(page.viewportSize()!.height - 40);
-    const stuckHeader = await page.locator("header.nav").boundingBox();
+    expect(movedPanel!.y + movedPanel!.height, "the card stays at the viewport bottom").toBeGreaterThan(page.viewportSize()!.height - 40);
+    if (route === "/") await expectClearOf(page, movedPanel!, HERO_TARGETS, "after the scroll");
+    const stuckHeader = await page.locator("[data-v34-header]").boundingBox();
     expect(stuckHeader, "public header should remain available after a scroll").not.toBeNull();
     expect(Math.abs(stuckHeader!.y)).toBeLessThanOrEqual(1);
   }
 });
 
-test("on Home from 900px the 8 s prompt covers no title, support, action or film", async ({ page }, testInfo) => {
-  test.skip(!["1920", "1440", "1280", "1024"].includes(testInfo.project.name), "the Home row exists from 900px");
+test("on Home from 900px the 8 s prompt covers no title, support, action or hero art", async ({ page }, testInfo) => {
+  test.skip(!["1920", "1440", "1280", "1024"].includes(testInfo.project.name), "the card is the desktop placement");
   await page.clock.install();
   await page.goto("/");
   const panel = page.getByRole("region", PANEL);
   await expect(panel).toHaveCount(0);
-  // The timer path: no scroll at all, so the whole first screen is what the row must clear.
+  // The timer path: no scroll at all, so the whole first screen is what the card must clear.
   await page.clock.fastForward(8_000);
   await expect(panel).toBeVisible();
   await settle(panel);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   const box = (await panel.boundingBox())!;
-  await expectHomeRowUnderHeader(page, box);
-  for (const target of ["#s1 h1", "#s1 .lv2-hero-support", "#s1 .lv2-actions", HERO_STAGE]) {
-    const rect = await page.locator(target).first().boundingBox();
-    expect(rect, target).not.toBeNull();
-    expect(overlaps(box, rect!), `the 8 s row covers ${target}`).toBe(false);
-  }
-  await testInfo.attach("home-row-8s", { body: await page.screenshot(), contentType: "image/png" });
+  await expectClearOf(page, box, [...HERO_TARGETS, HERO_ART], "at 8 s");
+  await testInfo.attach("home-card-8s", { body: await page.screenshot(), contentType: "image/png" });
 });
 
-/*
-  Fix round 3 (judge gap 3), phones. At 8 s with no scroll the hero film fills the foot of a
-  360-430px first screen, where the bottom sheet sits, so the sheet waits until the film is out of
-  its zone and never opens over the film; the 200px scroll path is always clear. Neither path
-  shows anything on the first paint.
-
-  Fix round 4 (M3): the zone is kept clear of the frame and the stage's reading line together (at
-  430 the 8 s sheet cleared the frame and covered the line under it). Both boxes are checked on
-  both paths.
-
-  UX-L6 (UX-PLAN-2026-10-17 §8.2, R4-MJ2): the 412 and 430 projects (412x915, 430x932) run it too,
-  so the branch where the 8 s sheet opens is taken by a width project, not only by (a) below.
-
-  FINAL-SPEC 2026-10-26 (§2.1, D-7): a phone opens on the source pane and Home prints no reading line,
-  so below 768px the film's own box is the whole of what the sheet must clear. The sheet still checks
-  the reading block (`[data-film-reading]`), which holds the pane strip from 768px; (b) below keeps a
-  scenario where that block alone decides.
-*/
-test("on a Home phone the prompt never opens over the hero film", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
+test("on a Home phone the prompt never opens over the title, support or actions", async ({ page }, testInfo) => {
   test.skip(!["430", "412", "390", "360"].includes(testInfo.project.name), "the phone bottom sheet");
   await page.clock.install();
   await page.goto("/");
   const panel = page.getByRole("region", PANEL);
-  // Hydrated (the player has read its media query) before the clock moves.
-  await expect(page.locator('#s1 [data-testid="hero-compile-tabs"]')).toHaveAttribute("data-mode", "video");
+  await expect(page.locator(HERO_TARGETS[0])).toBeVisible();
   await expect(panel).toHaveCount(0);
   await page.clock.fastForward(8_000);
   await page.clock.runFor(500);
-  await expect(page.locator("#s1 [data-film-reading] p"), "no reading line on Home (D-7)").toHaveCount(0);
-  const film = (await page.locator(HERO_STAGE).boundingBox())!;
-  const height = page.viewportSize()!.height;
-  if (await panel.count()) {
-    const box = (await panel.boundingBox())!;
-    expect(overlaps(box, film), "the 8 s sheet covers the film").toBe(false);
-  } else {
-    // Waiting, because the clear-of region -- the frame and the reading block under it (homeSheetClear, fix
-    // round 4) -- reaches into the sheet's 104px zone at the foot of the screen. In the compact frame (2026-10-27)
-    // at 360 the frame ends 2px above the zone and the reading block under it is what reaches in.
-    // The re-recorded cuts (2026-11-05) draw no pane strip, so there may be no reading block at all.
-    const reading = page.locator("#s1 [data-film-reading]");
-    const line = await reading.count() ? await reading.boundingBox() : null;
-    expect(Math.max(film.y + film.height, line ? line.y + line.height : 0)).toBeGreaterThan(height - 104);
-    expect(film.y).toBeLessThan(height);
-  }
-  await page.evaluate(() => window.scrollTo(0, 300));
-  await expect(panel).toBeVisible();
+  await expect(panel, "the sheet opens at 8 s").toBeVisible();
   await settle(panel);
+  expect(await page.evaluate(() => window.scrollY), "unscrolled").toBe(0);
+  const height = page.viewportSize()!.height;
   const box = (await panel.boundingBox())!;
-  const moved = (await page.locator(HERO_STAGE).boundingBox())!;
-  expect(overlaps(box, moved), "the scrolled sheet covers the film").toBe(false);
+  await expectClearOf(page, box, HERO_TARGETS, "at 8 s");
   expect(box.y + box.height).toBeGreaterThan(height - 40);
+  await page.evaluate(() => window.scrollTo(0, 300));
+  const moved = (await panel.boundingBox())!;
+  await expectClearOf(page, moved, HERO_TARGETS, "after a 300px scroll");
+  expect(moved.y + moved.height).toBeGreaterThan(height - 40);
   await testInfo.attach("home-phone-sheet", { body: await page.screenshot(), contentType: "image/png" });
 });
 
 /*
-  Fix round 5 (R4-MJ2). Projects 390 and 360 (390x844, 360x844) always take the waiting branch
-  above: their frame reaches the 104px zone, so neither the 8 s line check nor a sheet that
-  could cover the line ever ran in CI. These two scenarios run where they can.
-
-  (a) 430x932 and 412x915, the widths where the 8 s sheet does open. Fix round 5 measured the
-  frame at 570.7-820.1 (430) and 570.7-809.7 (412) on every stage (fix4/frames-after-chrome.json)
-  against zones from 828 and 811, so the sheet shows at 8 s at 430 and must be clear of the frame
-  and of the line. At 412 the margin is 1.3px, so the spec asserts the rule both ways from the
-  measured boxes instead of a fixed answer: open and clear when both boxes are out of the zone,
-  waiting when either reaches into it.
+  The two wide phones, 430x932 and 412x915, from project 390 (which sets its own viewport): the 8 s sheet
+  opens and leaves the title, support and both actions alone.
 */
 for (const [width, height] of [[430, 932], [412, 915]] as const) {
-  test(`on a wide Home phone the 8 s sheet opens clear of the film and its reading line (${width}x${height})`, async ({ page }, testInfo) => {
-    test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
+  test(`on a wide Home phone the 8 s sheet opens clear of the title, support and actions (${width}x${height})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "390", "sets its own viewport");
     await page.setViewportSize({ width, height });
     await page.clock.install();
     await page.goto("/");
     const panel = page.getByRole("region", PANEL);
-    await expect(page.locator('#s1 [data-testid="hero-compile-tabs"]')).toHaveAttribute("data-mode", "video");
+    await expect(page.locator(HERO_TARGETS[0])).toBeVisible();
     await expect(panel).toHaveCount(0);
     await page.clock.fastForward(8_000);
     await page.clock.runFor(500);
     expect(await page.evaluate(() => window.scrollY), `${width}: unscrolled`).toBe(0);
-    // FINAL-SPEC 2026-10-26: no reading line under or over the phone pane, so the film's box is the reach. The 4:5 pane
-    // is taller than the old 16:10 frame, so whether the sheet opens at 8 s is read from the boxes, both ways, at both widths.
-    const film = (await page.locator(HERO_STAGE).boundingBox())!;
-    const reach = film.y + film.height;
-    if (reach <= height - 104) {
-      await expect(panel, `${width}: the 8 s sheet opens`).toBeVisible();
-      await settle(panel);
-      const box = (await panel.boundingBox())!;
-      expect(overlaps(box, film), `${width}: the 8 s sheet covers the film`).toBe(false);
-    } else {
-      await expect(panel, `${width}: the sheet waits while the film reaches its zone`).toHaveCount(0);
-    }
+    await expect(panel, `${width}: the 8 s sheet opens`).toBeVisible();
+    await settle(panel);
+    await expectClearOf(page, (await panel.boundingBox())!, HERO_TARGETS, `${width} at 8 s`);
     await testInfo.attach(`home-phone-sheet-8s-${width}`, { body: await page.screenshot(), contentType: "image/png" });
   });
 }
 
 /*
-  (b) The one path where the sheet's check of [data-film-reading] decides alone; without it the sheet
-  opens on the block (verified in fix round 5 by removing `line` from the boxes in
-  marketing-consent.tsx: this test failed, fix4/mutation-*.log).
-
-  It was 430x932 in Focus details, scrolled 300px, with the reading line under the frame. FINAL-SPEC
-  2026-10-26 removed the line and a phone's reading block is empty, so the scenario moves to the band
-  where the block still has a box: 768-899px, the pan surface, with the pane strip under the frame
-  and the bottom sheet still in use (the sheet's phone query runs to 899px). At 800x800 the page is
-  scrolled until the frame's bottom is 4px above the zone, past the 200px trigger; the strip under
-  it then reaches into the zone.
+  The card reads as its own surface. Text >= 4.5:1 on the card, and the two answers' borders >= 3:1 (WCAG 1.4.11)
+  against the card; its edge rule >= 3:1 against the card and against the ground behind it (the legacy failure was a row
+  the colour of the page with a 1.31:1 rule). A bordered card is not enough: the border has to be visible.
 */
-test("in the 768-899 band in Focus the scrolled sheet never covers the reading block", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
-  test.skip(testInfo.project.name !== "390", "sets its own viewport");
-  const [width, height] = [800, 800];
-  await page.setViewportSize({ width, height });
-  await page.goto("/");
-  const film = page.locator('#walkthrough figure[data-testid="landing-hero-film"]');
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-narrow", "1");
-  // Home opens compact (founder 2026-10-27); Focus, the taller frame this guards, is one press of Focus details.
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "fit");
-  await film.locator(".compile-film-focus-control").click();
-  await expect(film.locator(".compile-film-sequence")).toHaveAttribute("data-mobile-view", "focus");
-  const frameBottom = await film.locator(".compile-film-viewport").evaluate(node => node.getBoundingClientRect().bottom + scrollY);
-  const scroll = Math.round(frameBottom - (height - 104) + 4);
-  expect(scroll, "past the 200px reveal").toBeGreaterThan(200);
-  await page.evaluate(y => window.scrollTo(0, y), scroll);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll);
-  const frame = (await film.locator(".compile-film-viewport").boundingBox())!;
-  /*
-    Film re-record (2026-11-05): the cuts are product screens and STAGE_FRAMES has no `panes`, so the player draws no
-    pane strip and there is no reading block under the frame. What is left to guard is the frame: out of the zone, and
-    the sheet never over it. If a strip comes back, this fails and the reading-block check below applies again.
-  */
-  await expect(film.locator("[data-film-reading]")).toHaveCount(0);
-  const reading = frame;
-  expect(frame.y + frame.height, "frame above the sheet's zone").toBeLessThanOrEqual(height - 104);
-  // Past the 200px trigger the sheet decides within a frame; give it the 180ms entry as well.
-  await page.waitForTimeout(800);
-  const panel = page.getByRole("region", PANEL);
-  if (await panel.count()) {
-    await settle(panel);
-    const box = (await panel.boundingBox())!;
-    expect(overlaps(box, reading), "the scrolled sheet covers the reading line").toBe(false);
-  }
-  await testInfo.attach("home-band-sheet-focus", { body: await page.screenshot(), contentType: "image/png" });
-});
-
-/*
-  Fix round 3 (judge gap 3), 1440. The row under the header was #faf9f6 on the #faf9f6 page with a
-  1.31:1 rule. Text >= 4.5:1, and the rule and the two answers' borders >= 3:1 (WCAG 1.4.11) against
-  the row and the page.
-*/
-test("on Home from 900px the consent row reads as its own row", async ({ page }, testInfo) => {
-  test.skip(!["1920", "1440", "1280", "1024"].includes(testInfo.project.name), "the Home row exists from 900px");
+test("on Home from 900px the consent card reads as its own surface", async ({ page }, testInfo) => {
+  test.skip(!["1920", "1440", "1280", "1024"].includes(testInfo.project.name), "the card is the desktop placement");
   await page.goto("/");
   const panel = await revealConsent(page);
   const contrast = await panel.evaluate(element => {
@@ -335,26 +223,33 @@ test("on Home from 900px the consent row reads as its own row", async ({ page },
     const lum = (c: number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]!) + 0.7152 * f(c[1]!) + 0.0722 * f(c[2]!); };
     const ratio = (a: number[], b: number[]) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x! + 0.05) / (y! + 0.05); };
     const style = getComputedStyle(element);
-    const row = rgb(style.backgroundColor).slice(0, 3);
-    const pageGround = rgb(getComputedStyle(document.querySelector("#s1")!).backgroundColor).slice(0, 3);
-    const rule = rgb(style.borderBottomColor);
+    const card = rgb(style.backgroundColor).slice(0, 3);
     const button = getComputedStyle(element.querySelector("button")!);
+    // The ground behind the card: the first element under its centre that is not the card itself.
+    const box = element.getBoundingClientRect();
+    const behind = document.elementsFromPoint(box.x + box.width / 2, box.y + box.height / 2).find(node => !element.contains(node));
+    let ground = [255, 255, 255];
+    for (let node: Element | null = behind ?? null; node; node = node.parentElement) {
+      const value = rgb(getComputedStyle(node).backgroundColor);
+      if (value.length >= 3 && (value[3] ?? 1) > 0) { ground = value.slice(0, 3); break; }
+    }
     return {
-      text: ratio(over(rgb(getComputedStyle(element.querySelector("p")!).color), row), row),
-      answer: ratio(over(rgb(button.color), row), row),
-      ruleWidth: parseFloat(style.borderBottomWidth),
-      ruleOnRow: ratio(over(rule, row), row),
-      ruleOnPage: ratio(over(rule, pageGround), pageGround),
-      answerBorder: ratio(over(rgb(button.borderTopColor), row), row),
+      text: ratio(over(rgb(getComputedStyle(element.querySelector("p")!).color), card), card),
+      answer: ratio(over(rgb(button.color), card), card),
+      answerBorder: ratio(over(rgb(button.borderTopColor), card), card),
+      borderWidth: parseFloat(style.borderTopWidth),
+      borderOnCard: ratio(over(rgb(style.borderTopColor), card), card),
+      borderOnGround: ratio(over(rgb(style.borderTopColor), ground), ground),
     };
   });
-  await testInfo.attach("home-row-contrast", { body: JSON.stringify(contrast, null, 2), contentType: "application/json" });
+  await testInfo.attach("home-card-contrast", { body: JSON.stringify(contrast, null, 2), contentType: "application/json" });
   expect(contrast.text).toBeGreaterThanOrEqual(4.5);
   expect(contrast.answer).toBeGreaterThanOrEqual(4.5);
-  expect(contrast.ruleWidth).toBeGreaterThanOrEqual(1);
-  expect(contrast.ruleOnRow).toBeGreaterThanOrEqual(3);
-  expect(contrast.ruleOnPage).toBeGreaterThanOrEqual(3);
   expect(contrast.answerBorder).toBeGreaterThanOrEqual(3);
+  // The legacy bar (WCAG 1.4.11, fix round 3): the panel's edge rule is >= 3:1 against the panel and against the ground behind it.
+  expect(contrast.borderWidth).toBeGreaterThanOrEqual(1);
+  expect(contrast.borderOnCard, "the card's edge against the card").toBeGreaterThanOrEqual(3);
+  expect(contrast.borderOnGround, "the card's edge against the ground behind it").toBeGreaterThanOrEqual(3);
 });
 
 test("Escape inside the consent card refuses, persists, and loads no analytics", async ({ page }) => {

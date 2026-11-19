@@ -159,19 +159,31 @@ describe("the Provided / Roadmap / Not provided table", () => {
 describe("the three surfaces render the same rows", () => {
   it.each([
     ["trust", "app/trust/page.tsx"],
-    ["security", "app/security/page.tsx"],
-    ["enterprise", "app/enterprise/page.tsx"],
   ])("/%s renders the shared table rather than its own copy of it", (_route, file) => {
     const page = read(file);
     expect(page).toContain(`from "@/components/trust-provisions"`);
     expect(page).toContain("<TrustProvisions");
   });
 
+  // V34: /security and /enterprise render the same rows through one route-local layout that reads the one module.
+  it.each([
+    ["security", "components/v34/routes/security/security.tsx", `from "./provisions"`],
+    ["enterprise", "components/v34/routes/enterprise/enterprise.tsx", `from "../security/provisions"`],
+  ])("/%s renders the shared rows through the V34 provisions layout", (_route, file, from) => {
+    const page = read(file);
+    expect(page).toContain(from);
+    expect(page).toContain("<Provisions />");
+    expect(read("components/v34/routes/security/provisions.tsx")).toContain(`from "@/content/trust/provisions"`);
+  });
+
   it("keeps the wording in one module, so a row cannot say two things", () => {
     // If a page ever types a provision's sentence out, the two go out of step the first time
     // one of them is edited. The module is the only file that contains them.
     const assurance = TRUST_PROVISIONS.find((row) => row.id === "third_party_assurance")!;
-    for (const file of ["app/trust/page.tsx", "app/security/page.tsx", "app/enterprise/page.tsx"]) {
+    for (const file of ["app/trust/page.tsx", "app/security/page.tsx", "app/enterprise/page.tsx",
+      "components/v34/routes/security/security.tsx", "components/v34/routes/security/security-content.ts",
+      "components/v34/routes/security/provisions.tsx",
+      "components/v34/routes/enterprise/enterprise.tsx", "components/v34/routes/enterprise/enterprise-content.ts"]) {
       expect(read(file)).not.toContain(assurance.line);
     }
   });
@@ -232,7 +244,8 @@ describe("the public sample frame on /enterprise", () => {
       (source) => source.documentId === signedProductDemo.answer.citation.sourceId,
     );
     expect(cited?.href).toMatch(/^\/explore-sample\/fp-200-/);
-    expect(read("app/enterprise/page.tsx")).toContain("<SampleWorldFrame");
+    // V34: /enterprise renders the route's SampleFrame over the same fixture (held to the frame facts in routes-enterprise).
+    expect(read("components/v34/routes/enterprise/enterprise.tsx")).toContain("<SampleFrame demo={signedProductDemo}");
   });
 });
 

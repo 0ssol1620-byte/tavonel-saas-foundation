@@ -188,7 +188,7 @@ test.describe("notice live regions (journey A9)", () => {
     });
     await page.route("**/api/billing/portal", route => route.fulfill({ status: 404, json: { code: "BILLING_CUSTOMER_NOT_FOUND" } }));
     await page.goto("/workspace/settings/usage", { waitUntil: "domcontentloaded" });
-    const manage = page.locator("section.billing-card").getByRole("button", { name: "Manage billing" });
+    const manage = page.locator("section.billing-card").getByRole("button", { name: "Manage or cancel subscription" });
     await expect(manage).toBeEnabled();
     expect(await markEmptyAlertRegions(page)).toBeGreaterThan(0);
 
@@ -254,18 +254,19 @@ test.describe("notice live regions (journey A9)", () => {
     await page.route("**/api/billing/status", route => route.fulfill({ json: { code: "OK", account: null } }));
     const checkout = await holdCheckoutRefusal(page, "PILOT_ACCESS_REQUIRED", 403);
 
-    await page.goto("/pricing", { waitUntil: "domcontentloaded" });
-    const developer = page.getByRole("link", { name: "Buy Developer — $29/month", exact: true });
-    await expect(developer).toBeVisible();
-    expect(await markEmptyAlertRegions(page), "no empty alert region was waiting for the reply").toBeGreaterThan(0);
-    await developer.click();
+    // Catalog v2: no Buy link exists while nothing is delivered, so the checkout is the one the address resumes
+    // (`/pricing?checkout=<code>`, what sign-in returns). The reply is held, so the regions are marked while it is outstanding.
+    await page.goto("/pricing?checkout=personal", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("link", { name: "Request Personal access", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Buy / })).toHaveCount(0);
     await expect.poll(() => checkout.posts.length).toBe(1);
+    expect(await markEmptyAlertRegions(page), "no empty alert region was waiting for the reply").toBeGreaterThan(0);
 
     checkout.release();
     const refusal = page.getByRole("alert").filter({ hasText: "Checkout is unavailable." });
     await expect(refusal).toHaveCount(1);
     await expect(refusal).toHaveAttribute("data-a9-before-reply", "");
-    await expect(refusal.locator(".notice"), "the fixed toast inside the region is what is shown").toBeVisible();
+    await expect(refusal.locator(".notice"), "the sentence inside the region is what is shown").toBeVisible();
     await expect(refusal).not.toContainText("PILOT_ACCESS_REQUIRED");
     await expect(page.getByRole("status").filter({ hasText: "Checkout is unavailable." })).toHaveCount(0);
     // Nothing navigated: the refusal is read where the buyer is.

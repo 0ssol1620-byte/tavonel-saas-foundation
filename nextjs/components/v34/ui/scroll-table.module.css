@@ -1,0 +1,74 @@
+/*
+  The only overflow surface. Edge shadows are background layers: the two `local` gradients cover
+  the `scroll` shadows once the content is scrolled to that edge, so a shadow shows exactly where
+  more content lies beyond.
+*/
+.region {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background:
+    linear-gradient(to right, var(--v34-surface, var(--v34-paper)) 30%, transparent) left center / 40px 100% no-repeat local,
+    linear-gradient(to left, var(--v34-surface, var(--v34-paper)) 30%, transparent) right center / 40px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(24 36 30 / 0.3), transparent) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(24 36 30 / 0.3), transparent) right center / 14px 100% no-repeat scroll;
+}
+
+.region:focus-visible {
+  outline: 3px solid var(--v34-fg-focus, var(--v34-focus));
+  outline-offset: 4px;
+}
+
+.table {
+  width: 100%;
+  min-width: 530px;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.caption {
+  padding-bottom: 10px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  text-align: left;
+}
+
+.columnHead,
+.rowHead,
+.cell {
+  padding: 13px 10px;
+  border-bottom: 1px solid var(--v34-fg-rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.columnHead {
+  color: var(--v34-fg-muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.rowHead {
+  font-weight: 650;
+}
+
+.cell {
+  color: var(--v34-fg);
+}
+
+@media (max-width: 650px) {
+  .table {
+    min-width: 525px;
+    font-size: 0.85rem;
+  }
+
+  .columnHead,
+  .rowHead,
+  .cell {
+    padding: 9px 6px;
+  }
+}
+
+@media (forced-colors: active) {
+  .region:focus-visible { outline-color: Highlight; }
+}

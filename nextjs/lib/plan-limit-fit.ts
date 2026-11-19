@@ -9,7 +9,7 @@ import { PROCESSING_CEILING } from "../../shared/intakeCeiling";
   buyer asks first, which is whether the corpus can be compiled here at all -- and the answer to
   that is not on the plan. Every ceiling in this deployment is a property of the reading chain,
   not of the subscription: `PROCESSING_CEILING` is what the CDR accepts, `CORPUS_MAX_DOCUMENTS`
-  and `COMPILE_MAX_DOCUMENTS` are the corpus contract, and none of the four published plans moves
+  and `COMPILE_MAX_DOCUMENTS` are the corpus contract, and none of the published plans moves
   any of them. So the comparator states that outcome rather than dressing it up as a difference:
   a row lands in the same state for every plan, and the plan totals beside it are the only column
   that moves.

@@ -120,3 +120,12 @@ nextjs/content/evidence/*.json -text
 # The guide recordings, their posters and captions (lane EN-2-3), served byte-for-byte from /guide/ and
 # pinned by sha256 in public/guide/manifest.json, which lib/guide-content.test.ts rehashes.
 nextjs/public/guide/** -text
+
+nextjs/public/v34/*.json -text
+
+# Hashbang scripts imported by vitest: a carriage return after "#!/usr/bin/env node" is a SyntaxError
+# in the transform (eval/ask-quality/metrics.test.ts collected no tests).
+nextjs/eval/ask-quality/**/*.mjs text eol=lf
+
+# The pilot worksheet is downloaded verbatim; lib/pilot-evaluation-worksheet.test.ts reads it line by line.
+nextjs/public/evaluation/*.md text eol=lf

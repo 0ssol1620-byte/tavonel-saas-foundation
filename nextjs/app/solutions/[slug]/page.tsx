@@ -205,12 +205,13 @@ export const SOLUTIONS = {
       /*
         BA-049. "Membership is not available yet for shared workspaces; Team remains contact-only
         until tenancy is complete" put an internal engineering milestone in front of knowledge
-        owners and security reviewers. The commercial fact is unchanged and is the one a buyer has
-        to plan for: Team is `saleChannel: "contact"` in `lib/billing-catalog.ts`, so it is set up
-        with us rather than bought at a checkout. The roadmap half belongs in the pricing footnote
-        where a reader is comparing plans, and goes to `copy-commerce-legal` as a cross-lane item.
+        owners and security reviewers. The fact a buyer has to plan for is unchanged: setting up a
+        shared workspace is arranged with us rather than bought at a checkout, because the plans
+        that carry shared access (Team and Business, catalog v2) are requested -- their per-member
+        source permissions and organization policy are not delivered, `/pricing`'s
+        `planAvailability`. The sentence names no plan, so it cannot disagree with that page.
       */
-      "Team setup is arranged with us rather than bought at a checkout. Each workspace is a single-member workspace; shared roles, invitations and organization administration are not available.",
+      "Shared-workspace setup is arranged with us rather than bought at a checkout. Each workspace has a single owner, and shared administration is scoped with Enterprise.",
       "Rollback restores a prior revision. It does not undo downstream use of an older answer.",
     ],
   },
@@ -256,7 +257,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
   if (!solution) notFound();
 
   return (
-    <PublicPageShell template="T1">
+    <PublicPageShell template="T1" path={`/solutions/${slug}`}>
       <section className={`scene doc solution-page ${styles.surface}`}><div className="shell">
         <div className={`solution-hero ${styles.hero}`}>
           <h1 className="document-title">{solution.title}</h1>
@@ -350,7 +351,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
           phone. It is above the actions now, in the text face, and it names its destinations.
         */}
         <p className={styles.next}>
-          Planning a first compile? <Link href="/solutions#design-partners-title">See how a design partnership works</Link>.
+          Planning a first compile? <Link href="/contact">Tell us what you are trying to compile</Link>.
         </p>
 
         <p className={styles.next}>

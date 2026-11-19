@@ -25,21 +25,28 @@ import { Fragment, type ReactNode } from "react";
 /*
   Strings before comments in the alternation, and both anchored on real openers.
 
-  `//` is guarded against a preceding colon, or every `https://tavonel.com/...` in the reference
-  would render its own host as a comment. A `#` inside a quoted string is consumed by the string
-  branch because that branch starts earlier in the input, and a quote inside a `#` comment is
-  consumed by the comment branch for the same reason: `matchAll` scans by position, so the token
-  that opens first wins without a rule saying so.
+  `//` right after a colon is not a comment, or every `https://tavonel.com/...` in the reference
+  would render its own host as a comment. That check is made in code, not by a lookbehind: Safari
+  and iOS before 16.4 cannot parse one, and this module ships in the /docs client chunks. A match
+  it rejects resumes the scan one character later, which is where the lookbehind's own search went
+  on. A `#` inside a quoted string is consumed by the string branch because that branch starts
+  earlier in the input, and a quote inside a `#` comment is consumed by the comment branch for the
+  same reason: the scan goes by position, so the token that opens first wins without a rule saying so.
 */
-const TOKEN = /('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*")|((?:#|(?<!:)\/\/)[^\n]*)/g;
+const TOKEN = /('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*")|((?:#|\/\/)[^\n]*)/g;
 
 export type CodeToken = { text: string; kind: "plain" | "string" | "comment" };
 
 export function codeTokens(body: string): CodeToken[] {
   const out: CodeToken[] = [];
+  const token = new RegExp(TOKEN);
   let at = 0;
-  for (const match of body.matchAll(TOKEN)) {
-    const start = match.index ?? 0;
+  for (let match = token.exec(body); match; match = token.exec(body)) {
+    const start = match.index;
+    if (match[2]?.startsWith("//") && body[start - 1] === ":") {
+      token.lastIndex = start + 1;
+      continue;
+    }
     if (start > at) out.push({ text: body.slice(at, start), kind: "plain" });
     out.push({ text: match[0], kind: match[1] ? "string" : "comment" });
     at = start + match[0].length;

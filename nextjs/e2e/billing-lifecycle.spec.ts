@@ -13,6 +13,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { BILLING_OFFERS } from "../lib/billing-catalog";
 import {
   INACTIVE_BILLING,
   installFixtureSession,
@@ -46,13 +47,40 @@ test("an active subscription shows its state, its remaining pages and a working 
     updatedAt: "2026-09-01T00:00:00Z",
   }));
 
-  await expect(card.getByRole("heading", { name: "studio access" })).toBeVisible();
-  await expect(card.locator("dl")).toContainText("active");
+  // A legacy Team holder (`studio_access`, no plan code) is headed by its own plan's catalog label, the retired
+  // "Team (2026-09 plan)" since catalog v2; the 2026-11-10 "Pro" name no longer exists (WO-CAT-3 repoint).
+  await expect(card.getByRole("heading", { name: BILLING_OFFERS.studio_access.label, exact: true })).toBeVisible();
+  await expect(card.locator(":scope > dl")).toContainText("active");
   // 4 credits to a standard page, so 4,000 credits is 1,000 pages. Derived, never invented.
-  await expect(card.locator("dl")).toContainText("1,000");
-  await expect(card.getByRole("button", { name: "Manage billing" })).toBeEnabled();
+  await expect(card.locator(":scope > dl")).toContainText("1,000");
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
   await expect(card.locator(".billing-hold")).toHaveCount(0);
   await expect(card).not.toContainText("not read yet");
+});
+
+/*
+  WO-REL-1 (ledger L613 item 3). Opening the V22 sale is an env-only redeploy (PADDLE_PRICE_PERSONAL and
+  PADDLE_PRICE_DEVELOPER). This card reads only /api/billing/status, never a price env, so a legacy holder's renewal
+  reads the same in both states; this build has the prices unset, and the unit tests run both states
+  (lib/paddle-billing-event.test.ts, lib/status-route-contract.test.ts). What the card must never do in either: offer
+  a legacy holder a purchase, or name the retired 2026-11-10 plan names.
+*/
+test("a legacy holder's renewal card offers no purchase and names no retired plan name", async ({ page }) => {
+  const card = await openBilling(page, account({
+    accessPlan: "observer_access",
+    subscriptionStatus: "active",
+    creditBalance: 2_000,
+    lifetimeCreditsPurchased: 2_000,
+    paddleCustomerId: "ctm_fixture_legacy",
+    updatedAt: "2026-11-01T00:00:00Z",
+  }));
+
+  await expect(card.getByRole("heading", { name: BILLING_OFFERS.observer_access.label, exact: true })).toBeVisible();
+  await expect(card.locator(":scope > dl")).toContainText("active");
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
+  await expect(card.getByRole("link", { name: /^Buy / })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: /^Buy / })).toHaveCount(0);
+  await expect(card).not.toContainText(/\bStarter\b|\bPro plan\b|can be bought/);
 });
 
 test("a past-due account keeps the hold visible as an alert, not a colour", async ({ page }) => {
@@ -64,12 +92,12 @@ test("a past-due account keeps the hold visible as an alert, not a colour", asyn
     paddleCustomerId: "ctm_fixture_pastdue",
   }));
 
-  await expect(card.locator("dl")).toContainText("past_due");
+  await expect(card.locator(":scope > dl")).toContainText("past_due");
   const hold = card.getByRole("alert");
   await expect(hold).toContainText("Billing hold active");
   await expect(hold).toContainText("cannot be processed");
   // The way out stays reachable while the hold is on.
-  await expect(card.getByRole("button", { name: "Manage billing" })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeEnabled();
 });
 
 test("a scheduled cancellation says access continues, and until when", async ({ page }) => {
@@ -83,10 +111,10 @@ test("a scheduled cancellation says access continues, and until when", async ({ 
 
   // Not "canceled": the state is active-until, and saying "canceled" would understate what the
   // customer still has.
-  await expect(card.locator("dl")).toContainText("active until");
+  await expect(card.locator(":scope > dl")).toContainText("active until");
   await expect(card.getByRole("status")).toContainText("Cancellation is scheduled");
   await expect(card.getByRole("status")).toContainText("through the current paid period");
-  await expect(card.locator("dl")).toContainText("200");
+  await expect(card.locator(":scope > dl")).toContainText("200");
 });
 
 test("a billing read that failed prints no number at all", async ({ page }) => {
@@ -94,13 +122,13 @@ test("a billing read that failed prints no number at all", async ({ page }) => {
   // panel has nothing to state -- which is the only honest thing to show about a balance.
   const card = await openBilling(page, null);
 
-  await expect(card.locator("dl")).toContainText("not read yet");
+  await expect(card.locator(":scope > dl")).toContainText("not read yet");
   await expect(card).toContainText("These are not zeroes");
-  await expect(card.getByRole("button", { name: "Manage billing" })).toBeDisabled();
+  await expect(card.getByRole("button", { name: "Manage or cancel subscription" })).toBeDisabled();
   // Fail closed: no zero balance, no invented plan name. The card is still headed, and the heading
   // is the neutral one -- not a plan, and not a repeat of the tab above it (workspace-18).
   await expect(card.getByRole("heading", { level: 2 })).toHaveText("Access and balance");
-  await expect(card.locator("dl")).not.toContainText("active");
+  await expect(card.locator(":scope > dl")).not.toContainText("active");
   // And the read is retryable rather than terminal.
   await expect(card.getByRole("button", { name: "Refresh billing" })).toBeEnabled();
 });

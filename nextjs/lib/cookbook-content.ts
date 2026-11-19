@@ -148,36 +148,28 @@ export type CookbookRecord = {
   readonly sourceRights: "unverified" | "cleared" | "restricted";
 };
 
-const TEAM = BILLING_OFFERS.studio_access;
-const DEVELOPER = BILLING_OFFERS.observer_access;
+const { personal: PERSONAL, developer: DEVELOPER, team: TEAM, business: BUSINESS } = BILLING_OFFERS;
 
 /*
-  How the activation plan is sold, derived rather than described.
+  Which plans reach activation, derived rather than described.
 
-  Team is `contact` today because the membership flow is unfinished, and it flips to
-  `self_serve` in `billing-catalog.ts` when that ships. A sentence typed here would keep telling
-  readers to book a call for a month after the checkout opened, and -- the worse direction --
-  would keep promising self-serve after a gate closed.
-
-  Stage-B integration: FD-02 opened activation to the Developer plan when the caller is the
-  workspace owner (`planReachesLevel` in `lib/billing-product-access.ts` -- `required ===
-  "activation" && role === "owner"`), so the sentence that said activation needs Team was wrong
-  in the direction that under-sells. Both halves are still read off the catalog, and the free
-  evaluation is still refused, which is the half that must not soften.
+  FD-02 opened activation to the `observer_access` level when the caller is the workspace owner
+  (`planReachesLevel` in `lib/billing-product-access.ts` -- `required === "activation" && role ===
+  "owner"`), and `studio_access` reaches it for any role. Catalog v2 (PB-2026-11-V22) puts Personal
+  and Developer on the first level and Team and Business on the second, so the names below are
+  read off the catalog. How a plan is bought is /pricing's availability, decided on the server
+  from what the product delivers; a content page states it nowhere, so it cannot go stale in
+  either direction. The free evaluation is still refused a second World, which is the half that
+  must not soften.
 */
-const ACTIVATION_CLAUSE = TEAM.saleChannel === "contact"
-  ? "sold through a conversation today rather than self-serve checkout"
-  : "available on self-serve checkout";
-
-const DEVELOPER_CLAUSE = DEVELOPER.saleChannel === "self_serve"
-  ? `the ${DEVELOPER.label} plan, if you are the workspace owner`
-  : `the ${DEVELOPER.label} plan, if you are the workspace owner and have arranged it with us`;
+const OWNER_CLAUSE = `the ${PERSONAL.label} or ${DEVELOPER.label} plan, if you are the workspace owner`;
+const STUDIO_CLAUSE = `the ${TEAM.label} or ${BUSINESS.label} plan`;
 
 // FD-02 (`docs/policy/DECISION_LOG_2026-09-11.md`): the plan that reaches activation is a
-// delegated decision, 2026-09-11. Both halves below are read off the catalog.
+// delegated decision, 2026-09-11. Every name below is read off the catalog.
 const ACTIVATION_SENTENCE =
   `A compile produces a candidate, and a candidate becomes an active World only when a person activates it in the workspace. `
-  + `A free evaluation activates one World, as its owner. More than that needs a paid plan: ${DEVELOPER_CLAUSE}, or the ${TEAM.label} plan, which is ${ACTIVATION_CLAUSE}. `
+  + `A free evaluation activates one World, as its owner. More than that needs a paid plan: ${OWNER_CLAUSE}, or ${STUDIO_CLAUSE}, all listed on /pricing. `
   + `Decide the plan before you plan a run that needs a second World.`;
 
 const READING = CAPABILITY_MANIFEST.entries.find((entry) => entry.mime === "application/pdf");

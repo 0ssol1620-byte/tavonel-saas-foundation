@@ -66,10 +66,11 @@ export function describeImportScope(latestState: string, backlog: SyncBacklog | 
   return lines;
 }
 
-function recovery(code: string | null) {
+export function recovery(code: string | null) {
   if (code === "SOURCE_LIFECYCLE_REVIEW_REQUIRED" || code?.includes("SUSPENSION") || code?.includes("BINDING_UNRESOLVED"))
     return "Source access changed. Review the affected sources and permissions before continuing.";
   if (code === "INTAKE_DAILY_QUOTA_EXCEEDED") return "The daily import allowance has been reached. This job is waiting for capacity.";
+  if (code === "STORAGE_ALLOWANCE_EXHAUSTED") return "This workspace has used its plan's storage allowance. This job is waiting: delete sources the workspace no longer needs and it continues.";
   if (code === "OAUTH_TOKEN_REFRESH_FAILED" || code === "OAUTH_CONNECTION_NOT_FOUND")
     return "The source connection could not be refreshed. Check its account access before starting another import.";
   if (code?.includes("REVISION") || code?.includes("HASH_MISMATCH"))

@@ -21,6 +21,12 @@ const widths = [1920, 1440, 1280, 1024, 768, 390, 360] as const;
 */
 const auditSpecs = /(overflow-audit|overlap-audit|contrast-zoom-audit|dialog-focus-audit|film-fallback-audit|film-motion-control-audit|failure-states-audit|billing-lifecycle|cross-tenant-negative|compile-resume|workspace-intake-triage|self-serve-journey)\.spec\.ts/;
 const auditWidthSpecs = /(contrast-zoom-audit|failure-states-audit|billing-lifecycle)\.spec\.ts/;
+/*
+  The V34 QA matrix (lane F-qa) and its self-test. They set their own widths, engines and media from
+  inside the test, so the seven width projects and the reduced-motion project skip them: running them
+  there would repeat the matrix once per width. The v34-* projects below run them, once per engine.
+*/
+const v34Specs = /v34-(matrix|support\.selftest)\.spec\.ts/;
 const testPort = Number(process.env.PLAYWRIGHT_PORT ?? "3117");
 /*
   PLAYWRIGHT_BASE_URL points the suite at a deployment instead of the local server.
@@ -49,7 +55,7 @@ export default defineConfig({
   projects: [
     ...widths.map(width => ({
       name: `${width}`,
-      testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],
+      testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs, v34Specs],
       use: { viewport: { width, height: width <= 390 ? 844 : 900 } },
     })),
     /*
@@ -71,7 +77,7 @@ export default defineConfig({
     })),
     {
       name: "reduced-motion",
-      testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs],
+      testIgnore: [/launch-qa.*\.spec\.ts/, auditSpecs, v34Specs],
       use: {
         viewport: { width: 1440, height: 900 },
         reducedMotion: "reduce" as const,
@@ -100,6 +106,37 @@ export default defineConfig({
       testMatch: auditWidthSpecs,
       use: { viewport: { width, height: width === 768 ? 1024 : 900 } },
     })),
+    /*
+      V34 matrix (D33 §5): one project per engine, all at 1440x900 light. The width, the reduced-motion
+      and the forced-colors contexts are opened inside the spec. Run recipe, from the lane receipt:
+      V34_QA_OUT=outputs/v34/qa/<sha> V34_QA_COMMIT=<sha> PLAYWRIGHT_EXTERNAL_SERVER=1
+      PLAYWRIGHT_BASE_URL=http://127.0.0.1:3117 playwright test --project=v34-chromium
+      The held-route 404 check runs the SEO pass against the production-mode server with
+      V34_SERVER_MODE=production and --grep '@pass:seo'.
+    */
+    ...(["chromium", "firefox", "webkit"] as const).map(browserName => ({
+      name: `v34-${browserName}`,
+      testMatch: /v34-matrix\.spec\.ts/,
+      use: {
+        browserName,
+        viewport: { width: 1440, height: 900 },
+        colorScheme: "light" as const,
+        /*
+          Untraced in every engine. WebKit: the same Windows trace deadlock the launch projects document
+          below. All: the contrast, keyboard and consent passes are hundreds of actions and screenshots
+          each, and the trace's per-action snapshots took them past 120 s on a loaded machine where the
+          untraced run takes 15-25 s. `trace` is worker-scoped, so it cannot be turned off for those
+          tests alone. Assertions and failure screenshots are unchanged.
+        */
+        trace: "off" as const,
+      },
+    })),
+    /* The harness's own fixtures; needs no server. Run with PLAYWRIGHT_EXTERNAL_SERVER=1. */
+    {
+      name: "v34-selftest",
+      testMatch: /v34-support\.selftest\.spec\.ts/,
+      use: { browserName: "chromium" as const },
+    },
     ...(["chromium", "firefox", "webkit"] as const).map(browserName => ({
       name: `launch-${browserName}`,
       testMatch: /launch-qa.*\.spec\.ts/,

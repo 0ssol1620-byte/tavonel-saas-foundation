@@ -122,6 +122,19 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
 ];
 
+/** D33 §1.1 and decision 6. Source, then final destination. */
+const V34_REDIRECTS = [
+  ["/product", "/platform"],
+  ["/product/compiled-world", "/world"],
+  ["/product/continuous-knowledge", "/changes"],
+  ["/product/document-understanding", "/compiler"],
+  ["/product/knowledge-compiler", "/journal/compiler"],
+  ["/how-it-works", "/methods"],
+  ["/knowledge-compiler", "/journal/compiler"],
+  ["/integrations", "/connect"],
+  ["/resources", "/journal"],
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
@@ -160,17 +173,30 @@ const nextConfig = {
   outputFileTracingRoot: packageRoot,
   outputFileTracingIncludes: {
     "/*": ["./public/policy/*2026-09-30*"],
+    /*
+      The public corpus is read at runtime by the routes that render the World instrument (the home
+      page is dynamic). The file is content-addressed: its name is its digest.
+    */
+    "/": ["./public/v34/corpus-*.json"],
+    "/world": ["./public/v34/corpus-*.json"],
   },
   /*
     Founder decision 2026-11-09: global-only presentation. The service is presented in English and
     a Korean reader uses the browser's own translation. Every /ko URL answers 308 with the English
     equivalent, so a link published before this keeps working and a crawler drops the old URL.
-    The app/ko sources stay in the tree, unreachable, until a separate change deletes them.
+    The app/ko sources are deleted; only these redirects remain.
+
+    V34 (2026-11-16, D33 §1.1): the retired product, process and resource routes answer 308 with
+    their V34 destination. Each has a /ko twin that goes straight to the final destination, listed
+    before the generic /ko rule, so no URL takes two hops. The source pages are deleted by the
+    integration step once their content is folded into the target route.
   */
   async redirects() {
     return [
       { source: "/ko", destination: "/", permanent: true },
+      ...V34_REDIRECTS.map(([source, destination]) => ({ source: `/ko${source}`, destination, permanent: true })),
       { source: "/ko/:path*", destination: "/:path*", permanent: true },
+      ...V34_REDIRECTS.map(([source, destination]) => ({ source, destination, permanent: true })),
       // 2026-11-10 (founder direction): /arena is retired. Measured results live on /benchmarks.
       { source: "/arena", destination: "/benchmarks", permanent: true },
     ];
@@ -196,6 +222,11 @@ const nextConfig = {
       */
       {
         source: "/film/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      /* The corpus file's name is its digest, so a changed corpus is a new URL. */
+      {
+        source: "/v34/corpus-:hash.json",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       { source: "/(.*)", headers: securityHeaders },

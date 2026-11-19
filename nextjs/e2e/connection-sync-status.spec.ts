@@ -14,7 +14,7 @@ test("connector progress follows real response states and retains uncertainty on
   await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source: "owner", accessPlan: "studio_access", billingExempt: true, expiresAt: null, limits: null, customerDataEnabled: true } } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
-  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.route("**/api/connections", route => route.fulfill({ json: { connections: [] } }));
   const connectionId = "22222222-2222-4222-8222-222222222222";
   await page.route("**/api/v1/oauth-connectors", route => route.fulfill({ json: {
@@ -82,8 +82,8 @@ for (const [source, sentence] of [
     await page.route("**/api/v1/oauth-connectors/authorize", route => { authorizeCalls += 1; return route.fulfill({ status: 402, json: { code: "TRIAL_FEATURE_NOT_INCLUDED" } }); });
     await page.goto("/workspace/connections");
     const gate = page.locator(".workspace-access-gate");
-    await expect(gate.getByRole("heading", { name: "Available on Developer and Team." })).toBeVisible();
-    await expect(gate).toContainText("Google Drive and file-server connections are included on Developer and Team.");
+    await expect(gate.getByRole("heading", { name: "Available on a paid plan." })).toBeVisible();
+    await expect(gate).toContainText("Local-folder connections are included in every paid plan.");
     await expect(gate).toContainText(sentence);
     await expect(gate).not.toContainText(/Dropbox|OneDrive/);
     await expect(gate.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");

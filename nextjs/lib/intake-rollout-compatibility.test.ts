@@ -162,6 +162,18 @@ describe("disabled triage rollout compatibility", () => {
     expect(mocks.headObject).not.toHaveBeenCalled();
   });
 
+  it("answers a full workspace with 402 STORAGE_ALLOWANCE_EXHAUSTED, a plan limit, before any compute is reserved (WO-CAT-8)", async () => {
+    mocks.reserveAdmission.mockResolvedValueOnce({ ok: false, code: "STORAGE_ALLOWANCE_EXHAUSTED" });
+    const response = await legacyCapabilityPost(new Request("https://tavonel.com/api/uploads/capability", {
+      method: "POST", headers: { "content-type": "application/json", "x-tavonel-source-idempotency-key": "stable-source-token" },
+      body: JSON.stringify({ originalFilename: "report.pdf", declaredMimeType: "application/pdf", requestedBytes: 1024,
+        attemptKey, scopeDigest, pricingFingerprint: hash, fileKey, contentSha256: hash }),
+    }));
+    expect([response.status, await response.json()]).toEqual([402, { code: "STORAGE_ALLOWANCE_EXHAUSTED" }]);
+    expect(mocks.reserveCompute).not.toHaveBeenCalled();
+    expect(mocks.presign).not.toHaveBeenCalled();
+  });
+
   it("fails closed before reservation or final-key signing for an existing triage approval after rollout-off", async () => {
     mocks.readApproval.mockResolvedValueOnce({ ok: true, result: {
       attemptKey, scopeDigest, pricingFingerprint: hash,

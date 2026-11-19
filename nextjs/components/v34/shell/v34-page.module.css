@@ -1,0 +1,20 @@
+.main {
+  display: block;
+  min-width: 0;
+  /* header 66 + 16: an in-page jump never lands under the sticky bar */
+  scroll-margin-top: 82px;
+}
+
+/* The skip link lands here; a focus ring on the whole page body would be noise, the content inside has its own. */
+.main:focus {
+  outline: none;
+}
+
+/*
+  Retained bodies (pricing, security, changelog ...) render inside this <main>. A long unbroken
+  token in one of them (an environment variable name in the changelog) wraps here instead of
+  widening the page past 320px.
+*/
+.main {
+  overflow-wrap: break-word;
+}

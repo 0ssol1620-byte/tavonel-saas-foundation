@@ -125,7 +125,7 @@ async function mockWorkspace(page: Page, options: { world?: boolean } = {}) {
   await page.route("**/api/billing/status", (route) => route.fulfill({
     json: {
       account: {
-        accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0,
+        accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0,
         lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
       },
     },

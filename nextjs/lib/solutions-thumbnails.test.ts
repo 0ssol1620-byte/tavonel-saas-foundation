@@ -79,16 +79,27 @@ describe("the /solutions card thumbnails", () => {
     }
   });
 
-  it("is placed on the hub from the record the detail pages read", () => {
-    const page = readFileSync(
-      fileURLToPath(new URL("../app/solutions/page.tsx", import.meta.url)),
-      "utf8",
-    );
-    expect(page).toContain('<SolutionProofSample pick={solution.proof} variant="thumb" />');
-    const prose = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
-    /* No illustration, no stock art, no drawing: the card shows a filing or it shows nothing. */
+  /*
+    V34 (D33 §4 #18): the hub cards carry the Input / Action / Output list and no thumbnail; the
+    sample is placed on each detail page, from the same record, through SolutionWorkflowProof.
+    The invariant is unchanged: what a reader sees of a solution is a filing from the record, never
+    stock art or a placeholder.
+  */
+  it("is placed on each detail page from the record the hub reads", () => {
+    const source = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+    const detail = source("../app/solutions/[slug]/page.tsx");
+    const proof = source("../app/solutions/solution-workflow-proof.tsx");
+    expect(detail).toContain("<SolutionWorkflowProof kind={slug as SolutionSlug} pick={solution.proof} />");
+    expect(proof).toContain("<SolutionProofSample pick={selectedPick}");
+    const prose = proof.replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
     for (const banned of ["<svg", "illustration", "placeholder", "/img/", "unsplash"]) {
-      expect(prose, `the hub renders ${banned}`).not.toContain(banned);
+      expect(prose, `the sample renders ${banned}`).not.toContain(banned);
+    }
+    /* The hub cards show no image at all; the hub's one drawing is the hero Figure, never stock art. */
+    const hub = source("../components/v34/routes/solutions/solutions.tsx");
+    expect(hub).not.toContain("<SolutionProofSample");
+    for (const banned of ["placeholder", "/img/", "unsplash", "<img"]) {
+      expect(hub, `the hub renders ${banned}`).not.toContain(banned);
     }
   });
 

@@ -43,7 +43,10 @@ describe("raw HTML injection", () => {
     expect(
       users.map((file) => file.path).sort(),
       "a further raw-HTML sink is a design decision, not a refactor: justify it here or do not add it",
-    ).toEqual(["app/knowledge-compiler/page.tsx", "app/layout.tsx", "components/breadcrumb-json-ld.tsx", "components/pricing-page-client.tsx"]);
+    ).toEqual([
+      "app/knowledge-compiler/page.tsx", "app/layout.tsx", "components/breadcrumb-json-ld.tsx",
+      "components/pricing-page-client.tsx", "components/v34/shell/route-json-ld.tsx",
+    ]);
     /*
       All three serialise JSON-LD only. layout.tsx inlines an object literal; the breadcrumb
       component (2026-09-08 exposure lane) serialises `breadcrumbList(trail)`, whose trail is a
@@ -60,6 +63,15 @@ describe("raw HTML injection", () => {
     const byPath = new Map(users.map((file) => [file.path, file.text]));
     expect(byPath.get("app/layout.tsx")).toMatch(/__html: jsonLdHtml\(\{\s*\n\s*"@context": "https:\/\/schema\.org"/);
     expect(byPath.get("components/breadcrumb-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(breadcrumbList\(trail\)\)/);
+    /*
+      The V34 sink (2026-11-16, D33 §3.6), justified as this assertion asks. Every V34 page renders
+      `<RouteJsonLd route="key" />`, which serialises `routeJsonLd(key)` through `jsonLdHtml`. Its input is
+      the typed registry record -- a module-level literal -- and a BreadcrumbList built from it; an
+      Article only where that record carries publication dates. Nothing reaches it from a request, a
+      document or a model, the same standing as the sinks above.
+    */
+    expect(byPath.get("components/v34/shell/route-json-ld.tsx")).toMatch(/__html: jsonLdHtml\(node\)/);
+    expect(byPath.get("components/v34/shell/route-json-ld.tsx")).toContain("routeJsonLd(route)");
     expect(byPath.get("components/pricing-page-client.tsx")).toMatch(/__html: jsonLdHtml\(pricingJsonLd\(initialLiveCheckout, faqRows\)\)/);
     expect(
       byPath.get("components/pricing-page-client.tsx"),

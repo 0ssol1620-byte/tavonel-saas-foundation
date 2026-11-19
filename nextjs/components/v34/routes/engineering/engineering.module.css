@@ -1,0 +1,168 @@
+/*
+  Engineering page only. Colours come from --v34-* tokens. The bands set their own surface, so a rule
+  here that paints a background also states its foreground. No animation.
+*/
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--v34-on-dark);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.refHead {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.records,
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record {
+  min-width: 0;
+}
+
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+
+.sourceLink:hover {
+  color: var(--v34-fg);
+}
+
+.sourceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.step {
+  min-width: 0;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: var(--v34-h3);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.text {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.no {
+  display: block;
+  margin: 0 0 10px;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  letter-spacing: 0.11em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tools {
+  margin-bottom: 24px;
+}
+
+.accessActions,
+.refActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.refActions {
+  margin-top: 28px;
+}
+
+/* the support-issue card beside the split's text: a drawn example, labelled Illustration */
+.issue {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-panel);
+}
+
+.issueTitle {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-lead);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.issueRows {
+  display: grid;
+  margin: 0;
+}
+
+.issueRow {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.issueTerm {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  font-weight: 650;
+}
+
+.issueText {
+  min-width: 0;
+  margin: 0;
+  color: var(--v34-fg);
+}
+
+@media (max-width: 900px) {
+  .records,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .issueRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

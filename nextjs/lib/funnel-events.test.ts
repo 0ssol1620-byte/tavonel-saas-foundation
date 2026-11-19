@@ -302,7 +302,7 @@ describe("server funnel events", () => {
 */
 describe("the recipe hop is measured by the events that exist", () => {
   const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
-  const loginPage = read("../app/login/page.tsx");
+  const loginPage = read("../app/login/login-client.tsx");
   const callbackPage = read("../app/auth/callback/page.tsx");
   const cookbookPage = read("../app/cookbooks/[slug]/page.tsx");
 

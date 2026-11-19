@@ -49,8 +49,13 @@ export const LANDING_VARIANT_COOKIE = "tavonel.lp-variant";
 export const LANDING_VARIANT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 export const LANDING_VARIANT_QUERY = "lp";
 
-/** The paths this module is allowed to affect: the two entry pages and nothing else. */
-export const LANDING_VARIANT_PATHS: ReadonlySet<string> = new Set(["/", "/ko"]);
+/**
+ * The paths this module is allowed to affect. Empty since the V34 home replaced the Landing V2 entry
+ * page: no live page reads the arm, and a cookie about a page that cannot read it is a cookie for
+ * nothing. A path joins this set only together with the page that calls `landingVariantState`
+ * (`lib/landing-experiments.test.ts` checks the pairing).
+ */
+export const LANDING_VARIANT_PATHS: ReadonlySet<string> = new Set<string>();
 
 export type LandingVariantState = {
   readonly experiment: LandingExperiment | null;

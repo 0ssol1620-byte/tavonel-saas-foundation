@@ -16,11 +16,10 @@ import { NAV_OPEN_EVENT } from "@/lib/marketing-analytics";
  * The header passes `<NavSections sheet />` (`components/public-site-chrome.tsx`), the
  * server-rendered rows the desktop bar draws, so the sheet is an accordion over the same
  * `NAV_GROUPS` rather than a second list -- and the panels' copy never ships in this file's script.
- * The words are handed in too (`labels`), from `KO_CHROME`, so this file imports no navigation
+ * The words are handed in too (`labels`), so this file imports no navigation
  * module at all: see the note at the top of `components/site-nav/desktop-primary-nav.tsx`.
  */
-export default function MobilePrimaryNav({ korean = false, signedIn: signedInProp, labels, start, children }: {
-  korean?: boolean;
+export default function MobilePrimaryNav({ signedIn: signedInProp, labels, start, children }: {
   signedIn?: boolean;
   labels: { menu: string; pricing: string; signIn: string };
   /**
@@ -84,17 +83,17 @@ export default function MobilePrimaryNav({ korean = false, signedIn: signedInPro
         BQ-059 keeps that and changes what the word looks like: it was set in 9.5px monospace
         caps, below the site's 12px floor and in the instrument voice, for the one control that
         is the whole navigation on a phone. It is the page's own face at 13px now, in a 44px
-        target, and it says "메뉴" on /ko like everything else around it.
+        target, in the page's own language.
       */}
       {/* The span is the hook one-path.css uses below 400px to keep the word as the name while the
           toggle is drawn as a 44px icon. */}
       <summary><span>{labels.menu}</span></summary>
       {/* Following any link closes the sheet; a group's toggle is a button and leaves it open. */}
-      <nav aria-label={korean ? "모바일 섹션" : "Mobile sections"}
+      <nav aria-label="Mobile sections"
         onClick={(event) => { if ((event.target as Element).closest("a")) close(); }}>
         {children}
         {/* Brief move 6: below the desktop switch the header is wordmark + Menu, so Pricing is a row here. */}
-        <NavCurrentLink native className="mobile-nav-direct" href={korean ? "/ko/pricing" : "/pricing"} match="/pricing" also={[]}>
+        <NavCurrentLink native className="mobile-nav-direct" href="/pricing" match="/pricing" also={[]}>
           {labels.pricing}
         </NavCurrentLink>
         {/*
@@ -129,7 +128,7 @@ export default function MobilePrimaryNav({ korean = false, signedIn: signedInPro
           does not repeat the header: the header's action is the sample, this one is the start.
         */}
         {signedIn ? (
-          <Link className="btn mobile-nav-start" href="/workspace">{korean ? "워크스페이스 열기" : "Open workspace"}</Link>
+          <Link className="btn mobile-nav-start" href="/workspace">Open workspace</Link>
         ) : start ? (
           <a className="btn mobile-nav-start" href={start.href}>{start.label}</a>
         ) : null}

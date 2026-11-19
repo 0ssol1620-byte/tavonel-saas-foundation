@@ -24,7 +24,7 @@ export const TRUST_SEQUENCE = [
   { href: "/evidence", label: "Evidence", question: "Can I verify a compiled fact?" },
   { href: "/benchmarks", label: "Benchmarks", question: "Does the architecture have merit?" },
   { href: "/reproducibility", label: "Reproducibility", question: "Can I rebuild it myself?" },
-  { href: "/research", label: "Research", question: "What is still open?" },
+  { href: "/research/program", label: "Research", question: "What is still open?" },
   { href: "/pricing", label: "Pricing", question: "What does this cost?" },
 ] as const;
 
@@ -44,7 +44,7 @@ const NEXT_ACTION: Record<TrustStep, string> = {
   "/evidence": "See what was measured",
   "/benchmarks": "Rerun the public sample",
   "/reproducibility": "Read the open questions",
-  "/research": "Read what was measured",
+  "/research/program": "Read what was measured",
   "/pricing": "See the plans",
 };
 
@@ -61,12 +61,26 @@ const NEXT_ACTION: Record<TrustStep, string> = {
   chain still ends at /pricing: the notes page offers it as its closing ghost.
 */
 const INSTEAD_OF_THE_NEXT_STEP: Partial<Record<TrustStep, { to: Route; label: string; question: string }>> = {
-  "/research": {
+  "/research/program": {
     to: "/research/notes" as Route,
     label: "Research notes",
     question: "What has actually been measured?",
   },
 };
+
+/*
+  Lead decision 17 (WO-CI-24): the heading takes the role its position has.
+
+  A V34 trust page renders this block inside one of its Sections, under that Section's own H2, so
+  the block's heading is a sub-heading of that Section: an H3, whose size the host's sheet maps to
+  the V34 sub-heading size (`--t-6`). As an H2 it sat beside the Section's H2 at a second size
+  (/evidence: 33.84px against 61.92px at 1440). A retained page places the block beside its own
+  H2s, so there it stays an H2. Only the host knows where it puts the block, so the host names the
+  level (`heading`, required): there is no default for a host to fall into, and a value that is
+  neither level is refused rather than rendered.
+*/
+const HEADING_LEVELS = ["h2", "h3"] as const;
+type TrustNextHeading = (typeof HEADING_LEVELS)[number];
 
 /**
  * The one next step at the foot of a trust page.
@@ -80,14 +94,22 @@ const INSTEAD_OF_THE_NEXT_STEP: Partial<Record<TrustStep, { to: Route; label: st
  * `emphasis="quiet"` and this step renders as a ghost. The step is not removed: the sequence
  * exists because /reproducibility and /research had no way onward at all.
  */
-export function TrustNext({ from, emphasis = "primary" }: { from: TrustStep; emphasis?: "primary" | "quiet" }) {
+export function TrustNext({ from, heading, emphasis = "primary" }: {
+  from: TrustStep;
+  heading: TrustNextHeading;
+  emphasis?: "primary" | "quiet";
+}) {
+  if (!HEADING_LEVELS.includes(heading)) {
+    throw new Error(`TrustNext from ${from}: heading must be one of ${HEADING_LEVELS.join(", ")}, got ${String(heading)}`);
+  }
   const index = TRUST_SEQUENCE.findIndex((step) => step.href === from);
   const override = INSTEAD_OF_THE_NEXT_STEP[from];
   const next = override ? { href: override.to, label: override.label, question: override.question } : TRUST_SEQUENCE[index + 1];
   if (!next) return null;
+  const Heading = heading;
   return (
     <div className="stack trust-next">
-      <h2>Next: {next.label}</h2>
+      <Heading>Next: {next.label}</Heading>
       <p className="fine">{next.question}</p>
       <div className="actions">
         <Link className={emphasis === "quiet" ? "btn ghost" : "btn"} href={next.href as Route}>

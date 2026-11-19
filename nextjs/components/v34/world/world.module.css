@@ -1,0 +1,469 @@
+/*
+  The world instrument: a dark surface for the public reference corpus.
+
+  Every class that carries text or a background states BOTH a foreground and a background colour
+  (U46), so no surface depends on what it happens to sit on. The pairs, all on the #07100e ground:
+    text       #f2f7f0   on #07100e / #0d1b16 / #12251f   above 15:1
+    muted      #b8cbbd   on #07100e                       about 11:1
+    link       #8ae0bc   on #0b1713                       about 11:1
+    pressed    #0b1713   on #c9f2a5                       about 14:1
+    focus ring #8ae0bc, 2px, offset 2px
+  Type is 12px or larger. Nothing here animates: the one motion is the camera, in the canvas.
+*/
+
+.instrument {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #2b4a40;
+  border-radius: 8px;
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.caption {
+  margin: 0;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.root {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+/* Controls need the island: they stay out of sight, and out of the tab order, until it has hydrated. */
+.root[data-hydrated="false"] :is(.toolbar, .finder) {
+  visibility: hidden;
+}
+
+.stageCrop {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 900 / 620;
+  overflow: hidden;
+  border: 1px solid #1f3a31;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.fallbackImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.root[data-ready="true"] .fallback {
+  visibility: hidden;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: grab;
+  background-color: #07100e;
+  /* Vertical swipes scroll the page; the camera takes horizontal drags and two-finger gestures. */
+  touch-action: pan-y;
+  outline: none;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}
+
+.canvas:focus-visible {
+  outline: 2px solid #8ae0bc;
+  outline-offset: -4px;
+}
+
+.root[data-ready="true"] .canvas {
+  opacity: 1;
+}
+
+.explore {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 16px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #8ae0bc;
+  border-radius: 6px;
+  color: #0b1713;
+  background-color: #c9f2a5;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+/* The home hero on a touch device opens the corpus only when asked: the file is 275 kB. Under 900px it never does. */
+@media (pointer: coarse) and (min-width: 900px) {
+  .root[data-variant="hero"][data-load="idle"] .explore {
+    display: inline-flex;
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.segment {
+  display: inline-flex;
+  gap: 4px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+.control {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #5d8070;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #12251f;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.control:hover:not(:disabled) {
+  border-color: #8fb3a0;
+  color: #f2f7f0;
+  background-color: #1a352c;
+}
+
+.control[aria-pressed="true"] {
+  border-color: #c9f2a5;
+  color: #0b1713;
+  background-color: #c9f2a5;
+}
+
+.control[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: #d8f7bd;
+  color: #0b1713;
+  background-color: #d8f7bd;
+}
+
+.control:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/*
+  A control's label and fill change in the same frame. Under reduced motion the site's sweep (tavonel.css) gives
+  every element a 0.01ms transition of every property, and the camera control's label <span> inherits its colour:
+  its transition began a frame after the button's had ended, so for one frame the pressed fill (#d8f7bd under the
+  pointer) carried the unpressed label (#f2f7f0), 1.08:1, on 20 of 20 presses in Chromium and in WebKit (WO-CI-31).
+  Here neither transitions.
+*/
+.control,
+.control * {
+  transition-property: none;
+}
+
+@media (pointer: coarse) {
+  .control {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+.control:focus-visible,
+.explore:focus-visible,
+.input:focus-visible,
+.source:focus-visible {
+  outline: 2px solid #8ae0bc;
+  outline-offset: 2px;
+}
+
+/* The live status and, hidden in the same grid cell, every other status the variant can show. */
+.statusBox {
+  display: grid;
+  color: #b8cbbd;
+  background-color: #07100e;
+}
+
+.statusBox > * {
+  grid-area: 1 / 1;
+}
+
+.statusSizer {
+  visibility: hidden;
+}
+
+.swap {
+  display: inline-grid;
+  place-items: center;
+}
+
+.swap > * {
+  grid-area: 1 / 1;
+}
+
+.status {
+  margin: 0;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.finder {
+  display: grid;
+  gap: 8px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+@media (min-width: 640px) {
+  .finder {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .count {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #5d8070;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #0d1b16;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.input::placeholder {
+  color: #9fb5a8;
+  opacity: 1;
+}
+
+.count {
+  margin: 0;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.info {
+  min-height: 4.5em;
+  padding: 12px 14px;
+  border: 1px solid #1f3a31;
+  border-radius: 6px;
+  color: #f2f7f0;
+  background-color: #0b1713;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.infoLine {
+  margin: 0;
+}
+
+.source {
+  display: inline-block;
+  margin-top: 8px;
+  color: #8ae0bc;
+  background-color: #0b1713;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-size: 13px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f2f7f0;
+  background-color: #07100e;
+}
+
+/* An svg dot: the kind's colour is the canvas's own, and forced colours leave an svg's fill to it. */
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  forced-color-adjust: none;
+}
+
+.layerNumber,
+.legendCount {
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-variant-numeric: tabular-nums;
+}
+
+.domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #b8cbbd;
+  background-color: #07100e;
+  font-size: 13px;
+}
+
+.domain {
+  color: #b8cbbd;
+  background-color: #07100e;
+}
+
+.domainCount {
+  color: #f2f7f0;
+  background-color: #07100e;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  The home hero shows the stage and the camera controls. The finder, the readout, the layer legend and
+  the domain list are the full instrument's (/world, one link away) and would only lengthen the first
+  screen; display: none takes them out of the tab order with them.
+*/
+.root[data-variant="hero"] :is(.finder, .info, .legend),
+.instrument[data-variant="hero"] .domains {
+  display: none;
+}
+
+/*
+  From 900px the hero's controls sit on the stage's top edge, as one tray, so their wrapping (which
+  depends on the column width and on which face has loaded) never changes the height of the hero.
+  Under 900px the hero is the static image only (world-island.tsx): no controls, no status.
+*/
+.root[data-variant="hero"] {
+  position: relative;
+}
+
+.root[data-variant="hero"] .toolbar {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  max-width: calc(100% - 20px);
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.root[data-variant="hero"] .control {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+@media (pointer: coarse) {
+  .root[data-variant="hero"] .control {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/*
+  900-959px: the stage is 379-430px wide and the tray (392px at rest) wrapped to two rows over ~30% of
+  it. Tighter padding and gaps keep it one row; the type, the labels and every hit area above 34px stay.
+*/
+@media (min-width: 900px) and (max-width: 959.98px) {
+  .root[data-variant="hero"] .toolbar {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .root[data-variant="hero"] .control {
+    padding: 0 6px;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .root[data-variant="hero"] :is(.toolbar, .statusBox) {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .control,
+  .input,
+  .explore {
+    border: 1px solid ButtonText;
+  }
+
+  .control[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}

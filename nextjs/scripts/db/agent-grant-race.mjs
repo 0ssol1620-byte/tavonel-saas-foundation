@@ -1,0 +1,516 @@
+/**
+ * Concurrency races of the agent-proposal store (migrations 20261117130000, 20261117130200 and
+ * 20261117130300, workorders/agent-native.md §8 I-8, I-12, I-13; lead decision G3(b) of WO-AN-3; WO-AN-7;
+ * WO-AN-7B) against a real PostgreSQL 17, through real psql sessions as service_role.
+ *
+ *   LOCAL_RACE_TEST=1 node scripts/db/local-cluster.mjs up --port 55439
+ *   LOCAL_RACE_TEST=1 [RACE_SEED=n] [RACE_ITERATIONS=200] [RACE_PORT=55439] [RACE_RECEIPT_DIR=<dir>] \
+ *     [PSQL_BIN=<psql>] node scripts/db/agent-grant-race.mjs
+ *
+ * Every iteration runs nine scenarios in a seeded order, each on two sessions plus an observer:
+ *   I12A  revoke holds the grant in an open transaction, a create on that grant blocks on `for share`,
+ *         the revoke commits: the create raises proposal_agent_grant_revoked; no open row of the grant.
+ *   I12B  a create commits first (sequential), or holds the grant in an open transaction while a revoke
+ *         blocks on it (overlapping): the revoke withdraws the created row.
+ *   I8    two concurrent decides of one proposal (a session row or an agent row): exactly one
+ *         `confirmed`, the other proposal_not_decidable.
+ *   I13   two concurrent creates of one person at open limit - 1 (the limit is the caller's parameter,
+ *         set from the observed open count): exactly one admitted, the other proposal_open_limit.
+ *   LEAF  two sessions record a different correction of one base (record_foundation_review_patch_if_leaf):
+ *         the first holds its transaction open while the second blocks on the base's advisory lock
+ *         (overlapping), or both fire together (concurrent): exactly one recorded, the other
+ *         review_base_not_head; the base carries exactly one correction.
+ *   KILLA a grant creation holds its transaction open; a revoke-all (in its own transaction, committed
+ *         last) blocks on the kill-switch advisory lock; the creation commits, then the revoke-all: the
+ *         grant and its credential are revoked.
+ *   KILLB a revoke-all holds its transaction open; a grant creation blocks on the same lock; the revoke-all
+ *         commits, then the creation: a grant whose creation committed after the kill switch is a new,
+ *         live grant. A creation that answered before the revoke-all committed (what happens without the
+ *         lock) committed first and must be revoked.
+ *   BOUNDA a grant creation holds its transaction open; a revoke-all (autocommit) waits on the kill-switch lock:
+ *         it must answer agent_grant_lock_timeout within BOUND_MS and change nothing (no grant, key, proposal or
+ *         audit row); after the creation commits, the same revoke-all succeeds and revokes the held grant.
+ *   BOUNDB a revoke-all holds its transaction open; a grant creation (autocommit) waits on the same lock: it must
+ *         answer agent_grant_lock_timeout within BOUND_MS and create nothing; after the revoke-all commits, the
+ *         same creation succeeds and its grant is live.
+ *         Without lock_timeout (20261117130200, whose function-level statement_timeout never re-arms for the
+ *         calling statement) the waiter is still waiting at BOUND_MS: the harness then releases the holder, the
+ *         waiter goes on to succeed, and both "past the bound" and "changed the store" are reported.
+ *   The kill switch revokes every grant in the database, so the standing grant I8 and I13 use is made
+ *   again after each KILL scenario, and the live grant KILLB leaves is revoked by the observer.
+ * "Blocked" is observed, not assumed: the observer polls pg_stat_activity for a Lock wait of the
+ * waiting session before releasing the holder. A schedule whose waiter never blocked is still checked by
+ * the order-independent invariant (no open row of a revoked grant), which is what a create that reads
+ * the grant without `for share` violates.
+ *
+ * The seed fixes the schedule, not the OS interleaving. On the first violated invariant the run stops and
+ * prints the seed; it never edits SQL. Not covered: PostgREST transport, the TypeScript executor (I-8's
+ * "executor once" is the decision path's unit test), multi-instance rate windows.
+ */
+import { spawn } from "node:child_process";
+import { createHash, randomInt } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dsnFor } from "./local-cluster.mjs";
+import { mulberry32, validateEnvironment } from "./job-lease-race.mjs";
+
+export { mulberry32, validateEnvironment };
+
+const REPO_ROOT = resolve(import.meta.dirname, "..", "..", "..");
+export const SCENARIOS = ["I12A", "I12B", "I8", "I13", "LEAF", "KILLA", "KILLB", "BOUNDA", "BOUNDB"];
+/** The lock_timeout both kill-switch functions set (20261117130300); a unit test pins it to the migration text. */
+export const LOCK_TIMEOUT_MS = 2000;
+/** How long a waiter may take to answer: the lock timeout plus room for psql and the scheduler. */
+export const BOUND_MS = LOCK_TIMEOUT_MS + 1500;
+export const INVARIANTS = {
+  I8: "two concurrent decides of one proposal: exactly one confirmed, the other proposal_not_decidable; the row ends confirmed",
+  I12: "no proposal of a revoked grant is ever left open; a create that waited on the revoke is refused proposal_agent_grant_revoked; a create committed first is withdrawn by the revoke",
+  I13: "two concurrent creates at open limit - 1: exactly one admitted, the other proposal_open_limit; the open count rises by one",
+  LEAF: "two corrections of one base: exactly one recorded, the other review_base_not_head; the base carries exactly one correction",
+  KILL: "every grant whose creation committed before revoke-all's commit is revoked with its credential; a grant whose creation committed after it is live",
+  BOUND: "a creation or revoke-all waiting on the kill-switch lock answers agent_grant_lock_timeout within BOUND_MS and changes nothing; the same call succeeds once the holder commits",
+  ERR: "every refusal is exactly one known error token",
+};
+export const KNOWN_REFUSALS = new Set(["proposal_agent_grant_revoked", "proposal_not_decidable", "proposal_open_limit", "review_base_not_head", "agent_grant_lock_timeout"]);
+
+/** One psql result as {ok, value, error}: `value` is the JSON the RPC returned, `error` the error token or raw text. */
+export function parseOutcome({ out, err }) {
+  const m = /ERROR:\s+(.*)/.exec(err ?? "");
+  if (m) return { ok: false, value: null, error: m[1].trim() };
+  const line = (out ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop();
+  if (!line) return { ok: false, value: null, error: `no output: ${(err ?? "").trim()}` };
+  try {
+    return { ok: true, value: JSON.parse(line), error: null };
+  } catch {
+    return { ok: false, value: null, error: `unparsable output: ${line}` };
+  }
+}
+
+/** The seeded schedule of one iteration: scenario order, release delays, which I8 row kind, which I12B shape. */
+export function planIteration(rng) {
+  const order = [...SCENARIOS];
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return {
+    order,
+    releaseDelayMs: Math.floor(rng() * 15),
+    i8Agent: rng() < 0.5,
+    i12bOverlapping: rng() < 0.5,
+    staggerMs: Math.floor(rng() * 3),
+    leafOverlapping: rng() < 0.5,
+  };
+}
+
+const refusalViolations = (outcomes) => outcomes
+  .filter((o) => !o.ok && !KNOWN_REFUSALS.has(o.error))
+  .map((o) => ({ invariant: "ERR", detail: `refusal is not a known token: ${o.error}` }));
+
+/** obs = {create, blocked, openRowsOfGrant, grantRevoked} */
+export function checkI12A(obs) {
+  const v = refusalViolations([obs.create]);
+  if (obs.openRowsOfGrant !== 0) v.push({ invariant: "I12", detail: `order A left ${obs.openRowsOfGrant} open row(s) of a revoked grant` });
+  if (!obs.grantRevoked) v.push({ invariant: "I12", detail: "order A: the grant is not revoked after the revoke committed" });
+  if (obs.blocked && (obs.create.ok || obs.create.error !== "proposal_agent_grant_revoked")) {
+    v.push({ invariant: "I12", detail: `order A: a create that waited on the revoke answered ${obs.create.ok ? "ok" : obs.create.error}` });
+  }
+  return v;
+}
+
+/** obs = {create, revoke, rowState, openRowsOfGrant} */
+export function checkI12B(obs) {
+  const v = refusalViolations([obs.create, obs.revoke]);
+  if (!obs.create.ok) v.push({ invariant: "I12", detail: `order B: the create that came first was refused ${obs.create.error}` });
+  if (!obs.revoke.ok) v.push({ invariant: "I12", detail: `order B: the revoke failed ${obs.revoke.error}` });
+  else if (!(obs.revoke.value?.proposalsWithdrawn >= 1)) v.push({ invariant: "I12", detail: `order B: the revoke withdrew ${obs.revoke.value?.proposalsWithdrawn}` });
+  if (obs.rowState !== "withdrawn") v.push({ invariant: "I12", detail: `order B: the created row is ${obs.rowState}, not withdrawn` });
+  if (obs.openRowsOfGrant !== 0) v.push({ invariant: "I12", detail: `order B left ${obs.openRowsOfGrant} open row(s) of a revoked grant` });
+  return v;
+}
+
+/** obs = {decides: [outcome, outcome], finalState} */
+export function checkI8(obs) {
+  const v = refusalViolations(obs.decides);
+  const confirmed = obs.decides.filter((o) => o.ok && o.value?.state === "confirmed").length;
+  const refused = obs.decides.filter((o) => !o.ok && o.error === "proposal_not_decidable").length;
+  if (confirmed !== 1 || refused !== 1) v.push({ invariant: "I8", detail: `two decides gave ${confirmed} confirmed and ${refused} not-decidable` });
+  if (obs.finalState !== "confirmed") v.push({ invariant: "I8", detail: `the row ends ${obs.finalState}` });
+  return v;
+}
+
+/** obs = {creates: [outcome, outcome], openBefore, openAfter, limit} */
+export function checkI13(obs) {
+  const v = refusalViolations(obs.creates);
+  const admitted = obs.creates.filter((o) => o.ok && o.value?.replayed === false).length;
+  const capped = obs.creates.filter((o) => !o.ok && o.error === "proposal_open_limit").length;
+  if (admitted !== 1 || capped !== 1) v.push({ invariant: "I13", detail: `two creates at limit - 1 gave ${admitted} admitted and ${capped} capped` });
+  if (obs.openAfter !== obs.openBefore + 1 || obs.openAfter !== obs.limit) {
+    v.push({ invariant: "I13", detail: `open count ${obs.openBefore} -> ${obs.openAfter} with limit ${obs.limit}` });
+  }
+  return v;
+}
+
+/** obs = {records: [outcome, outcome], correctionsOfBase} */
+export function checkLeaf(obs) {
+  const v = refusalViolations(obs.records);
+  const recorded = obs.records.filter((o) => o.ok && o.value?.replayed === false).length;
+  const refused = obs.records.filter((o) => !o.ok && o.error === "review_base_not_head").length;
+  if (recorded !== 1 || refused !== 1) v.push({ invariant: "LEAF", detail: `two corrections of one base gave ${recorded} recorded and ${refused} base-not-head` });
+  if (obs.correctionsOfBase !== 1) v.push({ invariant: "LEAF", detail: `the base carries ${obs.correctionsOfBase} correction(s)` });
+  return v;
+}
+
+/**
+ * obs = {create, revoke, createCommittedFirst, grantRevoked, keyRevoked}. `createCommittedFirst` is the harness's
+ * own ordering: the creation had committed before the revoke-all's commit was sent.
+ */
+export function checkKill(obs) {
+  const v = refusalViolations([obs.create, obs.revoke]);
+  if (!obs.create.ok) v.push({ invariant: "KILL", detail: `the grant creation was refused ${obs.create.error}` });
+  if (!obs.revoke.ok) v.push({ invariant: "KILL", detail: `the revoke-all failed ${obs.revoke.error}` });
+  if (!obs.create.ok || !obs.revoke.ok) return v;
+  if (obs.createCommittedFirst && !(obs.grantRevoked && obs.keyRevoked)) {
+    v.push({ invariant: "KILL", detail: `a grant committed before revoke-all's commit survived (grant revoked ${obs.grantRevoked}, key revoked ${obs.keyRevoked})` });
+  }
+  if (!obs.createCommittedFirst && (obs.grantRevoked || obs.keyRevoked)) {
+    v.push({ invariant: "KILL", detail: "a grant whose creation committed after revoke-all's commit is not live" });
+  }
+  return v;
+}
+
+/**
+ * obs = {waiter, elapsedMs, unchanged, retry, retryTookEffect}. `waiter` is the call that queued behind the held
+ * lock, `unchanged` whether the store is as it was before it (read after it answered, before the holder
+ * committed), `retry` the same call after the holder committed, `retryTookEffect` whether it did what it is for.
+ */
+export function checkBound(obs) {
+  const v = refusalViolations([obs.waiter, obs.retry]);
+  if (!(obs.elapsedMs <= BOUND_MS)) v.push({ invariant: "BOUND", detail: `the waiter answered after ${obs.elapsedMs} ms, past the ${BOUND_MS} ms bound` });
+  if (obs.waiter.ok || obs.waiter.error !== "agent_grant_lock_timeout") {
+    v.push({ invariant: "BOUND", detail: `the waiter answered ${obs.waiter.ok ? "ok" : obs.waiter.error}, not agent_grant_lock_timeout` });
+  }
+  if (!obs.unchanged) v.push({ invariant: "BOUND", detail: "the waiter changed the store (a half state, or it went on after the bound)" });
+  if (!obs.retry.ok) v.push({ invariant: "BOUND", detail: `the retry after the holder committed was refused ${obs.retry.error}` });
+  else if (!obs.retryTookEffect) v.push({ invariant: "BOUND", detail: "the retry answered ok but did not take effect" });
+  return v;
+}
+
+/** One persistent psql session; statements run one at a time, errors come back as text. */
+class Session {
+  constructor(psql, host, port, id) {
+    this.id = id; this.dead = null; this.n = 0; this.out = ""; this.err = ""; this.waiter = null; this.tail = Promise.resolve();
+    this.child = spawn(psql, ["-X", "-qAt", "-h", host, "-p", String(port), "-U", "postgres", "-d", "postgres", "-v", "VERBOSITY=terse"],
+      { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: { ...process.env, PGCONNECT_TIMEOUT: "5", PGOPTIONS: "-c lc_messages=C" } });
+    this.child.stdout.on("data", (c) => { this.out += c; this.settle(); });
+    this.child.stderr.on("data", (c) => { this.err += c; this.settle(); });
+    this.child.on("error", (e) => { this.dead = e; this.waiter?.reject(e); });
+    this.child.on("exit", (code) => { this.dead ??= new Error(`psql session ${id} exited ${code}: ${this.err.trim()}`); this.waiter?.reject(this.dead); });
+  }
+  settle() {
+    const w = this.waiter;
+    if (!w) return;
+    const cut = (buf) => { const i = buf.indexOf(w.tag); const e = i < 0 ? -1 : buf.indexOf("\n", i); return e < 0 ? null : [buf.slice(0, i).trim(), buf.slice(e + 1)]; };
+    const o = cut(this.out), e = cut(this.err);
+    if (!o || !e) return;
+    this.out = o[1]; this.err = e[1]; this.waiter = null;
+    w.resolve({ out: o[0], err: e[0] });
+  }
+  run(sql) {
+    const next = this.tail.then(() => new Promise((resolveRun, reject) => {
+      if (this.dead) return reject(this.dead);
+      const tag = `@@A${this.id}-${++this.n}@@`;
+      this.waiter = { tag, resolve: resolveRun, reject };
+      this.child.stdin.write(`${sql}\n\\echo ${tag}\n\\warn ${tag}\n`);
+    }));
+    this.tail = next.catch(() => {});
+    return next;
+  }
+  close() { this.child.stdin.end(); }
+}
+
+const q = (v) => (v == null ? "null" : `'${String(v).replaceAll("'", "''")}'`);
+const hex = (rng, n) => Array.from({ length: n }, () => Math.floor(rng() * 16).toString(16)).join("");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const failOn = (what, r) => { if (/^(ERROR|FATAL)/m.test(r.err)) throw new Error(`${what}: ${r.err.trim()}`); return r.out.trim(); };
+
+function grantCall(ctx, ids, prefix = `r${hex(ids, 11)}`) {
+  return `public.create_foundation_agent_grant(${q(ctx.ws)}, ${q(ctx.user)}::uuid, 1, 'Race agent', null, ${q(prefix)},
+    ${q(hex(ids, 64))}, array['agent:read','agent:propose'], now() + interval '1 day')`;
+}
+const grantSql = (ctx, ids) => `select ${grantCall(ctx, ids)}->>'grantId';`;
+const revokeAllSql = "select public.revoke_all_foundation_agent_grants();";
+const grantStateSql = (grantId) => `select (g.revoked_at is not null)::text || '|' || coalesce(bool_and(k.revoked_at is not null)::text, 'nokey')
+  from public.foundation_agent_grants g left join public.foundation_api_keys k on k.agent_grant_id = g.grant_id
+  where g.grant_id = ${q(grantId)}::uuid group by g.revoked_at;`;
+function agentCreateSql(ctx, grantId, key, limit) {
+  return `select public.create_world_change_proposal(${q(ctx.ws)}, 'collection-' || repeat('a', 32), 'library_label', '{"labelKey":"race"}',
+    'sha256:' || repeat('1', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'agent', ${q(ctx.user)}::uuid, ${q(key)}, now() + interval '7 days',
+    'active_manifest', ${q(grantId)}::uuid, ${limit}, 1);`;
+}
+function sessionCreateSql(ctx, key) {
+  return `select public.create_world_change_proposal(${q(ctx.ws)}, 'collection-' || repeat('a', 32), 'library_label', '{"labelKey":"race"}',
+    'sha256:' || repeat('1', 64), '{}', 'sha256:' || repeat('d', 64), 1, 'session', ${q(ctx.user)}::uuid, ${q(key)}, now() + interval '7 days');`;
+}
+const revokeSql = (ctx, grantId) => `select public.revoke_foundation_agent_grant(${q(ctx.ws)}, ${q(grantId)}::uuid, ${q(ctx.user)}::uuid);`;
+const decideSql = (ctx, id) => `select public.decide_world_change_proposal(${q(ctx.ws)}, ${q(id)}::uuid, 'confirm', ${q(ctx.user)}::uuid, 'sha256:' || repeat('d', 64));`;
+const openRowsSql = (grantId) => `select count(*) from public.world_change_proposals where agent_grant_id = ${q(grantId)}::uuid and state = 'proposed';`;
+function leafSql(ctx, collection, base, result, after) {
+  return `select public.record_foundation_review_patch_if_leaf(${q(ctx.ws)}, ${q(collection)}, ${q(base)}, 'ev-race', 'src1', repeat('a', 64), 1,
+    array[0, 0, 10, 10], 'Race correction of one base.', ${q(ctx.user)}::uuid, 'obj-race', 'before label', ${q(after)}, ${q(result)});`;
+}
+const openOfPersonSql = (ctx) => `select count(*) from public.world_change_proposals where workspace_key = ${q(ctx.ws)} and principal_id = ${q(ctx.user)}::uuid
+  and principal_kind = 'agent' and state = 'proposed' and expires_at > clock_timestamp();`;
+
+const settledNow = (p) => Promise.race([p.then(() => true, () => true), sleep(0).then(() => false)]);
+
+/** Polls until `pid` waits on a lock (of `event` when given, e.g. 'advisory'); false after `timeoutMs`. */
+async function waitBlocked(obs, pid, timeoutMs = 2000, event = null) {
+  const end = performance.now() + timeoutMs;
+  while (performance.now() < end) {
+    const r = await obs.run(`select coalesce(wait_event_type, '') || '/' || coalesce(wait_event, '') from pg_stat_activity where pid = ${pid};`);
+    const [type, name] = r.out.trim().split("/");
+    if (type === "Lock" && (event === null || name === event)) return true;
+    await sleep(2);
+  }
+  return false;
+}
+
+async function killScenario(kind, plan, s, ctx, ids) {
+  const [a, b, obs] = s;
+  let create, revoke, blocked, createCommittedFirst;
+  if (kind === "KILLA") {
+    create = parseOutcome(await a.run(`begin; select ${grantCall(ctx, ids)};`));
+    const pending = b.run(`begin; ${revokeAllSql}`);
+    blocked = await waitBlocked(obs, b.pid, 2000, "advisory");
+    await sleep(plan.releaseDelayMs);
+    failOn("create commit", await a.run(create.ok ? "commit;" : "rollback;"));
+    createCommittedFirst = create.ok;
+    revoke = parseOutcome(await pending);
+    failOn("revoke-all commit", await b.run(revoke.ok ? "commit;" : "rollback;"));
+  } else {
+    revoke = parseOutcome(await b.run(`begin; ${revokeAllSql}`));
+    const pending = a.run(`select ${grantCall(ctx, ids)};`);
+    blocked = await waitBlocked(obs, a.pid, 2000, "advisory");
+    await sleep(plan.releaseDelayMs);
+    // Without the lock the creation (autocommit) has answered by now, so it committed before the revoke-all.
+    createCommittedFirst = await settledNow(pending);
+    failOn("revoke-all commit", await b.run(revoke.ok ? "commit;" : "rollback;"));
+    create = parseOutcome(await pending);
+  }
+  let grantRevoked = false, keyRevoked = false;
+  if (create.ok) {
+    const grantId = create.value.grantId;
+    [grantRevoked, keyRevoked] = failOn("grant state", await obs.run(grantStateSql(grantId))).split("|").map((x) => x === "true");
+    if (!grantRevoked) failOn("cleanup revoke", await obs.run(revokeSql(ctx, grantId)));
+  }
+  ctx.grant = failOn("standing grant", await obs.run(grantSql(ctx, ids)));
+  return { blocked, violations: checkKill({ create, revoke, createCommittedFirst, grantRevoked, keyRevoked }) };
+}
+
+/** Everything the kill switch and grant creation write, as one comparable string (the observer's snapshot). */
+const storeStateSql = `select (select count(*) from public.foundation_agent_grants) || '|'
+  || (select count(*) from public.foundation_agent_grants where revoked_at is null) || '|'
+  || (select count(*) from public.foundation_api_keys where token_kind = 'agent' and revoked_at is null) || '|'
+  || (select count(*) from public.world_change_proposals where principal_kind = 'agent' and state = 'proposed') || '|'
+  || (select count(*) from public.foundation_developer_audit_events where action in ('api_key_created', 'api_key_revoked'));`;
+
+async function boundScenario(kind, s, ctx, ids) {
+  const [a, b, obs] = s;
+  // An open proposal of the standing grant, so a revoke-all that ran would have a proposal to withdraw too.
+  const seeded = parseOutcome(await obs.run(agentCreateSql(ctx, ctx.grant, `agt_race_t_${hex(ids, 12)}`, 10000)));
+  if (!seeded.ok) throw new Error(`${kind} setup create: ${seeded.error}`);
+  const before = failOn("state before", await obs.run(storeStateSql));
+  const createSql = `select ${grantCall(ctx, ids)};`;
+  const [holder, waiterSession, holdSql, waitSql] = kind === "BOUNDA"
+    ? [a, b, `begin; ${createSql}`, revokeAllSql]
+    : [b, a, `begin; ${revokeAllSql}`, createSql];
+  const held = parseOutcome(await holder.run(holdSql));
+  if (!held.ok) throw new Error(`${kind} holder: ${held.error}`);
+  const started = performance.now();
+  const pending = waiterSession.run(waitSql);
+  const blocked = await waitBlocked(obs, waiterSession.pid, BOUND_MS, "advisory");
+  let answer = await Promise.race([pending, sleep(Math.max(0, BOUND_MS - (performance.now() - started))).then(() => null)]);
+  let elapsedMs = Math.round(performance.now() - started);
+  let unchanged = false;
+  if (answer === null) {
+    // Still waiting at the bound (no lock_timeout): release the holder so the run can go on; the waiter proceeds.
+    elapsedMs = Infinity;
+    failOn(`${kind} holder commit`, await holder.run("commit;"));
+    answer = await pending;
+  } else {
+    unchanged = failOn("state after", await obs.run(storeStateSql)) === before;
+    failOn(`${kind} holder commit`, await holder.run("commit;"));
+  }
+  const waiter = parseOutcome(answer);
+  // The same call again, now that the holder committed.
+  const retry = parseOutcome(await waiterSession.run(waitSql));
+  let retryTookEffect = false;
+  const leftLive = [];
+  if (kind === "BOUNDA") {
+    retryTookEffect = retry.ok && failOn("held grant", await obs.run(grantStateSql(held.value.grantId))) === "true|true";
+  } else {
+    if (retry.ok) retryTookEffect = failOn("retried grant", await obs.run(grantStateSql(retry.value.grantId))) === "false|false";
+    for (const o of [waiter, retry]) if (o.ok) leftLive.push(o.value.grantId);
+  }
+  for (const g of leftLive) {
+    const live = failOn("live?", await obs.run(`select revoked_at is null from public.foundation_agent_grants where grant_id = ${q(g)}::uuid;`)) === "t";
+    if (live) failOn("cleanup revoke", await obs.run(revokeSql(ctx, g)));
+  }
+  // Each kill switch above revoked the standing grant.
+  ctx.grant = failOn("standing grant", await obs.run(grantSql(ctx, ids)));
+  return { blocked, violations: checkBound({ waiter, elapsedMs, unchanged, retry, retryTookEffect }) };
+}
+
+async function scenario(kind, plan, s, ctx, ids) {
+  const [a, b, obs] = s;
+  if (kind === "KILLA" || kind === "KILLB") return killScenario(kind, plan, s, ctx, ids);
+  if (kind === "BOUNDA" || kind === "BOUNDB") return boundScenario(kind, s, ctx, ids);
+  if (kind === "I12A") {
+    const grantId = failOn("grant", await obs.run(grantSql(ctx, ids)));
+    failOn("revoke (open)", await a.run(`begin; ${revokeSql(ctx, grantId)}`));
+    const pending = b.run(agentCreateSql(ctx, grantId, `agt_race_a_${hex(ids, 12)}`, 10000));
+    const blocked = await waitBlocked(obs, b.pid);
+    await sleep(plan.releaseDelayMs);
+    failOn("revoke commit", await a.run("commit;"));
+    const create = parseOutcome(await pending);
+    const openRowsOfGrant = Number(failOn("open rows", await obs.run(openRowsSql(grantId))));
+    const grantRevoked = failOn("grant state", await obs.run(`select revoked_at is not null from public.foundation_agent_grants where grant_id = ${q(grantId)}::uuid;`)) === "t";
+    return { blocked, violations: checkI12A({ create, blocked, openRowsOfGrant, grantRevoked }) };
+  }
+  if (kind === "I12B") {
+    const grantId = failOn("grant", await obs.run(grantSql(ctx, ids)));
+    const key = `agt_race_b_${hex(ids, 12)}`;
+    let create, revoke, blocked = false;
+    if (plan.i12bOverlapping) {
+      create = parseOutcome(await a.run(`begin; ${agentCreateSql(ctx, grantId, key, 10000)}`));
+      const pending = b.run(revokeSql(ctx, grantId));
+      blocked = await waitBlocked(obs, b.pid);
+      await sleep(plan.releaseDelayMs);
+      failOn("create commit", await a.run(create.ok ? "commit;" : "rollback;"));
+      revoke = parseOutcome(await pending);
+    } else {
+      create = parseOutcome(await a.run(agentCreateSql(ctx, grantId, key, 10000)));
+      revoke = parseOutcome(await b.run(revokeSql(ctx, grantId)));
+    }
+    const rowState = failOn("row state", await obs.run(`select coalesce((select state from public.world_change_proposals where workspace_key = ${q(ctx.ws)} and idempotency_key = ${q(key)}), 'absent');`));
+    const openRowsOfGrant = Number(failOn("open rows", await obs.run(openRowsSql(grantId))));
+    return { blocked, violations: checkI12B({ create, revoke, rowState, openRowsOfGrant }) };
+  }
+  if (kind === "I8") {
+    const key = `race-i8-${hex(ids, 12)}`;
+    const created = parseOutcome(await obs.run(plan.i8Agent ? agentCreateSql(ctx, ctx.grant, `agt_${key}`, 10000) : sessionCreateSql(ctx, key)));
+    if (!created.ok) throw new Error(`I8 setup create: ${created.error}`);
+    const id = created.value.proposal.proposal_id;
+    const first = a.run(decideSql(ctx, id));
+    await sleep(plan.staggerMs);
+    const decides = (await Promise.all([first, b.run(decideSql(ctx, id))])).map(parseOutcome);
+    const finalState = failOn("final", await obs.run(`select state from public.world_change_proposals where proposal_id = ${q(id)}::uuid;`));
+    return { blocked: false, violations: checkI8({ decides, finalState }) };
+  }
+  if (kind === "LEAF") {
+    const collection = `collection-${hex(ids, 32)}`;
+    const base = `sha256:${hex(ids, 64)}`;
+    const [one, two] = [`sha256:${hex(ids, 64)}`, `sha256:${hex(ids, 64)}`];
+    let records, blocked = false;
+    if (plan.leafOverlapping) {
+      const first = parseOutcome(await a.run(`begin; ${leafSql(ctx, collection, base, one, "after one")}`));
+      const pending = b.run(leafSql(ctx, collection, base, two, "after two"));
+      blocked = await waitBlocked(obs, b.pid);
+      await sleep(plan.releaseDelayMs);
+      failOn("record commit", await a.run(first.ok ? "commit;" : "rollback;"));
+      records = [first, parseOutcome(await pending)];
+    } else {
+      const first = a.run(leafSql(ctx, collection, base, one, "after one"));
+      await sleep(plan.staggerMs);
+      records = (await Promise.all([first, b.run(leafSql(ctx, collection, base, two, "after two"))])).map(parseOutcome);
+    }
+    const correctionsOfBase = Number(failOn("corrections", await obs.run(`select count(*) from public.foundation_review_decisions
+      where workspace_key = ${q(ctx.ws)} and collection_id = ${q(collection)} and manifest_digest = ${q(base)} and resulting_manifest_digest is not null;`)));
+    return { blocked, violations: checkLeaf({ records, correctionsOfBase }) };
+  }
+  // I13
+  const openBefore = Number(failOn("open before", await obs.run(openOfPersonSql(ctx))));
+  const limit = openBefore + 1;
+  const first = a.run(agentCreateSql(ctx, ctx.grant, `agt_race_c_${hex(ids, 12)}`, limit));
+  await sleep(plan.staggerMs);
+  const creates = (await Promise.all([first, b.run(agentCreateSql(ctx, ctx.grant, `agt_race_d_${hex(ids, 12)}`, limit))])).map(parseOutcome);
+  const openAfter = Number(failOn("open after", await obs.run(openOfPersonSql(ctx))));
+  return { blocked: false, violations: checkI13({ creates, openBefore, openAfter, limit }) };
+}
+
+export async function main(env = process.env) {
+  const port = Number(env.RACE_PORT ?? 55439);
+  const { host } = validateEnvironment(env, dsnFor(port));
+  const seed = Number(env.RACE_SEED ?? Math.floor(Math.random() * 2 ** 31));
+  const iterations = Number(env.RACE_ITERATIONS ?? 200);
+  if (!Number.isSafeInteger(iterations) || iterations < 1 || iterations > 9000) throw new Error("RACE_ITERATIONS must be 1..9000 (the open cap parameter tops out at 10000)");
+  const receiptDir = resolve(env.RACE_RECEIPT_DIR ?? join(tmpdir(), "tavonel-race-receipts"));
+  const fold = (p) => (process.platform === "win32" ? p.toLowerCase() : p);
+  if (fold(receiptDir) === fold(REPO_ROOT) || fold(receiptDir).startsWith(fold(REPO_ROOT) + sep)) throw new Error(`refused: receipt directory ${receiptDir} is inside the repository`);
+  const psql = env.PSQL_BIN || (process.platform === "win32" ? "C:/Program Files/PostgreSQL/17/bin/psql.exe" : "psql");
+  process.stdout.write(`seed ${seed} iterations ${iterations} (RACE_SEED=${seed} reproduces the schedule, not the interleaving)\n`);
+
+  const sessions = [0, 1, 2].map((i) => new Session(psql, host, port, i));
+  const rng = mulberry32(seed);
+  // Identifiers (person, key prefixes, idempotency keys) come from their own stream, so re-running a seed on the
+  // same cluster schedules the same races without colliding with the rows the earlier run committed.
+  const ids = mulberry32(randomInt(2 ** 31));
+  const log = [];
+  const counts = Object.fromEntries(SCENARIOS.map((k) => [k, { runs: 0, blocked: 0 }]));
+  let failure = null, done = 0;
+  try {
+    // The two racing sessions call the RPCs as service_role, as the application does. The observer stays the
+    // superuser: it seeds, reads tables service_role has no grant on, and watches pg_stat_activity.
+    for (const s of sessions) {
+      const r = await s.run(`${s.id < 2 ? "set role service_role; " : ""}select pg_backend_pid();`);
+      s.pid = Number(failOn("session", r).split(/\r?\n/).pop());
+    }
+    const obs = sessions[2];
+    const version = failOn("version", await obs.run("show server_version;"));
+    if (!/^17\./.test(version)) throw new Error(`expected PostgreSQL 17, got ${version}`);
+    // One person per run, made through the signup trigger (personal workspace, active owner, revision 1).
+    const user = `a6e0${hex(ids, 4)}-${hex(ids, 4)}-4${hex(ids, 3)}-8${hex(ids, 3)}-${hex(ids, 12)}`;
+    failOn("seed user", await obs.run(`insert into auth.users (id) values (${q(user)}) on conflict do nothing;`));
+    const ws = `pilot-${user.replaceAll("-", "").slice(0, 16)}`;
+    // foundation_review_decisions.workspace_key references the billing account (LEAF needs one).
+    failOn("seed billing account", await obs.run(`insert into public.foundation_billing_accounts (workspace_key, user_id) values (${q(ws)}, ${q(user)}::uuid) on conflict do nothing;`));
+    const ctx = { user, ws, grant: null };
+    ctx.grant = failOn("standing grant", await obs.run(grantSql(ctx, ids)));
+    for (let n = 0; n < iterations; n += 1) {
+      const plan = planIteration(rng);
+      const entry = { n, order: plan.order, results: {} };
+      for (const kind of plan.order) {
+        const r = await scenario(kind, plan, sessions, ctx, ids);
+        counts[kind].runs += 1; if (r.blocked) counts[kind].blocked += 1;
+        entry.results[kind] = { blocked: r.blocked, violations: r.violations };
+        if (r.violations.length) { failure = { iteration: n, scenario: kind, violations: r.violations }; break; }
+      }
+      log.push(JSON.stringify(entry));
+      done += 1;
+      if (failure) break;
+    }
+    const receipt = {
+      schema: "tavonel.agent_grant_race_receipt.v1", status: failure ? "FAIL" : "PASS", seed, iterationsRequested: iterations, iterationsCompleted: done,
+      postgresVersion: version, invariants: INVARIANTS, scenarios: counts, failure,
+      notCovered: ["PostgREST transport", "TypeScript executor (I-8 'executor once' is a unit test of the decision path)", "multi-instance rate windows", "pgvector (shimmed)"],
+    };
+    mkdirSync(receiptDir, { recursive: true });
+    const logText = log.join("\n") + "\n";
+    receipt.logSha256 = createHash("sha256").update(logText).digest("hex");
+    const stem = join(receiptDir, `agent-grant-race-seed${seed}`);
+    writeFileSync(`${stem}.log`, logText);
+    writeFileSync(`${stem}.json`, JSON.stringify(receipt, null, 2));
+    process.stdout.write(`${receipt.status} ${done}/${iterations} iterations; blocked I12A ${counts.I12A.blocked}/${counts.I12A.runs}, I12B ${counts.I12B.blocked}/${counts.I12B.runs}, LEAF ${counts.LEAF.blocked}/${counts.LEAF.runs}, KILLA ${counts.KILLA.blocked}/${counts.KILLA.runs}, KILLB ${counts.KILLB.blocked}/${counts.KILLB.runs}, BOUNDA ${counts.BOUNDA.blocked}/${counts.BOUNDA.runs}, BOUNDB ${counts.BOUNDB.blocked}/${counts.BOUNDB.runs}; receipt ${stem}.json\n`);
+    if (failure) process.stdout.write(`FAILED at iteration ${failure.iteration} seed ${seed}: ${JSON.stringify(failure)}\n`);
+    return failure ? 1 : 0;
+  } finally {
+    for (const s of sessions) s.close();
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().then((code) => process.exit(code), (error) => { process.stderr.write(`${error.message}\n`); process.exit(2); });
+}

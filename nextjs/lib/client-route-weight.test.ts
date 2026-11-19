@@ -95,6 +95,30 @@ describe("the sign-in routes stay light", () => {
     }
   });
 
+  /*
+    V34 (D33 §4 #19). The World instrument and the walkthrough are the two heavy client islands of the
+    marketing site: a WebGL and Canvas renderer with the corpus geometry, and the stepped app frame. They
+    belong to the home page and /world. A sign-in page is a conversion page, and neither island, nor the
+    corpus module they read, may be reachable from it.
+  */
+  const V34_ISLANDS = ["components/v34/world/", "components/v34/walkthrough/", "lib/v34/public-corpus.ts", "lib/v34/world-geometry.ts"];
+
+  it("sees the V34 islands where they are imported, so the check below is not vacuous", () => {
+    const graph = [...importGraph("components/v34/world/world-instrument.tsx")];
+    expect(graph).toContain("components/v34/world/world-island.tsx");
+    expect(graph).toContain("lib/v34/public-corpus.ts");
+  });
+
+  it.each(ENTRY_POINTS)("%s reaches neither the World instrument nor the walkthrough", (entry) => {
+    const graph = [...importGraph(entry)];
+    for (const island of V34_ISLANDS) {
+      expect(
+        graph.filter((file) => file.startsWith(island)),
+        `${entry} imports ${island}. It is a client route, so the renderer and the corpus would ship to every sign-in.`,
+      ).toEqual([]);
+    }
+  });
+
   it("keeps the closed list in the light module, with one owner", () => {
     const slugs = readFileSync(resolve(root, "lib/cookbook-slugs.ts"), "utf8");
     expect(slugs, "the light module must not grow an import of its own").not.toMatch(/^\s*import\s/m);

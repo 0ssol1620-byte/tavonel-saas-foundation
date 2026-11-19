@@ -1,0 +1,430 @@
+/*
+  /evidence only. Colours come from --v34-* tokens and nothing else. The bands (Hero, Section,
+  FinalCta) set their own surface, so a rule here that paints a background also states its foreground,
+  and the rest read --v34-fg* from the band they sit in. No animation: selecting a region steps a border
+  weight, which reads instantly and survives reduced motion.
+*/
+
+/* ---- hero drawing ----------------------------------------------------------------------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.artPage { fill: var(--v34-paper); }
+.artTitle { fill: var(--v34-ink); }
+.artLine { fill: var(--v34-rule); }
+.artHit { fill: var(--v34-lime); stroke: var(--v34-link); stroke-width: 2; }
+.artRoute { fill: none; stroke: var(--v34-lime); stroke-width: 2; }
+.artDot { fill: var(--v34-lime); }
+.artCard { fill: var(--v34-step-bg); stroke: var(--v34-on-dark-muted); stroke-width: 1; }
+.artCardTitle { fill: var(--v34-on-dark); }
+.artCardLine { fill: var(--v34-step-small); }
+.artChain { fill: none; stroke: var(--v34-on-dark-muted); stroke-width: 2; }
+.artChip { fill: var(--v34-connect); stroke: var(--v34-lime); stroke-width: 2; }
+.artChainBar { fill: var(--v34-rule-dark); }
+
+/* ---- source page and its regions -------------------------------------------------------- */
+
+.tagRow {
+  margin-bottom: 20px;
+}
+
+.frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 28px;
+  min-width: 0;
+  margin: 0;
+}
+
+.pageColumn {
+  min-width: 0;
+}
+
+.page {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  border: 1px solid var(--v34-fg-border);
+  background: var(--v34-white);
+  color: var(--v34-ink);
+  line-height: 0;
+}
+
+.pageImage {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pageAbsent {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 17 / 22;
+  padding: 20px;
+  background: var(--v34-green);
+  color: var(--v34-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* An inert drawing of a measured box: the list beside it is the control. */
+.box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--v34-link);
+  pointer-events: none;
+}
+
+.box[data-selected] {
+  border: 3px solid var(--v34-ink);
+  box-shadow: 0 0 0 3px var(--v34-lime);
+}
+
+.side {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.detail {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+}
+
+.caption {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+}
+
+.mark {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.excerpt {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+.locator {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.sourceLine {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.open,
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.open:hover,
+.textLink:hover {
+  color: var(--v34-fg);
+}
+
+.open:focus-visible,
+.textLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: var(--v34-white);
+  color: var(--v34-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--v34-secondary-hover);
+  color: var(--v34-ink);
+}
+
+.row[aria-pressed="true"] {
+  border-color: var(--v34-ink);
+  background: var(--v34-green);
+  color: var(--v34-ink);
+}
+
+.row:focus-visible {
+  outline: 3px solid var(--v34-focus);
+  outline-offset: 2px;
+}
+
+.rowName {
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rowExcerpt {
+  font-size: var(--v34-small);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.reading {
+  display: grid;
+  gap: 6px;
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.readingLabel {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.readingText {
+  max-width: 68ch;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.contracted,
+.trustCase {
+  display: grid;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+/*
+  The shared TrustNext step is legacy global markup (h3, .fine, .btn.ghost) that reads the dark
+  site's names. Set here to this surface's tokens, or its words are dark-ground text on paper.
+  Its heading is this Section's sub-heading (lead decision 17), so the size the global h3 rule
+  reads (--t-6) is the V34 sub-heading size the steps' titles use.
+*/
+.trustCase {
+  --t-6: var(--v34-h3);
+  --text-hi: var(--v34-fg);
+  --text-mid: var(--v34-fg-muted);
+  --text-lo: var(--v34-fg-muted);
+  --text-max: var(--v34-header-btn-hover);
+  --hairline-hi: var(--v34-fg-border);
+  --ground: var(--v34-surface);
+  --g1: var(--v34-fg-hover);
+  --verified: var(--v34-fg-focus);
+}
+
+.locators {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 40px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contractedLocator {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.5;
+}
+
+.locatorFamily {
+  color: var(--v34-fg);
+  font-weight: 650;
+}
+
+.siblings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- bound things, steps, tables -------------------------------------------------------- */
+
+.kicker {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+}
+
+.mechanism,
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px 28px;
+}
+
+.mechanismItem,
+.step {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.itemText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+.stepsLink,
+.incompleteLink {
+  margin: 20px 0 0;
+}
+
+.tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 44px;
+  min-width: 0;
+}
+
+.sourceLink {
+  position: relative;
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-underline-offset: 3px;
+}
+
+.sourceLink:hover {
+  color: var(--v34-fg);
+}
+
+.sourceLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+
+.cardText {
+  margin: 0;
+}
+
+/* ---- narrow ----------------------------------------------------------------------------- */
+
+@media (min-width: 880px) {
+  .frame {
+    grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+    gap: 48px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .mechanism {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .locators {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mechanism,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
+@media (forced-colors: active) {
+  .box,
+  .box[data-selected] {
+    border-color: Highlight;
+  }
+
+  .row {
+    border-color: ButtonText;
+  }
+
+  .row[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}

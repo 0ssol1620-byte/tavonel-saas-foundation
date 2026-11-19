@@ -14,6 +14,8 @@ import {
   PRODUCT_NOUNS,
   SELF_SERVE_CTA,
 } from "./site-navigation";
+import { routeMetadata } from "./v34/route-metadata";
+import { V34_ROUTES, v34Route } from "./v34/routes";
 
 /**
  * SPEC 13.3 -- phrases the product may not use, enforced.
@@ -35,6 +37,18 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 
+/**
+ * V34 (D33 §4 #13): every source file under components/v34 is public copy, and so is the walkthrough's
+ * deck. Listed by walking the folder, so a new component arrives already checked.
+ */
+function v34CopySurfaces(directory = "components/v34"): string[] {
+  return readdirSync(join(root, directory), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return v34CopySurfaces(path);
+    return /\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
 /** Every file that carries public-facing copy. Add new surfaces here as they are built. */
 const COPY_SURFACES = [
   "app/page.tsx",
@@ -54,6 +68,7 @@ const COPY_SURFACES = [
   "app/auth/callback/page.tsx",
   "components/world-explorer.tsx",
   "app/login/page.tsx",
+  "app/login/login-client.tsx",
   "app/not-found.tsx",
   "app/error.tsx",
   "lib/capabilities.ts",
@@ -92,7 +107,6 @@ const COPY_SURFACES = [
   "lib/guide-content.ts",
   "components/guide/guide-page.tsx",
   "app/guide/page.tsx",
-  "app/ko/guide/page.tsx",
   "app/pricing/page.tsx",
   "app/product/page.tsx",
   "app/product/knowledge-compiler/page.tsx",
@@ -210,14 +224,6 @@ const COPY_SURFACES = [
   // The cookbook index, 2026-09-11 (BA-210). Its lede and card copy are written on the page.
   "app/cookbooks/page.tsx",
   /*
-    The §12.4 Korean entry page. A barred phrase does not stop being barred in translation, and
-    the list below is matched against source text, so the row is here for the English words this
-    page does carry -- the plan label it reads from `billing-catalog.ts`, the page names it links
-    to, and its own comments. What it cannot check is a Korean sentence that means one of these
-    things; that is a review, and it is why this page states no claim it does not link to.
-  */
-  "app/ko/page.tsx",
-  /*
     `llms.txt` is public copy that no guard read.
 
     It is prose, it is served verbatim to crawlers and AI tools, and it was the one public surface
@@ -253,6 +259,8 @@ const COPY_SURFACES = [
   // BA-232: the header's action is a rendered button on every public page, so it is a copy
   // surface. It wrote three labels of its own; it reads the shared two now.
   "components/public-primary-cta.tsx",
+  ...v34CopySurfaces(),
+  "lib/v34/walkthrough.ts",
 ];
 
 const BARRED = [
@@ -364,7 +372,6 @@ function marketingPageFiles(directory = "app", found: string[] = []): string[] {
 function landingSource(): string {
   return [
     read("app/page.tsx"),
-    read("app/ko/page.tsx"),
     read("components/landing-v2/landing-page.tsx"),
     read("components/landing-v2/scene-actions.ts"),
     read("lib/landing-v2-copy.ts"),
@@ -475,7 +482,8 @@ describe("public copy", () => {
     expect(
       hero,
       "the H1 is a rendering of the constant, not a copy of it"
-    ).toContain("copy.headline.split(");
+      // split into sentences in code since the lookbehind went (Safari before 16.4); the input is still the constant
+    ).toContain("sentences(arm || copy.headline)");
     // Comments stripped: the rationale for deleting them names the strings it deleted.
     const page = landingSource().replace(/\{?\/\*[\s\S]*?\*\/\}?/g, "");
     expect(page, "a numbered section kicker is not a section name").not.toMatch(
@@ -525,7 +533,6 @@ describe("public copy", () => {
       "<video"
     );
     expect(read("app/page.tsx")).not.toContain("HERO_PROOF_IMAGE");
-    expect(read("app/ko/page.tsx")).not.toContain("HERO_PROOF_IMAGE");
     expect(read("components/landing-v2/hero-film.tsx")).not.toContain("lv2-film-note");
   });
 
@@ -536,24 +543,38 @@ describe("public copy", () => {
     BRAND_LINE rather than a positioning sentence typed into the page.
   */
   it("writes one tab-title pattern and names its one exception", () => {
+    /*
+      V34 (D33 §4 #13): the home page takes its head from the registry row, which is the one
+      named exception. Its tab title is still `TAVONEL — ` + BRAND_LINE.headline (the registry test
+      pins the row to that composition); the social title, which carried the headline alone, is
+      now the tab title and still carries the headline.
+    */
     const home = read("app/page.tsx");
+    expect(home).toContain('routeMetadata("home")');
     // Fix round 3: the home tab names the outcome the H1 states.
-    expect(home).toContain("title: `TAVONEL — ${BRAND_LINE.headline}`");
-    expect(home).toContain("title: BRAND_LINE.headline");
-    expect(
-      home,
-      "the home exception does not write its own positioning sentence"
-    ).not.toContain("Make your knowledge ready for AI");
+    expect(v34Route("home").title).toBe(`TAVONEL — ${BRAND_LINE.headline}`);
+    expect(String(routeMetadata("home").openGraph?.title)).toContain(BRAND_LINE.headline);
+    for (const source of [home, read("lib/v34/routes.ts")]) {
+      expect(
+        source,
+        "the home exception does not write its own positioning sentence"
+      ).not.toContain("Make your knowledge ready for AI");
+    }
     expect(
       read("app/layout.tsx"),
       "the inherited fallback follows the site pattern"
     ).toContain('title: "Knowledge Compiler for AI — TAVONEL"');
-    for (const file of ["app/explore/page.tsx", "app/contact/page.tsx"]) {
+    for (const file of ["app/explore/page.tsx"]) {
       const titles = [
         ...read(file).matchAll(/title: "([^"]*TAVONEL[^"]*)"/g),
       ].map(match => match[1]!);
       expect(titles.length, `${file} declares a title`).toBeGreaterThan(0);
       for (const title of titles) expect(title, file).toMatch(/ — TAVONEL$/);
+    }
+    // /contact is a registry page now; every registry title but the home's follows the pattern.
+    expect(read("app/contact/page.tsx")).toContain('routeMetadata("contact")');
+    for (const route of V34_ROUTES) {
+      if (route.key !== "home") expect(route.title, route.key).toMatch(/ — TAVONEL$/);
     }
   });
 
@@ -579,7 +600,6 @@ describe("public copy", () => {
   it("hand-rolls no <video> on the entry pages, and keeps the one decoder in the player", () => {
     for (const file of [
       "app/page.tsx",
-      "app/ko/page.tsx",
       "components/landing-v2/landing-page.tsx",
       "components/landing-v2/hero-film.tsx",
     ]) {
@@ -843,7 +863,9 @@ describe("public copy", () => {
 
   it("keeps qualification details reachable without leading the landing page with a beta badge", () => {
     const source = landingSource();
-    const workspace = read("app/workspace/page.tsx");
+    // WO-REL-4 closing round: the workspace's source choices moved to their own module so they can be rendered in a test.
+    const workspace = read("components/workspace/source-choices.tsx");
+    expect(read("app/workspace/page.tsx")).toContain("<WorkspaceSourceChoices ");
     expect(source).not.toContain('<span className="st">BETA</span>');
     expect(source).not.toContain(
       '<span className="st">ENTERPRISE-ASSISTED</span>'
@@ -881,10 +903,10 @@ describe("public copy", () => {
       '{ name: "Google Drive", availability: "Beta" }'
     );
     expect(workspace).toContain(
-      '{ name: "Google Drive", availability: "Read-only" }'
+      '{ name: "Google Drive", availability: "Read-only", provider: "google_drive" }'
     );
     expect(workspace).toContain(
-      '{ name: "File Server", availability: "Assisted setup" }'
+      '{ name: "Local folder", availability: "Assisted setup", provider: null }'
     );
   });
 
@@ -973,6 +995,9 @@ describe("public copy", () => {
     "app/product/document-understanding/page.tsx",
     "app/knowledge-compiler/page.tsx",
     "app/resources/page.tsx",
+    // V34: the thin /evidence and /enterprise pages render bodies from their route folders.
+    ...v34CopySurfaces("components/v34/routes/evidence"),
+    ...v34CopySurfaces("components/v34/routes/enterprise"),
   ];
 
   it.each(A1_SURFACES)(
@@ -1003,7 +1028,11 @@ describe("public copy", () => {
     the grid rather than a correction folded underneath it.
   */
   it("marks one shipped locator on /evidence, and states the rest as unshipped", () => {
-    const page = read("app/evidence/page.tsx");
+    // V34 (D33 §4 #13): the declarations are in the route's content file, the grid in its body.
+    const page =
+      read("components/v34/routes/evidence/evidence-content.ts") +
+      "\n" +
+      read("components/v34/routes/evidence/evidence.tsx");
     const shipped = page.match(/const READING_TODAY = \["([^"]+)"/);
     expect(
       shipped,
@@ -1089,17 +1118,28 @@ describe("public copy", () => {
     quietly ending the reader's journey.
   */
   const TRUST_PAGES: Array<[string, string]> = [
-    ["app/security/page.tsx", "/security"],
-    ["app/evidence/page.tsx", "/evidence"],
+    ["components/v34/routes/security/security.tsx", "/security"],
+    ["components/v34/routes/evidence/evidence.tsx", "/evidence"],
     ["app/benchmarks/page.tsx", "/benchmarks"],
     ["app/reproducibility/page.tsx", "/reproducibility"],
-    ["app/research/page.tsx", "/research"],
+    ["components/v34/routes/research-program/program.tsx", "/research/program"],
   ];
 
   it.each(TRUST_PAGES)(
     "%s ends on its own step of the §17 trust sequence",
     (surface, href) => {
       const source = read(surface);
+      /*
+        V34 /security renders the step as a Bridge read from the same TRUST_SEQUENCE: it finds
+        its own position by its registry path, so it names itself rather than a typed position.
+      */
+      if (!source.includes("<TrustNext")) {
+        expect(source, `${surface} must render the shared next step`).toContain("TRUST_SEQUENCE");
+        expect(source, `${surface} must name itself, not another page's position`)
+          .toContain(`v34Route("${href.slice(1)}")`);
+        expect(source).toContain("TRUST_SEQUENCE.findIndex((step) => step.href === route.path)");
+        return;
+      }
       expect(source, `${surface} must render the shared next step`).toContain(
         "TrustNext"
       );
@@ -1116,7 +1156,7 @@ describe("public copy", () => {
     const steps = [...source.matchAll(/href: "([^"]+)"/g)].map(
       match => match[1]!
     );
-    const actions = [...source.matchAll(/"(\/[a-z]+)": "([^"]+)"/g)];
+    const actions = [...source.matchAll(/"(\/[a-z/]+)": "([^"]+)"/g)];
     expect(steps.length).toBeGreaterThanOrEqual(5);
     for (const step of steps.slice(0, -1)) {
       const action = actions.find(([, href]) => href === step);
@@ -1136,7 +1176,11 @@ describe("public copy", () => {
     file renamed in the exporter fails here instead of on a customer's `unzip`.
   */
   it("names only files the exporter actually writes, on every page that lists them", () => {
-    const page = read("app/developers/page.tsx");
+    // V34: the /developers body and its words live in the route folder.
+    const page =
+      read("components/v34/routes/developers/developers.tsx") +
+      "\n" +
+      read("components/v34/routes/developers/developers-content.ts");
     const contents = read("lib/package-contents.ts");
     const exporter = read("lib/collection-download.ts");
     const extras = contents.match(
@@ -1192,6 +1236,9 @@ describe("public copy", () => {
     "app/research/page.tsx",
     "app/developers/page.tsx",
     "app/docs/page.tsx",
+    // V34: the thin pages above render bodies from their route folders.
+    ...["security", "evidence", "research", "research-program", "developers"].flatMap((key) =>
+      v34CopySurfaces(`components/v34/routes/${key}`)),
   ];
 
   it.each(CONVERSION_SURFACES)(
@@ -1643,13 +1690,9 @@ describe("the site's own vocabulary", () => {
       `cta.label` unless the page is /ko, where it is that action's Korean name keyed by the same
       destination. The chrome may still write neither English literal itself.
     */
-    expect(
-      chrome,
-      "the header derives the Pricing label from the navigation model"
-    ).toContain(
-      'const pricingLabel = korean ? KO_CHROME.nav["/pricing"] : "Pricing";'
+    expect(read("components/public-site-chrome.tsx"), "the header's Pricing link is a plain English label").toContain(
+      'href="/pricing">Pricing</Link>'
     );
-    expect(chrome, "and renders that").toContain("{pricingLabel}");
     for (const literal of ["Request access", "Sign up for access"]) {
       expect(
         chrome,

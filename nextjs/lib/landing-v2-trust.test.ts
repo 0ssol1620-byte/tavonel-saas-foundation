@@ -112,7 +112,7 @@ describe("landing scene 08 -- trust", () => {
       receipt rather than a nearby page. Read out of the route itself, not pinned as a string.
     */
     expect(review.href).toBe("/contact");
-    const contact = readFileSync(new URL("../app/contact/page.tsx", import.meta.url), "utf8");
+    const contact = readFileSync(new URL("../components/v34/routes/contact/contact.tsx", import.meta.url), "utf8");
     expect(contact).toContain("It is held for review and surfaced as such, not published as if it were verified.");
 
     /*

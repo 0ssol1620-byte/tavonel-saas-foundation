@@ -21,8 +21,22 @@
   --unresolved: var(--tv-unresolved);
   --paper-50: #fff;
   --lv2-paper-shadow: none;
+  /* A paper page: its native controls, scrollbars and autofill are the light ones (the site root is dark). */
+  color-scheme: light;
   color: var(--text-hi);
   background: var(--ground);
+}
+
+/* "Inspect the public sample first" stands alone on its line, so it gets a full target (2.5.8) and the underline every other body link has. */
+.sample {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration-line: underline;
+}
+/* Body links answer the pointer: the underline lifts, as on the /contact form's Privacy notice. */
+@media (hover: hover) and (pointer: fine) {
+  .shell :any-link:hover { text-decoration-line: none; }
 }
 
 .page :is(a, button, input, select, summary, textarea):focus-visible {
@@ -30,8 +44,10 @@
   outline-offset: 3px;
 }
 .page :global(.paper-label) { font: 600 13px/1.5 var(--f-sans); color: #53606a; margin: 0; }
-/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, so the H1 sits under the wordmark. */
-.page :global(.evaluation-shell) { width: var(--tv-page-w); max-width: none; margin: 0 auto; padding: calc(64px + 56px) 0 80px; }
+/* UX-L2 (UX-PLAN-2026-10-17 §4.5, R1): the site's one container, so the H1 sits under the wordmark.
+   WO-CI-21: that container is the V34 frame's `--v34-shell`, and the header is in flow above this
+   body (sticky, not fixed), so the 64px that used to clear a fixed header is gone from the top. */
+.page :global(.evaluation-shell) { width: var(--v34-shell); max-width: none; margin: 0 auto; padding: 56px 0 80px; }
 .page :global(.evaluation-intro) { max-width: 760px; }
 /* UX-L3 (UX-PLAN-2026-10-17 §5.3 R2): size, weight and tracking are the T2 H1 role in tavonel.css. */
 .page :global(.evaluation-intro) h1 {
@@ -67,31 +83,27 @@
   color: #171c20;
   border-radius: 6px;
 }
-.page :global(.evaluation-form .btn) { background: var(--tv-action); color: #fff; }
+/*
+  WO-CI-21: no accent paint of this page's own. The form's filled button takes the V34 action from
+  the frame's one rule (components/v34/tokens.module.css), and the legacy header these rules re-inked
+  is no longer rendered: the V34 header paints its own surface.
+*/
 
-/* Main's shared header is transparent on first paint. Re-ink it only on this paper page. */
-.page > header:not([data-scrolled="1"]) > :global(.wordmark),
-.page > header:not([data-scrolled="1"]) > :global(.wordmark) :is(b, svg),
-.page > header:not([data-scrolled="1"]) > :global(.one-path-primary-nav) > :global(.site-nav-direct),
-.page > header:not([data-scrolled="1"]) > :global(.nav-actions) > a:not(:global(.btn)) {
-  color: var(--text-hi);
+/*
+  WO-CI-36, lead decisions 23 and 25. The worksheet link closes a long sentence in the intro's fine print. The site's
+  44px floor (app/tavonel.css, `(pointer: coarse), (max-width: 1079px)`) makes an in-sentence link an inline-block with
+  12.5px of block padding and the same negative margin; wrapped over three lines at 360 and 390 that box cannot be
+  placed on the paragraph's lines (WO-CI-30, measured by the shared classifier: "(1) the line that holds it measures
+  NaNpx against the paragraph's next line 28.89px"). A link inside a sentence is a plain inline box here, as it is on the
+  V34 pages. (The same rule was first written in app/paper-product.css against `.evaluation-page main`, which this
+  page's markup never matches: the wrapper is inside the frame's <main>, not around it.)
+*/
+@media (pointer: coarse), (max-width: 1079px) {
+  .page :global(.evaluation-intro .fine) a { display: inline; min-height: 0; padding-block: 0; margin-block: 0; }
 }
-.page > header > :global(.one-path-mobile-nav) > summary {
-  color: var(--text-hi);
-  background: var(--ground);
-}
-.page > header > :global(.one-path-mobile-nav[open]) nav a:focus-visible { background: var(--ground); }
-@media (hover: hover) and (pointer: fine) {
-  .page > header > :global(.one-path-mobile-nav[open]) nav a:hover { background: var(--ground); }
-}
-.page > :global(header.nav.chrome-v2-header[data-scrolled="1"]) {
-  background: var(--tv-canvas);
-  border-bottom-color: #d8ddd9;
-}
-.page > header :global(.btn) { color: #fff; background: var(--tv-action); border-color: var(--tv-action); }
 
 @media (max-width: 760px) {
-  .page :global(.evaluation-shell) { padding: calc(64px + 32px) 0 48px; }
+  .page :global(.evaluation-shell) { padding: 32px 0 48px; }
   .page :global(.evaluation-grid) { grid-template-columns: 1fr; gap: 24px; }
   .page :global(.evaluation-form) { padding: 20px 16px; }
 }

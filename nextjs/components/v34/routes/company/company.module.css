@@ -1,0 +1,254 @@
+/* ---- drawing: tokens only, on the dark crop the Figure paints ------------------------------ */
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.node,
+.world {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.nodeOut {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.line,
+.arrow {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dot {
+  fill: var(--v34-lime);
+  stroke: none;
+}
+
+.cap {
+  fill: var(--v34-on-dark-muted);
+  font-family: var(--v34-font);
+  font-size: 18px;
+}
+
+.lab {
+  fill: var(--v34-on-dark);
+  font-family: var(--v34-font);
+  font-size: 16px;
+  font-weight: 560;
+}
+
+/* ---- numbered four-up (ownership and principles) -------------------------------------------- */
+
+.four {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 clamp(18px, 2.4vw, 32px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+  padding: 18px 0 8px;
+  border-top: 2px solid var(--v34-fg);
+}
+
+.itemNo {
+  margin: 0 0 14px;
+  color: var(--v34-fg-muted);
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+}
+
+.itemTitle {
+  margin: 0 0 8px;
+  font-size: var(--v34-h3);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.itemBody {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- the quote band --------------------------------------------------------------------------- */
+
+.quoteGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(24px, 5vw, 72px);
+  align-items: start;
+}
+
+.quote {
+  margin: 0;
+  min-width: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h2);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.quoteText {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.quoteBody {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.65;
+}
+
+/* ---- documents -------------------------------------------------------------------------------- */
+
+.docs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 clamp(28px, 6vw, 88px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 18px 0 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.docLink {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-size: var(--v34-h3);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  text-underline-offset: 4px;
+}
+
+.docLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.docLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+.docText {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- operator --------------------------------------------------------------------------------- */
+
+.operator {
+  display: grid;
+  gap: 0;
+  max-width: 48rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: 4px 24px;
+  padding: 12px 0;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.factName {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+}
+
+.factValue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+  margin: 0;
+  min-width: 0;
+  color: var(--v34-fg);
+  overflow-wrap: anywhere;
+}
+
+.opLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+/* The site-wide mailto and tel rule pulls such links 12.5px up over the line above; a flex item needs neither. */
+.factValue .opLink {
+  margin-block: 0;
+  padding-block: 0;
+}
+
+.opLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.opLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1000px) {
+  .four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .quoteGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .four,
+  .docs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (forced-colors: active) {
+  .docLink:focus-visible,
+  .opLink:focus-visible { outline-color: Highlight; }
+}

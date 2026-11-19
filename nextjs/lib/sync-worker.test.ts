@@ -388,6 +388,22 @@ describe("batching", () => {
   });
 });
 
+describe("a workspace at its storage allowance (WO-CAT-8)", () => {
+  it("defers the sync like the daily quota, without consuming the job retry budget", async () => {
+    importSourceObject.mockResolvedValue({ ok: false, nativeId: "full", code: "STORAGE_ALLOWANCE_EXHAUSTED" });
+    listOAuthSourcePage.mockResolvedValue({ items: [sourceItem("full")], cursor: "next", complete: false });
+
+    const result = await runSourceImportBatch({ ...JOB, cursorToken: "current" }, "worker-1");
+
+    expect(result).toEqual({ ok: false, code: "STORAGE_ALLOWANCE_EXHAUSTED" });
+    expect(completeJobBatch.mock.calls[0][3]).toEqual({
+      outcome: "deferred",
+      errorCode: "STORAGE_ALLOWANCE_EXHAUSTED",
+      retryAfterSeconds: 3_600,
+    });
+  });
+});
+
 describe("failure classification", () => {
   it("fails permanently when the connection is gone", async () => {
     // Retrying cannot make a deleted connection reappear.

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import sitemap from "@/app/sitemap";
 import { LANDING_V2_COPY, LANDING_V2_SCENE_ORDER } from "./landing-v2-copy";
 import { PUBLIC_MARKETING_PATHS } from "./marketing-analytics";
+import { routeMetadata } from "./v34/route-metadata";
+import { v34Route } from "./v34/routes";
 
 const landingPageSource = readFileSync(
   new URL("../components/landing-v2/landing-page.tsx", import.meta.url),
@@ -14,7 +16,6 @@ const landingAnalyticsSource = readFileSync(
   "utf8",
 );
 const englishPageSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-const koreanPageSource = readFileSync(new URL("../app/ko/page.tsx", import.meta.url), "utf8");
 const llms = readFileSync(new URL("../public/llms.txt", import.meta.url), "utf8");
 const sitemapPaths = new Set(sitemap().map((entry) => new URL(entry.url).pathname.replace(/\/$/, "") || "/"));
 
@@ -26,6 +27,13 @@ const OUTCOME_ROUTES = [
   "/trust",
   "/contact",
 ] as const;
+
+/*
+  V34 (D33 §4 #16). The rollback landing's copy still links `/product/continuous-knowledge`, which
+  answers 308 to `/changes`. The link a reader follows works; the page that answers, is measured and
+  is advertised is the destination, so the three surface checks below are made against it.
+*/
+const SERVED_AT: Readonly<Record<string, string>> = { "/product/continuous-knowledge": "/changes" };
 
 describe("B33 outcome IA cross-surface integration", () => {
   it("keeps the nine customer-task scenes in the canonical order", () => {
@@ -50,7 +58,8 @@ describe("B33 outcome IA cross-surface integration", () => {
       ...copy.use.outbound.map((entry) => entry.href),
     ]);
     expect(linked).toEqual(new Set(OUTCOME_ROUTES));
-    for (const route of linked) {
+    for (const link of linked) {
+      const route = SERVED_AT[link] ?? link;
       expect(sitemapPaths, `${route} is absent from the sitemap`).toContain(route);
       expect(PUBLIC_MARKETING_PATHS, `${route} is absent from consented analytics`).toContain(route);
       expect(llms, `${route} is absent from llms.txt`).toContain(`https://tavonel.com${route}`);
@@ -60,11 +69,11 @@ describe("B33 outcome IA cross-surface integration", () => {
   it("publishes the result-first home description consistently", () => {
     const sentence =
       "Inspect a finished public Compiled World, follow one result to its exact source region, and compare what changed before you discuss your own sources.";
-    expect(englishPageSource).toContain(sentence);
+    // V34 (D33 §4 #16): the home page takes its head from the registry row.
+    expect(englishPageSource).toContain('routeMetadata("home")');
+    expect(v34Route("home").description).toBe(sentence);
+    expect(routeMetadata("home").description).toBe(sentence);
     expect(llms).toContain(`[Home](https://tavonel.com/): ${sentence}`);
-    expect(koreanPageSource).toContain(
-      "완성된 공개 Compiled World를 살펴보고, 결과 하나를 정확한 원문 영역까지 따라가고, 변경 내용과 허용 원문 및 배포 경계를 확인한 뒤 직접 가진 원문을 논의하세요.",
-    );
   });
 
   it("keeps the entry page indexable and measured, and no longer advertises /ko (GX-02)", () => {

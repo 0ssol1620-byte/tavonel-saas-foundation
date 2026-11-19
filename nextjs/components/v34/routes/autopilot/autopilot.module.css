@@ -1,0 +1,122 @@
+/*
+  Autopilot page only. Colours come from --v34-* tokens; each band sets its own surface, so a rule
+  that paints a background also states its foreground. No motion.
+*/
+
+.art { display: block; width: 100%; height: 100%; }
+.box { fill: none; stroke: var(--v34-on-dark-muted); stroke-width: 2; }
+.flow { fill: none; stroke: var(--v34-lime); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.gate { fill: none; stroke: currentColor; stroke-width: 4; }
+.dot { fill: var(--v34-lime); stroke: var(--v34-dark); stroke-width: 3; }
+.faint { fill: currentColor; opacity: 0.1; }
+
+/* The four dates, left to right along one rule. */
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 clamp(16px, 3vw, 40px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.step {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 20px 0;
+}
+
+.stepNo {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepName {
+  margin: 0;
+  color: var(--v34-fg);
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.stepKind {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+}
+
+.layers {
+  display: grid;
+  gap: 24px;
+}
+
+.layer {
+  min-width: 0;
+}
+
+/* The replay: numbered ruled rows. */
+.facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: 4px clamp(16px, 3vw, 40px);
+  min-width: 0;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.factNo {
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.factTitle {
+  margin: 0 0 8px;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.factText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+
+  .fact {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .factText {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 360px) {
+  .timeline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

@@ -1,6 +1,7 @@
 import type { LandingV2HeroCopy } from "@/lib/landing-v2-copy";
 import type { LandingVariant } from "@/lib/landing-experiments";
-const SENTENCES = /(?<=\.)\s+/;
+/* The sentences of a headline, each keeping its period. Split in code rather than on a lookbehind, which Safari before 16.4 cannot parse. */
+const sentences = (text: string) => text.split(/\.\s+/).map((part, index, all) => (index < all.length - 1 ? `${part}.` : part));
 export default function HeroStatement({
   copy,
   titleId,
@@ -24,7 +25,7 @@ export default function HeroStatement({
   children?: React.ReactNode;
 }) {
   const arm = headlineVariant === "a" ? undefined : copy.headlineExperiment?.[headlineVariant];
-  const lines = arm ? arm.split(SENTENCES).filter(Boolean) : copy.headline.split(SENTENCES).filter(Boolean);
+  const lines = sentences(arm || copy.headline).filter(Boolean);
   // One capture group, so split() returns the held phrases at the odd indexes.
   const held = !accent && keep?.length ? new RegExp(`(${keep.map(phrase => phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`) : null;
   return (

@@ -108,7 +108,7 @@
     Direction C (2026-11-04): every public page stands on the warm canvas. --g2 stays the white sheet a
     card is made of, and --g3 is sand, the one colour block a public page may use for a waiting action.
   */
-  :global(.page:not(.lv2)):has(> .header) {
+  :global(.page:not(.lv2)):has(> .header, > [data-v34-header]) {
     --ground: var(--tv-canvas);
     --g1: var(--tv-paper-sunk);
     --g2: var(--tv-paper-raised);
@@ -232,6 +232,10 @@
 .wordmark.wordmark {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+/* The way home answers the pointer like every other link in the bar. */
+@media (hover: hover) and (pointer: fine) {
+  .wordmark.wordmark:hover { opacity: 0.72; }
 }
 
 /*
@@ -366,11 +370,12 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  /* 24px: the 2.5.8 minimum. The transparent border is invisible here and drawn in the user's colour under forced colours. */
+  width: 24px;
   min-height: 44px;
-  margin: 0 0 0 -10px;
+  margin: 0 0 0 -12px;
   padding: 0;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--tv-r-inst, 6px);
   background: transparent;
   color: inherit;

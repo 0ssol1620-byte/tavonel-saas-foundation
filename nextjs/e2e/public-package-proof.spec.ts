@@ -24,7 +24,7 @@ test("the actual sample package remains readable and keyboard usable at narrow w
     const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height }, deviceScaleFactor: profile.deviceScaleFactor });
     const proofPage = await context.newPage();
     try {
-      await proofPage.goto("/product/compiled-world");
+      await proofPage.goto("/world"); // V34 (D33 1.1): /product/compiled-world answers 308 to /world.
       // Release 2: the consent card appears after a 200px scroll (or 8 s), not on the first paint.
       await proofPage.evaluate(() => window.scrollTo(0, 300));
       const consent = proofPage.getByRole("region", { name: "Optional analytics", exact: true });
@@ -83,12 +83,12 @@ test("the actual sample package remains readable and keyboard usable at narrow w
       // Keep the same header and viewport bounds, observing them after native scrolling.
       await expect.poll(() => preview.evaluate(element => {
         const box = element.getBoundingClientRect();
-        const header = document.querySelector("header.nav")?.getBoundingClientRect();
+        const header = document.querySelector("[data-v34-header]")?.getBoundingClientRect();
         return box.top >= (header?.bottom ?? 0) - 1 && box.bottom <= innerHeight;
       })).toBe(true);
       const previewBox = await preview.evaluate(element => {
         const box = element.getBoundingClientRect();
-        const header = document.querySelector("header.nav")?.getBoundingClientRect();
+        const header = document.querySelector("[data-v34-header]")?.getBoundingClientRect();
         return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, headerBottom: header?.bottom ?? 0, width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth, font: parseFloat(getComputedStyle(element.querySelector("code")!).fontSize), scrollHeight: element.scrollHeight, clientHeight: element.clientHeight, scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
       });
       expect(previewBox.left).toBeGreaterThanOrEqual(0);
@@ -171,7 +171,7 @@ test("the actual sample package remains readable and keyboard usable at narrow w
         await expect(link).toBeFocused();
         await expect.poll(() => link.evaluate(target => {
           const box = target.getBoundingClientRect();
-          const header = document.querySelector("header.nav")?.getBoundingClientRect();
+          const header = document.querySelector("[data-v34-header]")?.getBoundingClientRect();
           const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
           return box.top >= (header?.bottom ?? 0) - 1 && box.bottom <= innerHeight && (hit === target || (hit !== null && target.contains(hit)));
         })).toBe(true);

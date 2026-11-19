@@ -2,7 +2,8 @@ import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import ExplorePage from "../app/explore/page";
-import SolutionsPage from "../app/solutions/page";
+import ExploreStage from "../components/explore/explore-stage";
+import { SolutionsBody } from "../components/v34/routes/solutions/solutions";
 import SolutionPage, { SOLUTIONS } from "../app/solutions/[slug]/page";
 import SolutionWorkflowProof, { solutionWorkflowEvidence } from "../app/solutions/solution-workflow-proof";
 import { readFileSync } from "node:fs";
@@ -29,9 +30,10 @@ const entries = Object.entries(SOLUTIONS) as [keyof typeof SOLUTIONS, typeof SOL
 const escape = (text: string) => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#x27;");
 
 describe("Solutions task choices and workflow evidence", () => {
-  it("renders the same input/action/output on hub and every detail, with adoption content once", async () => {
-    const hub = renderToStaticMarkup(createElement(SolutionsPage));
-    expect((hub.match(/id="design-partners-title"/g) ?? []).length).toBe(1);
+  // V34 (D33 §4 #18): the hub body renders without the frame; the adoption path is /contact.
+  it("renders the same input/action/output on hub and every detail, with one adoption path", async () => {
+    const hub = renderToStaticMarkup(createElement(SolutionsBody));
+    expect(hub).not.toContain('href="/solutions#design-partners-title"');
     for (const [slug, solution] of entries) {
       const detail = renderToStaticMarkup(await SolutionPage({ params: Promise.resolve({ slug }) }));
       expect(hub).toContain(`href="/solutions/${slug}"`);
@@ -40,7 +42,8 @@ describe("Solutions task choices and workflow evidence", () => {
         expect(detail).toContain(escape(value));
       }
       expect(detail).not.toContain('id="design-partners-title"');
-      expect(detail).toContain('href="/solutions#design-partners-title"');
+      expect(detail).toContain('href="/contact"');
+      expect(detail).not.toContain("#design-partners-title");
       expect(detail).toMatch(/<details[^>]*class="solution-notes"[^>]*open=""/);
       for (const limitation of solution.limitations) expect(detail).toContain(escape(limitation));
       expect(detail).toContain('href="/docs"');
@@ -63,8 +66,12 @@ describe("Solutions task choices and workflow evidence", () => {
 
   it("ships every published Solutions target in the bounded /explore model, with its locator and owner", () => {
     // The model /explore actually hands its stage, not a projection rebuilt beside it.
-    const [stage] = ExplorePage().props.children as [ReactElement<{ model: VisualWorldModel }>, ReactNode];
-    const shipped = stage.props.model;
+    // Found by type, not by position: the page draws the V34 header before the stage (WO-CI-6B).
+    const stage = (ExplorePage().props.children as ReactNode[]).find(
+      (child): child is ReactElement<{ model: VisualWorldModel }> => (child as ReactElement | null)?.type === ExploreStage,
+    );
+    expect(stage, "the page renders the stage").toBeDefined();
+    const shipped = stage!.props.model;
     const full = toVisualWorldModel(exploreSampleWorld, exploreSampleDocuments);
     const shippedIds = new Set(shipped.evidence.map((item) => item.id));
     expect(entries.map(([slug]) => slug)).toContain("knowledge-operations");
@@ -164,19 +171,22 @@ describe("Solutions task choices and workflow evidence", () => {
     expect(readHtml).not.toContain("does not establish");
   });
 
-  it("links exported files to the existing compiled-world package section", () => {
+  // Lead decision 9 (WO-CI-24): the package section is ported to /world and the link names it there.
+  it("links exported files to the package section on /world", () => {
     for (const kind of ["ai-ready-knowledge", "knowledge-graph"] as const) {
       const html = renderToStaticMarkup(createElement(SolutionWorkflowProof, { kind, pick: SOLUTIONS[kind].proof }));
-      expect(html).toContain('href="/product/compiled-world#public-package-proof"');
+      expect(html).toContain('href="/world#public-package-proof"');
       expect(html).not.toContain("/product/portable-artifacts");
     }
   });
 
-  it("keeps Team contact-led without promising shared membership administration", async () => {
+  it("keeps shared-workspace setup contact-led without promising shared membership administration", async () => {
     const html = renderToStaticMarkup(await SolutionPage({ params: Promise.resolve({ slug: "knowledge-operations" }) }));
-    expect(html).toContain("Team setup is arranged with us rather than bought at a checkout");
-    expect(html).toContain("single-member workspace");
-    expect(html).toContain("shared roles, invitations and organization administration are not available");
+    // Catalog v2 (PB-2026-11-V22, WO-CAT-2): the page no longer names a plan for the shared workspace -- nothing is on sale and
+    // the 2026-09 Pro label is retired -- so the sentence states the setup itself, still arranged with us and not bought.
+    expect(html).toContain("Shared-workspace setup is arranged with us rather than bought at a checkout");
+    expect(html).not.toMatch(/Pro/);
+    expect(html).toContain("Each workspace has a single owner, and shared administration is scoped with Enterprise.");
     expect(html).not.toContain("we provision the tenant and the roles with you");
   });
 

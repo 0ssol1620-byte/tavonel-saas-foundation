@@ -1,5 +1,8 @@
 import { ogCard } from "@/lib/og-card";
+import { v34Route } from "@/lib/v34/routes";
 
 export { alt, contentType, size } from "@/lib/og-card";
 
-export default ogCard("Solutions", "Five documented uses of the compiler: who each is for, the workflow it follows, what it leaves behind and where it stops.");
+const route = v34Route("solutions");
+
+export default ogCard(route.ogLabel, route.description);
