@@ -3448,6 +3448,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
+  // root-stylesheet-scope (WO-CI-16d): which sheets the root imports and which routes import the workspace sheets instead.
+  // The two token suites pin both ends, so a sheet cannot drift back into every route's first paint unnoticed.
+  'root-stylesheet-scope': Object.freeze({
+    paths: Object.freeze(['app/dev/compile-stage/page.tsx', 'app/globals.css']),
+    unitFiles: Object.freeze(['lib/design-tokens.test.ts', 'lib/landing-v2-tokens.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.
