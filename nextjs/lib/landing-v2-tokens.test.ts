@@ -265,10 +265,20 @@ describe("route-scoped global sheets", () => {
   it("the root layout imports neither landing-v2.css nor one-path.css", () => {
     expect(code("app/layout.tsx")).not.toMatch(/import\s+["'][^"']*(landing-v2|one-path)\.css["']/);
   });
+  it("the root (layout and globals.css) imports neither workspace sheet", () => {
+    for (const path of ["app/layout.tsx", "app/globals.css"]) {
+      expect(code(path), path).not.toMatch(/workspace-(final-polish|no1)\.css/);
+    }
+  });
   it.each([
     ["components/landing-v2/landing-page.tsx", ["@/app/one-path.css", "@/app/landing-v2.css"]],
     ["components/compile-stage-player.tsx", ["@/app/one-path.css"]],
-    ["app/workspace/layout.tsx", ["@/app/one-path.css"]],
+    // WO-CI-16d: workspace-final-polish.css and workspace-no1.css (every class `.workspace-*`,
+    // `.board-row-name`, `.document-meta` or under `.one-path-workspace`) left globals.css; their
+    // renderers are the workspace route and the compile-stage harness. Layer order inside
+    // `overrides` is unchanged: they still load after tavonel.css and product-polish.css.
+    ["app/workspace/layout.tsx", ["@/app/one-path.css", "@/app/workspace-final-polish.css", "@/app/workspace-no1.css"]],
+    ["app/dev/compile-stage/page.tsx", ["@/app/workspace-final-polish.css", "@/app/workspace-no1.css"]],
   ])("%s imports the sheets that style its classes, ahead of every other import", (path, sheets) => {
     const imports = [...code(path).matchAll(/^import\s+(?:[^"';]+\s+from\s+)?["']([^"']+)["'];?$/gm)].map((match) => match[1]);
     expect(imports.slice(0, sheets.length)).toEqual(sheets);

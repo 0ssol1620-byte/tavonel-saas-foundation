@@ -1,5 +1,8 @@
 // `.one-path-ai-*` and `.one-path-more`: from the root layout to the routes that render them (WO-CI-16b).
 import "@/app/one-path.css";
+// The workspace sheets (`@layer overrides`), from globals.css to the routes that render them (WO-CI-16d).
+import "@/app/workspace-final-polish.css";
+import "@/app/workspace-no1.css";
 import type { Metadata, Viewport } from "next";
 import { OAuthProviderAvailability } from "@/components/connections-panel";
 import { RemoteMcpAvailability } from "@/components/workspace/connect-ai-panel";
