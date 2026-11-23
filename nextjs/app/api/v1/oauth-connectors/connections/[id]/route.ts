@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireFoundationRevokeSession } from "@/lib/developer-auth";
+import { requireConnectionManager, requireFoundationRevokeSession } from "@/lib/developer-auth";
 import { deleteOAuthSecret, readOAuthSecretBrokerConfig } from "@/lib/connector-oauth-secrets";
 import { getOAuthConnectionSecretReference, revokeOAuthConnection } from "@/lib/connector-oauth-store";
 
@@ -13,6 +13,9 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   // Not plan-gated: a lapsed, held or trial workspace can still withdraw what it shared.
   const auth = await requireFoundationRevokeSession(request);
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
+  // TC-D7: the owner's or an admin's act, checked before the broker deletes the refresh token.
+  const role = requireConnectionManager(auth.principal);
+  if (role) return NextResponse.json({ code: role.code }, { status: role.status, headers: HEADERS });
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "OAUTH_CONNECTION_ID_INVALID" }, { status: 400, headers: HEADERS });
   const broker = readOAuthSecretBrokerConfig();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
-import { requireFoundationSession } from "@/lib/developer-auth";
+import { requireConnectionManager, requireFoundationSession } from "@/lib/developer-auth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { enqueueConnectorSync, listConnectionJobs } from "@/lib/job-store";
@@ -49,6 +49,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!activationPolicy.customerIntake.enabled) return NextResponse.json({ code: "INTAKE_DISABLED" }, { status: 503, headers: HEADERS });
   const auth = await requireFoundationSession(request, "connections");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: HEADERS });
+  // TC-D7: an import through the workspace's connection is the owner's or an admin's act.
+  const role = requireConnectionManager(auth.principal);
+  if (role) return NextResponse.json({ code: role.code }, { status: role.status, headers: HEADERS });
 
   const { id } = await context.params;
   if (!UUID.test(id)) return NextResponse.json({ code: "OAUTH_CONNECTION_ID_INVALID" }, { status: 400, headers: HEADERS });

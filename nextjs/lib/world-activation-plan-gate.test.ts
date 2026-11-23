@@ -108,7 +108,8 @@ function signedIn(plan: Plan | null, role: Role) {
   // here -- that is what the route asks `authorizeFoundationProduct` next.
   apiRequest.mockResolvedValue({
     ok: true,
-    principal: { kind: "session", workspaceKey: workspaceId, userId, scopes: ["collections:compile"] },
+    // WO-C-T1: the role the index rebuild asks with is the principal's durable membership role.
+    principal: { kind: "session", workspaceKey: workspaceId, userId, scopes: ["collections:compile"], workspaceRole: role },
   });
 }
 
@@ -322,11 +323,18 @@ describe("promote on a free evaluation", () => {
     expect(rollback).not.toHaveBeenCalled();
   });
 
-  it("still refuses a Team-plan member on the role gate, not the plan gate", async () => {
+  // TC-D7 (WO-C-T1): a member may promote inside their scope. Rollback below stays owner/admin.
+  it("admits a Team-plan member past the role gate, which a viewer still does not pass", async () => {
     signedIn("studio_access", "member");
-    const response = await promoteRequest();
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ code: "PROMOTION_ROLE_REQUIRED" });
+    const member = await promoteRequest();
+    expect(member.status).toBe(404);
+    expect(candidate).toHaveBeenCalled();
+    candidate.mockClear();
+    signedIn("studio_access", "viewer");
+    const viewer = await promoteRequest();
+    expect(viewer.status).toBe(403);
+    expect(await viewer.json()).toEqual({ code: "PROMOTION_ROLE_REQUIRED" });
+    expect(candidate).not.toHaveBeenCalled();
   });
 });
 
@@ -405,11 +413,14 @@ describe("retrieval-index rebuild takes the activation bar", () => {
     expect(response.status).toBe(409);
   });
 
-  it("refuses a Team-plan member on the role gate, not the plan gate", async () => {
+  // TC-D7 (WO-C-T1): a member may promote, so a member may rebuild the index a promote compiles.
+  it("admits a Team-plan member past the role gate, which a viewer still does not pass", async () => {
     signedIn("studio_access", "member");
-    const response = await retrievalIndexRequest();
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ code: "RETRIEVAL_COMPILE_ROLE_REQUIRED" });
+    expect((await retrievalIndexRequest()).status).toBe(409);
+    signedIn("studio_access", "viewer");
+    const viewer = await retrievalIndexRequest();
+    expect(viewer.status).toBe(403);
+    expect(await viewer.json()).toEqual({ code: "RETRIEVAL_COMPILE_ROLE_REQUIRED" });
   });
 });
 

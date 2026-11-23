@@ -188,6 +188,12 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
         whatToDo: "Nothing a caller can send fixes this. It is an operator configuration; retry later.",
       },
       {
+        code: "REMOTE_MCP_MEMBER_UNAVAILABLE",
+        status: 403,
+        meaning: "The remote MCP connection, or the consent that would create one, belongs to a person who is a member, not an owner or admin, of the workspace it names. This holds for every credential the remote MCP accepts. The remote MCP serves owners and admins only, because it cannot yet limit what it reads to the sources a member may read.",
+        whatToDo: "Use the REST API with a key made in Workspace > Developers, or ask a workspace owner or admin to connect the AI client.",
+      },
+      {
         code: "PILOT_ACCESS_REQUIRED",
         status: 403,
         meaning: "The credential is valid and the workspace it names is not admitted to TAVONEL.",
@@ -511,6 +517,7 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
       { code: "GOOGLE_VIEWER_LINK_CONSENT_INVALID", meaning: "The Google consent response did not prove the requested viewer-only access and consent state.", whatToDo: "Restart authorization and grant the requested viewer-only permission." },
       { code: "OAUTH_REFRESH_TOKEN_MISSING", meaning: "The OAuth provider returned no refresh token for a connector that requires persistent access.", whatToDo: "Re-authorize the connector with the provider's offline access consent enabled." },
       { code: "CONNECTION_NOT_FOUND", status: 404, meaning: "No such connection in this workspace.", whatToDo: "List `GET /connections`." },
+      { code: "CONNECTION_ROLE_REQUIRED", status: 403, meaning: "Creating, revoking or syncing a workspace connection needs the workspace owner or admin role. Nothing was changed and nothing reached the connection's provider or its stored credential.", whatToDo: "Ask an owner or admin of this workspace." },
       { code: "CONNECTION_NOT_SYNCABLE", status: 409, meaning: "The connection is revoked or in a state that does not accept a batch.", whatToDo: "Re-create the connection." },
       { code: "CONNECTION_CREATE_FAILED", status: 503, meaning: "The connection could not be recorded.", whatToDo: "Retry." },
       { code: "CONNECTION_REVOKE_FAILED", status: 503, meaning: "The revoke could not be recorded, so it is not reported as done. Immutable outputs are retained by design when a revoke does succeed.", whatToDo: "Retry. A revoke that cannot be proven is not reported as a revoke." },

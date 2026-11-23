@@ -104,7 +104,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [] },
+    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [], workspaceRole: "owner" },
   });
   pilot.mockReturnValue({ membership: { workspaceId: WORKSPACE, role: "owner" } });
   productAccess.mockResolvedValue({ ok: true, source: "paid", billingExempt: false });
@@ -264,20 +264,41 @@ describe("POST /v1/collections/{id}/retrieval-index", () => {
     expect(body.retrievalIndex.errorClass).toBe("RETRIEVAL_COMPILE_EMBEDDING_PROVIDER_FAILED");
   });
 
-  it("takes the same owner or admin bar promotion takes", async () => {
-    pilot.mockReturnValue({ membership: { workspaceId: WORKSPACE, role: "member" } });
+  // WO-C-T1 + TC-D7: the bar promotion takes is now owner, admin or member, and the role is the
+  // principal's own (its active membership in the workspace it acts in), never the derived pilot one.
+  it("admits a member, the bar promotion takes since TC-D7", async () => {
+    authorize.mockResolvedValue({
+      ok: true,
+      principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [], workspaceRole: "member" },
+    });
+    const response = await recompileIndex(post(), { params });
+    expect(response.status).toBe(200);
+    expect(productAccess).toHaveBeenCalledWith(WORKSPACE, USER, "activation", "member");
+  });
+
+  it("refuses a principal that carries no workspace role, rather than assuming one", async () => {
+    authorize.mockResolvedValue({
+      ok: true,
+      principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [] },
+    });
     const response = await recompileIndex(post(), { params });
     expect(response.status).toBe(403);
     expect((await response.json()).code).toBe("RETRIEVAL_COMPILE_ROLE_REQUIRED");
     expect(ensureIndex).not.toHaveBeenCalled();
   });
 
-  it("refuses when the key's membership is not the key's workspace", async () => {
+  it("takes the role from the principal, not from the derived pilot workspace", async () => {
+    // A member's key bound to a shared workspace: the derived pilot workspace is another one and
+    // says "owner" -- that must neither refuse the key nor lend it the owner role.
     pilot.mockReturnValue({ membership: { workspaceId: "pilot-rival9", role: "owner" } });
+    authorize.mockResolvedValue({
+      ok: true,
+      principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: USER, keyId: "key-1", scopes: [], workspaceRole: "admin" },
+    });
     const response = await recompileIndex(post(), { params });
-    expect(response.status).toBe(403);
-    expect((await response.json()).code).toBe("PILOT_ACCESS_REQUIRED");
-    expect(ensureIndex).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(productAccess).toHaveBeenCalledWith(WORKSPACE, USER, "activation", "admin");
+    expect(pilot).not.toHaveBeenCalled();
   });
 
   it("refuses to rebuild from a World whose source was deleted or suspended", async () => {

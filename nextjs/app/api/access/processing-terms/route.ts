@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { readBoundedJson } from "@/lib/enterprise-http";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { resolveActingWorkspace } from "@/lib/acting-workspace";
+import { getRequestUser } from "@/lib/foundation-pilot";
 import {
   loadPublishedProcessingTerms,
   parseProcessingTermsAcceptanceRequest,
@@ -35,8 +36,8 @@ export async function POST(request: Request) {
   }
   const user = await getRequestUser(request);
   if (!user) return reply({ code: "AUTH_REQUIRED" }, 401);
-  const pilot = foundationPilotAccess(user.id);
-  if (!pilot) return reply({ code: "PILOT_ACCESS_REQUIRED" }, 403);
+  const pilot = await resolveActingWorkspace(request, user);
+  if (!pilot.ok) return reply({ code: pilot.code }, pilot.status);
 
   const body = await readBoundedJson(request, 2_048);
   if (!body.ok) return reply({ code: body.code }, body.status);
