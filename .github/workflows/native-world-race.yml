@@ -91,7 +91,7 @@ jobs:
         run: node "$NWR_HELPER" admit
 
       - name: Install Supabase CLI 2.116.0
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
 
