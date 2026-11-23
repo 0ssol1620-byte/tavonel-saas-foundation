@@ -24,7 +24,10 @@ const registeredUnitTestPaths = new Set([
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 // The eight scripts/db suites (WO-CI-7 L5/L7, round 8) run without a DSN and with no skip: each refuses or fails closed when no PostgreSQL answers.
-const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
+// WO-TRAIN-2: the member-scope race suite (pure checks of the race script's verdict logic and SQL; it opens no connection) makes nine, and the
+// developer channel's clean-install suite (Node built-ins, a 127.0.0.1 server, no skip where a POSIX sh exists) joins. A skipped case
+// fails validateNodeTapReport, so neither can pass by skipping.
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'public/developer/channel-install.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -742,7 +745,12 @@ export function validateNodeTapReport(output, selectedFiles) {
   const failed = count(/^# fail (\d+)$/m);
   const skipped = count(/^# skipped (\d+)$/m);
   const todo = count(/^# todo (\d+)$/m);
-  if (plan === undefined || Number(plan) !== tests || tests < 1 || passed !== tests || failed !== 0 || skipped !== 0 || todo !== 0) {
+  const suites = count(/^# suites (\d+)$/m);
+  // Flat (suites 0): the plan counts the tests. With describe blocks the plan counts top-level entries, so each top-level result line
+  // must be ok and their number must be the plan (WO-TRAIN-2). A missing suites line is neither shape.
+  const topLevel = [...output.matchAll(/^(not )?ok \d+ /gm)];
+  const shaped = suites === 0 ? Number(plan) === tests : suites > 0 && topLevel.length === Number(plan) && topLevel.every(result => !result[1]);
+  if (plan === undefined || !shaped || tests < 1 || passed !== tests || failed !== 0 || skipped !== 0 || todo !== 0) {
     throw new Error('Node TAP report must show executed passing tests for every selected Node test file.');
   }
   return { files: selectedFiles.length, tests, passed, failed, skipped, todo };

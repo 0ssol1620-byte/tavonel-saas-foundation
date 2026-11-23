@@ -3287,9 +3287,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // db-harness (L5, L7): the local database harness and the race harnesses. Their eight node:test suites run without a DSN and with
   // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script. Round 8: WO-CAT-8's
   // plan-allowance race joins (its suite imports the script and spawns it without the opt-in and against a closed port).
+  // WO-TRAIN-2: WO-C-T3's member-scope race joins (its suite imports the script and checks its verdict logic and SQL; it needs no DSN).
   'db-harness': Object.freeze({
-    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/plan-allowance-race.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
-    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/plan-allowance-race.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3472,11 +3473,11 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // the v1 collections list and the member sources route; adversarial-acl-negatives imports the job and cancel routes;
   // durable-compile-orchestration and corpus-batching read the blockers, cancel and corpus routes; review-route imports v1/reviews;
   // world-discovery-routes imports manifest-status; route-classification checks every route's memberScope mechanism in its file, which is
-  // the one check that reads collections/[id]/world and v1/runs/[runId]/events (no suite imports either). The race harness
-  // scripts/db/member-scope-race(.test).mjs has no owner here: the Repair Node runner does not register its suite.
+  // a check that reads collections/[id]/world and v1/runs/[runId]/events. WO-TRAIN-2: member-source-scope-routes.test.ts drives both
+  // through their handlers (a member without scope is refused MEMBER_SOURCE_SCOPE_DENIED). The race harness is db-harness's.
   'member-source-scope': Object.freeze({
-    paths: Object.freeze(['app/api/collections/[id]/world/route.ts', 'app/api/compile-jobs/[jobId]/blockers/route.ts', 'app/api/compile-jobs/[jobId]/cancel/route.ts', 'app/api/compile-jobs/[jobId]/route.ts', 'app/api/compile-jobs/corpus/[corpusId]/route.ts', 'app/api/v1/collections/route.ts', 'app/api/v1/reviews/route.ts', 'app/api/v1/runs/[runId]/events/route.ts', 'app/api/v1/world/[id]/manifest-status/route.ts', 'app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts', 'lib/member-source-scope.test.ts', 'lib/member-source-scope.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts']),
-    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/corpus-batching.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/member-source-scope.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-discovery-routes.test.ts']),
+    paths: Object.freeze(['app/api/collections/[id]/world/route.ts', 'app/api/compile-jobs/[jobId]/blockers/route.ts', 'app/api/compile-jobs/[jobId]/cancel/route.ts', 'app/api/compile-jobs/[jobId]/route.ts', 'app/api/compile-jobs/corpus/[corpusId]/route.ts', 'app/api/v1/collections/route.ts', 'app/api/v1/reviews/route.ts', 'app/api/v1/runs/[runId]/events/route.ts', 'app/api/v1/world/[id]/manifest-status/route.ts', 'app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/member-source-scope.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts']),
+    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/corpus-batching.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-discovery-routes.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3497,10 +3498,11 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   }),
   // developer-channel (WO-LOC-3, WO-LOC-7): developer-distribution.test.ts runs the CLI and pins the digest of every channel asset, the
   // source agent's systemd unit included; export-signing.test.ts runs the channel signing script on a synthetic channel.
-  // public/developer/channel-install.test.mjs has no owner here: no runner of the Repair job (nor any workflow) runs it.
+  // WO-TRAIN-2: channel-install.test.mjs is a registered Repair Node suite and runs itself: it serves channel.json and the assets it names
+  // from 127.0.0.1, installs them into a fresh directory and runs the CLI and MCP from there.
   'developer-channel': Object.freeze({
-    paths: Object.freeze(['public/developer/tavonel-cli.mjs', 'public/developer/tavonel-source-agent.service', 'scripts/sign-developer-channel.mjs']),
-    unitFiles: Object.freeze(['lib/developer-distribution.test.ts', 'lib/export-signing.test.ts']),
+    paths: Object.freeze(['public/developer/channel-install.test.mjs', 'public/developer/tavonel-cli.mjs', 'public/developer/tavonel-source-agent.service', 'scripts/sign-developer-channel.mjs']),
+    unitFiles: Object.freeze(['lib/developer-distribution.test.ts', 'lib/export-signing.test.ts', 'public/developer/channel-install.test.mjs']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3508,6 +3510,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   'developer-keys-inventory': Object.freeze({
     paths: Object.freeze(['lib/developer-keys-inventory.test.ts']),
     unitFiles: Object.freeze(['lib/developer-keys-inventory.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-audit-routes (codex/v34-an-8, merged at 9a258268; WO-TRAIN-1's pending owner, moved by WO-TRAIN-2): the agent grant activity
+  // route and the proposal receipt route. change-proposals-routes.test.ts imports both and calls GET; route-classification reads every route.
+  'agent-audit-routes': Object.freeze({
+    paths: Object.freeze(['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts']),
+    unitFiles: Object.freeze(['lib/change-proposals-routes.test.ts', 'lib/route-classification.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3522,16 +3532,9 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
 // the database-contract group's.
 // WO-CI-16 merged and moved to the program owners.
 // Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8 (7a2df0e8) adds the agent grant activity route and the proposal receipt route;
-// change-proposals-routes.test.ts on that branch imports both and route-classification reads every route file. Both suites exist at
-// this head, so the owner holds whether or not the lane has merged: absent, nothing selects it; merged, its paths map to it.
-export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({
-  'agent-audit-routes': Object.freeze({
-    paths: Object.freeze(['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts']),
-    unitFiles: Object.freeze(['lib/change-proposals-routes.test.ts', 'lib/route-classification.test.ts']),
-    browserFiles: Object.freeze([]),
-    externalChecks: Object.freeze({}),
-  }),
-});
+// change-proposals-routes.test.ts on that branch imports both and route-classification reads every route file. WO-TRAIN-2: the lane
+// merged (9a258268), and the owner moved to the program owners; none is pending.
+export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({});
 // D-4 and WO-AN-1: the program's pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
 // rehearsal (round 7: WO-CAT-3's catalog_v2_offer_codes.sql joins the four). Fixtures that build a SQL-bearing head take this list, never
 // a copy of it.

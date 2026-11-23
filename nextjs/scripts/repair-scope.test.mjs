@@ -8558,7 +8558,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-qa-harness', 10, '0fc4323c29acf1c5', 0, 'e3b0c44298fc1c14', ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'],
     { 'e2e/v34-matrix.spec.ts': v34MatrixJob('v34-chromium'), 'e2e/v34-support.selftest.spec.ts': v34MatrixJob('v34-selftest') }],
   // Round 8: WO-CAT-8's plan-allowance race joins (15 -> 17 paths, 7 -> 8 Node suites).
-  ['db-harness', 17, '1da7e8b49a015cc0', 8, '2aa2e1825aad2ec0', [], {}],
+  // WO-TRAIN-2: WO-C-T3's member-scope race joins (17 -> 19 paths, 8 -> 9 Node suites).
+  ['db-harness', 19, '7a111122556a7503', 9, '78282f0c350c0f3c', [], {}],
   ['agent-proposals', 5, '3169e14af02855ea', 2, '777d8d8269835876', [], {}],
   ['proposals-decision-path', 3, 'db1504de4a1b9f29', 6, 'a26a71baeb81f76d', [], {}],
   ['agent-grants', 6, 'ff6e8a683eb77229', 5, '281a9e72832c855e', [], {}],
@@ -8584,11 +8585,15 @@ const V34_OWNER_PINS = Object.freeze([
   ['root-stylesheet-scope', 2, '62941b95a605b38f', 2, 'e6fc291b724a57a1', [], {}],
   // Train 2026-11-24 (WO-TRAIN-1): the train lanes' 53 owned paths, in six owners; acting-workspace.spec.ts is Product QA's claim at 390.
   ['acting-workspace', 13, '86d90f197fc018c4', 9, 'f717502531e6e8a0', [], { 'e2e/acting-workspace.spec.ts': v34ProductQa('390') }],
-  ['member-source-scope', 17, '231acc58cc5bbb9c', 10, '131992facbcf95a1', [], {}],
+  // WO-TRAIN-2: member-source-scope-routes.test.ts drives the world and run-events handlers (17 -> 18 paths, 10 -> 11 suites).
+  ['member-source-scope', 18, 'fdb1ab49386f4bb8', 11, 'ff7b88ff343634d0', [], {}],
   ['connector-provider-qualification', 17, '6703f379e43e1fc9', 1, '368f502c594389f5', [], {}],
   ['format-census', 2, '069edb130111c258', 1, '68cac7ee81a96597', [], {}],
-  ['developer-channel', 3, '5c0ddf8b1ccd1df1', 2, 'd54f49f16845e0de', [], {}],
+  // WO-TRAIN-2: the clean-install suite is a registered Node suite and joins developer-channel (3 -> 4 paths, 2 -> 3 suites).
+  ['developer-channel', 4, 'bb8674d247659760', 3, 'd323ec8d54d7598d', [], {}],
   ['developer-keys-inventory', 1, 'ff744f408484c885', 1, 'ff744f408484c885', [], {}],
+  // WO-TRAIN-2: codex/v34-an-8 merged; its pending owner is a program owner now.
+  ['agent-audit-routes', 2, 'b5d75d4e64f713f1', 2, '29971313f2d3e397', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8596,7 +8601,7 @@ const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billi
 const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
 const v34Executed = map => map.unitFiles.length + map.browserFiles.length + map.databaseTests.length;
 const DB_HARNESS_SUITES = ['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs',
-  'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
+  'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
 test('affected v34 program owners: every owner keeps its exact paths, at least one executed suite and its external claims', () => {
   assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
   for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {
@@ -8919,6 +8924,28 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
   // The local cluster and the pgTAP subset are not exercised by the affected SQL lane, so database-contract does not take them.
   assert.equal(AFFECTED_GROUPS.find(o => o.group === 'database-contract').match.test('nextjs/scripts/db/pgtap-subset.sql'), false);
 });
+// WO-TRAIN-2: channel-install.test.mjs groups its cases in describe blocks, so its TAP plan counts top-level entries (6) while
+// "# tests" counts every case (31). The Node runner accepts such a report only when every top-level entry is ok and their count is
+// the plan; a flat report (suites 0) keeps the old rule, plan equal to tests.
+test('affected v34 node runner: a registered suite grouped in describe blocks is accepted only when every top-level entry passes', () => {
+  const file = 'public/developer/channel-install.test.mjs';
+  const summary = (tests, suites) => `# tests ${tests}\n# suites ${suites}\n# pass ${tests}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n`;
+  const grouped = 'TAP version 13\n# Subtest: flat\nok 1 - flat\n# Subtest: group\n    # Subtest: inner a\n    ok 1 - inner a\n    # Subtest: inner b\n'
+    + "    ok 2 - inner b\n    1..2\nok 2 - group\n  ---\n  type: 'suite'\n  ...\n1..2\n" + summary(3, 1);
+  assert.deepEqual(validateNodeTapReport(grouped, [file]), { files: 1, tests: 3, passed: 3, failed: 0, skipped: 0, todo: 0 });
+  // A failed top-level entry is refused even when the summary lines claim a pass.
+  assert.throws(() => validateNodeTapReport(grouped.replace('\nok 2 - group', '\nnot ok 2 - group'), [file]), /executed passing tests/);
+  // Top-level entries that do not add up to the plan (one missing) are refused.
+  assert.throws(() => validateNodeTapReport(grouped.replace('\nok 2 - group', ''), [file]), /executed passing tests/);
+  // No suites line: refused, never read as a flat report or a grouped one.
+  assert.throws(() => validateNodeTapReport(grouped.replace('# suites 1\n', ''), [file]), /executed passing tests/);
+  // Flat: the plan must still equal the test count.
+  const flat = 'TAP version 13\n# Subtest: a\nok 1 - a\n# Subtest: b\nok 2 - b\n1..2\n';
+  assert.deepEqual(validateNodeTapReport(flat + summary(2, 0), [file]).tests, 2);
+  assert.throws(() => validateNodeTapReport(flat + summary(3, 0), [file]), /executed passing tests/);
+  // A skipped case inside a group is refused as before.
+  assert.throws(() => validateNodeTapReport(grouped.replace('# skipped 0', '# skipped 1'), [file]), /executed passing tests/);
+});
 // WO-CI-7 round 3 (L8): owners for paths two running lanes add, ready before the files exist.
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
   // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too. Round 8: WO-CI-16 is in
@@ -8926,9 +8953,19 @@ test('affected v34 pending owners: a lane path absent at head is owned, selected
   // WO-CI-16 merged and moved to the program owners. Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8 (7a2df0e8) adds two routes; its own
   // rebase round must not reopen this file, so the owner holds in both states: before the merge its paths are absent and nothing at
   // head selects it; after, each path is present and maps to it alone with an executed check.
-  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), ['agent-audit-routes']);
-  assert.deepEqual(V34_PROGRAM_PENDING_OWNERS['agent-audit-routes'], { paths: ['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts'],
+  // WO-TRAIN-2: the lane merged (9a258268) and the owner moved to the program owners: none is pending, both routes are at head, each
+  // maps to agent-audit-routes alone, and the suite it selects imports both routes at this head.
+  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
+  const moved = V34_PROGRAM_AFFECTED_OWNERS['agent-audit-routes'];
+  assert.deepEqual(moved, { paths: ['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts'],
     unitFiles: ['lib/change-proposals-routes.test.ts', 'lib/route-classification.test.ts'], browserFiles: [], externalChecks: {} });
+  const routesSuite = v34ReadHead('nextjs/lib/change-proposals-routes.test.ts') ?? '';
+  for (const path of moved.paths) {
+    assert.ok(existsSync(v34RepoPath(`nextjs/${path}`)), path);
+    assert.ok(routesSuite.includes(`await import("../${path.replace(/\.ts$/, '')}")`), `change-proposals-routes.test.ts imports ${path}`);
+    const merged = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+    assert.deepEqual([merged.failures, merged.groups, merged.unitFiles], [[], ['agent-audit-routes'], [...moved.unitFiles]], path);
+  }
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
     for (const path of owner.paths) {
