@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildContextPacket, type RankedRetrievalUnit } from "./context-packet";
-import { answerFromContextPacket, answerGroundedQuestion, EVIDENCE_EXCEEDS_ANSWER_LIMIT as ANSWER_REASON } from "./grounded-ask";
+import { answerFromContextPacket, answerGroundedQuestion, CITED_EVIDENCE_NOT_IN_PACKET as INTEGRITY_REASON, EVIDENCE_EXCEEDS_ANSWER_LIMIT as ANSWER_REASON } from "./grounded-ask";
 import type { WorldEvidence } from "./world-read-model";
-import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion, type AskCitationSource } from "./workspace-ask-copy";
+import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion, type AskCitationSource } from "./workspace-ask-copy";
 
 const helper = readFileSync(new URL("./workspace-ask-copy.ts", import.meta.url), "utf8");
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8").replaceAll("\r\n", "\n");
@@ -74,10 +74,29 @@ describe("workspace Ask abstention copy", () => {
     }
   });
 
-  it("leaves every other abstention on its existing English copy, in either page language", () => {
-    for (const reason of [null, "NO_REGION_BOUND_EVIDENCE_MATCH", "CITED_EVIDENCE_NOT_IN_PACKET", "every candidate was rejected by the World Gate"])
+  it("leaves every no-match abstention on its existing English copy, in either page language", () => {
+    for (const reason of [null, "NO_REGION_BOUND_EVIDENCE_MATCH", "every candidate was rejected by the World Gate"])
       for (const languages of [undefined, "ko"] as const)
         expect(askAbstentionCopy(reason, languages)).toEqual({ notice: NO_EVIDENCE_NOTICE, result: NO_EVIDENCE_RESULT, action: null });
+  });
+
+  /*
+    WO-ASK-0 ruling 3: no match, an integrity failure and overflow each have their own sentence.
+    The integrity reason is the compiled builder's own constant, so a rename there fails here.
+  */
+  it("says an integrity failure is an integrity failure, never 'no evidence matched', and offers no action", () => {
+    expect(CITED_EVIDENCE_NOT_IN_PACKET).toBe(INTEGRITY_REASON);
+    for (const languages of [undefined, "en", "ko"] as const) {
+      const noMatch = askAbstentionCopy("NO_REGION_BOUND_EVIDENCE_MATCH", languages);
+      const integrity = askAbstentionCopy(INTEGRITY_REASON, languages);
+      const overflow = askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, languages);
+      expect(new Set([noMatch.notice, integrity.notice, overflow.notice]).size).toBe(3);
+      expect(new Set([noMatch.result, integrity.result, overflow.result]).size).toBe(3);
+      expect(integrity.action).toBeNull();
+      for (const text of [integrity.notice, integrity.result]) expect(text).not.toMatch(/no region-bound evidence|matched/i);
+    }
+    expect(askAbstentionCopy(INTEGRITY_REASON).result).toBe("A citation could not be verified against the retrieved evidence, so nothing was returned.");
+    expect(askAbstentionCopy(INTEGRITY_REASON, "ko").result).toContain("검증");
   });
 
   it("is no longer what the fallback builder returns for long evidence; the copy stays for remembered replays", () => {

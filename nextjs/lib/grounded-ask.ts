@@ -220,6 +220,8 @@ function canonicalize(value: unknown): string {
 export const FALLBACK_ANSWER_CHARACTER_LIMIT = 3 * 420 + 2 * 2;
 export const COMPILED_ANSWER_CHARACTER_LIMIT = 10 * 420 + 9 * 2;
 export const EVIDENCE_EXCEEDS_ANSWER_LIMIT = "EVIDENCE_EXCEEDS_ANSWER_LIMIT";
+/** The integrity abstention: a citation the packet verifier could not find in the packet. */
+export const CITED_EVIDENCE_NOT_IN_PACKET = "CITED_EVIDENCE_NOT_IN_PACKET";
 
 export function answerGroundedQuestion(
   value: unknown,
@@ -462,7 +464,7 @@ export function answerFromContextPacket(
     status === "grounded"
       ? null
       : !verified.valid
-        ? "CITED_EVIDENCE_NOT_IN_PACKET"
+        ? CITED_EVIDENCE_NOT_IN_PACKET
         : (packet.abstentionReasons[0] ?? "NO_REGION_BOUND_EVIDENCE_MATCH");
   const unsigned = {
     status,

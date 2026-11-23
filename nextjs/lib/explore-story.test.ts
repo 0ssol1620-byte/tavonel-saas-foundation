@@ -360,6 +360,15 @@ describe("the answer adapter carries the retriever's state and refuses a malform
 });
 
 describe("public copy on this lane's surfaces", () => {
+  it("describes the answers the page actually shows: verbatim windows marked with …, not whole regions or nothing", () => {
+    // WO-ASK-0: at least one prepared answer is a window of a longer region, so the note may not
+    // claim complete text or that a long answer is withheld; it has to name the marker it shows.
+    expect(exploreSampleAnswers.some((answer) => answer.status === "grounded" && answer.answer.includes("…"))).toBe(true);
+    expect(EXPLORE_COPY.askNote).toContain("…");
+    expect(EXPLORE_COPY.askNote).toMatch(/word for word/);
+    expect(EXPLORE_COPY.askNote).not.toMatch(/complete text|no answer is shown|too long to show/i);
+  });
+
   it.each(SURFACES)("keeps every barred phrase out of %s", (surface) => {
     const source = read(surface).toLowerCase();
     for (const phrase of BARRED) expect(source, `SPEC 13.3 bars "${phrase}"`).not.toContain(phrase);

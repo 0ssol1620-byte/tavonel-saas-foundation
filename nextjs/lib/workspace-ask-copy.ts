@@ -7,14 +7,20 @@
   answer is shown. Telling that reader to add a source would be false. Not every listed
   citation can be opened, either -- see resolveCitationRegion -- so the copy does not promise it.
 
-  The overflow branch and the unavailable-source marker follow the browser language (English or
-  Korean); every other abstention keeps its existing English copy. Not a locale framework.
+  An integrity failure is a third abstention (WO-ASK-0 ruling 3): a citation could not be
+  verified against the retrieved evidence, so nothing was returned. It is not "no evidence
+  matched", and it offers no action -- adding a source would not fix it.
 
-  The reason code is repeated here rather than imported: grounded-ask.ts pulls in node:crypto
-  and must not reach the client bundle. workspace-ask-copy.test.ts pins the two together.
+  The overflow and integrity branches and the unavailable-source marker follow the browser
+  language (English or Korean); the no-match abstention keeps its existing English copy. Not a
+  locale framework.
+
+  The reason codes are repeated here rather than imported: grounded-ask.ts pulls in node:crypto
+  and must not reach the client bundle. workspace-ask-copy.test.ts pins them together.
 */
 
 export const EVIDENCE_EXCEEDS_ANSWER_LIMIT = "EVIDENCE_EXCEEDS_ANSWER_LIMIT";
+export const CITED_EVIDENCE_NOT_IN_PACKET = "CITED_EVIDENCE_NOT_IN_PACKET";
 
 export type AskAbstentionCopy = { notice: string; result: string; action: string | null };
 export type AskSourceCopy = { unavailable: string; unverified: string; missing: string };
@@ -42,6 +48,21 @@ const OVERFLOW: Record<"en" | "ko", AskAbstentionCopy> = {
   },
 };
 
+/* The English result is consumer-verification.ts's sentence for the same reason, verbatim. */
+const INTEGRITY: Record<"en" | "ko", AskAbstentionCopy> = {
+  en: {
+    notice:
+      "The active world abstained: a citation could not be verified against the retrieved evidence, so nothing was returned.",
+    result: "A citation could not be verified against the retrieved evidence, so nothing was returned.",
+    action: null,
+  },
+  ko: {
+    notice: "활성 World가 답변을 보류했습니다. 인용 하나를 검색된 근거와 대조해 검증할 수 없어 아무것도 반환하지 않았습니다.",
+    result: "인용 하나를 검색된 근거와 대조해 검증할 수 없어 아무것도 반환하지 않았습니다.",
+    action: null,
+  },
+};
+
 const SOURCE: Record<"en" | "ko", AskSourceCopy> = {
   en: {
     unavailable:
@@ -61,8 +82,9 @@ const SOURCE: Record<"en" | "ko", AskSourceCopy> = {
 
 /** `locale` is the page's language (`pageLocale()`), never the browser's preference list. */
 export function askAbstentionCopy(reason: string | null, locale: "en" | "ko" = "en"): AskAbstentionCopy {
-  if (reason !== EVIDENCE_EXCEEDS_ANSWER_LIMIT) return NO_EVIDENCE;
-  return OVERFLOW[locale];
+  if (reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT) return OVERFLOW[locale];
+  if (reason === CITED_EVIDENCE_NOT_IN_PACKET) return INTEGRITY[locale];
+  return NO_EVIDENCE;
 }
 
 export function askSourceCopy(locale: "en" | "ko" = "en"): AskSourceCopy {
