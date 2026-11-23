@@ -1,0 +1,24 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/master/files.stone",
+    "https://docs.dropboxapi.com/dropbox-api/docs/error-handling"
+  ],
+  "retrievedAt": "2026-11-18T13:22:40Z",
+  "scenario": "list_folder/continue refuses an invalidated cursor. The spec: reset 'Indicates that the cursor has been invalidated. Call list_folder to obtain a new cursor.' The error page: endpoint-specific errors are 409 with error and error_summary.",
+  "assumes": "The error value is the route's error union serialised with '.tag', the shape the spec's unions use; the error page read gives no example 409 body.",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dropboxapi.com/2/files/list_folder/continue",
+    "cursor": "AAHsynthetic-dropbox-cursor-3"
+  },
+  "status": 409,
+  "headers": {},
+  "body": {
+    "error_summary": "reset/..",
+    "error": {
+      ".tag": "reset"
+    }
+  }
+}

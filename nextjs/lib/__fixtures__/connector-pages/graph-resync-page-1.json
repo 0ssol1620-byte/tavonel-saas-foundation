@@ -1,0 +1,36 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0"
+  ],
+  "retrievedAt": "2026-11-18T13:22:05Z",
+  "scenario": "The fresh enumeration after the 410, page 1: the drive root delta without a token ('starts a fresh delta enumeration from scratch'), continued by @odata.nextLink.",
+  "request": {
+    "method": "GET",
+    "url": "https://graph.microsoft.com/v1.0/drives/SYNTHDRIVE2/root/delta?%24top=25",
+    "cursor": null
+  },
+  "status": 200,
+  "headers": {},
+  "body": {
+    "value": [
+      {
+        "id": "SYNTHKEEP01",
+        "name": "plan.pdf",
+        "eTag": "eSYNTHkeep01v1",
+        "cTag": "cSYNTHkeep01v1",
+        "lastModifiedDateTime": "2026-10-01T09:00:00Z",
+        "size": 4096,
+        "file": {
+          "mimeType": "application/pdf"
+        },
+        "parentReference": {
+          "driveId": "SYNTHDRIVE2",
+          "id": "SYNTHROOT2"
+        }
+      }
+    ],
+    "@odata.nextLink": "https://graph.microsoft.com/v1.0/drives/SYNTHDRIVE2/root/delta?token=SYNTHfresh1"
+  }
+}

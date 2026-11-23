@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/master/files.stone"
+  ],
+  "retrievedAt": "2026-11-18T13:22:05Z",
+  "scenario": "The fresh listing, last page. A file bound before the reset (id:SYNTHteamGone00000000001) is named on neither page; no DeletedMetadata names its path.",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dropboxapi.com/2/files/list_folder/continue",
+    "cursor": "AAHsynthetic-dropbox-fresh-1"
+  },
+  "status": 200,
+  "headers": {},
+  "body": {
+    "entries": [
+      {
+        ".tag": "file",
+        "name": "b.pdf",
+        "id": "id:SYNTHteamB0000000000000002",
+        "path_lower": "/team/b.pdf",
+        "path_display": "/team/b.pdf",
+        "client_modified": "2026-10-01T09:00:00Z",
+        "server_modified": "2026-10-01T09:00:00Z",
+        "rev": "015a1c10ce0dd91",
+        "size": 1024,
+        "content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "cursor": "AAHsynthetic-dropbox-fresh-2",
+    "has_more": false
+  }
+}

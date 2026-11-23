@@ -1,0 +1,41 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/master/files.stone"
+  ],
+  "retrievedAt": "2026-11-18T13:22:05Z",
+  "scenario": "A move split across pages: page 1 reports the old path removed (DeletedMetadata: name and path, no id).",
+  "assumes": "Dropbox reports a move as a DeletedMetadata at the old path and a FileMetadata with the same id at the new path. The spec read says the id is 'A unique identifier for the file' and a DeletedMetadata means 'there used to be a file or folder at this path'; it does not state the move pairing itself.",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dropboxapi.com/2/files/list_folder",
+    "cursor": null
+  },
+  "status": 200,
+  "headers": {},
+  "body": {
+    "entries": [
+      {
+        ".tag": "deleted",
+        "name": "q3.pdf",
+        "path_lower": "/reports/q3.pdf",
+        "path_display": "/reports/q3.pdf"
+      },
+      {
+        ".tag": "file",
+        "name": "keep.pdf",
+        "id": "id:SYNTHkeep000000000000001",
+        "path_lower": "/reports/keep.pdf",
+        "path_display": "/reports/keep.pdf",
+        "client_modified": "2026-10-01T09:00:00Z",
+        "server_modified": "2026-10-01T09:00:00Z",
+        "rev": "015a1c10ce0dd78",
+        "size": 7212,
+        "content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "cursor": "AAHsynthetic-dropbox-cursor-1",
+    "has_more": true
+  }
+}

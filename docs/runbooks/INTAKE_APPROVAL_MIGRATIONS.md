@@ -193,6 +193,67 @@ migration first. With the switch on, a missing approval function answers
 Dropbox path reconciliation: a missing `reconcile_dropbox_source_page` fails the sync closed as
 `DROPBOX_SOURCE_RECONCILIATION_MIGRATION_MISSING` with the checkpoint held.
 
+## 5. Dropbox reconciliation on its own switch, and the operator cancel (WO-E-CON-1)
+
+`DROPBOX_RECONCILIATION_SWITCH` in `nextjs/lib/dropbox-reconciliation-switch.ts` turns Dropbox path
+reconciliation on without the approval lineage. Flipping it is a reviewed code change with the same
+precondition as section 4: migration 4 applied in the same window, immediately before the deploy.
+
+**What a cursor reset does.** A Graph `410` resync or a Dropbox `409` `reset` on a continuation is
+not retried against the dead cursor: the worker lists again from the reader's first request (a
+re-inventory round), and nothing missing from the new listing is suspended or deleted. Bounds (start
+values, uncalibrated, `nextjs/lib/sync-worker.ts`): `REINVENTORY_PAGE_LIMIT` = 400 provider pages per
+round, `REINVENTORY_ROUND_LIMIT` = 2 rounds per job. Past either, the job ends `failed` with
+`SOURCE_REINVENTORY_BOUND_EXCEEDED` and an `error_detail` naming the bound. An outage (5xx, 429,
+timeout) stays `SOURCE_LIST_FAILED`: retried, checkpoint held, `dead` after the attempt ceiling.
+This holds with the switch on or off; what the switch changes is who releases a stopped job.
+
+**Why an operator is needed with the switch on.** With migration 4 applied, a Dropbox
+`source_import` job that ends `failed` or `dead` keeps the connection:
+`dropbox_uncommitted_source_stream` returns it, `enqueue_connector_sync` requeues that same job with
+its cursor, and the insert guard refuses any other job (`DROPBOX_SOURCE_STREAM_CONFLICT`).
+Requeueing helps after an outage. It cannot help a job whose own cursor cannot advance:
+`SOURCE_REINVENTORY_BOUND_EXCEEDED` (the requeued job meets the same bound on its next turn),
+`JOB_CURSOR_INVALID`, `SOURCE_CURSOR_STALE`, `SOURCE_CURSOR_TOO_LARGE`, `CONNECTOR_PAGE_INVALID`,
+`CONNECTOR_PAGE_LEGACY_REVIEW_REQUIRED`, `DROPBOX_SOURCE_PATH_UNRESOLVED`,
+`DROPBOX_SOURCE_IDENTITY_LEGACY`, `DROPBOX_SOURCE_STREAM_INVALID`. Such a connection stays held until
+an operator cancels the job.
+
+**Operator cancel, step by step.**
+
+1. Read, and record the row in the campaign ledger (workspace, connection, job id, state,
+   `error_code`, `error_detail`) before changing anything:
+
+   ```sql
+   select job_id, state, error_code, error_detail, attempt, items_seen, items_done, updated_at
+   from public.dropbox_uncommitted_source_stream('<workspace_key>', '<oauth_connection_id>');
+   ```
+
+   No row with a `job_id`: nothing holds the connection; stop here.
+2. If `error_code` is an outage code (`SOURCE_LIST_FAILED`, `DROPBOX_SOURCE_RECONCILIATION_UNAVAILABLE`,
+   `CONNECTOR_PAGE_STORE_UNAVAILABLE`, `OAUTH_TOKEN_REFRESH_FAILED`), do not cancel: the next sync
+   request requeues the job with its progress. Cancel only for the codes listed above.
+3. Cancel exactly that job:
+
+   ```sql
+   update public.foundation_jobs
+   set state = 'canceled', completed_at = coalesce(completed_at, now()), updated_at = now()
+   where workspace_key = '<workspace_key>' and job_id = '<job_id>' and state in ('failed', 'dead')
+   returning job_id, state;
+   ```
+
+   One row back, or stop and read again: zero rows means the job changed state in between.
+4. Start a sync for the connection. The new job begins at the connection checkpoint
+   (`foundation_connector_checkpoints`, the last listing that completed), not at the canceled job's
+   cursor. If that checkpoint is itself the dead cursor, the new job starts its own re-inventory round.
+
+What the cancel does not do: it deletes no source, binding, page snapshot, reconciliation receipt
+or path row, and suspends nothing. Removals the canceled stream had staged
+(`dropbox_source_pending_removals`) are judged at the next stream's listing boundary like any staged
+removal. It is not reversible: a canceled stream is never resumed, and its pages since the
+checkpoint are listed again by the new job. Rollback of the switch itself: set it back to `false`;
+Dropbox then takes main's path again (section "What the deploy needs" above).
+
 ## Rollback
 
 - Before the switch is on, migrations 1 and 2 are inert; leaving them in place is the rollback.

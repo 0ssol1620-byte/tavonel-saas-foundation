@@ -1,6 +1,6 @@
 import type { OAuthConnectorProvider } from "./connector-oauth";
 import { assertSafeUrl, safeFetch, type EgressPolicy } from "./safe-url";
-import { INTAKE_APPROVAL_ROLLOUT_ENABLED } from "./intake-approval-rollout";
+import { dropboxReconciliationEnabled } from "./dropbox-reconciliation-switch";
 
 export type OAuthSourceTarget = {
   rootPath?: string;
@@ -134,12 +134,51 @@ function validTarget(target: OAuthSourceTarget) {
   return values.every((value) => value.length <= 512 && /^[A-Za-z0-9._~!$&'()+,;=:@/ -]*$/.test(value));
 }
 
+/*
+  A dead continuation, told apart from an outage (WO-E-CON-1).
+
+  Both providers say, on a continuation request only, "this cursor can no longer be served; list
+  again from the start". That is OAUTH_SOURCE_RESYNC_REQUIRED, and the worker answers it with a
+  bounded re-inventory. Every other non-2xx -- a 5xx, a 429, a 410 or 409 naming anything else, a
+  body that is not JSON -- stays OAUTH_SOURCE_LIST_FAILED: retried with the checkpoint held.
+
+  Graph (driveitem-delta, read 2026-11-18): 410 Gone with resyncChangesApplyDifferences or
+  resyncChangesUploadDifferences; resyncRequired is the name the work order and blueprint use.
+  Graph errors page (read 2026-11-23): the code may sit in a nested innererror, and apps "loop
+  through all the nested error codes" -- walked to a fixed depth, so a hostile body cannot make
+  it long. The 410's Location header is never followed: the fresh listing is built from the
+  reader's own constants.
+
+  Dropbox (files.stone): list_folder/continue's error union tag "reset" -- "Call list_folder to
+  obtain a new cursor"; endpoint-specific errors arrive as 409.
+*/
+const GRAPH_RESYNC_CODES = new Set(["resyncRequired", "resyncChangesApplyDifferences", "resyncChangesUploadDifferences"]);
+
+function graphResyncRequired(status: number, body: unknown) {
+  if (status !== 410 || !readableRow(body)) return false;
+  let error: unknown = body.error;
+  for (let depth = 0; depth < 8 && readableRow(error); depth += 1) {
+    if (typeof error.code === "string" && GRAPH_RESYNC_CODES.has(error.code)) return true;
+    error = error.innererror ?? error.innerError;
+  }
+  return false;
+}
+
+function dropboxCursorReset(status: number, body: unknown) {
+  return status === 409 && readableRow(body) && readableRow(body.error) && body.error[".tag"] === "reset";
+}
+
+function parsedOrNull(text: string): unknown {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
 async function jsonRequest(
   url: string,
   accessToken: string,
   init: RequestInit,
   fetcher: typeof fetch,
   policy: EgressPolicy,
+  resyncRequired?: (status: number, body: unknown) => boolean,
 ) {
   const result = await safeFetch(
     url,
@@ -151,7 +190,9 @@ async function jsonRequest(
   // the egress decision, so a listing that stopped because the URL was refused is
   // distinguishable in a log from one that stopped because the provider was down.
   if (!result.ok) throw new Error(`OAUTH_SOURCE_EGRESS_REFUSED:${result.code}`);
-  if (result.status < 200 || result.status > 299) throw new Error("OAUTH_SOURCE_LIST_FAILED");
+  if (result.status < 200 || result.status > 299) {
+    throw new Error(resyncRequired?.(result.status, parsedOrNull(result.text)) ? "OAUTH_SOURCE_RESYNC_REQUIRED" : "OAUTH_SOURCE_LIST_FAILED");
+  }
   try {
     const payload: unknown = JSON.parse(result.text);
     if (!readableRow(payload)) throw new Error("OAUTH_SOURCE_PAGE_INVALID");
@@ -162,10 +203,11 @@ async function jsonRequest(
 }
 
 /*
-  Main dbe22b1e's Dropbox mapping, kept verbatim for the intake-approval rollout switch off: a
-  DeletedMetadata (path, no id) takes its path_lower as nativeId and carries no providerPath, so
-  the worker suspends it by that id as main does. The path-only tombstone below is only resolvable
-  by reconcile_dropbox_source_page (migration 20261007100000), which ships behind the same switch.
+  Main dbe22b1e's Dropbox mapping, kept verbatim for the Dropbox reconciliation switch off
+  (lib/dropbox-reconciliation-switch.ts): a DeletedMetadata (path, no id) takes its path_lower as
+  nativeId and carries no providerPath, so the worker suspends it by that id as main does. The
+  path-only tombstone below is only resolvable by reconcile_dropbox_source_page (migration
+  20261007100000), which ships behind the same switch the worker reads.
 */
 function mainDropboxObservation(row: Record<string, unknown>): OAuthSourceItem | null {
   const tag = row[".tag"];
@@ -192,11 +234,13 @@ async function listDropbox(accessToken: string, cursor: string | null, target: O
     { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
     fetcher,
     LIST_POLICY.dropbox,
+    continuation ? dropboxCursorReset : undefined,
   );
   const rows = sourceRows(payload, "entries");
+  const reconcile = dropboxReconciliationEnabled();
   const items = completeObservations(rows.map((row): OAuthSourceItem | OAuthPathTombstone | null => {
     if (!readableRow(row)) return null;
-    if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return mainDropboxObservation(row);
+    if (!reconcile) return mainDropboxObservation(row);
     const tag = row[".tag"];
     const deleted = tag === "deleted";
     // DeletedMetadata has path_lower and no id. The path travels beside the id, never as one.
@@ -226,7 +270,7 @@ async function listMicrosoftGraph(accessToken: string, cursor: string | null, ta
     firstPage.searchParams.set("$top", String(OAUTH_SOURCE_PAGE_SIZE));
     url = firstPage.toString();
   }
-  const payload = await jsonRequest(url, accessToken, {}, fetcher, LIST_POLICY.microsoft_graph);
+  const payload = await jsonRequest(url, accessToken, {}, fetcher, LIST_POLICY.microsoft_graph, cursor ? graphResyncRequired : undefined);
   const rows = sourceRows(payload, "value");
   const items = completeObservations(rows.map((row): OAuthSourceItem | null => {
     if (!readableRow(row)) return null;
