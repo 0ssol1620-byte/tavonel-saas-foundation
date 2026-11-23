@@ -96,7 +96,7 @@ import {
   W1_REMOTE_MCP_A1_A5_AFFECTED_PATHS, W1_REMOTE_MCP_A1_A5_AFFECTED_UNIT_FILES,
 } from './repair-scope.mjs';
 import { buildRepairReceipt, requireCompletedReadRehearsal } from './repair-scope-gate.mjs';
-import { V34_SELFTEST_WEBKIT_CASE, auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
+import { V34_SELFTEST_WEBKIT_CASE, auditBrowserFiles, browserRunOutputDir, buildNodeTestArgs, buildUnitArgs, collectWorkspaceIntakeCaptures, WORKSPACE_INTAKE_CAPTURE_NAMES, MAX_MOUNTED_PNG_BYTES, validateMountedPngMetadata, isInsideWorkspace, liveBrowserEnv, heldBrowserProjects, planBrowserRuns, requireUnitFiles, runBrowserGroups, validateNodeTapReport, validateSelectedPath } from './run-repair-check.mjs';
 import { readAndValidatePlaywrightReport, readAndValidateVitestReport, validatePlaywrightReport, validateVitestReport } from './repair-test-report.mjs';
 
 const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/current-foundation-residual-workflow-paths.json', import.meta.url)), 'utf8'));
@@ -3124,7 +3124,7 @@ test('Explore repair successor plan reuses the unchanged424 selection with both 
 });
 test('Explore repair successor reports reuse the unchanged runner owner: 34 units, six Solutions cases with104 captures and the separate nineteen-case Explore report', () => {
   const runner=readFileSync(resolve(solutionsRepoRoot,'nextjs/scripts/run-repair-check.mjs'),'utf8');
-  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity)'));
+  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity, held)'));
   const root=mkdtempSync(resolve(tmpdir(),'repair-explore-successor-'));try{const f=exploreFixture(root);f.plan.exploreRepairPresentation={eligible:true,source:{profile:'explore-repair-successor',parent:solutionsAdmission.EXPLORE_SUCCESSOR_PARENT}};
     assert.equal(collectSolutionsWorkflowCaptures(root,f.plan,true).length,104);
     const r=readExploreRepairExecution(root,f.plan);assert.equal(r.units.passed,34);assert.equal(r.solutionsBrowser.passed,6);assert.equal(r.exploreBrowser.passed,17);assert.equal(r.exploreBrowser.skipped,2);assert.equal(r.captures.length,104);assert.equal(r.exploreCases.length,19);
@@ -3865,7 +3865,7 @@ test('affected Explore admission: the plan has no historical flags and no Soluti
   assert.deepEqual(plan.pendingFullDebt,['PR-base full CI','PR-base full Launch QA','Lighthouse','full release build and exact Foundation/Core pair']);
   // The ordinary plan takes the shared planner; only a historical plan takes the separate two-report Explore planner.
   const runner=readFileSync(new URL('./run-repair-check.mjs',import.meta.url),'utf8');
-  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity)'));
+  assert.ok(runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity, held)'));
   assert.deepEqual([...EXPLORE_REPAIR_BROWSER_FILES],[AFFECTED_EXPLORE_SPEC,'e2e/solutions-workflows.spec.ts']);
   assert.deepEqual(planExploreRepairBrowserRuns([...EXPLORE_REPAIR_BROWSER_FILES],false),[{kind:'project',project:'1440',files:['e2e/solutions-workflows.spec.ts']},{kind:'project',project:'1440',files:[AFFECTED_EXPLORE_SPEC]}]);
   assert.equal(EXPLORE_BROWSER_CASES.length,19);assert.equal(EXPLORE_1440_ALLOWED_SKIPS.length,2);
@@ -8553,7 +8553,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-repointed-specs', 2, '5d4a583b1fe39ef9', 0, 'e3b0c44298fc1c14', ['e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts'], {}],
   ['v34-qa-harness', 10, '0fc4323c29acf1c5', 0, 'e3b0c44298fc1c14', ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'],
     { 'e2e/v34-matrix.spec.ts': v34MatrixJob('v34-chromium'), 'e2e/v34-support.selftest.spec.ts': v34MatrixJob('v34-selftest') }],
-  ['db-harness', 15, 'e1ec5d332b30aaf2', 7, 'd37c1fb696c86f9e', [], {}],
+  // Round 8: WO-CAT-8's plan-allowance race joins (15 -> 17 paths, 7 -> 8 Node suites).
+  ['db-harness', 17, '1da7e8b49a015cc0', 8, '2aa2e1825aad2ec0', [], {}],
   ['agent-proposals', 5, '3169e14af02855ea', 2, '777d8d8269835876', [], {}],
   ['proposals-decision-path', 3, 'db1504de4a1b9f29', 6, 'a26a71baeb81f76d', [], {}],
   ['agent-grants', 6, 'ff6e8a683eb77229', 5, '281a9e72832c855e', [], {}],
@@ -8563,6 +8564,20 @@ const V34_OWNER_PINS = Object.freeze([
   ['agent-mcp-route', 6, '7de747c49dbec65c', 7, 'a9a732c5350f063a', [], {}],
   // Round 6: WO-CI-6C merged; its key guard spec joined WO-CI-6B's group as Product QA's claim at 1440 (the only project its skip allows).
   ['v34-retained-shell', 2, '923aa0f0cdd019c2', 1, '96c34fcc763756a6', [], { 'e2e/explore-shell-keys.spec.ts': v34ProductQa('1440') }],
+  // Round 8: the release head's 28 unowned paths (e9364899), in eight owners; one-path.spec.ts is Product QA's claim on its four width
+  // projects (its screenshots land in an unignored folder the affected checkout guard refuses, so it has no Repair row).
+  ['catalog-meters', 8, 'b4a556d75cb9a9b6', 4, '92cf17b8c09736a7', [], {}],
+  ['workspace-e2e-fixtures', 2, '279a5861f68b0bfd', 0, 'e3b0c44298fc1c14', ['e2e/billing-lifecycle.spec.ts', 'e2e/connection-sync-status.spec.ts', 'e2e/contrast-zoom-audit.spec.ts', 'e2e/dialog-focus-audit.spec.ts', 'e2e/failure-states-audit.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/recipe-continuation.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts'],
+    { 'e2e/one-path.spec.ts': V34_CHANGE_PROPOSALS_CLAIM }],
+  ['page-meter-cohort', 3, '4e53dbe11df63088', 4, 'dba6ae19c9e222f6', [], {}],
+  ['sale-opening', 2, 'c365a9e5bc27d9ac', 7, '1867b312c0ca17e9', [], {}],
+  ['sitemap-shallow', 1, '464a87b552d32ad9', 1, '464a87b552d32ad9', [], {}],
+  ['v34-held-feature', 3, 'a89767cf98a9d2c6', 3, '3852904d96f1827e', ['e2e/film-line-stability.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/visual-refinement.spec.ts'], {}],
+  ['v34-in-sentence-guard', 4, '0016458fb1e67a3e', 5, '048903ee5ea32aa4', ['e2e/mobile-landing.spec.ts', 'e2e/p4-followups.spec.ts'], {}],
+  ['v34-frame', 3, '3d16097bbf3b034b', 2, '22f3cd846a30de7c', ['e2e/docs-reading-layout.spec.ts'], {}],
+  ['v34-shell-client-weight', 2, '601b907f0fb5b3b8', 2, 'c5dc2177d17f842a', [], {}],
+  ['source-availability', 5, 'f4a2bee82d192af7', 4, 'a51c2808fd4904e3', [], {}],
+  ['root-stylesheet-scope', 2, '62941b95a605b38f', 2, 'e6fc291b724a57a1', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8570,7 +8585,7 @@ const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billi
 const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
 const v34Executed = map => map.unitFiles.length + map.browserFiles.length + map.databaseTests.length;
 const DB_HARNESS_SUITES = ['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs',
-  'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
+  'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
 test('affected v34 program owners: every owner keeps its exact paths, at least one executed suite and its external claims', () => {
   assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
   for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {
@@ -8702,8 +8717,13 @@ test('affected v34 program owners: the whole program delta maps with no failure,
   const external = [...new Map(V34_OWNER_PINS.flatMap(([, , , , , , claims]) => Object.entries(claims))).entries()].sort(([a], [b]) => a.localeCompare(b));
   assert.deepEqual(map.externalChecks.map(check => [check.file, check.runner]), external);
   for (const check of map.externalChecks) assert.ok(!map.unitFiles.includes(check.file) && (!map.browserFiles.includes(check.file) || v34RepairRunsPart(check.file)) && /^claim read at head/.test(check.status), check.file);
-  assert.deepEqual(map.browserFiles, ['e2e/compiler-contract.spec.ts', 'e2e/contrast-zoom-audit.spec.ts', 'e2e/home-v34.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/login-capability.spec.ts',
-    'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts', 'e2e/resources-filter.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts']);
+  // Round 8: the eight new owners add eighteen specs (12 -> 30), each a Repair row that imports or renders one of their paths.
+  assert.deepEqual(map.browserFiles, ['e2e/billing-lifecycle.spec.ts', 'e2e/compiler-contract.spec.ts', 'e2e/connection-sync-status.spec.ts', 'e2e/contrast-zoom-audit.spec.ts',
+    'e2e/dialog-focus-audit.spec.ts', 'e2e/docs-reading-layout.spec.ts', 'e2e/failure-states-audit.spec.ts', 'e2e/film-line-stability.spec.ts', 'e2e/home-v34.spec.ts',
+    'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/login-capability.spec.ts',
+    'e2e/marketing-story.spec.ts', 'e2e/mobile-landing.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/recipe-continuation.spec.ts',
+    'e2e/resources-filter.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/v34-matrix.spec.ts',
+    'e2e/v34-support.selftest.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
   for (const file of DB_HARNESS_SUITES) assert.ok(map.unitFiles.includes(file), file);
   assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
   const plan = affectedAskPlan(map);
@@ -8890,7 +8910,9 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
 });
 // WO-CI-7 round 3 (L8): owners for paths two running lanes add, ready before the files exist.
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
-  // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too, so none is in flight.
+  // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too. Round 8: WO-CI-16 is in
+  // flight (codex/v34-ci-16 at 2c52aa89) and adds the shell's current() and its client-weight suite.
+  // WO-CI-16 merged and moved to the program owners: nothing is pending at this head.
   assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
@@ -9102,13 +9124,16 @@ test('affected v34 claim grammar: no scalar hides a step or a key, a trigger fil
   const jobName = '    name: V34 matrix (chromium, drawer pass)\n', fakeStep = `    name: |\n      V34 matrix\n      - name: fake\n${env}        run: ${V34_MATRIX_RUN}\n`;
   const quotedName = quote => `      - name: ${quote}Run the V34\n        run: ${V34_MATRIX_RUN}\n        id: x${quote}\n`;
   const filter = (between, line) => edits(['  pull_request:\n  push:\n', `  pull_request:\n${between}${line}  push:\n`]);
+  // Round 8: the line a refusal names is read from the workflow at head (WO-CI-17 added steps above the V34 step: 320 -> 346).
+  const lineOf = needle => { assert.equal(text.split(needle).length, 2, needle); return text.slice(0, text.indexOf(needle)).split('\n').length; };
+  const stepLine = lineOf(stepName), jobLine = lineOf(jobName);
   const cases = [
     // The review's shapes (receipts/review-WO-CI-7/r20/r5/adv-probe2): A and B hide a run in a double- or single-quoted step name, D and F a
     // whole step in a literal job name; js-yaml reads no step running the claim (A, B, D) or one in production mode (F).
-    ['A: a double-quoted name hides a run; the real run sets V34_SERVER_MODE', edits([step, `${quotedName('"')}${env}        run: V34_SERVER_MODE=production ${V34_MATRIX_RUN}\n`]), /\(line 320: a quoted scalar that does not close on its line\)/],
-    ['B: a single-quoted name hides a run; the real run greps nothing', edits([step, `${quotedName("'")}${env}        run: ${V34_MATRIX_RUN} --grep @nothing\n`]), /\(line 320: a quoted scalar that does not close on its line\)/],
-    ['D: a literal job name holds a step; the real step is removed', edits([jobName, fakeStep], [step, '']), /line 288: a block scalar at jobs\.v34-matrix\.name,/],
-    ['F: a literal job name holds a step; the real step (a quoted run) runs in production mode', edits([jobName, fakeStep], [step, `${stepName}${env.replace('          V34_QA_OUT', '          V34_SERVER_MODE: production\n          V34_QA_OUT')}        run: "${V34_MATRIX_RUN}"\n`]), /line 288: a block scalar at jobs\.v34-matrix\.name,/],
+    ['A: a double-quoted name hides a run; the real run sets V34_SERVER_MODE', edits([step, `${quotedName('"')}${env}        run: V34_SERVER_MODE=production ${V34_MATRIX_RUN}\n`]), new RegExp(`\\(line ${stepLine}: a quoted scalar that does not close on its line\\)`)],
+    ['B: a single-quoted name hides a run; the real run greps nothing', edits([step, `${quotedName("'")}${env}        run: ${V34_MATRIX_RUN} --grep @nothing\n`]), new RegExp(`\\(line ${stepLine}: a quoted scalar that does not close on its line\\)`)],
+    ['D: a literal job name holds a step; the real step is removed', edits([jobName, fakeStep], [step, '']), new RegExp(`line ${jobLine}: a block scalar at jobs\\.v34-matrix\\.name,`)],
+    ['F: a literal job name holds a step; the real step (a quoted run) runs in production mode', edits([jobName, fakeStep], [step, `${stepName}${env.replace('          V34_QA_OUT', '          V34_SERVER_MODE: production\n          V34_QA_OUT')}        run: "${V34_MATRIX_RUN}"\n`]), new RegExp(`line ${jobLine}: a block scalar at jobs\\.v34-matrix\\.name,`)],
     // The same class on other keys and levels: a block scalar anywhere a claim reads but a step's run or with input, a quote left open anywhere.
     ['a folded step name', edits([stepName, '      - name: >-\n          Run the V34 matrix\n']), /a block scalar at jobs\.v34-matrix\.steps\[\d+\]\.name,/],
     ['a literal workflow name', edits(['name: Launch QA\n', 'name: |\n  Launch QA\n']), /line 1: a block scalar at name,/],
@@ -9549,3 +9574,111 @@ function assertV34ProgramEndpoint(path) {
   assert.deepEqual([map.failures, map.groups, map.unmappedPaths, map.unitFiles, map.browserFiles], [[], [group], [], [...owner.unitFiles].sort(), [...owner.browserFiles].sort()], path);
   return true;
 }
+
+// WO-CI-7 r9: an affected plan runs a selected file only in the projects where one of its cases can run. Synthetic specs under the
+// real mapped names go through the real reader (heldBrowserProjects) and the real planner; the held state follows the switch values.
+// The reader needs the `typescript` package. The pre-install selector step has none, so these five skip there and
+// run in the post-install step, which sets REPAIR_HELD_READER_REQUIRED=1: a missing parser is then a failure, not a skip.
+const heldReaderRequire = (await import('node:module')).createRequire(import.meta.url);
+function heldReaderMissing(t) {
+  try { heldReaderRequire.resolve('typescript'); return false; }
+  catch (error) {
+    if (error?.code !== 'MODULE_NOT_FOUND' || process.env.REPAIR_HELD_READER_REQUIRED === '1') throw error;
+    t.skip('typescript is not installed in this step; the post-install held-pairs step runs these');
+    return true;
+  }
+}
+function heldWorkspace(files) {
+  const workspace = mkdtempSync(resolve(tmpdir(), 'repair-held-'));
+  for (const [path, body] of Object.entries(files)) { mkdirSync(dirname(resolve(workspace, path)), { recursive: true }); writeFileSync(resolve(workspace, path), body); }
+  return workspace;
+}
+const HELD_SWITCH = mounted => `import { fileURLToPath } from "node:url";\nimport { phase } from "./phase";\nconst here: string = fileURLToPath(new URL("./", import.meta.url));\nexport const MOUNTED = ${mounted} as boolean;\nexport const PHASE = phase as "still" | "film";\nexport const showsStill = (project: string): boolean => PHASE === "still" && ["360", "390"].includes(project) && here.length > 0;\nexport const panel = { open: false };\n`;
+const HERO_SPEC = cases => `import { expect, test } from "@playwright/test";\nimport { MOUNTED, showsStill, panel } from "./support/switch";\n${cases}\n`;
+const HELD_CASES = 'test.describe("film", () => {\n  test.beforeEach(async ({ page }, info) => {\n    test.skip(!MOUNTED, "not mounted");\n  });\n  for (const motion of ["reduce", "no-preference"]) {\n    test(`plays ${motion}`, async ({ page }) => { await page.goto("/"); });\n  }\n});\ntest("while the still stands in", async ({ page }, testInfo) => {\n  test.skip(!["360", "390"].includes(testInfo.project.name), "phone");\n  test.skip(!showsStill(testInfo.project.name), "the film is the phone hero");\n});';
+const writeSwitch = (workspace, mounted, phase = 'film') => {
+  mkdirSync(resolve(workspace, 'e2e/support'), { recursive: true });
+  writeFileSync(resolve(workspace, 'e2e/support/switch.ts'), HELD_SWITCH(mounted));
+  writeFileSync(resolve(workspace, 'e2e/support/phase.ts'), `export const phase: string = "${phase}";\n`);
+};
+const HERO_FILE = 'e2e/landing-hero-mobile.spec.ts';
+
+test('affected held pairs: every case skipped by an imported switch is held in each mapped project, and runs again when it flips', t => { if (heldReaderMissing(t)) return;
+  for (const [mounted, phase, expected] of [[false, 'film', [[HERO_FILE, ['360', '390']]]], [true, 'film', []], [false, 'still', []]]) {
+    const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC(HELD_CASES) });
+    try {
+      writeSwitch(workspace, mounted, phase);
+      const held = heldBrowserProjects([HERO_FILE], workspace);
+      assert.deepEqual([...held], expected, `${mounted}/${phase}`);
+      assert.deepEqual(planBrowserRuns([HERO_FILE], false, held).map(run => run.project), expected.length ? [] : ['390', '360']);
+    } finally { rmSync(workspace, { recursive: true, force: true }); }
+  }
+  assert.deepEqual(planBrowserRuns([HERO_FILE], false).map(run => run.project), ['390', '360'], 'without held pairs the planner is unchanged');
+});
+
+test('affected held pairs: a file-level skip read through a relative import chain holds the file; the plan keeps its other files', t => { if (heldReaderMissing(t)) return;
+  const workspace = heldWorkspace({
+    'lib/triage-rollout.ts': 'export const TRIAGE_ENABLED = false;\nexport function disabled(extra: Record<string, unknown> = {}) { return extra; }\n',
+    'lib/approval-rollout.ts': 'import { TRIAGE_ENABLED } from "./triage-rollout";\nconst SWITCH = false;\nexport const APPROVAL_ENABLED: boolean = SWITCH || TRIAGE_ENABLED;\n',
+    'e2e/workspace-intake-triage.spec.ts': 'import { test } from "@playwright/test";\nimport { APPROVAL_ENABLED } from "../lib/approval-rollout";\ntest.skip(!APPROVAL_ENABLED, "ships only with the switch");\ntest("a", async () => {});\ntest("b", async () => {});\n',
+    'e2e/overlap-audit.spec.ts': 'import { test } from "@playwright/test";\ntest("draws nothing over text", async () => {});\n',
+  });
+  try {
+    const files = ['e2e/overlap-audit.spec.ts', 'e2e/workspace-intake-triage.spec.ts'];
+    const held = heldBrowserProjects(files, workspace);
+    assert.deepEqual([...held], [['e2e/workspace-intake-triage.spec.ts', ['audit']]]);
+    assert.deepEqual(planBrowserRuns(files, false, held), [{ kind: 'project', project: 'audit', files: ['e2e/overlap-audit.spec.ts'] }]);
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
+test('affected held pairs: what the reader cannot prove held stays selected, so the one-passing-test rule still decides', t => { if (heldReaderMissing(t)) return;
+  const cases = {
+    'a case with no skip': `${HELD_CASES}\ntest("always", async () => {});`,
+    'a predicate it cannot evaluate': 'test("narrow", async ({ page }) => {\n  test.skip(isNarrow(page));\n});',
+    'a skip nested in an if': 'test("webkit", async ({ browserName }) => {\n  if (browserName === "webkit") test.skip(!MOUNTED, "x");\n});',
+    'a skip after a statement that can fail first': 'test("late", async ({ page }) => {\n  await page.goto("/");\n  test.skip(!MOUNTED, "x");\n});',
+    'a declared skipped case': 'test.skip("declared", async () => {});',
+    'a fixme case': 'test.fixme("later", async () => {});',
+    'a zero-argument skip': 'test("bare", async () => {\n  test.skip();\n});',
+    'a member of a name the spec does not import': 'test("local", async ({ page }, testInfo) => {\n  test.skip(testInfo.retry === 0);\n});',
+    'an imported member that is absent': 'test("absent", async () => {\n  test.skip(!panel.missing);\n});',
+    'a skip on a name the spec does not import': 'test("unimported", async () => {\n  test.skip(!LOCAL_SWITCH);\n});',
+    'a comparison of a non-primitive': 'test("object", async () => {\n  test.skip(panel !== "x");\n});',
+    'no case at all': 'const nothing = 1;',
+  };
+  for (const [label, body] of Object.entries(cases)) {
+    const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC(body) });
+    try { writeSwitch(workspace, false); assert.deepEqual([...heldBrowserProjects([HERO_FILE], workspace)], [], label); }
+    finally { rmSync(workspace, { recursive: true, force: true }); }
+  }
+  const unloadable = heldWorkspace({
+    'e2e/support/switch.ts': 'import React from "react";\nexport const MOUNTED = Boolean(React) && false;\n',
+    [HERO_FILE]: 'import { test } from "@playwright/test";\nimport { MOUNTED } from "./support/switch";\ntest("a", async () => {\n  test.skip(!MOUNTED, "x");\n});\n',
+  });
+  try { assert.deepEqual([...heldBrowserProjects([HERO_FILE], unloadable)], [], 'a switch module that imports a package is not read'); }
+  finally { rmSync(unloadable, { recursive: true, force: true }); }
+});
+
+test('affected held pairs: a project-name skip holds only the projects it names; a missing selected spec stays selected for the report rule', t => { if (heldReaderMissing(t)) return;
+  const workspace = heldWorkspace({ [HERO_FILE]: HERO_SPEC('test.describe("phone", () => {\n  test.beforeEach(async ({ page }, info) => {\n    test.skip(info.project.name !== "360", "360 only");\n  });\n  test("a", async () => {});\n});\ntest("b", async () => {\n  test.skip(test.info().project.name === "390", "not at 390");\n});') });
+  try {
+    writeSwitch(workspace, false);
+    assert.deepEqual([...heldBrowserProjects([HERO_FILE], workspace)], [[HERO_FILE, ['390']]]);
+    const missing = heldBrowserProjects(['e2e/film-line-stability.spec.ts'], workspace);
+    assert.deepEqual([...missing], []);
+    assert.deepEqual(planBrowserRuns(['e2e/film-line-stability.spec.ts'], false, missing), [{ kind: 'project', project: '390', files: ['e2e/film-line-stability.spec.ts'] }]);
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
+test('affected held pairs at this head: the hosted refusals of 77d68786 are exactly the pairs the switches hold', t => { if (heldReaderMissing(t)) return;
+  const nextjs = fileURLToPath(new URL('../', import.meta.url));
+  const read = path => readFileSync(resolve(nextjs, path), 'utf8');
+  const filmHeld = read('lib/hero-phone-mode.ts').includes('export const PHONE_HERO = "film" as "still" | "film";') && !/components\/landing-v2\//.test(read('app/page.tsx'));
+  const intakeHeld = read('lib/intake-approval-rollout.ts').includes('const APPROVAL_LINEAGE_SWITCH = false;') && read('lib/intake-triage-rollout.ts').includes('export const INTAKE_TRIAGE_ROLLOUT_ENABLED = false;');
+  const files = ['e2e/film-line-stability.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/landing-v2.spec.ts', 'e2e/failure-states-audit.spec.ts'];
+  const expected = [
+    ...(filmHeld ? [['e2e/film-line-stability.spec.ts', ['390']], ['e2e/landing-hero-film-loading.spec.ts', ['390']], ['e2e/landing-hero-mobile.spec.ts', ['360', '390']]] : []),
+    ...(intakeHeld ? [['e2e/workspace-intake-triage.spec.ts', ['audit']]] : []),
+  ];
+  assert.deepEqual([...heldBrowserProjects(files, nextjs)], expected);
+});

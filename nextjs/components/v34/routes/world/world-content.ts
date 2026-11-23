@@ -34,7 +34,7 @@ export const DOMAINS = {
 
 export const SOURCES = {
   title: "Inspect the original sources.",
-  lead: "Every record names the document it was read from. These are the public documents the reference World cites.",
+  lead: "Every curated reference record names the public document it cites. These are the documents the reference World cites.",
   columns: ["Source", "Revision or date", "What it is", "Original"],
   linkLabel: "Open original",
 } as const;

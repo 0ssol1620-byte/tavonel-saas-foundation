@@ -42,7 +42,6 @@ export const SOURCES = {
   items: [
     { label: "FHFA HPI", text: "Regional price indexes at published geographies.", href: "https://www.fhfa.gov/data/hpi" },
     { label: "Census Building Permits", text: "Permits by published geographic scope.", href: "https://www.census.gov/construction/bps/" },
-    { label: "FRED", text: "Rate and macro series. Check rights and vintages.", href: "https://fred.stlouisfed.org/" },
   ],
   linkLabel: "Open the source",
 } as const;

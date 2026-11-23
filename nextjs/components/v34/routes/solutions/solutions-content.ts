@@ -35,7 +35,7 @@ export const ROLES = {
     link("personal", "Individuals", "Your own PDFs, cited.", "Compile your own PDFs into a World, follow each answer back to the page it came from and read it from an MCP client."),
     link("research", "Students and researchers", "A research record that cites its sources.", "Keep papers and notes as a World where every claim links to the source that supports it."),
     link("enterprise", "Organizations", "Scope a deployment with us.", "Residency and private deployment are scoped with you before anything is promised."),
-    link("developers", "Developers and agent builders", "Read a World from code.", "Use read-only MCP tools and the HTTP API, with PKCE sign-in and API keys you can revoke."),
+    link("developers", "Developers and agent builders", "Read a World from code.", "Use read-only MCP tools on a local server and the HTTP API, with API keys from a paid plan that you can revoke."),
   ] satisfies readonly SolutionLink[],
 } as const;
 

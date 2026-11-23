@@ -3284,11 +3284,12 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
       'e2e/v34-support.selftest.spec.ts': v34MatrixJobClaim('v34-selftest'),
     }),
   }),
-  // db-harness (L5, L7): the local database harness and the race harnesses. Their seven node:test suites run without a DSN and with
-  // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script.
+  // db-harness (L5, L7): the local database harness and the race harnesses. Their eight node:test suites run without a DSN and with
+  // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script. Round 8: WO-CAT-8's
+  // plan-allowance race joins (its suite imports the script and spawns it without the opt-in and against a closed port).
   'db-harness': Object.freeze({
-    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
-    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/plan-allowance-race.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3356,12 +3357,115 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({ 'e2e/explore-shell-keys.spec.ts': productQaClaim('1440') }),
   }),
+  // Round 8 (release head e9364899): the 28 paths the release lanes and wave 5 added without an owner. Each group names the suites
+  // that import, render or read its paths. None binds a path another owner keeps: those owners' exact-owner pins stay as reviewed, and
+  // the three keepers that do not select the new suites yet (app/sitemap.ts, the settle and legacy status routes, the two collection
+  // read routes) are recorded for the lead rather than widened here.
+  // catalog-meters (WO-CAT-4, WO-CAT-3B, WO-CAT-8): the knowledge-query meter and the three v1 routes it meters. kqu-meter.test.ts
+  // imports the meter and all three routes; the other three suites run themselves (plan-meter-refusals reads the OpenAPI route and the
+  // failure copy, billing-status-notices calls the billing status route, subscription-upgrade-migration reads migration 0011).
+  'catalog-meters': Object.freeze({
+    paths: Object.freeze(['app/api/v1/collections/[id]/ask/route.ts', 'app/api/v1/collections/[id]/search/route.ts', 'app/api/v1/world/[id]/ask/route.ts', 'lib/billing-status-notices.test.ts', 'lib/kqu-meter.test.ts', 'lib/kqu-meter.ts', 'lib/plan-meter-refusals.test.ts', 'lib/subscription-upgrade-migration.test.ts']),
+    unitFiles: Object.freeze(['lib/billing-status-notices.test.ts', 'lib/kqu-meter.test.ts', 'lib/plan-meter-refusals.test.ts', 'lib/subscription-upgrade-migration.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // workspace-e2e-fixtures (WO-CAT-3B, WO-CAT-8 item 8): the shared workspace fixture and the one-path workspace spec, whose billing
+  // status mocks gained planCode. A fixture change runs every spec that imports it and has a Repair row (detail-integrity is left out:
+  // it runs only behind its own detail gate); those specs open the same workspace shell under the same mocks. one-path.spec.ts is not
+  // a Repair row: at module load it writes screenshots under ../.chatgpt2codex, which is not ignored, and the affected checkout guard
+  // refuses untracked paths (assertAffectedCheckout). Product QA runs it on the four width projects: a claim read at head.
+  'workspace-e2e-fixtures': Object.freeze({
+    paths: Object.freeze(['e2e/fixtures/workspace-fixture.ts', 'e2e/one-path.spec.ts']),
+    unitFiles: Object.freeze([]),
+    browserFiles: Object.freeze(['e2e/billing-lifecycle.spec.ts', 'e2e/connection-sync-status.spec.ts', 'e2e/contrast-zoom-audit.spec.ts', 'e2e/dialog-focus-audit.spec.ts', 'e2e/failure-states-audit.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/recipe-continuation.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts']),
+    externalChecks: Object.freeze({
+      'e2e/one-path.spec.ts': Object.freeze({ kind: 'playwright', workflow: '.github/workflows/launch-qa.yml', job: 'product-qa', run: LAUNCH_QA_PRODUCT_STEP, env: LAUNCH_QA_PRODUCT_ENV, projects: Object.freeze(['1440', '390', '360', 'reduced-motion']) }),
+    }),
+  }),
+  // page-meter-cohort (WO-REL-2): the page meter behind a workspace cohort. page-meter-cohort.test.ts imports it; the settle route and
+  // the legacy status route import it, and settle-route-worker-body.test.ts, billing-secrets.test.ts and status-route-contract.test.ts
+  // call those routes.
+  'page-meter-cohort': Object.freeze({
+    paths: Object.freeze(['lib/page-meter-cohort.test.ts', 'lib/page-meter-cohort.ts', 'lib/settle-route-worker-body.test.ts']),
+    unitFiles: Object.freeze(['lib/billing-secrets.test.ts', 'lib/page-meter-cohort.test.ts', 'lib/settle-route-worker-body.test.ts', 'lib/status-route-contract.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // sale-opening (WO-REL-1): the public sale status and the plan-name rule. Every suite that imports public-status.ts, and the plan-name
+  // suite, which runs itself.
+  'sale-opening': Object.freeze({
+    paths: Object.freeze(['lib/public-plan-names.test.ts', 'lib/public-status.ts']),
+    unitFiles: Object.freeze(['lib/checkout-customer-data-gate.test.ts', 'lib/checkout-quote.test.ts', 'lib/cta-truth.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/operator-status.test.ts', 'lib/public-plan-names.test.ts', 'lib/public-status.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // sitemap-shallow (WO-CI-37): the shallow-clone suite for app/sitemap.ts, which runs itself.
+  'sitemap-shallow': Object.freeze({
+    paths: Object.freeze(['lib/sitemap-shallow.test.ts']),
+    unitFiles: Object.freeze(['lib/sitemap-shallow.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-held-feature (WO-CI-18): the held-feature gate, read from Home's import graph. Every suite that imports the import graph
+  // (held-flag through the gate, retained-shell, link-rows) and every spec with a Repair row that imports the gate.
+  'v34-held-feature': Object.freeze({
+    paths: Object.freeze(['e2e/support/held-feature.ts', 'lib/v34/held-flag.test.ts', 'lib/v34/import-graph.ts']),
+    unitFiles: Object.freeze(['lib/v34/held-flag.test.ts', 'lib/v34/link-rows.test.ts', 'lib/v34/retained-shell.test.ts']),
+    browserFiles: Object.freeze(['e2e/film-line-stability.spec.ts', 'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/marketing-story.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/visual-refinement.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-in-sentence-guard (WO-CI-30, WO-CI-36, WO-CI-37): the in-sentence link guard and its browser classifier. Every suite that imports
+  // the guard and both specs that import the classifier.
+  'v34-in-sentence-guard': Object.freeze({
+    paths: Object.freeze(['e2e/in-sentence-links.ts', 'lib/v34/in-sentence-guard.test.ts', 'lib/v34/in-sentence-guard.ts', 'lib/v34/link-rows.test.ts']),
+    unitFiles: Object.freeze(['lib/v34/in-sentence-guard.test.ts', 'lib/v34/link-rows.test.ts', 'lib/v34/routes-contact.test.ts', 'lib/v34/routes-enterprise.test.ts', 'lib/v34/routes-security.test.ts']),
+    browserFiles: Object.freeze(['e2e/mobile-landing.spec.ts', 'e2e/p4-followups.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-frame (WO-CI-19, WO-CI-21): the server-only route-template map and the shell's server-side section state. route-templates.test.ts
+  // imports the map; shell-nav-state.test.ts renders the V34 page frame, which imports it; docs-reading-layout.spec.ts imports it.
+  'v34-frame': Object.freeze({
+    paths: Object.freeze(['lib/v34/route-templates.test.ts', 'lib/v34/route-templates.ts', 'lib/v34/shell-nav-state.test.ts']),
+    unitFiles: Object.freeze(['lib/v34/route-templates.test.ts', 'lib/v34/shell-nav-state.test.ts']),
+    browserFiles: Object.freeze(['e2e/docs-reading-layout.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // v34-shell-client-weight (WO-CI-16, merged): the shell's own current() and the suite that keeps every client module of the shell
+  // and home away from next/server and the route registry; nav.test.ts holds current()'s cases.
+  'v34-shell-client-weight': Object.freeze({
+    paths: Object.freeze(['components/v34/shell/current.ts', 'lib/v34/shell-client-weight.test.ts']),
+    unitFiles: Object.freeze(['lib/v34/nav.test.ts', 'lib/v34/shell-client-weight.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // source-availability (WO-REL-4): which sources a workspace is offered. configuredOAuthProviders() is the one server-side fact
+  // the /api/v1/oauth-connectors route, the /connect cards and the workspace source tiles read; its own suite, the tile render
+  // suite, the /connect render suite and the copy pins exercise them.
+  'source-availability': Object.freeze({
+    paths: Object.freeze(['app/api/v1/oauth-connectors/route.ts', 'components/workspace/source-choices.tsx', 'lib/connector-oauth-secrets.test.ts', 'lib/connector-oauth-secrets.ts', 'lib/workspace-source-choices.test.ts']),
+    unitFiles: Object.freeze(['lib/brand-copy.test.ts', 'lib/connector-oauth-secrets.test.ts', 'lib/v34/routes-connect.test.ts', 'lib/workspace-source-choices.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // root-stylesheet-scope (WO-CI-16d): which sheets the root imports and which routes import the workspace sheets instead.
+  // The two token suites pin both ends, so a sheet cannot drift back into every route's first paint unnoticed.
+  'root-stylesheet-scope': Object.freeze({
+    paths: Object.freeze(['app/dev/compile-stage/page.tsx', 'app/globals.css']),
+    unitFiles: Object.freeze(['lib/design-tokens.test.ts', 'lib/landing-v2-tokens.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
-// so a suite it names that is absent today can only be selected by the change that adds it. None at this head (round 6: WO-CI-6C merged
-// and its spec joined v34-retained-shell).
+// so a suite it names that is absent today can only be selected by the change that adds it.
+// Round 8: WO-CI-16 (codex/v34-ci-16 at 2c52aa89) adds the shell's own current() and the client-weight suite that pins it to
+// lib/v34/nav; nav.test.ts holds current()'s cases at this head. Its other write scope (components/v34/shell/**,
+// components/v34/routes/home/**, app/layout.tsx) is owned file by file; a further new file there needs its entry. WO-CI-38 (f07e2a3c)
+// changes four existing suites, each already owned.
 // WO-AN-7B's migration 20261117130300 and its rollback draft (merged) need no entry: every supabase/{migrations,tests,drafts}/*.sql is
 // the database-contract group's.
+// WO-CI-16 merged and moved to the program owners: nothing is pending.
 export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({});
 // D-4 and WO-AN-1: the program's pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
 // rehearsal (round 7: WO-CAT-3's catalog_v2_offer_codes.sql joins the four). Fixtures that build a SQL-bearing head take this list, never

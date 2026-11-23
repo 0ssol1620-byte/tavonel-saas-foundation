@@ -60,6 +60,7 @@ import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
+import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
@@ -194,19 +195,7 @@ type GroundedAnswer = {
   receipt: { collectionId: string; manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
-/*
-  These are action labels, not qualification claims. Workspace tells a user how access works;
-  /integrations owns the evidence-backed support level and provider-specific limitations.
-*/
-const WORKSPACE_SOURCE_CHOICES = [
-  { name: "Google Drive", availability: "Read-only" },
-  { name: "Dropbox", availability: "Read-only" },
-  { name: "OneDrive", availability: "Read-only" },
-  { name: "File Server", availability: "Assisted setup" },
-  { name: "Amazon S3", availability: "Assisted setup" },
-  { name: "Cloudflare R2", availability: "Assisted setup" },
-  { name: "MinIO", availability: "Assisted setup" },
-] as const;
+/* The source choices under the drop zone, and the server fact that decides them: components/workspace/source-choices.tsx. */
 
 /** One shape for the billing card and the post-checkout wait (journey A4) that refreshes it. */
 type BillingAccount = BillingStatusAccount;
@@ -313,7 +302,7 @@ export default function WorkspacePage() {
   const [notice, setNotice] = useState<string | { alert: string } | null>(null);
   const notifyCheckout = useCallback((text: string, tone: NoticeTone) => setNotice(tone === "alert" ? { alert: text } : text), []);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
-  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
+  const [accessSource, setAccessSource] = useState<WorkspaceAccessSource>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   /** Why a closed workspace is closed, as the shell read it from the v2 bootstrap; "legacy" on v1. */
   const [sourcePending, setSourcePending] = useState<SourcePendingReason | "legacy">("legacy");
@@ -3223,16 +3212,9 @@ export default function WorkspacePage() {
                 {/*
                   The availability line under each name is WORKSPACE_SOURCE_CHOICES verbatim.
                   Nothing here states a support level the capability manifest does not; the
-                  provider-specific limits stay on /integrations.
+                  provider-specific limits stay on /connect.
                 */}
-                <div className="workspace-source-choices" aria-label="Available source connections">
-                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
-                    <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
-                      <span>{source.name}</span>
-                      <small>{source.availability}</small>
-                    </button>
-                  ))}
-                </div>
+                <WorkspaceSourceChoices accessSource={accessSource} onChoose={() => navigateSurface("connections")} />
               </div>
               )}
               {staging ? (
@@ -4120,8 +4102,8 @@ export default function WorkspacePage() {
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Google Drive and file-server connections are included in every paid plan. The free evaluation works with files you upload directly."
-                : "Google Drive and file-server connections are included in every paid plan. This workspace has no active plan."}</p>
+                ? "Local-folder connections are included in every paid plan. The free evaluation works with files you upload directly."
+                : "Local-folder connections are included in every paid plan. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"

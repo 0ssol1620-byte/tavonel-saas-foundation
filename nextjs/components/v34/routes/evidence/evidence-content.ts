@@ -111,7 +111,7 @@ export const PROVENANCE_RECORD_ID = "control-ac-1";
 export const PROVENANCE = {
   eyebrow: "Public reference corpus",
   title: "Every record shows its authority.",
-  lead: "Every record names its source, the revision it was read from and where in that source it sits. The first table prints one record; the second lists the sources behind this page.",
+  lead: "Every curated reference record names its source and that source's revision. The first table prints one record; the second lists the sources behind this page.",
   recordColumns: ["Field", "Value"],
   sourceColumns: ["Source", "Revision or date", "What it is", "Original"],
   linkLabel: "Open original",

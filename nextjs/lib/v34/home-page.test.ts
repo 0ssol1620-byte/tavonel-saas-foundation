@@ -196,6 +196,19 @@ describe("links and the primary action", () => {
     expect(html).toContain(createWorldAction().label);
   });
 
+  /*
+    WO-CI-16c: the hero World image is the page's LCP element. `priority` alone preloads it at Low
+    (Lighthouse lcp-discovery-insight: "fetchpriority=high should be applied"); it is the one image
+    on the page fetched at high priority, so no other image competes with it.
+  */
+  it("fetches the hero World image, and only it, at high priority", () => {
+    const html = renderToStaticMarkup(createElement(HomeBody));
+    const imgs = html.match(/<img\b[^>]*>/g) ?? [];
+    const high = imgs.filter((tag) => /\sfetchpriority="high"/i.test(tag));
+    expect(high).toHaveLength(1);
+    expect(high[0]).toContain('src="/v34/world-layers.svg"');
+  });
+
   it("scrolls the secondary action to a section that exists", () => {
     const html = renderToStaticMarkup(createElement(HomeBody));
     expect(html).toContain('href="#walkthrough"');

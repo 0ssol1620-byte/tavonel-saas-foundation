@@ -1,7 +1,7 @@
 import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers } from "./billing-catalog";
+import { BILLING_OFFERS, deliveredForSale, planAvailability, readConfiguredBillingOffers } from "./billing-catalog";
 import { OFFER_CODES, REVENUE_PATHS, revenuePathForOffer, type RevenuePath } from "./revenue-paths";
 
 // /pricing is rendered below; its header reads the route it is on.
@@ -23,10 +23,12 @@ describe("revenue paths", () => {
     expect(OFFER_CODES.length).toBe(6);
     const everyEnv = Object.fromEntries(OFFER_CODES.map((c, i) => [BILLING_OFFERS[c].priceEnv, `pri_${String(i).repeat(26)}`]));
     const configured = readConfiguredBillingOffers(everyEnv);
-    // WO-REL-1: with every price set, Personal and Developer are purchasable, so their paths are sold self-serve.
-    expect(OFFER_CODES.filter((code) => planAvailability(code, configured) === "purchasable")).toEqual(["personal", "developer"]);
+    // WO-REL-1: with every price set (and, WO-REL-5, the page meter on for every workspace), Personal and Developer are
+    // purchasable, so their paths are sold self-serve.
+    const metered = deliveredForSale({ TAVONEL_PAGE_METER_COHORT: "*" });
+    expect(OFFER_CODES.filter((code) => planAvailability(code, configured, metered) === "purchasable")).toEqual(["personal", "developer"]);
     for (const code of OFFER_CODES) {
-      if (planAvailability(code, configured) === "purchasable") expect(revenuePathForOffer(code).state, code).toBe("sold_self_serve");
+      if (planAvailability(code, configured, metered) === "purchasable") expect(revenuePathForOffer(code).state, code).toBe("sold_self_serve");
     }
     // With no price set nothing is purchasable, whatever the table says (the closed sale of build 1).
     for (const code of OFFER_CODES) expect(planAvailability(code, readConfiguredBillingOffers({})), code).not.toBe("purchasable");
@@ -68,12 +70,16 @@ describe("revenue paths", () => {
       vi.unstubAllEnvs();
     });
 
-    /** Today's page, or (saleOpen) the same release with its two V22 prices set: build 2 of the release plan. */
-    async function pricingHtml(seam?: { saleOpen: boolean }) {
+    /**
+     * Today's page, or (saleOpen) the same release with its two V22 prices set: build 2 of the release plan. WO-REL-5:
+     * build 2 also sets TAVONEL_PAGE_METER_COHORT to `*`; `cohort` replaces that value (undefined = unset).
+     */
+    async function pricingHtml(seam?: { saleOpen: boolean; cohort?: string | undefined }) {
       vi.resetModules();
       if (seam?.saleOpen) {
         vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"c".repeat(26)}`);
         vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"d".repeat(26)}`);
+        vi.stubEnv("TAVONEL_PAGE_METER_COHORT", "cohort" in seam ? seam.cohort : "*");
         // A Buy action also needs the deployment's purchase open: the launch flags `nextjs/vercel.json` sets in production.
         for (const [name, value] of Object.entries({
           VERCEL_ENV: "production", COMMERCIAL_MODE: "live", TAVONEL_BILLING_LAUNCH_APPROVED: "true", ACCESS_MODE: "self_service",
@@ -129,8 +135,9 @@ describe("revenue paths", () => {
 
     it("appears only in a Request access allowance line or overage row on today's page", async () => {
       const html = await pricingHtml();
-      // The rule reads what it guards: four request-access allowance lines and four overage rows, and they name KQU.
-      expect(allowedRanges(html)).toHaveLength(8);
+      // The rule reads what it guards: four request-access allowance lines and two overage rows (PCU, KQU; WO-REL-4
+      // removed the storage and extra-seat rows, lead decision C3), and they name KQU.
+      expect(allowedRanges(html)).toHaveLength(6);
       expect(text(html)).toMatch(/\bKQU\b/);
       expect(misplacedTerms(html)).toEqual([]);
     }, 180_000);
@@ -139,10 +146,21 @@ describe("revenue paths", () => {
       const html = await pricingHtml({ saleOpen: true });
       expect(text(html)).toContain("Buy Personal");
       expect(text(html)).toContain("Buy Developer");
-      // Team and Business keep Request access, and so does every overage row: 2 + 4 places.
-      expect(allowedRanges(html)).toHaveLength(6);
+      // Team and Business keep Request access, and so does every overage row: 2 + 2 places.
+      expect(allowedRanges(html)).toHaveLength(4);
       expect(misplacedTerms(html)).toEqual([]);
     }, 180_000);
+
+    it("WO-REL-5: with both prices set but the page meter on for a canary list, unset or malformed, every plan is Request access", async () => {
+      for (const cohort of [undefined, "pilot-canary01", " *"]) {
+        const html = await pricingHtml({ saleOpen: true, cohort });
+        expect(text(html), JSON.stringify(cohort)).not.toMatch(/\bBuy\b/);
+        // Four plan cards and the two overage rows (PCU, KQU) WO-REL-4 kept: 4 + 2 places.
+        expect(allowedRanges(html), JSON.stringify(cohort)).toHaveLength(6);
+        expect(html, JSON.stringify(cohort)).not.toContain("pilot-canary");
+        vi.unstubAllEnvs();
+      }
+    }, 540_000);
 
     /*
       WO-REL-1 flipped KQU and storage to sold (their meters are delivered), so the failure paths below run the guard

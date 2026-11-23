@@ -24,7 +24,7 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [Methods](https://tavonel.com/methods): Follow the method from source file to evidence region, record and relationship, including how supported formats are read and how each step is checked.
 - [Capabilities](https://tavonel.com/capabilities): Every capability listed with its current state, from the compiler contract clauses to supported formats.
 - [Reference walkthrough](https://tavonel.com/studio): Step through compiling a small sample into a World, from source file to evidence region to a cited answer.
-- [Connect](https://tavonel.com/connect): Configuration steps for reading a World from an MCP client over stdio or through the HTTP API, with PKCE sign-in and read-only tools.
+- [Connect](https://tavonel.com/connect): Configuration steps for reading a World from an MCP client through a local stdio server or the HTTP API, with an API key and read-only tools.
 - [Developers](https://tavonel.com/developers): API, MCP, retrieval packages and signed exports.
 - [Solutions](https://tavonel.com/solutions): The five documented uses, each linking to its own page: who it is for, the path from source to World, what the workflow leaves behind, and where it stops. A described use, not a completed customer case.
 - [Personal](https://tavonel.com/personal): Compile your own PDFs into a World of your own, cite answers back to the page they came from and revoke any API key at any time.
@@ -39,8 +39,8 @@ Indexing: public product, documentation, research and trust pages are indexable.
 - [How an AI client reads a World through MCP](https://tavonel.com/journal/mcp): What the Model Context Protocol is and how a client connects to TAVONEL.
 - [What changed in a NIST control catalog revision](https://tavonel.com/journal/revision): A worked example of a standards revision, traced to the published notice.
 - [A research record built from public sources](https://tavonel.com/journal/research): A worked method for a literature review, with each claim tied to its source passage.
-- [Pricing](https://tavonel.com/pricing): Free Evaluation, Developer, Team and Enterprise access.
-- [Billing](https://tavonel.com/billing): What a credit is, how many credits a page uses, how refunds work and what happens when a balance runs out.
+- [Pricing](https://tavonel.com/pricing): Free, Personal, Developer, Team, Business and Enterprise, and for each plan whether it is bought online or requested.
+- [Billing](https://tavonel.com/billing): Credits pay for the pages a compile reads, and the balance is checked before a compile starts. Plans, prices and refund terms are on the pricing page.
 - [Security](https://tavonel.com/security): Data path, tenant isolation, retention and security controls.
 - [Trust Center](https://tavonel.com/trust): The index of what this deployment publishes about itself, and what it does not.
 - [Company](https://tavonel.com/company): Who operates TAVONEL, the principles behind the product and where to find the legal documents.

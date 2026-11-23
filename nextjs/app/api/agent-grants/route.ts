@@ -14,13 +14,18 @@ const MAX_BODY_BYTES = 1_024;
 
   GET  lists the grants the signed-in person made in their workspace, revoked ones included. It is
        never behind the flag and never plan-gated: a person must always be able to find what to
-       disconnect. No token, no hash, no prefix.
+       disconnect. No token, no hash, no prefix. `creatable` (WO-REL-5) is whether POST would create a
+       grant for this workspace: the same `grantCreatable` POST refuses on, one boolean, never the
+       flag's name or the cohort.
   POST creates a grant and its one `tvnl_agt_` credential and answers the token once, `no-store`.
        Flag off, or a workspace outside the cohort: 404, identical to a route that does not exist.
        A free evaluation cannot mint a credential (402), exactly as with developer keys.
 */
 
 const notFound = () => NextResponse.json({ code: "NOT_FOUND" }, { status: 404, headers: NO_STORE });
+
+/** The flag and the cohort: the two facts POST refuses on, and the one GET answers as `creatable`. */
+const grantCreatable = (workspaceKey: string) => agentProposalsEnabled() && agentProposalsCohortRefusal(workspaceKey) === null;
 
 /** `{ clientLabel }` and nothing else, at most MAX_BODY_BYTES. Any other shape is a 4xx, never a throw. */
 async function readClientLabel(request: Request): Promise<{ ok: true; clientLabel: string } | { ok: false; code: string; status: 400 | 413 }> {
@@ -43,15 +48,17 @@ export async function GET(request: Request) {
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
   const result = await listAgentGrants(auth.principal.workspaceKey, auth.principal.userId);
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: STATUS[result.code], headers: NO_STORE });
-  return NextResponse.json({ code: "OK", grants: result.grants, truncated: result.truncated }, { headers: NO_STORE });
+  return NextResponse.json({
+    code: "OK", grants: result.grants, truncated: result.truncated, creatable: grantCreatable(auth.principal.workspaceKey),
+  }, { headers: NO_STORE });
 }
 
 export async function POST(request: Request) {
   if (!agentProposalsEnabled()) return notFound();
   const auth = await requireFoundationSession(request, "observer");
   if (!auth.ok) return NextResponse.json({ code: auth.code }, { status: auth.status, headers: NO_STORE });
-  // Outside the cohort reads exactly like the flag being off.
-  if (agentProposalsCohortRefusal(auth.principal.workspaceKey) !== null) return notFound();
+  // Outside the cohort reads exactly like the flag being off. The same function GET answers `creatable` with.
+  if (!grantCreatable(auth.principal.workspaceKey)) return notFound();
   if (auth.principal.accessSource === "trial") {
     return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
   }

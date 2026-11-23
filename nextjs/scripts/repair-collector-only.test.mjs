@@ -771,7 +771,7 @@ test('shared browser project map exclusion accepts the current runner and reject
   const runner=readFileSync(fileURLToPath(new URL('./run-repair-check.mjs',import.meta.url)),'utf8').replace(/\r\n/g,'\n'),checker=readFileSync(fileURLToPath(new URL('./verify-repair-workflows.mjs',import.meta.url)),'utf8');
   assert.ok(checker.includes("import { sharedBrowserProjectsMapExcludesExplore } from './repair-collector-only.mjs';"));assert.ok(checker.includes('assert(sharedBrowserProjectsMapExcludesExplore(runner)&&'));
   assert.ok(!checker.includes(`!runner.includes("['e2e/explore.spec.ts',")`),'the whole-runner negative substring is removed');
-  for(const kept of ["runner.includes('export function planExploreRepairBrowserRuns(files,runDetailIntegrity)')","runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity)')"])assert.ok(checker.includes(kept),kept);
+  for(const kept of ["runner.includes('export function planExploreRepairBrowserRuns(files,runDetailIntegrity)')","runner.includes('plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity, held)')"])assert.ok(checker.includes(kept),kept);
   // The legitimate separate Explore declaration lives outside the shared map and is accepted.
   assert.ok(runner.includes("export const EXPLORE_REPAIR_BROWSER_FILES=Object.freeze(['e2e/explore.spec.ts','e2e/solutions-workflows.spec.ts']);"));
   assert.equal(world.sharedBrowserProjectsMapExcludesExplore(runner),true);assert.equal(world.sharedBrowserProjectsMapExcludesExplore(runner.replaceAll('\n','\r\n')),true);

@@ -73,6 +73,8 @@ describe("status API compatibility", () => {
     // WO-REL-1: the open state is the one with the two V22 prices set (build 2); the closed one is below.
     vi.stubEnv("PADDLE_PRICE_PERSONAL", `pri_${"c".repeat(26)}`);
     vi.stubEnv("PADDLE_PRICE_DEVELOPER", `pri_${"d".repeat(26)}`);
+    // WO-REL-5: and the page meter on for every workspace.
+    vi.stubEnv("TAVONEL_PAGE_METER_COHORT", "*");
 
     const legacy = await legacyStatus().json() as { liveCheckout: boolean; selfService: boolean; billing: string };
     const publicStatus = parsePublicStatusV2(await publicStatusV2().json());
@@ -133,6 +135,8 @@ describe("legacy status: the catalog readiness check (WO-CAT-1)", () => {
       PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}`,
       PADDLE_PRICE_TEAM: `pri_${"e".repeat(26)}`,
       PADDLE_PRICE_BUSINESS: `pri_${"f".repeat(26)}`,
+      // WO-REL-5: build 2 also turns the page meter on for every workspace.
+      TAVONEL_PAGE_METER_COHORT: "*",
       ...overrides,
     };
     for (const [name, value] of Object.entries(prices)) vi.stubEnv(name, value);
@@ -180,6 +184,37 @@ describe("legacy status: the catalog readiness check (WO-CAT-1)", () => {
       expect(legacy.billing, JSON.stringify(overrides)).toBe("live_incomplete");
       expect(legacy.liveCheckout, JSON.stringify(overrides)).toBe(false);
       expect(readPublicOperations().readiness.billingConfigured, JSON.stringify(overrides)).toBe(false);
+      vi.unstubAllEnvs();
+    }
+  });
+
+  /*
+    WO-REL-5: the ladder is canary (a cohort list, sale closed) -> rollout (`*`) -> sale. Prices set before the rollout is a
+    configuration error an operator sees (billing incomplete, a log line), opens nothing, and never shows the cohort's value.
+  */
+  it("reports both prices set while the page meter is not on for everyone as incomplete, and opens nothing", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const cohort of ["", "pilot-canary01,pilot-canary02", " *", "*,pilot-canary01", "all"]) {
+      configureBilling({ TAVONEL_PAGE_METER_COHORT: cohort });
+      const text = await legacyStatus().text();
+      const legacy = JSON.parse(text) as { billing: string; liveCheckout: boolean };
+      expect([legacy.billing, legacy.liveCheckout], JSON.stringify(cohort)).toEqual(["live_incomplete", false]);
+      expect(parsePublicStatusV2(await publicStatusV2().json())?.availableActions.purchasePlan.enabled, JSON.stringify(cohort)).toBe(false);
+      expect(readPublicOperations().readiness.billingConfigured, JSON.stringify(cohort)).toBe(false);
+      expect(text, JSON.stringify(cohort)).not.toContain("pilot-canary");
+      vi.unstubAllEnvs();
+    }
+    expect(logged).toHaveBeenCalledWith("catalog_sale_held_page_meter", { name: "TAVONEL_PAGE_METER_COHORT", code: "PAGE_METER_NOT_ALL_SALE_HELD" });
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("pilot-canary");
+    logged.mockRestore();
+  });
+
+  it("treats the canary and the rollout with the sale closed as valid: launch pending, nothing to buy", async () => {
+    for (const cohort of ["", "pilot-canary01", "*"]) {
+      configureBilling({ PADDLE_PRICE_PERSONAL: "", PADDLE_PRICE_DEVELOPER: "", PADDLE_PRICE_TEAM: "", PADDLE_PRICE_BUSINESS: "", TAVONEL_PAGE_METER_COHORT: cohort });
+      const legacy = await legacyStatus().json() as { billing: string; liveCheckout: boolean };
+      expect([legacy.billing, legacy.liveCheckout], JSON.stringify(cohort)).toEqual(["live_launch_pending", false]);
+      expect(readPublicOperations().readiness.billingConfigured, JSON.stringify(cohort)).toBe(true);
       vi.unstubAllEnvs();
     }
   });

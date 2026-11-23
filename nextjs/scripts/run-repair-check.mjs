@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { playwrightReportContainsPath, readAndValidatePlaywrightReport, readAndValidateVitestReport } from './repair-test-report.mjs';
 
 const repoRoot = realpathSync(process.cwd());
@@ -22,8 +23,8 @@ const registeredUnitTestPaths = new Set([
   'eval/ask-quality/e2/metrics.test.ts',
 ]);
 const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
-// The seven scripts/db suites (WO-CI-7 L5/L7) run without a DSN and with no skip: each refuses or fails closed when no PostgreSQL answers.
-const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
+// The eight scripts/db suites (WO-CI-7 L5/L7, round 8) run without a DSN and with no skip: each refuses or fails closed when no PostgreSQL answers.
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
@@ -507,7 +508,173 @@ export function readPublicProductExecution(workspaceRoot,plan) {
   const captures=collectPublicProductCaptures(root,plan,false);return {units,browsers,captures};
 }
 
-export function planBrowserRuns(files, runDetailIntegrity) {
+/*
+  WO-CI-7 r9: a selected file runs only in the projects where one of its cases can run. A case is held in a project when a
+  `test.skip(predicate, ...)` that applies to it (its own body, an enclosing describe or beforeEach, the file) evaluates true there,
+  with the predicate's names read from the very modules the spec imports them from (HOME_MOUNTS_LANDING_V2, PHONE_HERO,
+  INTAKE_APPROVAL_ROLLOUT_ENABLED, ...) and the project name. A predicate this reader cannot evaluate, a module it cannot load, a
+  declared `test.skip(title, fn)` or `test.fixme` case, or a file with no case it can find is never held: the file stays selected and
+  the report rule (repair-test-report.mjs, unchanged) still refuses it if no case passes. The day a switch flips, the file runs again.
+*/
+const UNKNOWN = Symbol('unknown');
+const localRequire = createRequire(import.meta.url);
+const tsModules = new Map();
+function loadTsModule(file) {
+  if (tsModules.has(file)) return tsModules.get(file).exports;
+  const ts = localRequire('typescript');
+  const source = readFileSync(file, 'utf8').replaceAll('import.meta.url', '__heldModuleUrl');
+  const js = ts.transpileModule(source, { fileName: file, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const module = { exports: {} };
+  tsModules.set(file, module);
+  const requireFrom = specifier => {
+    if (specifier.startsWith('node:')) return localRequire(specifier);
+    if (!specifier.startsWith('.')) throw new Error(`${file} imports ${specifier}; only node: and relative modules are read.`);
+    const target = resolveTsModule(dirname(file), specifier);
+    if (!target) throw new Error(`${file} imports ${specifier}, which does not resolve.`);
+    return loadTsModule(target);
+  };
+  try { new Function('exports', 'require', 'module', '__heldModuleUrl', js)(module.exports, requireFrom, module, pathToFileURL(file).href); }
+  catch (error) { tsModules.delete(file); throw error; }
+  return module.exports;
+}
+function resolveTsModule(fromDir, specifier) {
+  const base = resolve(fromDir, specifier);
+  return [`${base}.ts`, `${base}.tsx`, base, resolve(base, 'index.ts')].find(candidate => /\.tsx?$/.test(candidate) && existsSync(candidate) && statSync(candidate).isFile());
+}
+
+function heldCaseInventory(ts, sourceFile, specFile) {
+  const imports = new Map();
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || !statement.moduleSpecifier.text.startsWith('.')) continue;
+    const bindings = statement.importClause?.isTypeOnly ? undefined : statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) if (!element.isTypeOnly) imports.set(element.name.text, { specifier: statement.moduleSpecifier.text, name: (element.propertyName ?? element.name).text });
+  }
+  const isTestMember = (expression, names) => ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === 'test' && names.includes(expression.name.text);
+  const isFunction = node => node != null && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
+  const infoName = fn => { const param = fn?.parameters?.[1]?.name; return param && ts.isIdentifier(param) ? param.text : null; };
+  const skipCall = statement => {
+    const call = ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression) ? statement.expression : null;
+    return call && isTestMember(call.expression, ['skip']) && call.arguments.length > 0 && !isFunction(call.arguments.at(-1)) && !isFunction(call.arguments[0]) ? call : null;
+  };
+  // A describe body or the file: every direct `test.skip(predicate, ...)` (a declaration-time modifier). A test or hook body: only the
+  // leading run of them, so a skip that follows any other statement (one that could fail first) is not read. A skip nested in an
+  // `if` or a loop is never read.
+  const skipsOf = (statements, info) => statements.map(skipCall).filter(Boolean).map(call => ({ predicate: call.arguments[0], info }));
+  const leadingSkipsOf = (statements, info) => {
+    const leading = [];
+    for (const statement of statements) { const call = skipCall(statement); if (!call) break; leading.push({ predicate: call.arguments[0], info }); }
+    return leading;
+  };
+  // A describe body's or the file's own skips and those of its direct `test.beforeEach` hooks apply to every case inside it.
+  const scopeSkips = statements => [...skipsOf(statements, null), ...statements.flatMap(statement => {
+    const hook = ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression) && isTestMember(statement.expression.expression, ['beforeEach']) ? statement.expression.arguments.at(-1) : null;
+    return isFunction(hook) && ts.isBlock(hook.body) ? leadingSkipsOf(hook.body.statements, infoName(hook)) : [];
+  })];
+  const cases = [];
+  const visit = (node, scope) => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression, fn = node.arguments.at(-1);
+      const describe = ts.isPropertyAccessExpression(callee) && (isTestMember(callee, ['describe']) || isTestMember(callee.expression, ['describe']));
+      if (describe && isFunction(fn) && fn.body && ts.isBlock(fn.body)) {
+        const own = [...scope, ...scopeSkips(fn.body.statements)];
+        for (const statement of fn.body.statements) visit(statement, own);
+        return;
+      }
+      if (isFunction(fn) && node.arguments.length >= 2) {
+        if (ts.isIdentifier(callee) && callee.text === 'test') { cases.push({ skips: [...scope, ...(ts.isBlock(fn.body) ? leadingSkipsOf(fn.body.statements, infoName(fn)) : [])] }); return; }
+        if (isTestMember(callee, ['skip', 'fixme', 'only', 'fail'])) { cases.push({ skips: [] }); return; }
+      }
+    }
+    ts.forEachChild(node, child => visit(child, scope));
+  };
+  const fileSkips = scopeSkips(sourceFile.statements);
+  for (const statement of sourceFile.statements) visit(statement, fileSkips);
+  const importedValue = name => {
+    const binding = imports.get(name);
+    if (!binding) return UNKNOWN;
+    const target = resolveTsModule(dirname(specFile), binding.specifier);
+    if (!target) return UNKNOWN;
+    try { const exports = loadTsModule(target); return Object.hasOwn(exports, binding.name) ? exports[binding.name] : UNKNOWN; }
+    catch { return UNKNOWN; }
+  };
+  return { cases, importedValue };
+}
+
+// Three-valued: true, false or UNKNOWN. Only literals, imported names, the project name and !, &&, ||, ===, !==, member reads,
+// Array includes and calls of imported functions are evaluated.
+function evaluateSkip(ts, node, info, project, importedValue) {
+  const known = value => value !== UNKNOWN;
+  const read = n => evaluateSkip(ts, n, info, project, importedValue);
+  if (ts.isParenthesizedExpression(node)) return read(node.expression);
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isNumericLiteral(node)) return Number(node.text);
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (ts.isArrayLiteralExpression(node)) { const values = node.elements.map(read); return values.every(known) ? values : UNKNOWN; }
+  if (ts.isIdentifier(node)) return importedValue(node.text);
+  if (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken) { const value = read(node.operand); return known(value) ? !value : UNKNOWN; }
+  if (ts.isPropertyAccessExpression(node) && !node.questionDotToken) {
+    const owner = node.expression;
+    if (ts.isPropertyAccessExpression(owner) && owner.name.text === 'project' && node.name.text === 'name') {
+      const infoOwner = owner.expression;
+      if ((ts.isIdentifier(infoOwner) && info !== null && infoOwner.text === info) || (ts.isCallExpression(infoOwner) && infoOwner.arguments.length === 0 && infoOwner.expression.getText() === 'test.info')) return project;
+    }
+    const value = read(owner);
+    return known(value) && value !== null && typeof value === 'object' && Object.hasOwn(value, node.name.text) ? value[node.name.text] : UNKNOWN;
+  }
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind, left = read(node.left), right = read(node.right);
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken) return left === false || right === false ? false : known(left) && known(right) ? Boolean(left && right) : UNKNOWN;
+    if (op === ts.SyntaxKind.BarBarToken) return left === true || right === true ? true : known(left) && known(right) ? Boolean(left || right) : UNKNOWN;
+    if (!known(left) || !known(right) || typeof left === 'object' || typeof right === 'object') return UNKNOWN;
+    if (op === ts.SyntaxKind.EqualsEqualsEqualsToken) return left === right;
+    if (op === ts.SyntaxKind.ExclamationEqualsEqualsToken) return left !== right;
+    return UNKNOWN;
+  }
+  if (ts.isCallExpression(node) && !node.questionDotToken) {
+    const args = node.arguments.map(read);
+    if (!args.every(known)) return UNKNOWN;
+    const callee = node.expression;
+    if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'includes' && args.length === 1) {
+      const list = read(callee.expression);
+      return Array.isArray(list) && !(typeof args[0] === 'object') ? list.includes(args[0]) : UNKNOWN;
+    }
+    if (ts.isIdentifier(callee)) {
+      const fn = importedValue(callee.text);
+      if (typeof fn !== 'function') return UNKNOWN;
+      let value;
+      try { value = fn(...args); } catch { return UNKNOWN; }
+      return typeof value === 'boolean' || typeof value === 'string' || typeof value === 'number' ? value : UNKNOWN;
+    }
+  }
+  return UNKNOWN;
+}
+
+/** Map of selected file -> the mapped projects in which every case of the file is held at this checkout (absent when none). */
+export function heldBrowserProjects(files, workspaceRoot = repoRoot) {
+  // The selector self-tests run before dependencies are installed. Without the parser nothing can be proven held:
+  // every file stays selected and the one-passing-test rule decides, exactly as before this reader existed.
+  let ts;
+  try { ts = localRequire('typescript'); }
+  catch (error) { if (error?.code === 'MODULE_NOT_FOUND') return new Map(); throw error; }
+  const held = new Map();
+  for (const file of [...new Set(files)].sort()) {
+    const projects = browserProjectsByFile.get(file);
+    if (!projects) continue;
+    const specFile = resolve(workspaceRoot, file);
+    // A missing spec is not held: it stays selected and the report rule refuses it (omitted file, no passing test).
+    if (!existsSync(specFile)) continue;
+    const sourceFile = ts.createSourceFile(specFile, readFileSync(specFile, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const { cases, importedValue } = heldCaseInventory(ts, sourceFile, specFile);
+    if (cases.length === 0) continue;
+    const heldIn = projects.filter(project => cases.every(({ skips }) => skips.some(({ predicate, info }) => evaluateSkip(ts, predicate, info, project, importedValue) === true)));
+    if (heldIn.length) held.set(file, Object.freeze(heldIn));
+  }
+  return held;
+}
+
+export function planBrowserRuns(files, runDetailIntegrity, held = new Map()) {
   const selected = [...new Set(files)].sort();
   const detailFile = 'e2e/detail-integrity.spec.ts';
   const hasDetail = selected.includes(detailFile);
@@ -525,7 +692,7 @@ export function planBrowserRuns(files, runDetailIntegrity) {
   for (const file of selected.filter(file => file !== detailFile)) {
     const projects = browserProjectsByFile.get(file);
     if (!projects) throw new Error(`No reviewed Playwright project mapping for ${file}`);
-    for (const project of projects) {
+    for (const project of projects.filter(project => !held.get(file)?.includes(project))) {
       if (!filesByProject.has(project)) filesByProject.set(project, []);
       filesByProject.get(project).push(file);
     }
@@ -545,7 +712,7 @@ export function readAffectedExecution(workspaceRoot, plan) {
   const nodeUnits = nodeFiles.length ? readNodeUnitExecution(workspaceRoot, plan) : null;
   const vitestFiles = plan.unitFiles.filter(file => !nodeUnitTestPaths.has(file));
   const units = vitestFiles.length ? readAndValidateVitestReport(resolve(reportDir, 'vitest.json'), vitestFiles) : null;
-  const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity).map((planned, index) => ({
+  const browsers = planBrowserRuns(plan.browserFiles, plan.runDetailIntegrity, plan.affectedIntegration ? heldBrowserProjects(plan.browserFiles, workspaceRoot) : new Map()).map((planned, index) => ({
     project: planned.project ?? planned.kind, files: planned.files,
     ...readAndValidatePlaywrightReport(resolve(reportDir, `playwright-${index + 1}.json`), planned.files, workspaceRoot, planned.projects ?? [planned.project]),
   }));
@@ -755,7 +922,9 @@ export async function runBrowserGroups(plannedRuns, { runGroup, readReport, onSu
 async function runBrowser() {
   const plan = readPlan();
   const files = plan.browserFiles.map(file => validateSelectedPath(file, 'browser'));
-  const plannedRuns = plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity);
+  const held = plan.affectedIntegration ? heldBrowserProjects(files) : new Map();
+  for (const [file, projects] of held) console.log(`Held at this head, not run: ${file} in ${projects.join(', ')} (every case is skipped by a switch it reads).`);
+  const plannedRuns = plan.exploreRepairPresentation ? planExploreRepairBrowserRuns(files, plan.runDetailIntegrity) : planBrowserRuns(files, plan.runDetailIntegrity, held);
   if (plannedRuns.length === 0) return;
   const baseUrl = 'http://127.0.0.1:3117';
   const env = liveBrowserEnv();

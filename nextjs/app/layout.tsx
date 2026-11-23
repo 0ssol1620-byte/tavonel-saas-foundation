@@ -6,9 +6,14 @@ import SkipLink from "@/components/skip-link";
 import { BRAND_LINE } from "@/lib/site-navigation";
 import { jsonLdHtml } from "@/lib/structured-data";
 import "./globals.css";
-import "./one-path.css";
 import "./chrome-v2.css";
-import "./landing-v2.css";
+/*
+  one-path.css and landing-v2.css are not imported here either (WO-CI-16b). No rule of either
+  matched an element on /, /explore or any public route measured; each was one more
+  render-blocking request (landing-v2.css its own) before every first paint. Their users import
+  them: LandingPage (`.lv2`, `:lang(ko)`), CompileStagePlayer (`.compile-film-*`) and the
+  workspace layout (`.one-path-ai-*`, `.one-path-more`).
+*/
 /*
   paper-product.css is not imported here. It styles three surfaces (Pricing, Explore, the
   evaluation page), and each imports it itself. From this layout it was a seventh render-blocking

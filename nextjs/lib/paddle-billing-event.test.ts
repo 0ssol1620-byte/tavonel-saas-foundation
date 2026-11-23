@@ -369,7 +369,8 @@ describe("catalog v2 leaves the retired offers' webhooks resolvable", () => {
       { ...closed, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: `pri_${"d".repeat(26)}` },
       { ...closed, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}` },
       { ...closed, PADDLE_PRICE_PERSONAL: `pri_${"p".repeat(26)}`, PADDLE_PRICE_DEVELOPER: "pri_not_a_price" },
-    ];
+    // WO-REL-5: and in every page-meter cohort state (unset, canary list, rollout, malformed).
+    ].flatMap((state) => [state, ...["pilot-canary01", "*", " *"].map((cohort) => ({ ...state, TAVONEL_PAGE_METER_COHORT: cohort }))]);
     for (const binding of [checkoutBinding(), legacyCheckoutBinding()]) {
       const event = renewal(binding);
       const projections = states.map((state) => parsePaddleBillingAction(event, state));

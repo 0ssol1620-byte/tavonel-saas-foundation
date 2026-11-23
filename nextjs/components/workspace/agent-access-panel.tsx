@@ -16,7 +16,7 @@ import styles from "./agent-access-panel.module.css";
 */
 
 type Grant = { grantId: string; clientLabel: string; createdAt: string; expiresAt: string | null; revokedAt: string | null; lastUsedAt: string | null };
-type Load = { state: "loading" } | { state: "unavailable" } | { state: "ready"; grants: Grant[]; truncated: boolean };
+export type Load = { state: "loading" } | { state: "unavailable" } | { state: "ready"; grants: Grant[]; truncated: boolean; creatable: boolean };
 
 // The one-time credential: set by a created grant, cleared by closing. Nothing else touches it.
 export type Reveal = string | null;
@@ -69,7 +69,11 @@ function downloadRows(rows: readonly GrantActivityRow[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** What one grant's agent proposed: a page at a time, and the same rows as an NDJSON download. A malformed answer shows nothing. */
+/**
+ * What one grant's agent proposed: a page at a time, and the same rows as an NDJSON download. A malformed answer shows nothing.
+ * This is the only reader of the activity route; it reads once it is mounted, which AgentAccessView does only for the grant a
+ * person opened.
+ */
 export function GrantActivity({ grantId }: { grantId: string }) {
   const [rows, setRows] = useState<GrantActivityRow[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
@@ -121,6 +125,15 @@ export function GrantActivity({ grantId }: { grantId: string }) {
 const isGrant = (g: unknown): g is Grant => Boolean(g) && typeof (g as Grant).grantId === "string" && typeof (g as Grant).clientLabel === "string"
   && typeof (g as Grant).createdAt === "string";
 const day = (iso: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(iso));
+
+/**
+ * What GET /api/agent-grants answered. WO-REL-5: `creatable` is the server's own answer to "would a create be
+ * accepted for this workspace"; anything but `true` means the offer is not shown, and the list still is.
+ */
+export function readGrantList(ok: boolean, body: { grants?: unknown; truncated?: unknown; creatable?: unknown } | null): Load {
+  if (!ok || !body || !Array.isArray(body.grants) || !body.grants.every(isGrant)) return { state: "unavailable" };
+  return { state: "ready", grants: body.grants, truncated: body.truncated === true, creatable: body.creatable === true };
+}
 
 /** The consent a person reads before Create: the five sentences and the note, with the label as the one slot. */
 export function ConsentText({ label }: { label: string }) {
@@ -188,9 +201,8 @@ export default function AgentAccessPanel() {
   const refresh = async () => {
     try {
       const response = await api("/api/agent-grants");
-      const body = await response.json().catch(() => null) as { grants?: unknown[]; truncated?: boolean } | null;
-      if (!response.ok || !body || !Array.isArray(body.grants) || !body.grants.every(isGrant)) { setLoad({ state: "unavailable" }); return; }
-      setLoad({ state: "ready", grants: body.grants, truncated: body.truncated === true });
+      const body = await response.json().catch(() => null) as { grants?: unknown; truncated?: unknown; creatable?: unknown } | null;
+      setLoad(readGrantList(response.ok, body));
     } catch {
       setLoad({ state: "unavailable" });
     }
@@ -237,22 +249,52 @@ export default function AgentAccessPanel() {
     }
   };
 
+  return (
+    <AgentAccessView load={load} label={label} busy={busy} notice={notice} token={token}
+      onLabel={setLabel} onCreate={create} onClose={() => dispatch({ type: "close" })}
+      onDisconnect={(grant) => void disconnect(grant)} onRetry={() => void refresh()}
+      openActivity={openActivity} onActivity={(grantId) => setOpenActivity((current) => (current === grantId ? null : grantId))} />
+  );
+}
+
+type ViewProps = {
+  load: Load; label: string; busy: boolean; notice: string | null; token: Reveal;
+  onLabel: (value: string) => void; onCreate: (event: React.FormEvent) => void; onClose: () => void;
+  onDisconnect: (grant: Grant) => void; onRetry: () => void;
+  /** WO-AN-10: the grant whose Activity is open (one at a time), and the toggle. */
+  openActivity: string | null; onActivity: (grantId: string) => void;
+};
+
+/**
+ * WO-REL-5. The offer -- "Connect an agent", the consent text and the Create form -- is rendered only when the server
+ * answered `creatable: true`: a workspace that POST would refuse is never shown a capability it cannot use. The list of
+ * existing connections and Disconnect are rendered whatever `creatable` says: revoking is never gated. A workspace
+ * with nothing to offer and nothing to disconnect renders nothing; so does a read still in flight.
+ * WO-AN-10: Activity is offered on every listed grant, revoked ones included, and like Disconnect it is never gated by
+ * `creatable` (its route is not behind the flag). Its read happens only once a person opens it; with no list rendered,
+ * no Activity is mounted and nothing is read.
+ */
+export function AgentAccessView({ load, label, busy, notice, token, onLabel, onCreate, onClose, onDisconnect, onRetry, openActivity, onActivity }: ViewProps) {
   const grants = load.state === "ready" ? load.grants : [];
+  const creatable = load.state === "ready" && load.creatable;
+  if (load.state === "loading") return null;
+  if (load.state === "ready" && !creatable && grants.length === 0 && token === null && notice === null) return null;
   return (
     <section className={styles.panel} aria-labelledby="agent-access-title">
       <h3 id="agent-access-title">Agent access</h3>
-      <p className={styles.muted}>Connect an agent that suggests changes.</p>
+      {creatable ? <p className={styles.muted}>Connect an agent that suggests changes.</p> : null}
       {notice ? <p className={styles.problem} role="status">{notice}</p> : null}
-      <TokenReveal token={token} onClose={() => dispatch({ type: "close" })} />
-      <form className={styles.form} onSubmit={create}>
-        <label htmlFor="agent-client-label">Client name</label>
-        <input id="agent-client-label" required maxLength={LABEL_MAX} value={label} onChange={(event) => setLabel(event.target.value)} autoComplete="off" />
-        <ConsentText label={label.trim() || "This client"} />
-        <button type="submit" className={styles.action} disabled={busy || !label.trim()}>Create connection</button>
-      </form>
-      {load.state === "loading" ? <p className={styles.muted} aria-busy="true">Reading connections…</p> : null}
+      <TokenReveal token={token} onClose={onClose} />
+      {creatable ? (
+        <form className={styles.form} onSubmit={onCreate}>
+          <label htmlFor="agent-client-label">Client name</label>
+          <input id="agent-client-label" required maxLength={LABEL_MAX} value={label} onChange={(event) => onLabel(event.target.value)} autoComplete="off" />
+          <ConsentText label={label.trim() || "This client"} />
+          <button type="submit" className={styles.action} disabled={busy || !label.trim()}>Create connection</button>
+        </form>
+      ) : null}
       {load.state === "unavailable" ? (
-        <p className={styles.muted} role="status">Connections could not be read. <button type="button" className={styles.link} onClick={() => { setLoad({ state: "loading" }); void refresh(); }}>Try again</button></p>
+        <p className={styles.muted} role="status">Connections could not be read. <button type="button" className={styles.link} onClick={onRetry}>Try again</button></p>
       ) : null}
       {load.state === "ready" && grants.length === 0 ? <p className={styles.muted}>No agent is connected.</p> : null}
       {grants.length > 0 ? (
@@ -269,9 +311,9 @@ export default function AgentAccessPanel() {
               </div>
               <div className={styles.actions}>
                 <button type="button" className={styles.action} aria-expanded={openActivity === grant.grantId} aria-label={`Activity of “${grant.clientLabel}”`}
-                  onClick={() => setOpenActivity(openActivity === grant.grantId ? null : grant.grantId)}>Activity</button>
+                  onClick={() => onActivity(grant.grantId)}>Activity</button>
                 {!grant.revokedAt ? (
-                  <button type="button" className={styles.action} disabled={busy} aria-label={`Disconnect “${grant.clientLabel}”`} onClick={() => void disconnect(grant)}>Disconnect</button>
+                  <button type="button" className={styles.action} disabled={busy} aria-label={`Disconnect “${grant.clientLabel}”`} onClick={() => onDisconnect(grant)}>Disconnect</button>
                 ) : null}
               </div>
               {openActivity === grant.grantId ? <GrantActivity grantId={grant.grantId} /> : null}

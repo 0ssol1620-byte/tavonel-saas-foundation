@@ -19,6 +19,8 @@
  * `/security` and `/trust` already publish instead of discovering the contradiction between two
  * pages. An empty list renders nothing.
  */
+import { readPageMeterCohort } from "./page-meter-cohort";
+
 /** The price book every plan below belongs to. A price id, a quote and a receipt name it. */
 export const PRICE_BOOK_VERSION = "PB-2026-11-V22";
 
@@ -66,7 +68,7 @@ export const BILLING_OFFERS = {
       "Compile your own worlds",
       "Evidence, Ask and signed export",
       "API and MCP access",
-      "Google Drive and file-server connections",
+      "Local-folder connections",
     ],
     notYetSold: [],
   },
@@ -87,8 +89,8 @@ export const BILLING_OFFERS = {
       "500 standard pages",
       "Compile your own worlds",
       "Evidence, Ask and signed export",
-      "API and MCP access, with scoped developer keys",
-      "Google Drive and file-server connections",
+      "API and MCP access",
+      "Local-folder connections",
     ],
     notYetSold: [],
   },
@@ -104,12 +106,11 @@ export const BILLING_OFFERS = {
     status: "v2",
     accessLevel: "studio_access",
     requires: ["pcu_accepted_meter", "kqu_meter", "storage_meter", "seat_cap", "per_member_source_scopes"],
-    description: "The higher-volume plan, with the review queue and version history.",
+    description: "The higher-volume plan.",
     features: [
       "3,000 standard pages",
       "Everything in Developer",
-      "Review queue and version history",
-      "Google Drive and file-server connections",
+      "Local-folder connections",
     ],
     notYetSold: ["Per-member source permissions"],
   },
@@ -132,7 +133,7 @@ export const BILLING_OFFERS = {
     features: [
       "12,000 standard pages",
       "Everything in Team",
-      "Google Drive and file-server connections",
+      "Local-folder connections",
     ],
     notYetSold: ["Per-member source permissions", "Organization policy and audit"],
   },
@@ -162,7 +163,7 @@ export const BILLING_OFFERS = {
       "Evidence, Ask and signed export",
       "API and MCP access",
       // 2026-11-10: the `connections` level. Only providers with a production OAuth app are named.
-      "Google Drive and file-server connections",
+      "Local-folder connections",
     ],
     notYetSold: [],
   },
@@ -211,7 +212,7 @@ export const BILLING_OFFERS = {
       "2,500 standard pages",
       "Everything in Developer (2026-09 plan)",
       "Review queue and version history",
-      "Google Drive and file-server connections",
+      "Local-folder connections",
     ],
     // Kept as main has it: `lib/v34/routes.test.ts` holds /teams exactly while this lists shared members.
     notYetSold: ["Shared members and roles", "Per-member source permissions"],
@@ -287,6 +288,22 @@ export type PlanAvailability = "purchasable" | "request_access" | "retired";
 const lineDelivered = (code: BillingOfferCode, delivered: ReadonlySet<Capability>) =>
   (BILLING_OFFERS[code].requires as readonly Capability[]).every((c) => delivered.has(c));
 
+/*
+  WO-REL-5 (lead ruling 2026-11-18): canary (a cohort list, sale closed) -> rollout (`*`) -> sale. `pcu_accepted_meter`
+  is in DELIVERED because the page meter is proven, but a buyer of a line that names it is settled per page only when
+  every workspace is: with TAVONEL_PAGE_METER_COHORT unset, a list or malformed, a new subscriber's reads would settle
+  per document, not per page as the card says. So the meter counts as delivered *for the sale* only when the cohort is
+  exactly `*`. Every surface that sells reads `planAvailability`, whose default is this set. A legacy subscriber is
+  not touched: a retired offer is "retired" in every cohort state, and its renewal resolves by price id.
+*/
+export function deliveredForSale(env: Environment = process.env): ReadonlySet<Capability> {
+  if (readPageMeterCohort(env).state === "all") return DELIVERED;
+  return new Set([...DELIVERED].filter((capability) => capability !== "pcu_accepted_meter"));
+}
+
+const requiresPageMeter = (code: BillingOfferCode) =>
+  (BILLING_OFFERS[code].requires as readonly Capability[]).includes("pcu_accepted_meter");
+
 /** The current offers whose whole line is delivered: they go on sale together, or none of them does. */
 const saleGroup = (delivered: ReadonlySet<Capability>) =>
   (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).filter((code) => !isRetired(code) && lineDelivered(code, delivered));
@@ -295,12 +312,13 @@ const saleGroup = (delivered: ReadonlySet<Capability>) =>
  * The one decision every surface reads: buy online only when the product delivers the whole line and the sale is
  * configured whole. With DELIVERED as it is, that is Personal and Developer together: one of the two prices alone (or
  * one that is not a usable `pri_` id, which `readConfiguredBillingOffers` drops) opens neither -- `catalogConfigured`
- * reports it as a configuration error instead of a half-open sale.
+ * reports it as a configuration error instead of a half-open sale. The default `delivered` is `deliveredForSale()`:
+ * no line that names the page meter is sold before TAVONEL_PAGE_METER_COHORT is `*` (WO-REL-5).
  */
 export function planAvailability(
   code: BillingOfferCode,
   configured: ReadonlyMap<BillingOfferCode, unknown> = readConfiguredBillingOffers(),
-  delivered: ReadonlySet<Capability> = DELIVERED,
+  delivered: ReadonlySet<Capability> = deliveredForSale(),
 ): PlanAvailability {
   if (isRetired(code)) return "retired";
   return lineDelivered(code, delivered) && saleGroup(delivered).every((member) => configured.has(member))
@@ -313,6 +331,8 @@ export function planAvailability(
  * a renewal incident; a current offer's env that is set to something `readConfiguredBillingOffers` cannot use (not a
  * `pri_` id, or shared with another offer) is an error, not "unset"; and the sale group is priced whole or not at
  * all. Every current price unset is a closed sale, which is a valid configuration. Env names only, never a value.
+ * WO-REL-5: a priced line that names the page meter while TAVONEL_PAGE_METER_COHORT is not `*` is an error too --
+ * `planAvailability` keeps it at Request access, and this says why (and logs it), never the cohort's value.
  */
 export function priceConfigurationProblems(
   env: Environment = process.env,
@@ -333,6 +353,10 @@ export function priceConfigurationProblems(
     for (const code of group.filter((member) => !configured.has(member))) {
       problems.push(`${BILLING_OFFERS[code].priceEnv}: required with ${with_}; no plan is sold until the whole group is priced`);
     }
+  }
+  if (priced.some(requiresPageMeter) && readPageMeterCohort(env).state !== "all") {
+    console.error("catalog_sale_held_page_meter", { name: "TAVONEL_PAGE_METER_COHORT", code: "PAGE_METER_NOT_ALL_SALE_HELD" });
+    problems.push(`TAVONEL_PAGE_METER_COHORT: not "*", so ${priced.map((code) => BILLING_OFFERS[code].priceEnv).join(", ")} sell nothing until every workspace settles by page`);
   }
   return problems;
 }

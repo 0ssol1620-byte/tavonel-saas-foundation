@@ -597,8 +597,14 @@ describe("backslashes in the documentation", () => {
     expect(stack.filter((family) => family === "monospace")).toHaveLength(1);
   });
 
-  it("shows an MCP args placeholder that is not a machine path", () => {
-    const configs = DOCS_SECTIONS.flatMap((section) => section.blocks.flatMap((block) => (block.kind === "code" && block.body.includes("mcpServers") ? [block.body] : [])));
+  it("shows an MCP args placeholder that is not a machine path", async () => {
+    // WO-REL-4: the remote configs exist only with the switch on, so the sections are read in that state.
+    vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "true");
+    vi.resetModules();
+    const { DOCS_SECTIONS: sections } = await import("./docs-content");
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    const configs = sections.flatMap((section) => section.blocks.flatMap((block) => (block.kind === "code" && block.body.includes("mcpServers") ? [block.body] : [])));
     // A stdio config launches the downloaded file. A remote config (2026-11-09) names the hosted URL instead.
     const stdio = configs.filter((body) => body.includes('"command"'));
     const remote = configs.filter((body) => !body.includes('"command"'));
@@ -614,24 +620,43 @@ describe("backslashes in the documentation", () => {
 
 describe("/docs/mcp says what this deployment serves", () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
-  // The docs are built with the deployment's env, the same TAVONEL_REMOTE_MCP_ENABLED the endpoint reads.
-  for (const [value, off] of [["", true], ["false", true], ["true", false]] as const) {
-    it(`TAVONEL_REMOTE_MCP_ENABLED=${JSON.stringify(value)} ${off ? "keeps" : "drops"} the not-switched-on note`, async () => {
-      vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", value);
-      vi.resetModules();
-      const { findDocsSection } = await import("./docs-content");
-      const text = JSON.stringify(findDocsSection("mcp")!.blocks);
-      expect(text.includes("Not available on this site yet."), value).toBe(off); // 2026-11-10 public-copy cleanup: intended re-pin.
-      // Either way the page never promises a package that does not exist, and names the real endpoint.
+  const mcpText = async (value: string) => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", value);
+    vi.resetModules();
+    const { findDocsSection } = await import("./docs-content");
+    return JSON.stringify(findDocsSection("mcp")!.blocks);
+  };
+  /*
+    The docs are built with the deployment's env, the same TAVONEL_REMOTE_MCP_ENABLED the endpoint reads.
+    WO-REL-4 (lead ruling 2026-11-18) replaces the 2026-11-10 pins: switched off, the page describes the
+    stdio server with an API key and nothing of the remote endpoint, and has no "not yet" sentence.
+  */
+  for (const value of ["", "false", "TRUE", "1"]) {
+    it(`TAVONEL_REMOTE_MCP_ENABLED=${JSON.stringify(value)} renders no remote MCP subsection`, async () => {
+      const text = await mcpText(value);
+      for (const absent of ["Remote MCP endpoint", "/api/mcp", "PKCE", "OAuth", "Add custom connector", "Not available on this site", "answers 404"]) {
+        expect(text, `${JSON.stringify(value)}: ${absent}`).not.toContain(absent);
+      }
+      expect(text).toContain("tavonel-mcp.mjs");
+      expect(text).toContain("TAVONEL_API_KEY");
       expect(text).toContain("There is no npm or PyPI package yet.");
-      expect(text).toContain("https://tavonel.com/api/mcp");
-      expect(text).toContain("Bearer ${TAVONEL_API_KEY}");
     });
   }
+  it("TAVONEL_REMOTE_MCP_ENABLED=\"true\" renders the remote subsection through the OAuth flow", async () => {
+    const text = await mcpText("true");
+    for (const present of ["Remote MCP endpoint", "https://tavonel.com/api/mcp", "Bearer ${TAVONEL_API_KEY}", "Authorization code with PKCE S256", "The OAuth flow"]) {
+      expect(text).toContain(present);
+    }
+    expect(text).not.toContain("Not available on this site");
+  });
 });
 
 describe("/docs/mcp retry guidance matches the facade", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
   it("offers the smaller-limit retry for search only, never for fetch", async () => {
+    // search and fetch are served at the remote endpoint, so their guidance is read with the switch on.
+    vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "true");
+    vi.resetModules();
     const { findDocsSection } = await import("./docs-content");
     const text = JSON.stringify(findDocsSection("mcp")!.blocks);
     expect(text).toContain("search answers DELIVERY_OVER_TOOL_RESULT_BUDGET, and a smaller limit is the retry");

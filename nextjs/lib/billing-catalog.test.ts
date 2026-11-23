@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BILLING_OFFERS,
   DELIVERED,
@@ -7,6 +7,7 @@ import {
   PRICE_BOOK_EXTRA,
   PRICE_BOOK_VERSION,
   catalogConfigured,
+  deliveredForSale,
   findOfferByPriceId,
   planAvailability,
   priceConfigurationProblems,
@@ -32,6 +33,8 @@ const allEnv = {
   PADDLE_PRICE_BUSINESS: id("b"),
   PADDLE_PRICE_OBSERVER_ACCESS: id("o"),
   PADDLE_PRICE_STUDIO_ACCESS: id("s"),
+  // WO-REL-5: the sale opens only with the page meter on for every workspace (rollout before sale).
+  TAVONEL_PAGE_METER_COHORT: "*",
 };
 
 describe("Foundation billing catalog", () => {
@@ -141,7 +144,7 @@ describe("DELIVERED: what the release proves", () => {
   it("makes Personal and Developer purchasable with both V22 prices set, and Team and Business Request access", () => {
     const configured = readConfiguredBillingOffers(allEnv);
     expect(configured.size).toBe(6);
-    expect(Object.fromEntries([...V2, ...RETIRED].map((code) => [code, planAvailability(code, configured)]))).toEqual({
+    expect(Object.fromEntries([...V2, ...RETIRED].map((code) => [code, planAvailability(code, configured, deliveredForSale(allEnv))]))).toEqual({
       personal: "purchasable", developer: "purchasable", team: "request_access", business: "request_access",
       observer_access: "retired", studio_access: "retired",
     });
@@ -172,8 +175,10 @@ describe("DELIVERED: what the release proves", () => {
   id, opens nothing and is a configuration error /api/status and /status report (billing not configured).
 */
 describe("a half-configured sale opens nothing and is reported", () => {
-  const retired = { PADDLE_PRICE_OBSERVER_ACCESS: id("o"), PADDLE_PRICE_STUDIO_ACCESS: id("s") };
-  const sold = (env: Record<string, string>) => V2.filter((code) => planAvailability(code, readConfiguredBillingOffers(env)) === "purchasable");
+  // The page meter is on for everyone here (WO-REL-5), so what these show is the price configuration alone.
+  const retired = { PADDLE_PRICE_OBSERVER_ACCESS: id("o"), PADDLE_PRICE_STUDIO_ACCESS: id("s"), TAVONEL_PAGE_METER_COHORT: "*" };
+  const sold = (env: Record<string, string>) => V2.filter((code) =>
+    planAvailability(code, readConfiguredBillingOffers(env), deliveredForSale(env)) === "purchasable");
 
   it("opens neither plan with only one of the two prices set", () => {
     for (const only of ["PADDLE_PRICE_PERSONAL", "PADDLE_PRICE_DEVELOPER"]) {
@@ -299,7 +304,8 @@ describe("a plan is purchasable only if every meter family its allowance names i
   });
 
   it("holds for what the product delivers today, with every price set", () => {
-    expect(V2.filter((code) => planAvailability(code, readConfiguredBillingOffers(allEnv)) === "purchasable")).toEqual(["personal", "developer"]);
+    expect(V2.filter((code) => planAvailability(code, readConfiguredBillingOffers(allEnv), deliveredForSale(allEnv)) === "purchasable"))
+      .toEqual(["personal", "developer"]);
     expectSoldMeters(DELIVERED);
     expectSoldMeters(new Set(ALL));
   });
@@ -336,6 +342,104 @@ describe("catalogConfigured: readiness of the price configuration", () => {
     expect(catalogConfigured(without("PADDLE_PRICE_PERSONAL"), new Set(ALL))).toBe(false);
     // With nothing delivered there is no group to complete.
     expect(catalogConfigured(without("PADDLE_PRICE_PERSONAL"), new Set<Capability>())).toBe(true);
+  });
+});
+
+/*
+  WO-REL-5 (lead ruling 2026-11-18, release review R1 non-blocker 1). canary (cohort list, sale closed) -> rollout (`*`)
+  -> sale. The page meter counts as delivered for the sale only when TAVONEL_PAGE_METER_COHORT is exactly `*`; in every
+  other state every plan is Request access exactly as with the prices unset, the state is a configuration problem
+  (status) and a log line, and neither names the cohort's value. A legacy renewal resolves the same in every cell.
+*/
+describe("WO-REL-5: no plan is sold before the page meter is on for every workspace", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+  const retired = { PADDLE_PRICE_OBSERVER_ACCESS: id("o"), PADDLE_PRICE_STUDIO_ACCESS: id("s") };
+  const PRICES = {
+    unset: retired,
+    both: { ...retired, PADDLE_PRICE_PERSONAL: id("p"), PADDLE_PRICE_DEVELOPER: id("d") },
+    one: { ...retired, PADDLE_PRICE_PERSONAL: id("p") },
+    malformed: { ...retired, PADDLE_PRICE_PERSONAL: id("p"), PADDLE_PRICE_DEVELOPER: "pri_short" },
+  } as const;
+  // Every reading of the cohort: unset, empty, a canary list, the rollout, and values that are not `*`.
+  const COHORTS = [undefined, "", "pilot-canary01", "pilot-canary01,pilot-canary02", "*", " *", "* ", "*,pilot-canary01", "all", "ALL", "pilot bad", "**"];
+  const cell = (prices: keyof typeof PRICES, cohort: string | undefined): Record<string, string> =>
+    cohort === undefined ? { ...PRICES[prices] } : { ...PRICES[prices], TAVONEL_PAGE_METER_COHORT: cohort };
+  const sold = (env: Record<string, string>) => V2.filter((code) =>
+    planAvailability(code, readConfiguredBillingOffers(env), deliveredForSale(env)) === "purchasable");
+
+  it("opens Personal and Developer only with both prices set and the cohort exactly *; every other cell sells nothing", () => {
+    for (const prices of Object.keys(PRICES) as Array<keyof typeof PRICES>) {
+      for (const cohort of COHORTS) {
+        const env = cell(prices, cohort);
+        const expected = prices === "both" && cohort === "*" ? ["personal", "developer"] : [];
+        expect(sold(env), `${prices} / ${JSON.stringify(cohort)}`).toEqual(expected);
+        for (const code of RETIRED) expect(planAvailability(code, readConfiguredBillingOffers(env), deliveredForSale(env))).toBe("retired");
+      }
+    }
+  });
+
+  it("goes through the real default: planAvailability(code) and the checkout policy read the deployment's prices and cohort", () => {
+    for (const cohort of COHORTS) {
+      vi.unstubAllEnvs();
+      for (const [name, value] of Object.entries(cell("both", cohort))) vi.stubEnv(name, value);
+      if (cohort === undefined) vi.stubEnv("TAVONEL_PAGE_METER_COHORT", undefined);
+      expect(V2.filter((code) => planAvailability(code) === "purchasable"), JSON.stringify(cohort))
+        .toEqual(cohort === "*" ? ["personal", "developer"] : []);
+      for (const code of V2) {
+        expect(decideOfferCheckoutPolicy({ code, saleChannel: BILLING_OFFERS[code].saleChannel }), `${code} / ${JSON.stringify(cohort)}`)
+          .toEqual(cohort === "*" && (code === "personal" || code === "developer") ? { allowed: true } : { allowed: false, code: "BILLING_OFFER_CONTACT_REQUIRED" });
+      }
+    }
+  });
+
+  it("keeps the meter itself in DELIVERED: only the sale reads the cohort", () => {
+    expect(deliveredForSale({ TAVONEL_PAGE_METER_COHORT: "*" })).toBe(DELIVERED);
+    for (const cohort of COHORTS.filter((value) => value !== "*")) {
+      const env = cohort === undefined ? {} : { TAVONEL_PAGE_METER_COHORT: cohort };
+      expect([...deliveredForSale(env)].sort(), JSON.stringify(cohort)).toEqual([...DELIVERED].filter((c) => c !== "pcu_accepted_meter").sort());
+    }
+    expect(DELIVERED.has("pcu_accepted_meter")).toBe(true);
+  });
+
+  it("reports priced plans held by the cohort as a configuration problem and a log line, never the cohort's value", () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const cohort of COHORTS.filter((value) => value !== "*")) {
+      logged.mockClear();
+      const env = cell("both", cohort);
+      const problems = priceConfigurationProblems(env);
+      expect(problems, JSON.stringify(cohort)).toEqual([
+        'TAVONEL_PAGE_METER_COHORT: not "*", so PADDLE_PRICE_PERSONAL, PADDLE_PRICE_DEVELOPER sell nothing until every workspace settles by page',
+      ]);
+      expect(catalogConfigured(env), JSON.stringify(cohort)).toBe(false);
+      expect(logged, JSON.stringify(cohort)).toHaveBeenCalledWith("catalog_sale_held_page_meter",
+        { name: "TAVONEL_PAGE_METER_COHORT", code: "PAGE_METER_NOT_ALL_SALE_HELD" });
+      const said = JSON.stringify([problems, logged.mock.calls]);
+      expect(said).not.toContain("pilot-canary");
+      expect(said).not.toContain("pilot bad");
+    }
+    // The canary stage (a list, prices unset) and the rollout stage (`*`, prices unset) are valid and log nothing.
+    logged.mockClear();
+    for (const cohort of COHORTS) expect(priceConfigurationProblems(cell("unset", cohort)), JSON.stringify(cohort)).toEqual([]);
+    expect(priceConfigurationProblems(cell("both", "*"))).toEqual([]);
+    expect(logged).not.toHaveBeenCalled();
+    // A half-priced sale under a canary cohort reports both problems: neither hides the other.
+    expect(priceConfigurationProblems(cell("one", "pilot-canary01"))).toEqual([
+      "PADDLE_PRICE_DEVELOPER: required with PADDLE_PRICE_PERSONAL; no plan is sold until the whole group is priced",
+      'TAVONEL_PAGE_METER_COHORT: not "*", so PADDLE_PRICE_PERSONAL sell nothing until every workspace settles by page',
+    ]);
+  });
+
+  it("leaves a legacy subscriber's price resolution unchanged in every cell", () => {
+    for (const prices of Object.keys(PRICES) as Array<keyof typeof PRICES>) {
+      for (const cohort of COHORTS) {
+        const env = cell(prices, cohort);
+        expect(findOfferByPriceId(id("o"), env)?.code, `${prices} / ${JSON.stringify(cohort)}`).toBe("observer_access");
+        expect(findOfferByPriceId(id("s"), env)?.code, `${prices} / ${JSON.stringify(cohort)}`).toBe("studio_access");
+      }
+    }
   });
 });
 

@@ -141,7 +141,7 @@ reset role;
 select throws_ok($$insert into public.foundation_intake_admissions (workspace_key, document_id, user_id, object_key, requested_bytes, declared_mime_type, expires_at)
   values ('pilot-sto002', 'f2f2f2f2-0000-4000-8000-0000000000f3', 'e2e2e2e2-0000-4000-8000-0000000000e2',
     'quarantine/pilot-sto002/f2f2f2f2-0000-4000-8000-0000000000f3/source', null, 'application/pdf', now() + interval '5 minutes')$$,
-  '23502', 'requested_bytes is NOT NULL: every admission states its size');
+  '23502', null, 'requested_bytes is NOT NULL: every admission states its size');
 
 -- 24: only the server may call the new signature.
 select ok(has_function_privilege('service_role', 'public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text, jsonb)', 'EXECUTE')
