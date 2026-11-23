@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
   const current = await revalidateFoundationSession(request, auth.principal, "observer");
   if (!current.ok) return NextResponse.json({ code: current.code }, { status: current.status, headers: NO_STORE });
-  return NextResponse.json({ code: "OK", keys: result.keys, remoteMcpKeys: result.remoteMcpKeys }, { headers: NO_STORE });
+  return NextResponse.json({ code: "OK", keys: result.keys, remoteMcpKeys: result.remoteMcpKeys, truncated: result.truncated }, { headers: NO_STORE });
 }
 
 export async function POST(request: Request) {
