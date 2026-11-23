@@ -788,6 +788,8 @@ export async function dispatchProductCoreV2(
   logicalCollectionKey?: string,
   remainingLatencyMs = CORE_CLIENT_TIMEOUT_MS,
   requestedBlueprint?: CoreBlueprintId,
+  /** Set to true the moment the request goes to fetch: whether Core was asked, observed rather than inferred from the code. */
+  attempt?: { made: boolean },
 ): Promise<
   | { ok: true; result: ProductCoreV2CompileResponse }
   | { ok: false; code: string; sizeLimit?: { object: "core-request"; bytes: number; bound: number }
@@ -823,6 +825,7 @@ export async function dispatchProductCoreV2(
     .update(`${timestamp}\n${envelope.requestId}\n${inputSha256}`, "utf8")
     .digest("hex");
   let response: Response;
+  if (attempt) attempt.made = true;
   try {
     response = await fetch(`${env.url}/v2/compile`, {
       method: "POST",
@@ -930,22 +933,33 @@ type ProductCoreV2Dispatch = Awaited<ReturnType<typeof dispatchProductCoreV2>>;
   receipt) is the same problem for a full compile, or an integrity failure, and is returned as it
   came; so is a code this list has never seen. The partition of every code Core a37d19b6 (AKC
   6b3a27bf) can answer is pinned by core-runtime-v2.revision-contract.test.ts.
+
+  The line leads with what happened to the full compile that followed -- succeeded, failed, not
+  sent, or not known -- read from that compile's own result and from whether its request went to
+  fetch, never from the absence of an error.
 */
-const REVISION_HOLD_LINES = {
-  FULL_REBUILD_EQUIVALENCE_FAILED: "Compiled in full: the compiler did not prove the revision equal to a full rebuild.",
-  CORE_REQUEST_INVALID: "Compiled in full: the compiler refused the revision request as invalid.",
-  CORE_COMPILE_REJECTED: "Compiled in full: the compiler rejected the revision request.",
-  CORE_IDEMPOTENCY_CONFLICT: "Compiled in full: the compiler holds a different request under this revision's key.",
-  COMPILE_INPUT_TOO_LARGE: "Compiled in full: the revision request, with the previous World, was over the request size bound.",
+const REVISION_HOLD_REASONS = {
+  FULL_REBUILD_EQUIVALENCE_FAILED: "the compiler did not prove the revision equal to a full rebuild",
+  CORE_REQUEST_INVALID: "the compiler refused the revision request as invalid",
+  CORE_COMPILE_REJECTED: "the compiler rejected the revision request",
+  CORE_IDEMPOTENCY_CONFLICT: "the compiler holds a different request under this revision's key",
+  COMPILE_INPUT_TOO_LARGE: "the revision request, with the previous World, was over the request size bound",
 } as const;
-export type RevisionHoldReason = keyof typeof REVISION_HOLD_LINES;
+export type RevisionHoldReason = keyof typeof REVISION_HOLD_REASONS;
 const HELD_REFUSAL_CODES: ReadonlySet<string> = new Set<RevisionHoldReason>([
   "CORE_REQUEST_INVALID", "CORE_COMPILE_REJECTED", "CORE_IDEMPOTENCY_CONFLICT", "COMPILE_INPUT_TOO_LARGE",
 ]);
+export type RevisionFullCompileOutcome = "succeeded" | "failed" | "not_attempted" | "unknown";
+const FULL_COMPILE_LEADS: Record<RevisionFullCompileOutcome, string> = {
+  succeeded: "Compiled in full.",
+  failed: "Full compile failed.",
+  not_attempted: "Full compile not sent.",
+  unknown: "Full compile outcome not known.",
+};
 
 export type RevisionCompileOutcome =
-  | { attempted: true; outcome: "equivalent" }
-  | { attempted: true; outcome: "held"; reason: RevisionHoldReason; line: string };
+  | { attempted: boolean; outcome: "equivalent" }
+  | { attempted: boolean; outcome: "held"; reason: RevisionHoldReason; fullCompile: RevisionFullCompileOutcome; line: string };
 
 function revisionHoldReason(revision: ProductCoreV2Dispatch): RevisionHoldReason | null {
   if (!revision.ok) return HELD_REFUSAL_CODES.has(revision.code) ? revision.code as RevisionHoldReason : null;
@@ -954,10 +968,25 @@ function revisionHoldReason(revision: ProductCoreV2Dispatch): RevisionHoldReason
     ? "FULL_REBUILD_EQUIVALENCE_FAILED" : null;
 }
 
+/** What happened to the full compile after a hold. Anything it cannot place is "unknown", never "succeeded". */
+export function revisionFullCompileOutcome(full: ProductCoreV2Dispatch, attempted: boolean): RevisionFullCompileOutcome {
+  if (!attempted) return full.ok ? "unknown" : "not_attempted";
+  if (!full.ok) return "failed";
+  switch (full.result.status) {
+    case "completed":
+    case "review_required":
+      return "succeeded";
+    case "rejected":
+      return "failed";
+    default:
+      return "unknown";
+  }
+}
+
 /**
  * A revision compile of `documents` from `previousActiveWorld`. When Core holds, exactly one full
  * compile follows -- never a second revision attempt, which would get the same answer -- and the
- * outcome carries the reason whether that full compile succeeds or not.
+ * outcome carries the reason and what that full compile actually did.
  */
 export async function dispatchProductCoreV2Revision(
   env: ProductCoreV2Env,
@@ -972,14 +1001,18 @@ export async function dispatchProductCoreV2Revision(
   requestedBlueprint?: CoreBlueprintId,
 ): Promise<ProductCoreV2Dispatch & { revisionCompile?: RevisionCompileOutcome }> {
   const deadline = Date.now() + remainingLatencyMs;
+  const revisionAttempt = { made: false };
   const revision = await dispatchProductCoreV2(env, workspaceId, documents, now, previousActiveWorld,
-    customerDataGate, expectedSourceScope, logicalCollectionKey, remainingLatencyMs, requestedBlueprint);
+    customerDataGate, expectedSourceScope, logicalCollectionKey, remainingLatencyMs, requestedBlueprint, revisionAttempt);
   const reason = revisionHoldReason(revision);
   if (!reason) {
-    return revision.ok && revision.result.status !== "rejected"
-      ? { ...revision, revisionCompile: { attempted: true, outcome: "equivalent" } } : revision;
+    return revision.ok && (revision.result.status === "completed" || revision.result.status === "review_required")
+      ? { ...revision, revisionCompile: { attempted: revisionAttempt.made, outcome: "equivalent" } } : revision;
   }
+  const fullAttempt = { made: false };
   const full = await dispatchProductCoreV2(env, workspaceId, documents, new Date(), null,
-    customerDataGate, expectedSourceScope, logicalCollectionKey, deadline - Date.now(), requestedBlueprint);
-  return { ...full, revisionCompile: { attempted: true, outcome: "held", reason, line: REVISION_HOLD_LINES[reason] } };
+    customerDataGate, expectedSourceScope, logicalCollectionKey, deadline - Date.now(), requestedBlueprint, fullAttempt);
+  const fullCompile = revisionFullCompileOutcome(full, fullAttempt.made);
+  return { ...full, revisionCompile: { attempted: revisionAttempt.made, outcome: "held", reason, fullCompile,
+    line: `${FULL_COMPILE_LEADS[fullCompile]} Revision held: ${REVISION_HOLD_REASONS[reason]}.` } };
 }

@@ -8,7 +8,9 @@ import {
   dispatchProductCoreV2Revision,
   projectProductCoreV2Candidate,
   readRevisionCompileSnapshot,
+  revisionFullCompileOutcome,
   type ProductCoreV2CompileRequest,
+  type ProductCoreV2CompileResponse,
 } from "./core-runtime-v2";
 
 /*
@@ -152,13 +154,14 @@ describe("a revision Core proves equal", () => {
 });
 
 describe("a revision Core holds runs one full compile and says why", () => {
+  // Outcome 1 of 3 through the real dispatch: the full compile succeeded.
   it.each([
     ["held_equivalence_failed", "zeroHashes", "FULL_REBUILD_EQUIVALENCE_FAILED",
-      "Compiled in full: the compiler did not prove the revision equal to a full rebuild."],
+      "Compiled in full. Revision held: the compiler did not prove the revision equal to a full rebuild."],
     ["held_request_invalid", "extraField", "CORE_REQUEST_INVALID",
-      "Compiled in full: the compiler refused the revision request as invalid."],
+      "Compiled in full. Revision held: the compiler refused the revision request as invalid."],
     ["held_idempotency_conflict", "zeroHashes", "CORE_IDEMPOTENCY_CONFLICT",
-      "Compiled in full: the compiler holds a different request under this revision's key."],
+      "Compiled in full. Revision held: the compiler holds a different request under this revision's key."],
   ] as const)("%s", async (name, variant, reason, line) => {
     const previous = variants[variant](await priorWorld());
     const pair = exchanges(name);
@@ -172,13 +175,14 @@ describe("a revision Core holds runs one full compile and says why", () => {
     expect(full.route.operationClass).toBe("initial_compile");
     expect(full.previousActiveWorld).toBeUndefined();
     expect(full.idempotencyKey).not.toBe(revision.idempotencyKey);
-    expect(result.revisionCompile).toEqual({ attempted: true, outcome: "held", reason, line });
+    expect(result.revisionCompile).toEqual({ attempted: true, outcome: "held", reason, fullCompile: "succeeded", line });
     expect(result).toMatchObject({ ok: true, result: { status: "completed", receipt: { equivalence: "not_run" } } });
     if (!result.ok) throw new Error(result.code);
     expect(projectProductCoreV2Candidate(result.result, v2, true)).not.toBeNull();
   });
 
-  it("a refusal of the full compile too is returned with the reason, never a third call", async () => {
+  // Outcome 2 of 3 through the real dispatch: the full compile was sent and failed.
+  it("a refusal of the full compile too says the full compile failed, never a third call", async () => {
     const previous = variants.extraField(await priorWorld());
     const [refusal] = exchanges("held_request_invalid");
     const sent = replay([refusal.response, refusal.response], [refusal.request.requestId, "core-00000000-0000-4000-8000-000000000000"]);
@@ -186,11 +190,12 @@ describe("a revision Core holds runs one full compile and says why", () => {
 
     expect(sent).toHaveLength(2);
     expect(result).toEqual({ ok: false, code: "CORE_REQUEST_INVALID", revisionCompile: {
-      attempted: true, outcome: "held", reason: "CORE_REQUEST_INVALID",
-      line: "Compiled in full: the compiler refused the revision request as invalid." } });
+      attempted: true, outcome: "held", reason: "CORE_REQUEST_INVALID", fullCompile: "failed",
+      line: "Full compile failed. Revision held: the compiler refused the revision request as invalid." } });
   });
 
-  it("a hold that leaves no time for the full compile says so, and sends nothing more", async () => {
+  // Outcome 3 of 3 through the real dispatch: the full compile was never sent.
+  it("a hold that leaves no time for the full compile says it was not sent, and sends nothing more", async () => {
     const previous = await priorWorld();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-18T13:00:00.000Z"));
@@ -203,10 +208,12 @@ describe("a revision Core holds runs one full compile and says why", () => {
     const result = await dispatchProductCoreV2Revision(env, ws, v2, previous, new Date(), undefined, undefined, undefined, 2_000);
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ ok: false, code: "CORE_V2_TIME_BUDGET_INVALID", revisionCompile: { outcome: "held", reason: "CORE_REQUEST_INVALID" } });
+    expect(result).toEqual({ ok: false, code: "CORE_V2_TIME_BUDGET_INVALID", revisionCompile: {
+      attempted: true, outcome: "held", reason: "CORE_REQUEST_INVALID", fullCompile: "not_attempted",
+      line: "Full compile not sent. Revision held: the compiler refused the revision request as invalid." } });
   });
 
-  it("a revision over the request bound is held before it is sent, and the full compile still goes", async () => {
+  it("a revision over the request bound is held before it is sent: not attempted, and the full compile still goes", async () => {
     const previous = await priorWorld();
     const oversized = { ...previous, units: previous.units.map((unit, index) => index === 0 ? { ...unit, text: "x".repeat(4_600_000) } : unit) };
     const [, full] = exchanges("held_equivalence_failed");
@@ -214,7 +221,62 @@ describe("a revision Core holds runs one full compile and says why", () => {
     const result = await revise(oversized, [full]);
 
     expect(sent).toEqual([full.request.body]);
-    expect(result).toMatchObject({ ok: true, revisionCompile: { outcome: "held", reason: "COMPILE_INPUT_TOO_LARGE" } });
+    expect(result).toMatchObject({ ok: true, revisionCompile: {
+      attempted: false, outcome: "held", reason: "COMPILE_INPUT_TOO_LARGE", fullCompile: "succeeded" } });
+  });
+
+  /*
+    The class, not one input: the line says "Compiled in full" exactly when the dispatch it is
+    returned with is a World Core compiled, for every way the full compile can end -- each refusal
+    code, a rejection, a transport failure, an unreadable body, a receipt that does not hold.
+  */
+  describe("the line names the full compile's actual outcome, for every way it can end", () => {
+    const [revisionAnswer, fullAnswer] = exchanges("held_request_invalid");
+    const status = (to: "review_required" | "rejected") => ({ status: 200, body: edited(fullAnswer.response.body, (response) => {
+      response.status = to;
+      response.candidate.lifecycle = to;
+    }) });
+    const cases: Array<[string, { status: number; body: string } | Error, "succeeded" | "failed"]> = [
+      ["completed", fullAnswer.response, "succeeded"],
+      ["review_required", status("review_required"), "succeeded"],
+      ["rejected", status("rejected"), "failed"],
+      ...fixture.core.refusalCodes.map((code) => [code, { status: 422, body: JSON.stringify({ code }) }, "failed"] as [string, { status: number; body: string }, "failed"]),
+      ["an unknown code", { status: 422, body: JSON.stringify({ code: "CORE_NOT_IN_THIS_RELEASE" }) }, "failed"],
+      ["HTTP 500, empty", { status: 500, body: "" }, "failed"],
+      ["HTTP 200, not JSON", { status: 200, body: "{" }, "failed"],
+      ["a receipt that does not hold", { status: 200, body: fullAnswer.response.body.replace(/"outputSha256":"sha256:[0-9a-f]{64}"/, `"outputSha256":"sha256:${"1".repeat(64)}"`) }, "failed"],
+      ["a refused connection", new TypeError("fetch failed"), "failed"],
+      ["a timeout", Object.assign(new Error("timed out"), { name: "TimeoutError" }), "failed"],
+    ];
+
+    it.each(cases)("%s", async (_name, answer, fullCompile) => {
+      const previous = variants.extraField(await priorWorld());
+      const sent = replay([revisionAnswer.response, answer], [revisionAnswer.request.requestId, fullAnswer.request.requestId]);
+      const result = await revise(previous, [revisionAnswer, fullAnswer]);
+
+      expect(sent).toHaveLength(2);
+      expect(result.revisionCompile).toMatchObject({ attempted: true, outcome: "held", reason: "CORE_REQUEST_INVALID", fullCompile });
+      const world = result.ok && (result.result.status === "completed" || result.result.status === "review_required");
+      expect(world).toBe(fullCompile === "succeeded");
+      const line = result.revisionCompile?.outcome === "held" ? result.revisionCompile.line : "";
+      expect(line.startsWith("Compiled in full.")).toBe(world);
+    });
+  });
+});
+
+describe("a full-compile outcome the code cannot classify is shown as not known, never as success", () => {
+  const completed = JSON.parse(exchanges("initial")[0].response.body) as ProductCoreV2CompileResponse;
+  it.each([
+    ["a status outside the contract, sent", { ok: true, result: { ...completed, status: "partial" } }, true],
+    ["a World that was never sent", { ok: true, result: completed }, false],
+  ] as const)("%s", (_name, dispatch, attempted) => {
+    expect(revisionFullCompileOutcome(dispatch as never, attempted)).toBe("unknown");
+  });
+  it("the three outcomes it can classify", () => {
+    expect(revisionFullCompileOutcome({ ok: true, result: completed }, true)).toBe("succeeded");
+    expect(revisionFullCompileOutcome({ ok: true, result: { ...completed, status: "rejected" } }, true)).toBe("failed");
+    expect(revisionFullCompileOutcome({ ok: false, code: "CORE_V2_UNAVAILABLE" }, true)).toBe("failed");
+    expect(revisionFullCompileOutcome({ ok: false, code: "CORE_V2_TIME_BUDGET_INVALID" }, false)).toBe("not_attempted");
   });
 });
 
