@@ -698,7 +698,7 @@ const agentRow = async (grantId = GRANT) => {
   if (!created.ok) throw new Error(created.code);
   return created.row.proposal_id;
 };
-const agentOn = () => { vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true"); stubSigner(true); };
+const agentOn = () => { vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true"); vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", WS); stubSigner(true); };
 
 describe("lookup by id (§5.5, §6)", () => {
   it("GET /api/proposals/[id] finds a row with no collection (a stub second type) and answers the public DTO", async () => {
@@ -826,6 +826,7 @@ describe("agent-origin rows (§6 steps 3 and 7, I-11, I-14, I-27)", () => {
 
   it("signer missing: 503 PROPOSAL_RECEIPT_SIGNER_NOT_CONFIGURED and the decide RPC is never called", async () => {
     vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true");
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", WS);
     stubSigner(false);
     const id = await agentRow();
     const answer = await confirm(id);
