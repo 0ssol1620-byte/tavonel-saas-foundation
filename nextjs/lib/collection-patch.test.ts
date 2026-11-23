@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { applyCandidatePatch } from "./collection-patch";
+import { applyCandidatePatch, applyOntologyPatch } from "./collection-patch";
 import {
   advertisedOntologyRelations,
   compileCollectionCandidate,
@@ -324,3 +324,36 @@ describe("correcting a label on a Core V2 candidate", () => {
     expect(validateReviewableCollectionArtifact(result.artifact, artifact.collectionId)).not.toBeNull();
   });
 });
+
+/*
+  K-6: a relabel through the ontology patch is the same correction as through
+  `applyCandidatePatch` -- the same regenerated files and the same manifest digest -- because
+  both go through one materializer and hash one field list.
+*/
+describe("a relabel through the ontology patch", () => {
+  it("lands on the digest and files a label correction produces", () => {
+    for (const artifact of [stored(), correctionBase()]) {
+      const target = artifact.ontology.nodes.find((node) => node.kind === "Entity")!;
+      const label = applyCandidatePatch(artifact, { objectId: target.id, before: target.label, after: "ACME Corporation" }, context);
+      const ontology = applyOntologyPatch(
+        artifact,
+        [{ op: "relabel", objectId: target.id, before: target.label, after: "ACME Corporation" }],
+        { readableDocumentIds: new Set(artifact.sourceDocuments.map((document) => document.documentId)), actorUserId: context.actorUserId, patchedAt: context.patchedAt },
+      );
+      if (!label.ok || !ontology.ok) throw new Error("patch refused");
+      expect(ontology.artifact.manifestDigest).toBe(label.artifact.manifestDigest);
+      expect(ontology.artifact.package.files).toEqual(label.artifact.package.files);
+      expect(ontology.artifact.validation).toEqual(label.artifact.validation);
+      expect(ontology.artifact.coreExecution).toEqual(label.artifact.coreExecution);
+    }
+  });
+});
+
+/** A second shape of base: one that is itself already a correction. */
+function correctionBase() {
+  const base = stored();
+  const target = entityNode(base);
+  const first = applyCandidatePatch(base, { objectId: target.id, before: target.label, after: "ACME Corp" }, context);
+  if (!first.ok) throw new Error(first.code);
+  return first.artifact;
+}
