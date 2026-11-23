@@ -424,9 +424,7 @@ type Built =
   | { ok: false; refusal: OntologyPatchRefusal };
 
 const refuse = (opIndex: number | null, code: OntologyPatchFailure): Built => ({ ok: false, refusal: { opIndex, code } });
-const errorKeys = (artifact: unknown) => new Set(
-  validateCompiledWorldPackage(filesFromArtifact(artifact)).errors.map((error) => `${String(error.code)}|${String(error.detail)}`),
-);
+const packageInvalid = (artifact: unknown) => validateCompiledWorldPackage(filesFromArtifact(artifact)).errors.length > 0;
 
 /*
   The base is the server's stored candidate, not the proposer's input, so a base that fails its own
@@ -441,6 +439,8 @@ function readBase(source: unknown): { base: StoredArtifact; gate: "promotable" |
   const gate = validatePromotableCollectionArtifact(base, base.collectionId) ? "promotable"
     : validateReviewableCollectionArtifact(base, base.collectionId) ? "reviewable" : null;
   if (!gate) throw invalid();
+  // validate.mjs is the compiler's second gate; a base it refuses could only yield a result it refuses.
+  if (packageInvalid(base)) throw invalid();
   return { base, gate };
 }
 
@@ -560,13 +560,12 @@ function buildOntologyPatch(source: unknown, rawOps: unknown, context: OntologyP
   /*
     The compiler's own two checks over the result: the gate the base passed (a patch never
     demotes a promotable candidate), and `validate.mjs` -- the predicate allowlist, the four graph
-    serialisations agreeing, counts, dangling references -- raising nothing the base did not.
+    serialisations agreeing, counts, dangling references -- raising nothing at all.
   */
   const patched = rebuild(base, nodes, edges, true);
   const gate = baseGate === "promotable" ? validatePromotableCollectionArtifact : validateReviewableCollectionArtifact;
   if (!gate(patched, base.collectionId)) return refuse(null, "PATCH_ARTIFACT_INVALID");
-  const before = errorKeys(base);
-  if ([...errorKeys(patched)].some((key) => !before.has(key))) return refuse(null, "PATCH_ARTIFACT_INVALID");
+  if (packageInvalid(patched)) return refuse(null, "PATCH_ARTIFACT_INVALID");
 
   return { ok: true, base, patched, ops, loss: { edgesRemoved, evidenceOrphaned }, affected: [...affected].sort() };
 }

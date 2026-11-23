@@ -333,6 +333,32 @@ describe("what an ontology patch refuses", () => {
     }
   });
 
+  it("throws on a base that passes the promotion gate but not validate.mjs: no patch result inherits an error", () => {
+    // Graph files re-materialized under a blueprint that does not declare mentions_entity.
+    const blueprint = { ...base.blueprint, ontologyRelations: ["discusses_topic", "supported_by"] };
+    const derived = materializeLabelDerivedFiles({
+      collectionId: base.collectionId,
+      nodes: base.ontology.nodes,
+      edges: base.ontology.edges,
+      blueprint,
+      inputBinding: base.sourceDocuments.map((document) => ({
+        documentId: document.documentId,
+        versionKey: document.versionKey,
+        inputSha256: document.inputSha256,
+        sourceImmutableKey: document.sanitizedKey,
+      })),
+    });
+    const replaced = new Map([derived.canonicalModel, derived.turtle, derived.jsonld, derived.nodeCsv, derived.edgeCsv].map((file) => [file.path, file]));
+    const bad = { ...base, blueprint, package: { ...base.package, files: base.package.files.map((file) => replaced.get(file.path) ?? file) } };
+    expect(validatePromotableCollectionArtifact(bad, bad.collectionId)).not.toBeNull();
+    expect(errors(bad).map((error) => error.code)).toContain("PREDICATE_UNDECLARED");
+    const entity = node(bad, "Entity");
+    for (const ops of [[{ op: "relabel", objectId: entity.id, before: entity.label, after: "ACME Corporation" }], addTopic(bad)]) {
+      expect(() => applyOntologyPatch(bad, ops, ACTOR)).toThrow("PATCH_BASE_INVALID");
+      expect(() => evaluateOntologyPatch(bad, ops, { ...ALL, questions: null })).toThrow("PATCH_BASE_INVALID");
+    }
+  });
+
   it("refuses to run without the proposer's readable documents rather than assume all of them", () => {
     expect(() => applyOntologyPatch(base, addTopic(base), { actorUserId: "u", patchedAt: "t" } as unknown as typeof ACTOR)).toThrow("PATCH_CONTEXT_INVALID");
     expect(() => evaluateOntologyPatch(base, addTopic(base), { readableDocumentIds: ["contract-a"], questions: null } as never)).toThrow("PATCH_CONTEXT_INVALID");
