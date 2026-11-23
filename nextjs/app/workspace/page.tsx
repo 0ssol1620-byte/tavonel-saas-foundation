@@ -61,6 +61,8 @@ import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
+import { ActiveWorldPicker, ConfirmDialog, discoverActiveWorlds, requestConfirm, type ActiveWorldDiscovery, type ConfirmRequest } from "@/components/workspace/in-page-choices";
+import type { ActiveWorldSummary } from "@/lib/world-store";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
@@ -775,6 +777,12 @@ export default function WorkspacePage() {
      absent model, or a candidate beside the answering active World opens nothing. */
   const askWorldModel = qualifyAskWorldModel(worldReadModel, collectionResult, askResult?.receipt);
 
+  /* WO-WS-1: Ask with no collection in the URL asks the server which Worlds are active. "opening"
+     is a World being loaded; "one" after loading with no active World means it could not be opened. */
+  const [askWorlds, setAskWorlds] = useState<"idle" | "checking" | "opening" | ActiveWorldDiscovery>("idle");
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const confirmInPage = (message: string, confirmLabel: string) => requestConfirm(setConfirmRequest, message, confirmLabel);
+
   const getAuthToken = async () => {
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -982,6 +990,34 @@ export default function WorkspacePage() {
     // Reads current URL; the loader only uses auth and state setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* The World Ask reads goes into the URL before it loads, so a reload keeps the same choice.
+     `history` is "push" for a choice the person made and "replace" when there was only one. */
+  const openActiveWorld = async (world: ActiveWorldSummary, history: "push" | "replace", after: ActiveWorldDiscovery) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("collection", world.collectionId);
+    url.searchParams.set("manifest", world.manifestDigest);
+    if (history === "push") window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+    setAskWorlds("opening");
+    await loadCollectionCandidate(world.collectionId, world.manifestDigest)
+      .catch(() => setNotice("The selected revision could not be read. Reload to recheck access; no revision was changed."));
+    setAskWorlds(after);
+  };
+
+  useEffect(() => {
+    if (surface !== "ask" || session !== "signed-in" || !workspaceStartupReady || collectionResult || askWorlds !== "idle") return;
+    if (new URLSearchParams(window.location.search).has("collection")) return;
+    setAskWorlds("checking");
+    void (async () => {
+      const token = await getAuthToken();
+      const found: ActiveWorldDiscovery = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED" };
+      if (found.kind === "one") await openActiveWorld(found.world, "replace", found);
+      else setAskWorlds(found);
+    })();
+    // The loaders only use auth and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surface, session, workspaceStartupReady, collectionResult, askWorlds]);
 
   useEffect(() => {
     if (!collectionResult?.manifestDigest) return;
@@ -2453,7 +2489,7 @@ export default function WorkspacePage() {
       // main's proof path: one file, its own reservation, no compile.
       if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) { await uploadLegacyDocument(proofFile); return; }
       const quote = quoteIntakeManifest([{ bytes: proofFile.size, mimeType: proofFile.type, claimedPages: null, claimedBasis: null }]);
-      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`)) return;
+      if (!quote.ok || !(await confirmInPage(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`, `Approve up to ${formatUsd(quote.quote.maximumUsd)}`))) return;
       await uploadDocuments([proofFile], null);
     } catch {
       setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
@@ -2487,7 +2523,7 @@ export default function WorkspacePage() {
         bytes: file.size, mimeType: file.type || "application/pdf", claimedPages: null, claimedBasis: null,
       })));
       // The cost-approval prompt belongs to the approval lineage; switch off is main's direct upload.
-      if (INTAKE_APPROVAL_ROLLOUT_ENABLED && (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`))) return;
+      if (INTAKE_APPROVAL_ROLLOUT_ENABLED && (!quote.ok || !(await confirmInPage(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`, `Approve up to ${formatUsd(quote.quote.maximumUsd)}`)))) return;
       await uploadDocuments(files, null);
     } catch {
       setNotice("The public collection proof could not be prepared. Nothing was activated.");
@@ -2662,7 +2698,7 @@ export default function WorkspacePage() {
       setNotice("Only a completed Python Core v2 candidate with a bound world state can be activated.");
       return;
     }
-    if (!window.confirm("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.")) return;
+    if (!(await confirmInPage("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.", "Activate this candidate"))) return;
     setWorldBusy(true);
     try {
       const token = await getAuthToken();
@@ -2700,7 +2736,7 @@ export default function WorkspacePage() {
 
   const rollbackWorld = async (targetManifestDigest: string) => {
     if (!collectionResult || !activeWorld || rollbackReason.trim().length < 8) return;
-    if (!window.confirm(`Roll the active pointer back to ${targetManifestDigest}? No package bytes will be deleted or rewritten.`)) return;
+    if (!(await confirmInPage(`Roll the active pointer back to ${targetManifestDigest}? No package bytes will be deleted or rewritten.`, "Roll back the active pointer"))) return;
     setWorldBusy(true);
     try {
       const token = await getAuthToken();
@@ -3019,6 +3055,7 @@ export default function WorkspacePage() {
         ) : null
       }
     >
+          {confirmRequest ? <ConfirmDialog request={confirmRequest} /> : null}
           <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           {/*
@@ -3893,7 +3930,24 @@ export default function WorkspacePage() {
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
                 </div>
-                {activeWorld ? null : (
+                {activeWorld ? null : askWorlds === "checking" || askWorlds === "opening" ? (
+                  <p className="notice static" role="status">
+                    {askWorlds === "checking" ? "Checking this workspace for an active World…" : "Opening the active World…"}
+                  </p>
+                ) : askWorlds !== "idle" && askWorlds.kind === "several" ? (
+                  <ActiveWorldPicker worlds={askWorlds.worlds} onChoose={(world) => void openActiveWorld(world, "push", askWorlds)} />
+                ) : askWorlds !== "idle" && (askWorlds.kind === "failed" || askWorlds.kind === "one") ? (
+                  <p className="notice static" role="status">
+                    <strong>{askWorlds.kind === "failed" ? "Active Worlds could not be checked." : "The active World could not be opened."}</strong>{" "}
+                    {askWorlds.kind === "failed" ? failureSentence(askWorlds.code, 503) : "Ask stays closed until it can read it."}
+                    <button type="button" onClick={() => {
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete("collection"); url.searchParams.delete("manifest");
+                      window.history.replaceState(null, "", url);
+                      ++candidateLoadSequence.current; setCollectionResult(null); setAskWorlds("idle");
+                    }}>Check again</button>
+                  </p>
+                ) : (
                   <p className="notice static" role="status">
                     <strong>No active World yet.</strong> Ask reads the active World only. Review a
                     candidate and activate it, and this becomes answerable.
