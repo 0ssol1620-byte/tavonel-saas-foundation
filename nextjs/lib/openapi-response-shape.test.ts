@@ -229,7 +229,7 @@ async function approvedCapabilityFixture() {
 function grantKey(extra: Record<string, unknown> = {}) {
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: "user-shape", scopes: [], ...extra },
+    principal: { kind: "api-key", workspaceKey: WORKSPACE, userId: "user-shape", scopes: [], workspaceRole: "owner", ...extra },
   });
 }
 

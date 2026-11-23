@@ -112,7 +112,7 @@ let base = "";
 let service: Server;
 const keyFor = (artifact: Fixture) => collectionCandidateKey(workspace, collection, artifact.manifestDigest.slice(7))!;
 const principal = { kind: "api_key", workspaceKey: workspace, userId: actor, keyId: "synthetic-key",
-  scopes: ["ask:read", "worlds:read"], authorizationRevision: 1 };
+  scopes: ["ask:read", "worlds:read"], authorizationRevision: 1, workspaceRole: "owner" };
 
 function mutationRequest(body: Record<string, unknown>) {
   return new Request("https://tavonel.test/synthetic", { method: "POST",

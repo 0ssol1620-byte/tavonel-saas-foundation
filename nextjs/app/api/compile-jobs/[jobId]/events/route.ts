@@ -1,4 +1,5 @@
 import { isTerminalCompileState, readCompileJob, readCompileJobEvents } from "@/lib/compile-job-store";
+import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,14 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
       : 503;
     return new Response(JSON.stringify({ code: job.code }), {
       status,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
+  // A job over a source outside a member's scope streams nothing to them (WO-C-T3).
+  const scopeRefusal = await memberSourcesRefusal(auth.principal, job.value.documentIds);
+  if (scopeRefusal) {
+    return new Response(JSON.stringify({ code: scopeRefusal.code }), {
+      status: scopeRefusal.status,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   }

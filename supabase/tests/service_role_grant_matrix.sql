@@ -19,7 +19,7 @@
 -- source_fingerprints and document_relations (20261104090500).
 
 begin;
-select plan(76);
+select plan(77);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -82,6 +82,8 @@ select table_privs_are('public', 'foundation_trial_daily_budget', 'service_role'
 select table_privs_are('public', 'foundation_trial_policy', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_trial_risk_events', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_trial_source_digests', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
+-- Member source scopes (WO-C-T3): RPC-only, the server role holds nothing on the table.
+select table_privs_are('public', 'foundation_workspace_member_source_scopes', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_world_events', 'service_role', array['SELECT']::text[]);
 select table_privs_are('public', 'foundation_world_versions', 'service_role', array['SELECT']::text[]);
 select table_privs_are('public', 'gpu_job_reservations', 'service_role', array[]::text[]);

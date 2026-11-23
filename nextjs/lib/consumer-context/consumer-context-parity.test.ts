@@ -680,13 +680,13 @@ const AT8: ConsumerSnapshot = { worldStateId: "wst_alpha-8.r1", manifestDigest: 
 
 const apiKeyPrincipal = (overrides: Partial<FoundationPrincipal> = {}): FoundationPrincipal => ({
   kind: "api-key", workspaceKey: WORKSPACE, userId: USER_ID, keyId: KEY_ID,
-  scopes: ["ask:read", "collections:read", "worlds:read"], authorizationRevision: 1, workspaceRole: "member",
+  scopes: ["ask:read", "collections:read", "worlds:read"], authorizationRevision: 1, workspaceRole: "owner",
   ...overrides,
 });
 // authorizeFoundationRequest grants a session exactly the scope of the route it authorized.
 const sessionPrincipal = (overrides: Partial<FoundationPrincipal> = {}): FoundationPrincipal => ({
   kind: "session", workspaceKey: WORKSPACE, userId: USER_ID,
-  scopes: ["worlds:read"], authorizationRevision: 1, workspaceRole: "member",
+  scopes: ["worlds:read"], authorizationRevision: 1, workspaceRole: "owner",
   ...overrides,
 });
 

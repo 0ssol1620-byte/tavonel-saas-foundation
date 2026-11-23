@@ -94,6 +94,7 @@ describe("compile-jobs v2 origin classification", () => {
   function stubStore(bindings: Row[], admissions: Row[]) {
     vi.stubGlobal("fetch", vi.fn(async (input: string) => {
       const url = new URL(input);
+      if (url.pathname.endsWith("/rpc/documents_outside_member_scope")) return new Response("false");
       if (url.pathname.endsWith("/rpc/connector_documents_blocked")) return new Response("false");
       if (url.pathname.endsWith("/rpc/assert_foundation_intake_compile_set")) {
         return new Response(JSON.stringify({ allowed: true, approvalRequired: false }), { headers: { "content-type": "application/json" } });

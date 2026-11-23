@@ -145,7 +145,7 @@ import { GET as documentSource } from "../app/api/documents/[id]/source/route";
 import { GET as v1World } from "../app/api/v1/world/[id]/route";
 import { GET as v1Lens } from "../app/api/v1/world/[id]/[lens]/route";
 
-const alpha = { ok: true, principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [] } };
+const alpha = { ok: true, principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [], workspaceRole: "owner" } };
 const alphaUser = { id: "user-alpha" };
 const alphaPilot = (role: string) => ({ membership: { workspaceId: MINE, role } });
 

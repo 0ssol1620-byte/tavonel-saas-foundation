@@ -39,7 +39,7 @@ describe("connector source deletion request", () => {
 
 describe("viewer-bound source access transport", () => {
   it("forwards only the authenticated Foundation viewer to the server-owned lookup RPC", async () => {
-    request.mockResolvedValue(Response.json(false));
+    request.mockImplementation(async () => Response.json(false));
     await expect(checkConnectorSourceAccessForViewer("pilot-acme01", ["document-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1"))
       .resolves.toEqual({ ok: true });
     expect(request).toHaveBeenCalledWith({}, "/rest/v1/rpc/connector_documents_blocked_for_viewer", expect.objectContaining({
@@ -50,24 +50,25 @@ describe("viewer-bound source access transport", () => {
   });
 
   it("preserves direct-upload access when the new RPC is missing", async () => {
-    request.mockResolvedValueOnce(new Response("function not found", { status: 404 }))
+    request.mockResolvedValueOnce(Response.json(false)).mockResolvedValueOnce(new Response("function not found", { status: 404 }))
       .mockResolvedValueOnce(Response.json(false));
     await expect(checkConnectorSourceAccessForViewer("pilot-acme01", ["direct-upload-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1"))
       .resolves.toEqual({ ok: true });
     expect(request.mock.calls.map(call => call[1])).toEqual([
+      "/rest/v1/rpc/documents_outside_member_scope",
       "/rest/v1/rpc/connector_documents_blocked_for_viewer", "/rest/v1/rpc/connector_documents_blocked",
     ]);
   });
 
   it("keeps connector-bound sources denied if the new RPC is missing", async () => {
-    request.mockResolvedValueOnce(new Response("function not found", { status: 404 }))
+    request.mockResolvedValueOnce(Response.json(false)).mockResolvedValueOnce(new Response("function not found", { status: 404 }))
       .mockResolvedValueOnce(Response.json(true));
     await expect(checkConnectorSourceAccessForViewer("pilot-acme01", ["connector-doc-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1"))
       .resolves.toEqual({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
   });
 
   it("does not allow access when both the draft RPC and legacy policy lookup are unavailable", async () => {
-    request.mockResolvedValueOnce(new Response("function not found", { status: 404 }))
+    request.mockResolvedValueOnce(Response.json(false)).mockResolvedValueOnce(new Response("function not found", { status: 404 }))
       .mockResolvedValueOnce(new Response("database unavailable", { status: 503 }));
     await expect(checkConnectorSourceAccessForViewer("pilot-acme01", ["direct-upload-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1"))
       .resolves.toEqual({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
@@ -75,18 +76,20 @@ describe("viewer-bound source access transport", () => {
 
   it("does not call the draft viewer RPC while the feature flag is disabled", async () => {
     vi.stubEnv("TAVONEL_GOOGLE_VIEWER_LINK_ENABLED", "false");
-    request.mockResolvedValue(Response.json(false));
+    request.mockImplementation(async () => Response.json(false));
     await expect(checkConnectorSourceAccessForViewer("pilot-acme01", ["direct-upload-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1"))
       .resolves.toEqual({ ok: true });
-    expect(request).toHaveBeenCalledOnce();
-    expect(request).toHaveBeenCalledWith({}, "/rest/v1/rpc/connector_documents_blocked", expect.any(Object));
+    // The member scope, then the legacy policy: never the draft viewer RPC.
+    expect(request.mock.calls.map(call => call[1])).toEqual([
+      "/rest/v1/rpc/documents_outside_member_scope", "/rest/v1/rpc/connector_documents_blocked",
+    ]);
   });
 
   it("uses the configured ACL freshness bound and rejects unsafe values", async () => {
     vi.stubEnv("TAVONEL_GOOGLE_DRIVE_ACL_MAX_AGE_SECONDS", "600");
-    request.mockResolvedValue(Response.json(false));
+    request.mockImplementation(async () => Response.json(false));
     await checkConnectorSourceAccessForViewer("pilot-acme01", ["connector-doc-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1");
-    expect(JSON.parse(String(request.mock.calls[0][2]?.body))).toMatchObject({ p_max_age_seconds: 600 });
+    expect(JSON.parse(String(request.mock.calls[1][2]?.body))).toMatchObject({ p_max_age_seconds: 600 });
     vi.stubEnv("TAVONEL_GOOGLE_DRIVE_ACL_MAX_AGE_SECONDS", "86400");
     request.mockResolvedValueOnce(Response.json(false));
     await checkConnectorSourceAccessForViewer("pilot-acme01", ["connector-doc-1"], "59d42924-a3cc-4a09-b92d-9c86b58901a1");

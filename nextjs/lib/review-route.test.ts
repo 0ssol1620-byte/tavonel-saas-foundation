@@ -36,7 +36,7 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  requireSession.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey: "pilot-review", userId: "969dc192-daa2-4119-a5d9-9a7621f171a1" } });
+  requireSession.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey: "pilot-review", userId: "969dc192-daa2-4119-a5d9-9a7621f171a1", workspaceRole: "owner" } });
   loadWorld.mockReset().mockResolvedValue({ ok: true, model: { world: { manifestDigest }, evidence: [evidence] } });
   recordDecision.mockReset().mockResolvedValue({ ok: true, receipt: { decisionId: "f07fe147-f52e-4fd0-8afc-79cd848b928d", action: "accept", recordedAt: "2026-09-02T09:00:00Z" } });
   listDecisions.mockReset().mockResolvedValue({ ok: true, decisions: [] });

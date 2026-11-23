@@ -52,7 +52,7 @@ function model(count: number, manifest = MANIFEST) {
 }
 
 function principal(workspaceKey = WORKSPACE, authorizationRevision = 3) {
-  return { ok: true, principal: { kind: "api-key", workspaceKey, userId: "u", keyId: "k", scopes: [], authorizationRevision } };
+  return { ok: true, principal: { kind: "api-key", workspaceKey, userId: "u", keyId: "k", scopes: [], authorizationRevision, workspaceRole: "owner" } };
 }
 
 async function get(query: string, lens = "evidence", id = COLLECTION) {

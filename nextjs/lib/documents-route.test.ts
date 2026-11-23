@@ -88,8 +88,8 @@ function reviewObjectsFor(documentId: string) {
 }
 
 beforeEach(() => {
-  authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId: "viewer-user" } });
-  reauthorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId: "viewer-user" } });
+  authorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId: "viewer-user", workspaceRole: "owner" } });
+  reauthorize.mockReset().mockResolvedValue({ ok: true, principal: { workspaceKey, userId: "viewer-user", workspaceRole: "owner" } });
   signerEnv.mockReset().mockReturnValue({
     accountId: "account",
     accessKeyId: "key",

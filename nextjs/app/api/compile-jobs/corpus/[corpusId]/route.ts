@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readCorpusParts } from "@/lib/compile-job-store";
 import { CORPUS_ID_PATTERN, summariseCorpus } from "@/lib/corpus-batching";
+import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,9 @@ export async function GET(request: Request, context: { params: Promise<{ corpusI
         : 503;
     return NextResponse.json({ code: parts.code }, { status, headers: HEADERS });
   }
+  // Every part's sources: a corpus touching one source outside a member's scope is refused whole.
+  const scopeRefusal = await memberSourcesRefusal(auth.principal, [...new Set(parts.value.flatMap((part) => part.documentIds))]);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: HEADERS });
 
   const summary = summariseCorpus(corpusId, parts.value.map((part) => ({
     jobId: part.jobId,

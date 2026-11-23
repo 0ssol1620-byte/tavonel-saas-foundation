@@ -39,6 +39,9 @@ vi.mock("@/lib/world-store", async (importOriginal) => ({
 }));
 vi.mock("@/lib/active-world-source-access", () => ({ loadActiveWorldSourceIds: fx.sourceIds }));
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccess: fx.sourceAccess, checkConnectorSourceAccessForViewer: fx.sourceAccess }));
+// The member of WO-CAT-8's shared-workspace case reads a World in their scope (WO-C-T3); the scope itself is
+// lib/member-source-scope.test.ts's subject, the meter is this file's.
+vi.mock("@/lib/member-source-scope", () => ({ memberCollectionScopeRefusal: async () => null }));
 vi.mock("@/lib/derived-data-admission", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./derived-data-admission")>()),
   admitsDerivedCustomerData: fx.admits,

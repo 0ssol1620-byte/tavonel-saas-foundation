@@ -5,7 +5,8 @@ import {
   resolveBoundSnapshot,
   snapshotOf,
 } from "@/lib/consumer-context-api";
-import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
+import { authorizeFoundationRequest, type FoundationPrincipal } from "@/lib/developer-auth";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import {
   ACTIVE_WORLD_PAGE_DEFAULT,
@@ -16,6 +17,39 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const NO_STORE = { "Cache-Control": "no-store" };
+const storeStatus = (code: string) => (code === "WORLD_STORE_READ_FAILED" || code === "WORLD_STORE_NOT_CONFIGURED" ? 503 : 400);
+// ponytail: a member's page reads the package of every World it passes to learn its sources, so the
+// walk is bounded; past MEMBER_SCAN_PAGES full store pages it refuses rather than guess. Upgrade path:
+// a stored per-World source set.
+const MEMBER_SCAN_PAGES = 4;
+
+/*
+  A member's page (WO-C-T3): only Worlds whose every source is in their scope, and nothing about
+  the others -- no count, no id. The cursor is therefore always the id of a World this page
+  returned, never one it dropped, which is why the walk continues past dropped rows instead of
+  handing back the store's own cursor. A last page may come back empty.
+*/
+async function memberPage(principal: FoundationPrincipal, limit: number, cursor: string | null) {
+  type World = Extract<Awaited<ReturnType<typeof listFoundationActiveWorlds>>, { ok: true }>["worlds"][number];
+  const kept: World[] = [];
+  let after = cursor;
+  for (let page = 0; page < MEMBER_SCAN_PAGES; page++) {
+    const listed = await listFoundationActiveWorlds(principal.workspaceKey, { limit: ACTIVE_WORLD_PAGE_MAX, cursor: after });
+    if (!listed.ok) return { ok: false as const, code: listed.code, status: storeStatus(listed.code) };
+    const refusals = await Promise.all(listed.worlds.map((world) =>
+      memberCollectionScopeRefusal(principal, world.collectionId, world.manifestDigest)));
+    for (const [index, world] of listed.worlds.entries()) {
+      const refusal = refusals[index];
+      if (refusal?.status === 503) return { ok: false as const, code: refusal.code, status: 503 };
+      if (refusal) continue;
+      kept.push(world);
+      if (kept.length === limit) return { ok: true as const, worlds: kept, nextCursor: world.collectionId };
+    }
+    if (listed.nextCursor === null) return { ok: true as const, worlds: kept, nextCursor: null };
+    after = listed.nextCursor;
+  }
+  return { ok: false as const, code: "MEMBER_SOURCE_SCOPE_UNAVAILABLE", status: 503 };
+}
 
 /*
   GET /v1/collections -- the workspace's active Worlds (audit X01).
@@ -61,6 +95,8 @@ export async function GET(request: Request) {
     const snapshot = await resolveBoundSnapshot(binding, auth.principal.workspaceKey);
     if (!snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
     const world = snapshot.world;
+    const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, world.collectionId, world.manifestDigest);
+    if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
     const collections = cursor === null || world.collectionId > cursor
       ? [{ collectionId: world.collectionId, manifestDigest: world.manifestDigest, revision: world.revision, updatedAt: world.updatedAt }]
       : [];
@@ -75,11 +111,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const listed = await listFoundationActiveWorlds(auth.principal.workspaceKey, { limit, cursor });
+  const member = auth.principal.workspaceRole !== "owner" && auth.principal.workspaceRole !== "admin";
+  const listed = member
+    ? await memberPage(auth.principal, limit, cursor)
+    : await listFoundationActiveWorlds(auth.principal.workspaceKey, { limit, cursor });
   if (!listed.ok) {
     return NextResponse.json(
       { code: listed.code },
-      { status: listed.code === "WORLD_STORE_READ_FAILED" || listed.code === "WORLD_STORE_NOT_CONFIGURED" ? 503 : 400, headers: NO_STORE },
+      { status: "status" in listed && typeof listed.status === "number" ? listed.status : storeStatus(listed.code), headers: NO_STORE },
     );
   }
   return NextResponse.json(

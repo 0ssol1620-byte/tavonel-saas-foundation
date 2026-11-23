@@ -72,6 +72,12 @@ async function answer(request: Request): Promise<Response> {
   }
   // The cohort is re-read on every call, so removing a workspace stops its credentials at once.
   if (agentProposalsCohortRefusal(auth.principal.workspaceKey) !== null) return notFound();
+  // WO-C-T3 (fail closed, as TC-D3 for the remote MCP): the agent tools list Worlds without a member's
+  // source scope, so a member's agent is refused until those reads are scope-aware.
+  if (auth.principal.workspaceRole !== "owner" && auth.principal.workspaceRole !== "admin") {
+    if (calling) telemetry(toolLabel, "AGENT_MCP_MEMBER_UNAVAILABLE");
+    return rpcError(403, id, -32001, "AGENT_MCP_MEMBER_UNAVAILABLE");
+  }
   // A notification or a response: accepted, nothing to answer.
   if (typeof method !== "string" || id === undefined || id === null) return new NextResponse(null, { status: 202, headers: NO_STORE });
 

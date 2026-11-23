@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [] },
+    principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [], workspaceRole: "owner" },
   });
   signerEnv.mockReturnValue({ accountId: "acct", accessKeyId: "id", secretAccessKey: "secret", bucket: "b" });
   // What a workspace-scoped store answers for an id it cannot see: absence, with no hint that
