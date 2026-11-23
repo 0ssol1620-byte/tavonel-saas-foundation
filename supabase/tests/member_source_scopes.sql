@@ -2,9 +2,10 @@
 -- in their scope, nothing by default; owners and admins read everything; no active membership
 -- reads nothing. set_member_source_scope is owner/admin only, never targets an owner/admin, and
 -- records one membership event per request id; a used request id replays and never writes again. A member's own upload enters their scope with the
--- admission row.
+-- admission row. A scope lives exactly as long as one active-member tenure: whatever ends it deletes
+-- the rows in the same transaction, and a re-accepted invite starts with none.
 begin;
-select plan(53);
+select plan(69);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -168,6 +169,73 @@ select ok(has_function_privilege('service_role', 'public.documents_outside_membe
       and not has_function_privilege('anon', 'public.set_member_source_scope(text, uuid, uuid, text, uuid[], text)', 'execute')
       and not has_function_privilege('service_role', 'public.foundation_member_upload_scope()', 'execute'),
   'the functions execute for service_role only, and the trigger function for nobody');
+
+-- 9. A scope lives exactly as long as one uninterrupted active-member tenure. Whatever ends it --
+-- revocation, a role change, a deleted row, by today's functions or by a direct write -- deletes the
+-- rows in that statement, and a re-activated row starts with none (lead ruling 2026-11-18).
+-- 9a. Revoke (section 6), re-invite, accept: the old `all` scope does not come back.
+select is((select count(*)::integer from public.foundation_workspace_member_source_scopes
+            where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(4)), 0,
+  'the revocation deleted member 4''s scope rows in its own transaction');
+select public.create_foundation_workspace_invite(pg_temp.ws(1), pg_temp.uid(1), 'scope-4@example.invalid', 'member',
+  pg_temp.hash(40), 'scope_idempotency_0040', now() + interval '1 hour', 'scope-reinvite-4');
+select public.accept_foundation_workspace_invite(pg_temp.uid(4), pg_temp.hash(40), 'scope-reaccept-4');
+select is((select count(*)::integer from public.foundation_workspace_member_source_scopes
+            where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(4)), 0,
+  'the re-accepted member starts with no scope row');
+select is(pg_temp.outside(4, array[1]), true, 'and reads no source');
+select is(pg_temp.readable(4, array[1, 2, 3, 7, 8]), '{}'::text[], 'and has no readable id');
+select is(public.get_member_source_scope(pg_temp.ws(1), pg_temp.uid(1), pg_temp.uid(4))->>'kind', 'none',
+  'and reads back as none to the owner');
+select is(pg_temp.set_scope(1, 4, 'all', null, 'scope-set-0015')->>'idempotentReplay', 'true',
+  'a late retry of the pre-revocation grant is a replay');
+select is(pg_temp.outside(4, array[1]), true, 'and does not bring the old scope back');
+
+-- 9b. A role change through the real function: member -> admin -> member starts again with nothing.
+select public.change_foundation_workspace_member_role(pg_temp.ws(1), pg_temp.uid(1), pg_temp.uid(3), 'admin', 'scope-role-3a');
+select is((select count(*)::integer from public.foundation_workspace_member_source_scopes
+            where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(3)), 0,
+  'promoting member 3 deleted their scope rows');
+select public.change_foundation_workspace_member_role(pg_temp.ws(1), pg_temp.uid(1), pg_temp.uid(3), 'member', 'scope-role-3b');
+select is(pg_temp.outside(3, array[7]), true, 'demoted back to member, they read no source, not even the old upload');
+
+-- 9c. The class, by direct writes (the statement any present or future membership function makes):
+-- every move off (active, member) leaves no scope row.
+create function pg_temp.end_tenure(i integer, st text, r text, req text) returns integer language plpgsql as $$
+begin
+  perform pg_temp.set_scope(1, i, 'listed', array[1, 2], req);
+  update public.foundation_workspace_members
+     set state = st, role = r, revoked_at = case when st = 'revoked' then clock_timestamp() end,
+         updated_at = clock_timestamp()
+   where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(i);
+  return (select count(*)::integer from public.foundation_workspace_member_source_scopes
+           where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(i));
+end
+$$;
+create function pg_temp.reactivate(i integer) returns void language sql as $$
+  update public.foundation_workspace_members
+     set state = 'active', role = 'member', revoked_at = null, accepted_at = clock_timestamp(), updated_at = clock_timestamp()
+   where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(i);
+$$;
+select pg_temp.join(6, 'member');
+select is(pg_temp.end_tenure(6, 'active', 'admin', 'scope-class-0001'), 0, 'active member -> active admin leaves no scope row');
+select pg_temp.reactivate(6);
+select is(pg_temp.end_tenure(6, 'revoked', 'member', 'scope-class-0002'), 0, 'active member -> revoked member leaves no scope row');
+select pg_temp.reactivate(6);
+select is(pg_temp.end_tenure(6, 'revoked', 'admin', 'scope-class-0003'), 0, 'active member -> revoked admin leaves no scope row');
+-- And no writer can attach a row to anything but an active member.
+select throws_ok($$insert into public.foundation_workspace_member_source_scopes (workspace_key, user_id, scope_kind, document_id, granted_by)
+    values (pg_temp.ws(1), pg_temp.uid(6), 'all', null, pg_temp.uid(1))$$, 'P0001', 'member_source_scope_membership_inactive',
+  'a scope row for a revoked membership is refused');
+select throws_ok($$insert into public.foundation_workspace_member_source_scopes (workspace_key, user_id, scope_kind, document_id, granted_by)
+    values (pg_temp.ws(1), pg_temp.uid(2), 'all', null, pg_temp.uid(1))$$, 'P0001', 'member_source_scope_membership_inactive',
+  'a scope row for an admin is refused');
+-- A deleted membership row takes its scope with it instead of being blocked by it.
+select pg_temp.set_scope(1, 4, 'listed', array[1], 'scope-set-0040');
+select lives_ok($$delete from public.foundation_workspace_members where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(4)$$,
+  'a membership row with scope rows can be deleted');
+select is((select count(*)::integer from public.foundation_workspace_member_source_scopes
+            where workspace_key = pg_temp.ws(1) and user_id = pg_temp.uid(4)), 0, 'and its scope rows go with it');
 
 select * from finish();
 rollback;

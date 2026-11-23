@@ -11,7 +11,8 @@
 --
 -- Rows: one `all` row, or any number of `listed` rows (one per document). A member with no row
 -- reads nothing (TC-D1). No membership row, a revoked membership, and an unknown role all read
--- nothing. Every read path asks the database on every request (documents_outside_member_scope /
+-- nothing. Rows exist only for an active member: revocation, any role change, re-activation and
+-- deletion of the membership row delete them in the same transaction (tenure triggers, below). Every read path asks the database on every request (documents_outside_member_scope /
 -- member_readable_document_ids); nothing is cached between the write and the check, so a
 -- narrowed scope or a revoked member is refused on the next request (constitution: an ACL revoke
 -- never waits for a background job).
@@ -35,8 +36,9 @@ create table public.foundation_workspace_member_source_scopes (
   granted_by uuid not null references auth.users(id) on delete restrict,
   granted_at timestamptz not null default clock_timestamp(),
   check ((scope_kind = 'all') = (document_id is null)),
+  -- A deleted membership takes its scope with it (see the tenure triggers below).
   foreign key (workspace_key, user_id)
-    references public.foundation_workspace_members (workspace_key, user_id) on delete restrict
+    references public.foundation_workspace_members (workspace_key, user_id) on delete cascade
 );
 create unique index foundation_member_source_scopes_all_idx
   on public.foundation_workspace_member_source_scopes (workspace_key, user_id)
@@ -341,13 +343,61 @@ create trigger foundation_member_upload_scope
   after insert or update of user_id on public.foundation_intake_admissions
   for each row execute function public.foundation_member_upload_scope();
 
+-- Tenure. A scope lives exactly as long as one uninterrupted (active, member) membership, enforced on
+-- the tables, not in each membership function, so revoke, a role change, a re-accepted invite (the
+-- upsert of accept_foundation_workspace_invite re-activates the revoked row) and any later function
+-- that ends or changes a membership are all covered:
+--   * any change of state or role deletes the scope rows in the same statement, so a revoked,
+--     promoted, demoted or re-activated member starts with no scope (TC-D1) until an owner/admin
+--     picks one; the revoke / role-change event already in that transaction is the record;
+--   * a deleted membership row cascades (foreign key above);
+--   * no writer can attach a scope row to anything but an active member: the guard locks the
+--     membership row FOR SHARE, so a concurrent revoke is ordered strictly before or after it.
+create function public.foundation_member_scope_tenure_end()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.foundation_workspace_member_source_scopes s
+   where s.workspace_key = old.workspace_key and s.user_id = old.user_id;
+  return null;
+end;
+$$;
+create trigger foundation_member_scope_tenure_end
+  after update of state, role on public.foundation_workspace_members
+  for each row when (old.state is distinct from new.state or old.role is distinct from new.role)
+  execute function public.foundation_member_scope_tenure_end();
+
+create function public.foundation_member_scope_requires_active_member()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform 1 from public.foundation_workspace_members m
+   where m.workspace_key = new.workspace_key and m.user_id = new.user_id
+     and m.state = 'active' and m.role = 'member'
+   for share;
+  if not found then raise exception 'member_source_scope_membership_inactive'; end if;
+  return new;
+end;
+$$;
+create trigger foundation_member_scope_requires_active_member
+  before insert or update on public.foundation_workspace_member_source_scopes
+  for each row execute function public.foundation_member_scope_requires_active_member();
+
 revoke all on function public.foundation_member_source_scope_digest(text, uuid[]),
   public.foundation_member_source_scope_stored(text, uuid),
   public.member_readable_document_ids(text, uuid, text[]),
   public.documents_outside_member_scope(text, uuid, text[]),
   public.get_member_source_scope(text, uuid, uuid),
   public.set_member_source_scope(text, uuid, uuid, text, uuid[], text),
-  public.foundation_member_upload_scope()
+  public.foundation_member_upload_scope(),
+  public.foundation_member_scope_tenure_end(),
+  public.foundation_member_scope_requires_active_member()
   from public, anon, authenticated, service_role;
 grant execute on function public.member_readable_document_ids(text, uuid, text[]),
   public.documents_outside_member_scope(text, uuid, text[]),

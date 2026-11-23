@@ -12,7 +12,7 @@
 -- restored action check could not hold over it. Deleting audit rows to make a rollback pass is not
 -- this file's call; the operator decides, with the ledger.
 --
--- Otherwise it drops the upload trigger, the six functions and the scope table (its rows are the
+-- Otherwise it drops the upload and the two tenure triggers, the nine functions and the scope table (its rows are the
 -- feature's own state and go with it), and restores the membership events action check of
 -- 20260920110000 verbatim. A missing object stops the rollback (no `if exists`).
 --
@@ -35,6 +35,10 @@ $$;
 
 drop trigger foundation_member_upload_scope on public.foundation_intake_admissions;
 drop function public.foundation_member_upload_scope();
+drop trigger foundation_member_scope_tenure_end on public.foundation_workspace_members;
+drop function public.foundation_member_scope_tenure_end();
+drop trigger foundation_member_scope_requires_active_member on public.foundation_workspace_member_source_scopes;
+drop function public.foundation_member_scope_requires_active_member();
 drop function public.set_member_source_scope(text, uuid, uuid, text, uuid[], text);
 drop function public.get_member_source_scope(text, uuid, uuid);
 drop function public.documents_outside_member_scope(text, uuid, text[]);
