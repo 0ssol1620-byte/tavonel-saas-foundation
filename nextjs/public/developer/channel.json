@@ -8,7 +8,7 @@
   "assets": {
     "cli": {
       "url": "https://tavonel.com/developer/tavonel-cli.mjs",
-      "sha256": "sha256:67c24a554df7f3dc6260933b31ceec8043322b7b6b917e98abe8e7795074b9bb"
+      "sha256": "sha256:fea455a338703d8de2e720859d9654a2ba5d9885bbe713ec13024c4ff8ccf8fd"
     },
     "mcp": {
       "url": "https://tavonel.com/developer/tavonel-mcp.mjs",
@@ -21,6 +21,10 @@
     "sourceAgent": {
       "url": "https://tavonel.com/developer/tavonel-source-agent.py",
       "sha256": "sha256:9c7be2d146cedeb6693310e28107f71cd5f311eaed7c36bdfde489338e43ce71"
+    },
+    "sourceAgentService": {
+      "url": "https://tavonel.com/developer/tavonel-source-agent.service",
+      "sha256": "sha256:6e0b42d15df5c1be17ebe1959f933c713da2548153250c7c10b95fdaede3119d"
     },
     "verifyExport": {
       "url": "https://tavonel.com/developer/tavonel-verify-export.mjs",

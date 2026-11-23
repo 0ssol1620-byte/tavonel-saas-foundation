@@ -6,6 +6,13 @@ const SEARCH_LIMIT_MAX = 25;
 const PAGE_LIMIT_MAX = 50;
 const baseUrl = (process.env.TAVONEL_BASE_URL || "https://tavonel.com").replace(/\/$/, "");
 const apiKey = process.env.TAVONEL_API_KEY || "";
+/*
+  The developer-channel key this release trusts: { keyId, publicKeySpkiSha256 }. It is compiled in, so a
+  site that changes channel.json, its signature and channel-trust.json together still fails verify-channel;
+  rotating the key is a new CLI release. Null until the channel key exists: verify-channel then refuses.
+*/
+const CHANNEL_TRUST_PIN = null;
+const CHANNEL_SIGNATURE_SCOPE = "tavonel.signed_developer_channel.v1";
 
 /* Hyphenated shell names and MCP-compatible underscore aliases resolve to one action. */
 const COMMAND_ALIASES = new Map([
@@ -30,6 +37,7 @@ function usage() {
 Usage:
   node tavonel-cli.mjs status
   node tavonel-cli.mjs update-check
+  node tavonel-cli.mjs verify-channel [download-dir]          # signature, then every sha256; no key, no network
   node tavonel-cli.mjs documents
   node tavonel-cli.mjs worlds [--limit 1-50] [--cursor <collection-id>]
   node tavonel-cli.mjs collection <collection-id>
@@ -171,6 +179,109 @@ async function checkForUpdate() {
   return { current: DISTRIBUTION_VERSION, latest: channel.version, updateAvailable: newerThan(channel.version, DISTRIBUTION_VERSION), assets: channel.assets };
 }
 
+/* Sorted keys, no whitespace: the bytes the channel signature covers. Same function as scripts/sign-developer-channel.mjs. */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function instant(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) && new Date(time).toISOString() === value ? time : null;
+}
+
+/*
+  Verifies a downloaded channel directory: channel.json against channel.json.sig under the pinned key and the
+  developer-channel scope, channel-trust.json against the pin, then every asset's sha256. Reads only; any
+  failure throws a typed reason and nothing is reported as verified.
+*/
+async function verifyChannel(directory) {
+  const { createHash, createPublicKey, verify } = await import("node:crypto");
+  const { readFileSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const fail = (code, detail) => { throw new Error(`${code}: ${detail}`); };
+  const sha256 = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  if (!CHANNEL_TRUST_PIN) fail("CHANNEL_TRUST_NOT_PINNED", "this CLI release pins no channel key");
+  const read = (name, maxBytes, missing) => {
+    let stat;
+    try { stat = statSync(join(directory, name)); } catch { fail(missing, name); }
+    if (!stat.isFile()) fail(missing, name);
+    if (stat.size > maxBytes) fail("CHANNEL_FILE_TOO_LARGE", name);
+    return readFileSync(join(directory, name));
+  };
+  const parse = (name, missing) => {
+    const bytes = read(name, 65_536, missing);
+    try { return JSON.parse(bytes.toString("utf8")); } catch { return fail("CHANNEL_JSON_INVALID", name); }
+  };
+  const channel = parse("channel.json", "CHANNEL_FILE_MISSING");
+  const signature = parse("channel.json.sig", "CHANNEL_SIGNATURE_MISSING");
+  const trust = parse("channel-trust.json", "CHANNEL_TRUST_MISSING");
+  if (!object(channel) || !object(channel.assets) || Object.keys(channel.assets).length === 0) fail("CHANNEL_JSON_INVALID", "channel.json");
+
+  const text = ["keyId", "publicKeySpkiDerBase64", "publicKeySpkiSha256", "signedPayloadSha256", "signatureBase64", "issuedAt", "expiresAt"];
+  if (!object(signature) || signature.schemaVersion !== "tavonel.export_signature.v2" || signature.algorithm !== "Ed25519"
+    || text.some((field) => typeof signature[field] !== "string") || !Number.isSafeInteger(signature.keyVersion) || signature.keyVersion < 1) {
+    fail("CHANNEL_SIGNATURE_MALFORMED", "channel.json.sig");
+  }
+  if (signature.signatureScope !== CHANNEL_SIGNATURE_SCOPE) fail("CHANNEL_SIGNATURE_SCOPE_MISMATCH", "channel.json.sig is not a developer-channel signature");
+  const der = Buffer.from(signature.publicKeySpkiDerBase64, "base64");
+  if (signature.keyId !== CHANNEL_TRUST_PIN.keyId || signature.publicKeySpkiSha256 !== CHANNEL_TRUST_PIN.publicKeySpkiSha256
+    || der.toString("base64") !== signature.publicKeySpkiDerBase64 || sha256(der) !== CHANNEL_TRUST_PIN.publicKeySpkiSha256) {
+    fail("CHANNEL_KEY_UNKNOWN", "the channel is signed by a key this CLI does not pin");
+  }
+  const record = object(trust) && trust.schemaVersion === "tavonel.export_trust.v2" && Array.isArray(trust.keys)
+    ? trust.keys.find((key) => object(key) && key.keyId === signature.keyId && key.keyVersion === signature.keyVersion)
+    : undefined;
+  if (!record || record.publicKeySpkiSha256 !== CHANNEL_TRUST_PIN.publicKeySpkiSha256 || record.publicKeySpkiDerBase64 !== signature.publicKeySpkiDerBase64) {
+    fail("CHANNEL_TRUST_MISMATCH", "channel-trust.json does not publish the pinned key");
+  }
+  if (record.status !== "active" && record.status !== "retired") fail("CHANNEL_KEY_REVOKED", "channel-trust.json does not list the key as active or retired");
+  const [issued, expires, notBefore, keyExpires] = [signature.issuedAt, signature.expiresAt, record.notBefore, record.expiresAt].map(instant);
+  if ([issued, expires, notBefore, keyExpires].includes(null) || issued >= expires || issued < notBefore || issued >= keyExpires || expires > keyExpires) {
+    fail("CHANNEL_SIGNATURE_INVALID", "the signature's validity window is outside the key's");
+  }
+  if (Date.now() >= expires) fail("CHANNEL_SIGNATURE_EXPIRED", signature.expiresAt);
+
+  const payload = Buffer.from(canonicalJson(channel), "utf8");
+  const header = `${JSON.stringify({
+    schemaVersion: "tavonel.export_signature.v2", algorithm: "Ed25519", signatureScope: signature.signatureScope,
+    keyId: signature.keyId, keyVersion: signature.keyVersion, issuedAt: signature.issuedAt, expiresAt: signature.expiresAt,
+    signedPayloadSha256: signature.signedPayloadSha256,
+  })}\n`;
+  let valid = false;
+  try {
+    const signatureBytes = Buffer.from(signature.signatureBase64, "base64");
+    valid = signatureBytes.length === 64 && signatureBytes.toString("base64") === signature.signatureBase64
+      && signature.signedPayloadSha256 === sha256(payload)
+      && verify(null, Buffer.concat([Buffer.from(header, "utf8"), payload]), createPublicKey({ key: der, format: "der", type: "spki" }), signatureBytes);
+  } catch {
+    valid = false;
+  }
+  if (!valid) fail("CHANNEL_SIGNATURE_INVALID", "channel.json does not match its signature");
+
+  const seen = new Set();
+  for (const [key, asset] of Object.entries(channel.assets)) {
+    let name;
+    try {
+      const url = new URL(asset.url);
+      name = url.protocol === "https:" ? /^\/developer\/([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(url.pathname)?.[1] : undefined;
+    } catch {
+      name = undefined;
+    }
+    if (!name || ["channel.json", "channel.json.sig", "channel-trust.json"].includes(name) || seen.has(name)
+      || typeof asset.sha256 !== "string" || !/^sha256:[a-f0-9]{64}$/.test(asset.sha256)) {
+      fail("CHANNEL_ASSET_INVALID", JSON.stringify(key.slice(0, 80)));
+    }
+    seen.add(name);
+    if (sha256(read(name, 33_554_432, "CHANNEL_ASSET_MISSING")) !== asset.sha256) fail("CHANNEL_ASSET_MISMATCH", name);
+  }
+  return { code: "CHANNEL_VERIFIED", version: channel.version, keyId: signature.keyId, signedAt: signature.issuedAt, assets: seen.size };
+}
+
 async function print(payload) {
   console.log(JSON.stringify(await payload, null, 2));
 }
@@ -179,6 +290,7 @@ async function main() {
   if (command === "--version" || command === "version") return console.log(`tavonel-cli ${DISTRIBUTION_VERSION} (api v${API_VERSION})`);
   if (command === "help" || command === "--help" || command === "-h") return console.log(usage());
   if (command === "update-check") return print(checkForUpdate());
+  if (command === "verify-channel" && args.length <= 1) return print(verifyChannel(args[0] ?? "."));
   if (command === "status") {
     const response = await fetch(`${baseUrl}/api/status/v2`, {
       headers: { accept: "application/json" },

@@ -6,7 +6,7 @@ Status: `IMPLEMENTED_NOT_PROVEN`. Local deterministic tests do not qualify a rea
 
 The agent reads only the explicitly selected local/mounted root or S3-compatible bucket/prefix. It does not obtain filesystem or cloud access by connecting MCP. Mounted SMB/NFS/SFTP must already be available to the host. S3/R2/MinIO uses the host's authorized boto3 credential chain.
 
-Requirements: Python 3.12+, outbound HTTPS to the configured Foundation and its signed upload destination, and boto3 only for S3 mode. Verify the script against `sourceAgent.sha256` in `channel.json` before running. This source change updates the distribution manifest; it does not mean a new version is already deployed.
+Requirements: Python 3.12+, outbound HTTPS to the configured Foundation and its signed upload destination, and boto3 only for S3 mode. Before running, download the channel into a directory and verify it with the CLI you already hold: `node tavonel-cli.mjs verify-channel <dir>` checks `channel.json.sig` against the channel key the CLI pins, then every asset's sha256, `sourceAgent` included, and exits non-zero with a typed reason on any mismatch. This source change updates the distribution manifest; it does not mean a new version is already deployed.
 
 Create the exact connection in the workspace and use its UUID. API credentials are read only from `TAVONEL_API_KEY`, never command-line flags or state. Keep state outside the source root and protect its directory. State, pending journal and lock contain private inventory metadata and must not be shared.
 

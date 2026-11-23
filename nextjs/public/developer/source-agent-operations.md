@@ -155,6 +155,37 @@ This is continuous inventory reconciliation, not an OS event watcher. Interval i
 
 A service manager may restart a stopped agent, but installing such a service or granting ongoing access is a separate user-authorized step. No service is installed by running the one-shot command.
 
+### Run as a user service
+
+Linux only, as your own user: `tavonel-source-agent.service` is a systemd `--user` unit that runs the agent with `--watch`. It is in the developer channel, so `verify-channel` checks its digest like every other file. Installing it, and the credit approval below, are your decisions; nothing here runs until you do.
+
+```sh
+mkdir -p ~/.local/share/tavonel ~/.config/systemd/user ~/.config/tavonel
+mkdir -m 700 -p ~/.local/state/tavonel
+cp tavonel-source-agent.py ~/.local/share/tavonel/
+cp tavonel-source-agent.service ~/.config/systemd/user/
+```
+
+Create `~/.config/tavonel/agent.env` yourself, with an editor, and `chmod 600` it. It holds the key and the bindings, one `NAME=value` per line, and nothing else:
+
+```
+TAVONEL_API_KEY=<your key, typed by you>
+TAVONEL_SOURCE_ROOT=/approved/documents
+TAVONEL_CONNECTION_ID=<the connection UUID>
+TAVONEL_APPROVE_CREDITS=<your per-cycle maximum>
+```
+
+The unit refuses to start, before the agent runs, unless that file is mode 600 and all four values are non-empty. Then:
+
+```sh
+systemd-analyze --user verify ~/.config/systemd/user/tavonel-source-agent.service
+systemctl --user daemon-reload
+systemctl --user enable --now tavonel-source-agent.service
+journalctl --user -u tavonel-source-agent.service
+```
+
+What the unit does: restarts on failure after 30 seconds; sets `NoNewPrivileges`, `ProtectSystem=strict` and a read-only home, so the source root is read-only to the agent; and leaves `~/.local/state/tavonel` (state file, pending journal and lock) as the one writable place. A source root outside your home is already read-only under `ProtectSystem=strict`. The unit also passes `--allow-unknown-page-count`, the same approval as in the one-shot example: remove that flag from the unit if you do not give it. The service stops at logout unless you run `loginctl enable-linger $USER`. This is what the unit file says, not a measured sandbox: the hardening needs unprivileged user namespaces, which some distributions disable, and it has not been run on a real host by TAVONEL.
+
 ## Durable commit and recovery
 
 Each cycle validates its state, scans the complete source inventory and computes added/changed/deleted events. Before network work, every changed set must fit one complete approval (at most 128 files and the bounded manifest size); partial approved sets are refused. Sync requires the caller to set `--approve-up-to-credits` (a positive maximum no greater than 10,000,000) and `--allow-unknown-page-count` when a changed source has no trusted page estimate. It requests a no-hold quote for the exact whole manifest, compares the quote maximum with that caller limit, then persists the attempt key, manifest, quote and approval body before approval. A quote above the limit stops with instructions to review and rerun using an explicit higher caller limit. A retry never accepts a changed quote or server ceiling automatically. After approval, the agent persists approval/scope/document identities before asking for any capability; each member uses the same stable attempt/file identity for capability, direct PUT and atomic confirmation. The sync batch and cursor advance only after every selected member is confirmed and the server accepts the complete batch.

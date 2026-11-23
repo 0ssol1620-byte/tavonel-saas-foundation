@@ -53,6 +53,7 @@ export const DEVELOPER_FILES: ReadonlyArray<{ key: string; file: string; purpose
   { key: "mcp", file: "tavonel-mcp.mjs", purpose: "The read-only MCP bridge, with a --doctor preflight." },
   { key: "consumerContext", file: "consumer-context.mjs", purpose: "The shared context sidecar a context-enabled CLI or MCP server loads from beside itself." },
   { key: "sourceAgent", file: "tavonel-source-agent.py", purpose: "Walks a folder or an S3-compatible bucket and pushes what it finds." },
+  { key: "sourceAgentService", file: "tavonel-source-agent.service", purpose: "The systemd user unit that runs the source agent as a service, with its hardening keys." },
   { key: "verifyExport", file: "tavonel-verify-export.mjs", purpose: "Checks an archive's signature, its file digests and that nothing was added." },
   { key: "verifyPackage", file: "tavonel-verify-package.mjs", purpose: "Checks what is inside: relations resolve, regions sit inside their page, the three graph formats agree." },
   { key: "verifyAnswer", file: "tavonel-verify-answer.mjs", purpose: "Checks a signed answer receipt: the signature, the scope, and that the answer beside it is the one signed." },
