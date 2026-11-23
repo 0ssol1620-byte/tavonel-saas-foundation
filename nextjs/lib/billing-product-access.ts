@@ -1,5 +1,6 @@
-import { getFoundationAccountGrant } from "./account-grants";
+import { getFoundationAccountGrant, type FoundationAccountGrant } from "./account-grants";
 import { getFoundationBillingAccount, type FoundationBillingAccount } from "./billing-store";
+import { foundationWorkspaceId } from "./foundation-pilot";
 import type { WorkspaceMembership } from "./pilot-tenant";
 
 /*
@@ -84,6 +85,34 @@ export function billingProductDecision(
   return { ok: true };
 }
 
+/**
+ * The operator grant and the billing account that govern this caller in this workspace (WO-C-T2).
+ *
+ * In their own workspace a caller's own grant is read first and, when there is one, nothing else --
+ * exactly as before. Elsewhere the workspace's account is read too: when it belongs to another user
+ * (the caller is an active admin or member, `getFoundationBillingAccount`), the grant that governs is
+ * that payer's (the account holder, or the owner when there is no account) and the caller's own grant does not carry into a
+ * workspace whose plan is somebody else's, as `reserve_foundation_compute_v3` decides it. `member`
+ * says which of the two answers this is; a member never draws on a free evaluation.
+ */
+export async function resolveWorkspaceEntitlement(workspaceKey: string, userId: string): Promise<
+  | { ok: true; grant: FoundationAccountGrant; member: boolean }
+  | { ok: true; grant: null; account: FoundationBillingAccount; member: boolean }
+  | { ok: false; code: string; status: 503 }
+> {
+  const own = await getFoundationAccountGrant(userId);
+  if (!own.ok) return { ok: false, code: own.code, status: 503 };
+  if (own.grant && workspaceKey === foundationWorkspaceId(userId)) return { ok: true, grant: own.grant, member: false };
+  const stored = await getFoundationBillingAccount(workspaceKey, userId);
+  if (!stored.ok) return { ok: false, code: stored.code, status: 503 };
+  const member = stored.account.userId !== userId;
+  const grant = member ? await getFoundationAccountGrant(stored.account.userId) : own;
+  if (!grant.ok) return { ok: false, code: grant.code, status: 503 };
+  return grant.grant
+    ? { ok: true, grant: grant.grant, member }
+    : { ok: true, grant: null, account: stored.account, member };
+}
+
 export async function authorizeFoundationProduct(
   workspaceKey: string,
   userId: string,
@@ -94,18 +123,16 @@ export async function authorizeFoundationProduct(
   // before billing so the product remains usable even if a historical provider subscription is
   // inactive, has no credits, or is eventually removed. The grant itself is stored server-side
   // and browser roles cannot read or mint it.
-  const grant = await getFoundationAccountGrant(userId);
-  if (!grant.ok) return { ok: false as const, code: grant.code, status: 503 };
-  if (grant.grant) {
-    if (!planReachesLevel(grant.grant.accessPlan, required, role)) {
+  const entitlement = await resolveWorkspaceEntitlement(workspaceKey, userId);
+  if (!entitlement.ok) return entitlement;
+  if (entitlement.grant) {
+    if (!planReachesLevel(entitlement.grant.accessPlan, required, role)) {
       return { ok: false as const, code: "STUDIO_SUBSCRIPTION_REQUIRED", status: 402 };
     }
-    return { ok: true as const, source: "owner" as const, billingExempt: grant.grant.billingExempt };
+    return { ok: true as const, source: "owner" as const, billingExempt: entitlement.grant.billingExempt };
   }
 
-  const stored = await getFoundationBillingAccount(workspaceKey, userId);
-  if (!stored.ok) return { ok: false as const, code: stored.code, status: 503 };
-  const decision = billingProductDecision(stored.account, required, role);
+  const decision = billingProductDecision(entitlement.account, required, role);
   return decision.ok
     ? { ok: true as const, source: "paid" as const, billingExempt: false }
     : decision;
