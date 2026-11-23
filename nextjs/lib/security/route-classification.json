@@ -785,6 +785,7 @@
     "purpose": "WO-C-T3: every API route, by how a workspace member's source scope reaches it. A member reads a World only when every source behind it is in their scope (TC-D2); lists drop what a member cannot read and never return its count, title or id. lib/route-classification.test.ts fails when a route is in none of the three maps or in two, when an entry names a file that no longer exists, or when an enforced route's file does not contain the mechanism its entry names.",
     "enforced": {
       "app/api/agent-mcp/route.ts": "refused:AGENT_MCP_MEMBER_UNAVAILABLE: the agent tools list Worlds without a scope, so a member's agent is refused",
+      "app/api/agent-grants/[id]/activity/route.ts": "chokepoint-via:listGrantActivity: proposals under the grant are dropped when the viewer cannot read their documents (filterReadableProposals)",
       "app/api/collections/[id]/ask/route.ts": "chokepoint: the active World's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
       "app/api/collections/[id]/download/route.ts": "chokepoint: the package's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
       "app/api/collections/[id]/promote/route.ts": "chokepoint: the candidate's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
@@ -805,6 +806,7 @@
       "app/api/documents/route.ts": "filter: rows outside the member's scope are dropped (filterMemberReadableDocumentIds), never counted; then the chokepoint",
       "app/api/library/decisions/route.ts": "chokepoint: the document through checkConnectorSourceAccessForViewer",
       "app/api/library/route.ts": "chokepoint-via:readLibraryDocuments: each id through checkConnectorSourceAccessForViewer",
+      "app/api/proposals/[id]/receipt/route.ts": "chokepoint-via:readProposalReceipt: an unreadable proposal is the same 404 (filterReadableProposals)",
       "app/api/proposals/[id]/decision/route.ts": "chokepoint-via:decideProposal: the proposal's documents through checkConnectorSourceAccessForViewer",
       "app/api/proposals/[id]/route.ts": "chokepoint-via:filterReadableProposals: an unreadable proposal is the same 404",
       "app/api/proposals/[id]/undo/route.ts": "chokepoint-via:undoProposal: the proposal's documents through checkConnectorSourceAccessForViewer",
@@ -917,7 +919,9 @@
       "app/api/workspaces/[workspaceKey]/invites/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
       "app/api/workspaces/[workspaceKey]/members/[userId]/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
       "app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
-      "app/api/workspaces/[workspaceKey]/members/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content."
+      "app/api/workspaces/[workspaceKey]/members/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
+      "app/api/workspaces/mine/route.ts": "The caller's own active memberships, owner names and plan labels; no source content.",
+      "app/api/workspaces/select/route.ts": "Chooses the caller's acting workspace among their own active memberships; no source content."
     }
   }
 }
