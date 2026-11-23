@@ -41,6 +41,8 @@ const FOREIGN_DIGEST = `sha256:${"f".repeat(64)}`;
 const JOB = `cjob-${"1".repeat(32)}`;
 const JOB_HIDDEN = `cjob-${"2".repeat(32)}`;
 const JOB_FOREIGN = `cjob-${"3".repeat(32)}`;
+/** The workspace a pilot key of PERSON authenticates into (foundationWorkspaceId), for the real-authorization case. */
+const AUTH_WS = `pilot-${PERSON.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16)}`;
 
 function ocr(documentId: string, digest: string, text: string): CollectionOcrInput {
   return {
@@ -314,6 +316,17 @@ function realReaderAnswer(path: string, body: Record<string, unknown> | null, js
           abstainReason: null, internalScore: null, evidenceIds: [], createdAt: "2026-11-16T00:00:00Z" })) });
     }
     case "rpc/current_foundation_processing_terms_acceptance": return json(null);
+    // What the real authorizeAgentRequest reads (WO-AN-8): the caller's key, its grant, the membership, the owner grant, the rate window.
+    case "foundation_api_keys": return json(eq("key_prefix") === "p".repeat(12) ? [{ key_id: "k-1", workspace_key: AUTH_WS, created_by: PERSON,
+      scopes: ["agent:read", "agent:propose"], expires_at: "2099-01-01T00:00:00Z", revoked_at: null, authorization_revision: 3, token_kind: "agent",
+      agent_grant_id: GRANT }] : []);
+    case "rpc/read_foundation_agent_grant": return json(body!.p_workspace_key === AUTH_WS && body!.p_grant_id === GRANT && body!.p_user_id === PERSON
+      ? { grantId: GRANT, authorizationRevision: 3, createdAt: "2026-11-17T00:00:00Z", revokedAt: null } : null);
+    case "foundation_workspace_members": return json(ws === AUTH_WS && eq("user_id") === PERSON ? [{ workspace_key: AUTH_WS, user_id: PERSON,
+      role: "owner", state: "active", accepted_at: "2026-11-01T00:00:00Z", revoked_at: null, authorization_revision: 3 }] : []);
+    case "foundation_account_access_grants": return json(eq("user_id") === PERSON ? [{ user_id: PERSON, grant_kind: "owner", access_plan: "studio_access",
+      billing_exempt: true, trial_exempt: true, active: true }] : []);
+    case "rpc/consume_foundation_api_rate_limit": return json(true);
     case "source_deletion_tombstones": return down.tombstones ? failed(down.tombstones) : json([]);
     case "connector_document_bindings": return counted([]);
     case "foundation_intake_admissions": {
@@ -394,7 +407,9 @@ const p4Args = (fields: Row = {}) => ({ collectionId: COLLECTION, baseManifestDi
 /** §8 I-1, exact names. current_foundation_processing_terms_acceptance: the v2 customer-data gate's one store read. */
 const READ_RPCS = ["documents_outside_member_scope", "connector_documents_blocked_for_viewer", "connector_documents_blocked", "read_library_organize", "list_collection_candidates",
   "quote_foundation_compile_recharge", "get_world_change_proposal", "list_world_change_proposals_page", "list_world_change_proposals",
-  "current_foundation_processing_terms_acceptance"];
+  "current_foundation_processing_terms_acceptance",
+  // authorizeAgentRequest's grant liveness read (WO-AN-8 real-authorization case); stable, asserted in supabase/tests/agent_proposals.sql.
+  "read_foundation_agent_grant"];
 const WRITE_RPCS = ["create_world_change_proposal", "consume_foundation_api_rate_limit"];
 /** The R2 helpers the tools may call, by exact name: a new helper (a presign-for-put named get*, say) fails I-1 until it is listed. */
 const R2_READS = ["readR2SignerEnv", "listImmutableWorkspaceObjects", "listFoundationQuarantineRejects", "getWorkspaceCollectionCandidate",
@@ -463,7 +478,12 @@ describe("I-2: only an agent credential is served at /api/agent-mcp", () => {
     expect((await response.json()).error.message).toBe("AUTH_INVALID");
   });
 
-  it("a propose tool is authorized with agent:propose, every other request with agent:read, inside the agent dispatch", async () => {
+  /*
+    WO-AN-8 narrowed the dispatch: authorizeAgentRequest enters it for authenticateDeveloperApiKey alone, so the
+    route calls it from outside (this assertion was `inside: true` x4 before WO-AN-8). That the authentication
+    itself runs inside is shown by the real-authorization case at the end of this file, which can only pass then.
+  */
+  it("a propose tool is authorized with agent:propose, every other request with agent:read; the route itself is outside the agent dispatch", async () => {
     const { insideAgentMcpDispatch } = await import("./agent-mcp-dispatch");
     const inside: boolean[] = [];
     authorize.mockImplementation(async () => { inside.push(insideAgentMcpDispatch()); return { ok: true, principal }; });
@@ -472,7 +492,35 @@ describe("I-2: only an agent credential is served at /api/agent-mcp", () => {
     await post({ jsonrpc: "2.0", id: 1, method: "tools/list" });
     await toolCall("not_a_tool", {});
     expect(authorize.mock.calls.map((call) => call[1])).toEqual(["agent:propose", "agent:read", "agent:read", "agent:read"]);
-    expect(inside).toEqual([true, true, true, true]);
+    expect(inside).toEqual([false, false, false, false]);
+  });
+
+  /*
+    WO-AN-8: a tool handler is not inside the agent dispatch, so anything it reaches that authorizes a bearer (a REST
+    helper, say) treats the agent credential as it would anywhere else: refused before the store is asked. Mutant:
+    wrap the handler in withinAgentMcpDispatch (authentication then asks the store for the key).
+  */
+  it("a tool handler runs outside the agent dispatch: a REST authorization it reaches refuses the agent credential before any store read", async () => {
+    const { insideAgentMcpDispatch } = await import("./agent-mcp-dispatch");
+    const { authorizeFoundationRequest } = await vi.importActual<typeof import("./developer-auth")>("./developer-auth");
+    const { authenticateDeveloperApiKey } = await import("./developer-store");
+    const probe: { inside?: boolean; rest?: unknown; authenticated?: unknown } = {};
+    const original = R2_ANSWERS.listImmutableWorkspaceObjects!;
+    R2_ANSWERS.listImmutableWorkspaceObjects = async (...args: never[]) => {
+      probe.inside = insideAgentMcpDispatch();
+      probe.rest = await authorizeFoundationRequest(new Request("https://tavonel.test/api/v1/collections", { headers: { authorization: `Bearer ${TOKEN}` } }),
+        "collections:read");
+      probe.authenticated = await authenticateDeveloperApiKey(TOKEN);
+      return original(...args);
+    };
+    try {
+      expect((await answerOf(await toolCall("list_documents", {}))).ok).toBe(true);
+    } finally {
+      R2_ANSWERS.listImmutableWorkspaceObjects = original;
+    }
+    expect(probe).toEqual({ inside: false, rest: { ok: false, code: "API_KEY_AUDIENCE_INVALID", status: 401 },
+      authenticated: { ok: false, code: "API_KEY_AUDIENCE_INVALID" } });
+    expect(calls.filter((call) => call.path.startsWith("/rest/v1/foundation_api_keys"))).toEqual([]);
   });
 
   it("a rate-limited call answers RATE_LIMITED", async () => {
@@ -498,16 +546,20 @@ describe("I-2: only an agent credential is served at /api/agent-mcp", () => {
     expect(readFileSync(resolve(import.meta.dirname, "../app/api/agent-mcp/route.ts"), "utf8")).toMatch(/^export const maxDuration = 60;$/m);
   });
 
-  it("telemetry is {event, tool, code} only", async () => {
+  /* WO-AN-8 added decidingReadFailed to the event (it was {event, tool, code} before). */
+  it("telemetry is {event, tool, code, decidingReadFailed} only", async () => {
     const lines: string[] = [];
     vi.mocked(console.info).mockImplementation((line: string) => { lines.push(line); });
     await toolCall("list_documents", {});
     await toolCall("get_compile_job", { jobId: JOB_FOREIGN });
     await toolCall("no_such_tool", {});
+    authorize.mockResolvedValueOnce({ ok: false, code: "API_RATE_LIMITED", status: 429 });
+    await toolCall("list_documents", {});
     expect(lines.map((line) => JSON.parse(line))).toEqual([
-      { event: "agent_mcp_tool", tool: "list_documents", code: "OK" },
-      { event: "agent_mcp_tool", tool: "get_compile_job", code: "NOT_FOUND" },
-      { event: "agent_mcp_tool", tool: "unknown", code: "UNKNOWN_TOOL" },
+      { event: "agent_mcp_tool", tool: "list_documents", code: "OK", decidingReadFailed: false },
+      { event: "agent_mcp_tool", tool: "get_compile_job", code: "NOT_FOUND", decidingReadFailed: false },
+      { event: "agent_mcp_tool", tool: "unknown", code: "UNKNOWN_TOOL", decidingReadFailed: false },
+      { event: "agent_mcp_tool", tool: "list_documents", code: "RATE_LIMITED", decidingReadFailed: false },
     ]);
   });
 
@@ -540,6 +592,53 @@ describe("I-22: the body is bounded", () => {
     const text = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping", params: { pad: "가".repeat(3000) } });
     expect(text.length).toBeLessThan(8192);
     expect((await post(text)).status).toBe(413);
+  });
+
+  /*
+    WO-AN-8: the cap is on the bytes read, never on what the client declares. A chunked body (no Content-Length) is
+    read from the stream and abandoned at the first chunk past 8 KiB: 413, nothing parsed, nobody authorized, and
+    the rest of the stream is never pulled (1 MiB here). Mutant: the cap on Content-Length only.
+  */
+  it("a chunked body over 8 KiB with no Content-Length is 413 before more is buffered, parsed or authorized", async () => {
+    let pulled = 0;
+    const chunk = new TextEncoder().encode(" ".repeat(1024));
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) { pulled += 1; if (pulled > 1024) controller.close(); else controller.enqueue(chunk); },
+    });
+    const request = new Request("https://tavonel.test/api/agent-mcp", { method: "POST", headers: { authorization: `Bearer ${TOKEN}` },
+      body, duplex: "half" } as RequestInit);
+    expect(request.headers.get("content-length")).toBeNull();
+    const parse = vi.spyOn(JSON, "parse");
+    const response = await POST(request);
+    const parsed = parse.mock.calls.length;
+    parse.mockRestore();
+    expect(response.status).toBe(413);
+    expect(parsed).toBe(0);
+    expect(authorize).not.toHaveBeenCalled();
+    expect(pulled).toBeLessThan(16);
+    expect(await response.json()).toEqual({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "REQUEST_TOO_LARGE" } });
+  });
+
+  it("a chunked body at the cap is read whole and answered", async () => {
+    const message = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" });
+    const bytes = new TextEncoder().encode(message.padEnd(8192, " "));
+    const body = new ReadableStream<Uint8Array>({ start(controller) {
+      for (let at = 0; at < bytes.length; at += 1000) controller.enqueue(bytes.slice(at, at + 1000));
+      controller.close();
+    } });
+    const response = await POST(new Request("https://tavonel.test/api/agent-mcp", { method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` }, body, duplex: "half" } as RequestInit));
+    expect(await response.json()).toEqual({ jsonrpc: "2.0", id: 1, result: {} });
+  });
+
+  /* The bytes are decoded here, so bytes that are not UTF-8 are a parse error, never a body with replacement characters. */
+  it("a body that is not valid UTF-8 is -32700 before authorization", async () => {
+    const bytes = Buffer.concat([Buffer.from('{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}}')]);
+    const response = await POST(new Request("https://tavonel.test/api/agent-mcp", { method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" }, body: bytes }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
+    expect(authorize).not.toHaveBeenCalled();
   });
 });
 
@@ -737,6 +836,35 @@ describe("the line: a failed existence-deciding read is NOT_FOUND, a failure aft
       for (const reader of after) {
         reset({ [reader]: mode });
         expect(await answerOf(await toolCall(tool, readable())), `${tool}: ${reader} ${String(mode)}`).toEqual({ ok: false, code: "UNAVAILABLE" });
+      }
+    }
+  });
+});
+
+/*
+  WO-AN-8: whether NOT_FOUND came from a deciding read that failed is an internal fact. The server log says it
+  (`decidingReadFailed`); the agent's answer does not. For every id-taking tool and every reader that decides, down
+  and throwing: an absent id with nothing down and a readable id whose deciding reader failed answer byte-identically,
+  and their log events differ only in that field. Mutant: copy the field into the body.
+*/
+describe("the deciding-read flag is in the server log only", () => {
+  it.each(Object.keys(LINE))("%s", async (tool) => {
+    const { readable, decides } = LINE[tool]!;
+    const lines: string[] = [];
+    vi.mocked(console.info).mockImplementation((line: string) => { lines.push(line); });
+    for (const reader of decides) {
+      for (const mode of [true, "throw"] as const) {
+        lines.length = 0;
+        reset();
+        const absent = await snapshot(await toolCall(tool, probes(seeded(1))[tool]!.absent, 7));
+        reset({ [reader]: mode });
+        const failed = await snapshot(await toolCall(tool, readable(), 7));
+        expect(failed, `${tool}: ${reader} ${String(mode)}`).toEqual(absent);
+        expect(failed.body).not.toContain("decidingReadFailed");
+        expect(lines.map((line) => JSON.parse(line)), `${tool}: ${reader} ${String(mode)}`).toEqual([
+          { event: "agent_mcp_tool", tool, code: "NOT_FOUND", decidingReadFailed: false },
+          { event: "agent_mcp_tool", tool, code: "NOT_FOUND", decidingReadFailed: true },
+        ]);
       }
     }
   });
@@ -981,6 +1109,39 @@ describe("I-1 over the real readers: only the transport is faked", () => {
     // The real readers were reached: the reads §8 names are observed, not only assumed.
     expect([...seen]).toEqual(expect.arrayContaining(["POST /rest/v1/rpc/connector_documents_blocked", "POST /rest/v1/rpc/read_library_organize",
       "POST /rest/v1/rpc/list_collection_candidates", "POST /rest/v1/rpc/quote_foundation_compile_recharge"]));
+  });
+
+  /*
+    WO-AN-8: I-1 with authorization real as well. authorizeAgentRequest runs unmocked (key, grant, pilot, membership,
+    owner grant, rate window) over the same transport, for a read tool, a listing and a proposal. The writes are
+    exactly one rate-window unit per call and the one proposal row. Mutant: an authorization step that writes (the
+    key's last_used_at by PATCH, say) fails here.
+  */
+  it("with authorizeAgentRequest real too: one rate-window unit per call and the proposal row, nothing else written", async () => {
+    authorize.mockImplementation((await vi.importActual<typeof import("./developer-auth")>("./developer-auth")).authorizeAgentRequest);
+    vi.stubEnv("FOUNDATION_PILOT_USER_IDS", PERSON);
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", AUTH_WS);
+    vi.stubEnv("TAVONEL_PROCESSING_WORKSPACE_COHORT", AUTH_WS);
+    inventories.set(AUTH_WS, inventories.get(WS)!);
+    library.set(AUTH_WS, library.get(WS)!);
+    actives.set(`${AUTH_WS}|${REAL}`, actives.get(`${WS}|${COLLECTION}`)!);
+    calls.length = 0;
+    const seen = new Set<string>();
+    for (const [tool, args] of [["get_workflow_status", {}], ["list_documents", {}],
+      ["propose_compile", { documentIds: [DOC_A, DOC_B], idempotencyKey: "client-key-auth" }]] as const) {
+      const answer = await call(tool, args);
+      expect(answer.ok ? "ok" : answer.code, tool).toBe("ok");
+    }
+    expectOnlyReadsAndTheProposalRow();
+    for (const entry of calls) seen.add(`${entry.method} ${entry.path.split("?")[0]}`);
+    expect([...seen]).toEqual(expect.arrayContaining(["GET /rest/v1/foundation_api_keys", "POST /rest/v1/rpc/read_foundation_agent_grant",
+      "GET /rest/v1/foundation_workspace_members", "GET /rest/v1/foundation_account_access_grants"]));
+    expect(calls.filter((entry) => entry.path.endsWith("/consume_foundation_api_rate_limit")).map((entry) => entry.body!.p_scope))
+      .toEqual(["agent:read", "agent:read", "agent:propose"]);
+    const created = calls.filter((entry) => entry.path.endsWith("/create_world_change_proposal"));
+    expect(created.map((entry) => [entry.body!.p_workspace_key, entry.body!.p_principal_kind, entry.body!.p_agent_grant_id]))
+      .toEqual([[AUTH_WS, "agent", GRANT]]);
+    expect(fetched).toEqual([]);
   });
 
   it("with the customer-data gate on v2 and no accepted terms: the gate's reads are reads, and its refusals write nothing", async () => {

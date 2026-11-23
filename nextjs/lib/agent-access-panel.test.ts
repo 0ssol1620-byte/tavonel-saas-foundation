@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AgentAccessView, ConsentText, copyCredential, createOutcome, readGrantList, revealAfter, TokenReveal, type Load } from "../components/workspace/agent-access-panel";
+import {
+  activityLine, activityNdjson, AgentAccessView, ConsentText, copyCredential, createOutcome, GrantActivity, readGrantList, revealAfter, TokenReveal, type Load,
+} from "../components/workspace/agent-access-panel";
 import { AGENT_PROPOSAL_CONSENT } from "./agent-consent";
 
 // A made-up value that only has the shape of a credential; no real one is used anywhere.
@@ -71,9 +73,11 @@ describe("Agent access panel (WO-AN-6)", () => {
   */
   const GRANT = { grantId: "29d42924-a3cc-4a09-b92d-9c86b58901a1", clientLabel: "Desk Agent", createdAt: "2026-11-17T12:00:00.000Z",
     expiresAt: null, revokedAt: null, lastUsedAt: null };
-  const view = (load: Load, extra: { token?: string | null; notice?: string | null } = {}) => renderToStaticMarkup(createElement(AgentAccessView, {
-    load, label: "", busy: false, notice: extra.notice ?? null, token: extra.token ?? null,
+  type Extra = { token?: string | null; notice?: string | null; busy?: boolean; openActivity?: string | null };
+  const view = (load: Load, extra: Extra = {}) => renderToStaticMarkup(createElement(AgentAccessView, {
+    load, label: "", busy: extra.busy ?? false, notice: extra.notice ?? null, token: extra.token ?? null,
     onLabel: () => undefined, onCreate: () => undefined, onClose: () => undefined, onDisconnect: () => undefined, onRetry: () => undefined,
+    openActivity: extra.openActivity ?? null, onActivity: () => undefined,
   }));
   const offer = ["Connect an agent that suggests changes.", "Create connection", "Client name", AGENT_PROPOSAL_CONSENT.suggests.replace(/&/g, "&amp;")];
 
@@ -120,5 +124,89 @@ describe("Agent access panel (WO-AN-6)", () => {
     expect(readGrantList(false, { grants, creatable: true })).toEqual({ state: "unavailable" });
     expect(readGrantList(true, { grants: [{}], creatable: true })).toEqual({ state: "unavailable" });
     expect(readGrantList(true, null)).toEqual({ state: "unavailable" });
+  });
+});
+
+describe("Agent access activity (WO-AN-10)", () => {
+  const row = { proposalId: "00000000-0000-4000-8000-000000000001", actionType: "library_label", state: "executed",
+    createdAt: "2026-11-18T09:00:00.000Z", decidedAt: "2026-11-18T09:30:45.000Z", receiptAvailable: true } as const;
+
+  it("a line carries type, state, both times in UTC and whether a signed receipt is stored, and nothing else", () => {
+    expect(activityLine(row)).toBe("Label · Done · proposed 2026-11-18 09:00 UTC · decided 2026-11-18 09:30 UTC · signed receipt stored");
+    expect(activityLine({ ...row, state: "proposed", decidedAt: null, receiptAvailable: false })).toBe("Label · Proposed · proposed 2026-11-18 09:00 UTC");
+    expect(activityLine({ ...row, actionType: "compile_plan", state: "failed" })).toContain("Compile · Failed");
+  });
+  it("an action type or state this build does not know is shown plainly, never as markup", () => {
+    expect(activityLine({ ...row, actionType: "<img>" as never, state: "later" as never })).toContain("Change · later");
+    expect(renderToStaticMarkup(createElement(GrantActivity, { grantId: row.proposalId }))).toContain("Reading activity");
+  });
+  it("the export is every listed row, in order, one JSON object per line (pages 1..n after Show more)", () => {
+    const page1 = [row, { ...row, proposalId: "00000000-0000-4000-8000-000000000002" }];
+    const page2 = [{ ...row, proposalId: "00000000-0000-4000-8000-000000000003", receiptAvailable: false }];
+    const listed = [...page1, ...page2];
+    const lines = activityNdjson(listed).split("\n");
+    expect(lines.pop()).toBe("");
+    expect(lines.map((line) => JSON.parse(line).proposalId)).toEqual(listed.map((r) => r.proposalId));
+    expect(lines.map((line) => JSON.parse(line))).toEqual(listed);
+  });
+  it("source: the panel offers Activity per grant, with the export and Show more, and no localStorage", () => {
+    const source = readFileSync(new URL("../components/workspace/agent-access-panel.tsx", import.meta.url), "utf8");
+    // The export is the rows in state (every page shown), never a re-request that would hold only page 1.
+    expect(source).not.toContain("format=ndjson");
+    expect(source).toContain("activityNdjson(rows)");
+    expect(source).toContain("Show more");
+    expect(source).toMatch(/aria-expanded=\{openActivity === grant\.grantId\}/);
+  });
+});
+
+/*
+  WO-AN-8R: the Activity disclosure inside WO-REL-5's view. GrantActivity is the only reader of the activity route and reads
+  once mounted (its "Reading activity" line, aria-busy, is what a mounted one renders first); these cases assert where it
+  is and is not mounted, through the real AgentAccessView.
+*/
+describe("Agent access view with Activity (WO-AN-8R)", () => {
+  const GRANT = { grantId: "29d42924-a3cc-4a09-b92d-9c86b58901a1", clientLabel: "Desk Agent", createdAt: "2026-11-17T12:00:00.000Z",
+    expiresAt: null, revokedAt: null, lastUsedAt: null };
+  const REVOKED = { ...GRANT, grantId: "5b0e8a4c-1f7e-4f43-9a52-3c1d2e4f5a6b", clientLabel: "Old Agent", revokedAt: "2026-11-19T08:00:00.000Z" };
+  const view = (load: Load, busy: boolean, openActivity: string | null) => renderToStaticMarkup(createElement(AgentAccessView, {
+    load, label: "", busy, notice: null, token: null, onLabel: () => undefined, onCreate: () => undefined, onClose: () => undefined,
+    onDisconnect: () => undefined, onRetry: () => undefined, openActivity, onActivity: () => undefined,
+  }));
+  const mounted = (markup: string) => markup.includes("Reading activity");
+  const activityButton = (markup: string, label: string) => markup.match(new RegExp(`<button[^>]*aria-label="Activity of “${label}”"[^>]*>`))?.[0];
+
+  it("Activity open while a disconnect is in flight: Activity stays open and usable, only Disconnect waits", () => {
+    const markup = view({ state: "ready", grants: [GRANT], truncated: false, creatable: true }, true, GRANT.grantId);
+    expect(mounted(markup)).toBe(true);
+    const button = activityButton(markup, "Desk Agent");
+    expect(button).toContain('aria-expanded="true"');
+    expect(button).not.toContain("disabled");
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Disconnect “Desk Agent”"/);
+  });
+
+  it("Activity for a revoked grant is offered and opens; the revoked grant has no Disconnect, also when not creatable", () => {
+    for (const creatable of [true, false]) {
+      const closed = view({ state: "ready", grants: [GRANT, REVOKED], truncated: false, creatable }, false, null);
+      expect(activityButton(closed, "Old Agent"), String(creatable)).toContain('aria-expanded="false"');
+      expect(mounted(closed), String(creatable)).toBe(false);
+      const open = view({ state: "ready", grants: [GRANT, REVOKED], truncated: false, creatable }, false, REVOKED.grantId);
+      expect(activityButton(open, "Old Agent")).toContain('aria-expanded="true"');
+      expect(activityButton(open, "Desk Agent")).toContain('aria-expanded="false"');
+      expect(open.match(/Reading activity/g)).toHaveLength(1);
+      expect(open).not.toContain("Disconnect “Old Agent”");
+      expect(open).toContain("Disconnect “Desk Agent”");
+    }
+  });
+
+  it("agent access off: no Activity is mounted (no read is made), even with an Activity id left open", () => {
+    for (const openActivity of [null, GRANT.grantId]) {
+      expect(view({ state: "ready", grants: [], truncated: false, creatable: false }, false, openActivity)).toBe("");
+      expect(view({ state: "loading" }, false, openActivity)).toBe("");
+      expect(mounted(view({ state: "unavailable" }, false, openActivity))).toBe(false);
+    }
+    // Not creatable but with a connection: Activity is offered (never gated, like Disconnect) and read only once opened.
+    const markup = view({ state: "ready", grants: [GRANT], truncated: false, creatable: false }, false, null);
+    expect(activityButton(markup, "Desk Agent")).toContain('aria-expanded="false"');
+    expect(mounted(markup)).toBe(false);
   });
 });

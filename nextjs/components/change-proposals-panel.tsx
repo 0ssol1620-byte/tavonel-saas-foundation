@@ -69,11 +69,39 @@ export const agentBadge = (proposer: PublicProposal["proposer"]): string | null 
   return parts ? parts.head + parts.label + parts.tail : null;
 };
 
+/** "Confirmed by you at 2026-11-18 09:30 UTC", or null when nobody decided or the state names no decision (WO-AN-10). */
+export function decisionLine(proposal: PublicProposal): string | null {
+  const verb = proposal.state === "rejected" ? "Rejected" : ["confirmed", "executed", "failed", "undone"].includes(proposal.state) ? "Confirmed" : null;
+  if (verb === null || typeof proposal.youDecided !== "boolean" || typeof proposal.decidedAt !== "string" || !Number.isFinite(Date.parse(proposal.decidedAt))) return null;
+  const at = new Date(proposal.decidedAt).toISOString().slice(0, 16).replace("T", " ");
+  return `${verb} by ${proposal.youDecided ? "you" : "another member of this workspace"} at ${at} UTC`;
+}
+
+/** The signed receipt is offered only where the server says one is stored. */
+export const receiptOffered = (proposal: PublicProposal) => proposal.receiptAvailable === true && ["executed", "failed", "undone"].includes(proposal.state);
+
 async function api(path: string, init: RequestInit = {}) {
   const client = getSupabaseBrowserClient();
   const token = client ? (await client.auth.getSession()).data.session?.access_token ?? null : null;
   return fetch(path, { ...init, cache: "no-store", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init.body ? { "Content-Type": "application/json" } : {}) } });
+}
+
+/** Reads `path` with the session and hands the body to the browser as a file. False on any refusal or failure; never throws. */
+export async function saveAsFile(path: string, filename: string): Promise<boolean> {
+  try {
+    const response = await api(path);
+    if (!response.ok) return false;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const ACTION_TYPES: ReadonlySet<string> = new Set(["library_label", "compile_plan", "ontology_label_patch"]);
@@ -167,19 +195,25 @@ function Preview({ proposal }: { proposal: PublicProposal }) {
 }
 
 /** One row. Presentational: what it offers comes from `rowActions`, what a click does from the parent. */
-export function ProposalItem({ proposal, disabled, onAct }: { proposal: PublicProposal; disabled: boolean; onAct: (action: Action) => void }) {
+export function ProposalItem({ proposal, disabled, onAct, onReceipt }: {
+  proposal: PublicProposal; disabled: boolean; onAct: (action: Action) => void; onReceipt?: () => void;
+}) {
   const badge = agentBadgeParts(proposal.proposer);
+  const decided = decisionLine(proposal);
   const label: Record<Action, string> = { confirm: "Confirm", reject: "Reject", undo: "Undo", finish: "Finish" };
   return (
     <li id={rowDomId(proposal.proposalId)} tabIndex={-1} className={styles.row} data-state={proposal.state}>
       <span className={styles.state}>{STATE_WORD[proposal.state]}</span>
       {badge ? <p className={styles.note}>{badge.head}<bdi>{badge.label}</bdi>{badge.tail}</p> : null}
       <Preview proposal={proposal} />
+      {decided ? <p className={styles.note}>{decided}</p> : null}
       {proposal.evidenceIds.length > 0 ? <p className={styles.note}>Evidence: <span className={styles.id}>{proposal.evidenceIds.join(", ")}</span></p> : null}
       <div className={styles.actions}>
         {rowActions(proposal).map((action) => (
           <button key={action} type="button" className={styles.action} disabled={disabled} onClick={() => onAct(action)}>{label[action]}</button>
         ))}
+        {onReceipt && receiptOffered(proposal)
+          ? <button type="button" className={styles.action} disabled={disabled} onClick={onReceipt}>Signed receipt</button> : null}
       </div>
     </li>
   );
@@ -240,6 +274,18 @@ export default function ChangeProposalsPanel(_props: Props) {
         if (status !== 200) { setProblem(decisionProblem(status, code)); break; }
       }
       await refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadReceipt(proposal: PublicProposal) {
+    setBusy(proposal.proposalId);
+    setProblem(null);
+    try {
+      if (!(await saveAsFile(`/api/proposals/${encodeURIComponent(proposal.proposalId)}/receipt`, `receipt-${proposal.proposalId}.json`))) {
+        setProblem("The receipt could not be downloaded.");
+      }
     } finally {
       setBusy(null);
     }
@@ -310,7 +356,7 @@ export default function ChangeProposalsPanel(_props: Props) {
       {rows.length === 0 ? <p className={styles.empty}>No proposals.</p> : (
         <ul className={styles.list}>
           {rows.map((proposal) => (
-            <ProposalItem key={proposal.proposalId} proposal={proposal} disabled={disabled} onAct={(action) => void act(proposal, action)} />
+            <ProposalItem key={proposal.proposalId} proposal={proposal} disabled={disabled} onAct={(action) => void act(proposal, action)} onReceipt={() => void downloadReceipt(proposal)} />
           ))}
         </ul>
       )}

@@ -185,15 +185,40 @@ describe("prepare: the creation dry-run", () => {
     expect(putCandidate).not.toHaveBeenCalled();
   });
 
+  /* WO-AN-8: the access check that cannot answer moved to the deciding-read class below (same not-found, flagged). */
   it.each([
     ["a base that is not a registered candidate", () => { candidates = []; }],
     ["a base whose documents the proposer cannot read", () => checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" })],
-    ["an access check that cannot answer", () => checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" })],
     ["derived data not admitted", () => admitsDerived.mockResolvedValue(false)],
   ])("%s is the same not-found, before the leaf is read", async (_name, arrange) => {
     arrange();
     expect(await patch.labelCorrectionExecutor.prepare(agent, request(), [])).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404 });
     expect(count("GET /rest/v1/foundation_review_decisions")).toBe(0);
+    expect(loadModel).not.toHaveBeenCalled();
+  });
+
+  /*
+    WO-AN-8, the class and not one input: the reads that decide whether the base names a candidate this caller can
+    read are the candidate listing and the access check (§18: P4 = candidates + access). For an agent, every way they
+    fail -- an error answer, a malformed answer, a throw, an access check that cannot answer or throws -- is the
+    not-found an absent base gets, flagged decidingReadFailed for the server log, and nothing after them is read.
+    Before WO-AN-8 the tool layer made this decision; now the executor alone does. Mutant: listing failure -> 503.
+  */
+  const decidingFailures: Array<[string, () => void]> = [
+    ["the candidates RPC answering an error", () => { candidates = "down"; }],
+    ["the candidates RPC answering a non-list", () => { candidates = { rows: [] } as unknown as unknown[]; }],
+    ["the base row naming a non-canonical document id", () => { candidates = [{ manifestDigest: BASE, registeredAt: "x", documentIds: ["../a"] }]; }],
+    ["the store throwing", () => { storeThrows = new Error("connect ECONNREFUSED"); }],
+    ["an access check that cannot answer", () => checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" })],
+    ["an access check that throws", () => checkAccess.mockRejectedValue(new TypeError("x is not a function"))],
+    ["an access check that throws a non-Error", () => checkAccess.mockRejectedValue("a string")],
+  ];
+  it.each(decidingFailures)("agent: %s is the not-found an absent base gets, flagged, and nothing after is read", async (_name, arrange) => {
+    arrange();
+    expect(await patch.labelCorrectionExecutor.prepare(agent, request(), []))
+      .toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404, decidingReadFailed: true });
+    expect(count("GET /rest/v1/foundation_review_decisions")).toBe(0);
+    expect(admitsDerived).not.toHaveBeenCalled();
     expect(loadModel).not.toHaveBeenCalled();
   });
 
@@ -219,12 +244,16 @@ describe("prepare: the creation dry-run", () => {
     expect(await patch.labelCorrectionExecutor.prepare(agent, raw, [])).toEqual({ ok: false, code, status });
   });
 
-  it.each([
-    ["the candidates RPC", () => { candidates = "down"; }],
-    ["the R2 signer", () => readSigner.mockReturnValue(null)],
-  ])("%s unavailable fails closed with 503", async (_name, arrange) => {
-    arrange();
+  /* WO-AN-8: for an agent the candidates RPC decides existence (the class above); after the decision an outage is a 503. */
+  it("agent: the R2 signer unavailable after the decision fails closed with 503", async () => {
+    readSigner.mockReturnValue(null);
     expect(await patch.labelCorrectionExecutor.prepare(agent, request(), [])).toEqual({ ok: false, code: "PROPOSAL_PRECONDITION_UNAVAILABLE", status: 503 });
+  });
+
+  it("person: the candidates RPC unavailable fails closed with 503", async () => {
+    candidates = "down";
+    expect(await patch.labelCorrectionExecutor.prepare({ kind: "session", workspaceKey: WS, userId: PERSON, authorizationRevision: 3 }, request(), []))
+      .toEqual({ ok: false, code: "PROPOSAL_PRECONDITION_UNAVAILABLE", status: 503 });
   });
 });
 

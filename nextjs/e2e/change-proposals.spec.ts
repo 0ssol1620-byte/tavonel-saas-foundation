@@ -1,5 +1,6 @@
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
+const { readFile } = await import("node:fs/promises");
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 type Page = import("@playwright/test").Page;
@@ -144,6 +145,8 @@ type StoredProposal = {
   proposalId: string; state: ProposalState; createdAt: string; labelKey: string; documentId: string; keyed?: string;
   /** WO-AN-6: a compile proposal made by an agent; `digest` is what a confirmation must echo, `resumable` an old confirmed row of this viewer. */
   compile?: boolean; agent?: boolean; digest?: string; resumable?: boolean;
+  /** WO-AN-10: a signed receipt is stored (set by the mock when an agent row executes, or by the case). */
+  signed?: boolean;
 };
 type ProposalStore = {
   proposals: StoredProposal[];
@@ -173,7 +176,10 @@ const toPublic = (p: StoredProposal) => ({
   previewDigest: p.state === "proposed" ? digestOf(p) : null,
   proposer: p.agent ? { kind: "agent", grantedBy: "owner@example.invalid", clientLabel: p.labelKey === "injected" ? "<img src=x onerror=alert(1)>" : "Desk Agent", clientLabelVerified: false } : { kind: "person" },
   notes: [],
-  evidenceIds: ["evidence-1"], expiresAt: "2026-11-24T09:00:00.000Z", createdAt: p.createdAt, decidedAt: null,
+  evidenceIds: ["evidence-1"], expiresAt: "2026-11-24T09:00:00.000Z", createdAt: p.createdAt,
+  // WO-AN-10: an executed row says who decided (a person, never named) and whether a signed receipt is stored.
+  ...(p.state === "executed" ? { decidedAt: "2026-11-18T09:30:00.000Z", youDecided: true, receiptAvailable: p.signed === true }
+    : { decidedAt: null, youDecided: null, receiptAvailable: false }),
 });
 
 async function mockProposals(page: Page, store: ProposalStore) {
@@ -210,7 +216,7 @@ async function mockProposals(page: Page, store: ProposalStore) {
     const { decision } = sent;
     if (decision === "confirm") store.confirmBodies.push(sent);
     if (target?.state === "confirmed" && target.resumable && decision === "confirm") {
-      target.state = "executed"; target.resumable = false; store.executions.push(id);
+      target.state = "executed"; target.resumable = false; target.signed = target.agent === true; store.executions.push(id);
       return route.fulfill({ json: { code: "OK" } });
     }
     if (!target || target.state !== "proposed") return route.fulfill({ status: 409, json: { code: "PROPOSAL_NOT_DECIDABLE" } });
@@ -221,7 +227,7 @@ async function mockProposals(page: Page, store: ProposalStore) {
     }
     if (decision === "reject") target.state = "rejected";
     else {
-      if (!store.loseNextDecisionResponse || store.recordWhenLost) { target.state = "executed"; store.executions.push(id); }
+      if (!store.loseNextDecisionResponse || store.recordWhenLost) { target.state = "executed"; target.signed = target.agent === true; store.executions.push(id); }
     }
     if (store.loseNextDecisionResponse) { store.loseNextDecisionResponse = false; return route.abort("failed"); }
     return route.fulfill({ json: { code: "OK" } });
@@ -624,4 +630,91 @@ test("Agent access: consent before Create, the credential once, then Disconnect"
   await expect(reread.getByRole("listitem")).toContainText("Disconnected");
   await expect(reread.getByRole("button", { name: /Disconnect “/ })).toHaveCount(0);
   expect(await overflow(page)).toBeLessThanOrEqual(1);
+});
+
+/* ---- WO-AN-10: who confirmed, the signed receipt, per-grant activity ---- */
+
+test("Proposals: a confirmed agent row says who confirmed and when, and its signed receipt downloads; an open row offers neither", async ({ page }) => {
+  const store = newProposalStore([agentCompile(1), agentCompile(2)]);
+  const receipts: string[] = [];
+  await page.route("**/api/proposals/*/receipt", (route) => {
+    receipts.push(route.request().url());
+    return route.fulfill({ json: { payloadJson: "{}", signature: { keyId: "e2e" } }, headers: { "Cache-Control": "no-store" } });
+  });
+  const panel = await openProposals(page, store);
+  const rows = panel.getByRole("listitem");
+  const open = rows.filter({ hasText: "Suggested by an agent" }).first(); // newest first: proposal 2
+  await open.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(open.locator("span").filter({ hasText: /^Done$/ })).toBeVisible();
+
+  await expect(open).toContainText("Confirmed by you at 2026-11-18 09:30 UTC");
+  await expect(rows.nth(1).getByRole("button", { name: "Signed receipt" })).toHaveCount(0);
+  await expect(rows.nth(1)).not.toContainText("Confirmed by");
+  expect(await overflow(page)).toBeLessThanOrEqual(1);
+  await shot(page, "confirmed-receipt-row");
+
+  const [download] = await Promise.all([page.waitForEvent("download"), open.getByRole("button", { name: "Signed receipt" }).click()]);
+  expect(download.suggestedFilename()).toBe(`receipt-${store.proposals[1]!.proposalId}.json`);
+  expect(receipts).toHaveLength(1);
+  expect(receipts[0]).toContain(`/api/proposals/${store.proposals[1]!.proposalId}/receipt`);
+});
+
+test("Proposals: a receipt that cannot be read says so and downloads nothing", async ({ page }) => {
+  const store = newProposalStore([{ ...agentCompile(1, "executed"), signed: true }]);
+  await page.route("**/api/proposals/*/receipt", (route) => route.fulfill({ status: 404, json: { code: "PROPOSAL_NOT_FOUND" } }));
+  const panel = await openProposals(page, store);
+  let downloaded = false;
+  page.on("download", () => { downloaded = true; });
+  await panel.getByRole("button", { name: "Signed receipt" }).click();
+  await expect(panel.getByRole("status").filter({ hasText: "The receipt could not be downloaded." })).toBeVisible();
+  expect(downloaded).toBe(false);
+});
+
+test("Agent access: Activity lists what this connection proposed, pages it, and exports the same rows", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const grantId = "00000000-0000-4000-8000-0000000000b0";
+  const grants: Grant[] = [{ grantId, clientLabel: "Desk Agent", createdAt: "2026-11-17T09:00:00.000Z", expiresAt: null, revokedAt: null, lastUsedAt: null }];
+  const all = Array.from({ length: 3 }, (_, index) => ({
+    proposalId: `00000000-0000-4000-8000-00000000001${index}`, actionType: "library_label", state: index === 0 ? "executed" : "proposed",
+    createdAt: `2026-11-18T09:0${index}:00.000Z`, decidedAt: index === 0 ? "2026-11-18T09:30:00.000Z" : null, receiptAvailable: index === 0,
+  })).reverse();
+  const requests: string[] = [];
+  const panel = await openAgentAccess(page, grants);
+  await page.route(`**/api/agent-grants/${grantId}/activity**`, (route) => {
+    const url = new URL(route.request().url());
+    requests.push(url.search);
+    const start = Number(url.searchParams.get("cursor") ?? "0");
+    const rows = all.slice(start, start + 2);
+    const next = start + 2 < all.length ? String(start + 2) : null;
+    if (url.searchParams.get("format") === "ndjson") {
+      return route.fulfill({ body: rows.map((row) => JSON.stringify(row)).join("\n") + "\n", contentType: "application/x-ndjson", headers: { "Cache-Control": "no-store" } });
+    }
+    return route.fulfill({ json: { code: "OK", activity: rows, nextCursor: next }, headers: { "Cache-Control": "no-store" } });
+  });
+
+  const activity = panel.getByRole("button", { name: "Activity of “Desk Agent”" });
+  await expect(activity).toHaveAttribute("aria-expanded", "false");
+  await activity.click();
+  await expect(activity).toHaveAttribute("aria-expanded", "true");
+  const list = panel.getByRole("list", { name: "Activity" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(list).toContainText("proposed 2026-11-18 09:02 UTC");
+  expect(await overflow(page)).toBeLessThanOrEqual(1);
+
+  await panel.getByRole("button", { name: "Show more" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await expect(list).toContainText("signed receipt stored");
+  await expect(panel.getByRole("button", { name: "Show more" })).toHaveCount(0);
+  expect(await overflow(page)).toBeLessThanOrEqual(1);
+  await shot(page, "agent-activity");
+
+  const [download] = await Promise.all([page.waitForEvent("download"), panel.getByRole("button", { name: "Export these rows" }).click()]);
+  expect(download.suggestedFilename()).toBe(`agent-activity-${grantId}.ndjson`);
+  // The file holds every listed row (pages 1 and 2), in the listed order, not just the first page.
+  const exported = (await readFile((await download.path())!, "utf8")).trim().split("\n").map((line) => JSON.parse(line).proposalId);
+  expect(exported).toEqual(all.map((r) => r.proposalId));
+
+  await activity.click();
+  await expect(list).toHaveCount(0);
 });

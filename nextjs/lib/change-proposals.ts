@@ -3,6 +3,7 @@ import {
   AGENT_ACL_SCAN_PAGES, AGENT_LABEL_BATCH_MAX, AGENT_OPEN_PROPOSALS_PER_PERSON, PROPOSAL_RESUME_AFTER_MS,
   agentProposalsEnabled, deriveAgentIdempotencyKey,
 } from "./agent-access";
+import { readAgentGrant } from "./agent-grants";
 import { ACTION_RECEIPT_SCHEMA, readActionReceiptSigner, signActionReceipt } from "./action-receipt-signing";
 import { canonicalJson } from "./change-notify";
 import { checkConnectorSourceAccessForViewer } from "./connector-source-access";
@@ -105,6 +106,10 @@ export type ProposalProposer = { kind: "person" } | { kind: "agent"; grantedBy: 
 type PublicCommon = Readonly<{
   proposalId: string; state: ProposalState; collectionId: string | null; previewDigest: string | null; resumable: boolean;
   evidenceIds: string[]; expiresAt: string; createdAt: string; decidedAt: string | null; proposer: ProposalProposer; notes: readonly "approver_only"[];
+  /** Who decided: this viewer, someone else, or nobody yet (WO-AN-10). A user id never leaves the server. */
+  youDecided: boolean | null;
+  /** True only when a signed receipt is stored for this row, so GET /api/proposals/{id}/receipt can answer it (WO-AN-10). */
+  receiptAvailable: boolean;
 }>;
 /** What a signed-in browser sees: a union discriminated by actionType. Never digests of the input, principals, grants or keys. */
 export type PublicProposal = { [K in keyof PreviewShapes]: PublicCommon & Readonly<{ actionType: K; preview: PreviewShapes[K] | null }> }[keyof PreviewShapes];
@@ -360,6 +365,16 @@ function isResumable(row: ProposalRow, viewerId: string, now: Date): boolean {
 
 export type ProposalViewer = Readonly<{ userId: string; now: Date }>;
 
+/**
+ * The signed receipt an agent-origin outcome stored, or null: the only part of `receipt` that leaves the server.
+ * An undone row keeps it under `executed` (the store nests the first outcome there).
+ */
+function signedReceiptOf(row: ProposalRow): Record<string, unknown> | null {
+  const stored = row.state === "undone" ? (isObject(row.receipt) ? row.receipt.executed : null)
+    : row.state === "executed" || row.state === "failed" ? row.receipt : null;
+  return isObject(stored) && isObject(stored.signedReceipt) ? stored.signedReceipt : null;
+}
+
 function publicOf(resolved: Resolved, viewer: ProposalViewer, withPreview: boolean): PublicProposal {
   const { row, executor, input, proposer } = resolved;
   const preview = withPreview ? executor.previewOf(input) : null;
@@ -368,6 +383,7 @@ function publicOf(resolved: Resolved, viewer: ProposalViewer, withPreview: boole
     previewDigest: preview !== null && row.state === "proposed" ? proposalPreviewDigest(row.proposal_id, row.action_type, preview) : null,
     resumable: isResumable(row, viewer.userId, viewer.now), evidenceIds: row.evidence_ids, expiresAt: row.expires_at,
     createdAt: row.created_at, decidedAt: row.decided_at, proposer,
+    youDecided: row.decided_by === null ? null : row.decided_by === viewer.userId, receiptAvailable: signedReceiptOf(row) !== null,
     notes: row.action_type === "compile_plan" && INTAKE_APPROVAL_ROLLOUT_ENABLED ? ["approver_only"] : [],
   } as PublicProposal;
 }
@@ -465,6 +481,45 @@ export async function listProposalsPage(viewer: Pick<ProposalActor, "workspaceKe
     if (listed.rows.length < LIST_LIMIT) return { ok: true, rows: out, nextCursor: null };
   }
   return { ok: true, rows: out, nextCursor: position ? encodeCursor(position) : null };
+}
+
+/**
+ * The stored signed receipt of one proposal (WO-AN-10). Absent, foreign, unreadable, malformed and unsigned are the
+ * same PROPOSAL_NOT_FOUND; an access check that cannot answer is a 503, never a receipt.
+ */
+export async function readProposalReceipt(viewer: Pick<ProposalActor, "workspaceKey" | "userId">, proposalId: string):
+  Promise<{ ok: true; receipt: Record<string, unknown> } | Failure> {
+  const found = await getProposal(viewer.workspaceKey, proposalId);
+  if (!found.ok) return found;
+  const readable = await filterReadableProposals(viewer, [found.row]);
+  if (!readable.ok) return readable;
+  const row = readable.rows[0];
+  const receipt = row ? signedReceiptOf(row) : null;
+  return receipt ? { ok: true, receipt } : failure("PROPOSAL_NOT_FOUND", 404);
+}
+
+/** One line of a grant's activity: no preview, no document id, no principal. */
+export type GrantActivityRow = Readonly<{
+  proposalId: string; actionType: ProposalActionType; state: ProposalState; createdAt: string; decidedAt: string | null; receiptAvailable: boolean;
+}>;
+
+/**
+ * The proposals made under one grant, newest first, one page (WO-AN-10). Only the person who made the grant reads it:
+ * another person's, another workspace's and an absent id are the same AGENT_GRANT_NOT_FOUND. Rows the viewer can no
+ * longer read are dropped before the page is cut (listProposalsPage).
+ */
+export async function listGrantActivity(viewer: Pick<ProposalActor, "workspaceKey" | "userId">, grantId: string, cursor: string | null):
+  Promise<{ ok: true; rows: GrantActivityRow[]; nextCursor: string | null } | Failure> {
+  const grant = await readAgentGrant(viewer.workspaceKey, grantId, viewer.userId);
+  if (!grant.ok) return failure("PROPOSAL_STORE_FAILED", 503);
+  if (!grant.grant) return failure("AGENT_GRANT_NOT_FOUND", 404);
+  const page = await listProposalsPage(viewer, { cursor, grantId: grant.grant.grantId });
+  if (!page.ok) return page;
+  const rows = page.rows.map((row): GrantActivityRow => ({
+    proposalId: row.proposal_id, actionType: row.action_type as ProposalActionType, state: row.state,
+    createdAt: row.created_at, decidedAt: row.decided_at, receiptAvailable: signedReceiptOf(row) !== null,
+  }));
+  return { ok: true, rows, nextCursor: page.nextCursor };
 }
 
 // ---------------------------------------------------------------------------------------------------------

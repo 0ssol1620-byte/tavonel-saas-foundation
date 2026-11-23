@@ -37,6 +37,14 @@
       "credential": "bearer:supabase-jwt",
       "note": "WO-AN-3 Disconnect. Session only (a tvnl_agt_ bearer is not a JWT: AUTH_REQUIRED); never behind the flag, never plan-gated. Revokes the caller's own grant, its credential and its open proposals in one transaction; any other id is the same 404."
     },
+    "app/api/agent-grants/[id]/activity/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-10 per-grant activity. Session only; never behind the flag, never plan-gated. Only the person who made the grant reads it (any other id is the same 404). Rows carry type, state, times and whether a signed receipt exists; no preview, document id, principal or digest. ?format=ndjson answers the same page as a download."
+    },
     "app/api/agent-grants/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -388,6 +396,14 @@
       ],
       "credential": "bearer:supabase-jwt",
       "note": "Session only: the inbox deep link. Unreadable, foreign, absent, malformed and unknown-type ids are the same 404 body."
+    },
+    "app/api/proposals/[id]/receipt/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-10 signed receipt download. Session only: an API key or agent credential is refused. Answers only the stored signed receipt (verifies offline); absent, foreign, unreadable, malformed and unsigned ids are the same 404 body."
     },
     "app/api/proposals/[id]/decision/route.ts": {
       "type": "A-bearer",
