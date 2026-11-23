@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyOntologyPatch, evaluateOntologyPatch } from "./collection-patch";
+import { applyCandidatePatch, applyOntologyPatch, evaluateOntologyPatch } from "./collection-patch";
 import {
   advertisedOntologyRelations,
   canonicalize,
@@ -9,7 +9,7 @@ import {
   type CollectionCandidateArtifact,
   type CollectionOcrInput,
 } from "./collection-compiler";
-import { validatePromotableCollectionArtifact } from "./collection-download";
+import { validatePromotableCollectionArtifact, validateReviewableCollectionArtifact } from "./collection-download";
 import { filesFromArtifact, validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
 
 /*
@@ -20,7 +20,7 @@ import { filesFromArtifact, validateCompiledWorldPackage } from "../scripts/comp
   package files the patch wrote.
 */
 
-function input(documentId: string, digest: string, text: string): CollectionOcrInput {
+function input(documentId: string, digest: string, text: string, bbox1000: [number, number, number, number] = [80, 120, 920, 320]): CollectionOcrInput {
   return {
     documentId,
     versionKey: digest,
@@ -37,7 +37,7 @@ function input(documentId: string, digest: string, text: string): CollectionOcrI
       order: 0,
       blockType: "paragraph",
       text,
-      bbox1000: [80, 120, 920, 320],
+      bbox1000,
       confidence: 0.99,
       authority: "contractual",
     }],
@@ -109,11 +109,64 @@ function coreShaped(): Stored {
   };
 }
 
+/*
+  The compiler's own `review_required` output: a region box that leaves the page frame, which
+  validate.mjs reports as COORDINATE_OUT_OF_RANGE and the compiler records as a review reason
+  (collection-compiler.ts, `errorCodes` -> `reviewReasons`). A legitimate stored candidate.
+*/
+function outOfRange(): Stored {
+  const base = compileCollectionCandidate([
+    input("contract-a", "a".repeat(64), "ACME Corporaton shall pay every valid invoice within 30 calendar days.", [80, 120, 1200, 320]),
+    input("contract-b", "b".repeat(64), "ACME Corporaton requires written approval before changing payment terms."),
+  ]);
+  return {
+    ...base,
+    coreExecution: {
+      status: "review_required",
+      runtime: "tavonel-python-core-v2",
+      worldStateId: "world-state-1",
+      receipt: { requestId: "ontology-patch-test", outputSha256: `sha256:${"c".repeat(64)}`, candidatePromotion: false },
+    },
+  } as unknown as Stored;
+}
+
+/* A base recorded `passed` whose graph files validate.mjs refuses: mentions_entity is not declared. */
+function undeclared(): Stored {
+  const base = fallback();
+  const blueprint = { ...base.blueprint, ontologyRelations: ["discusses_topic", "supported_by"] };
+  const derived = materializeLabelDerivedFiles({
+    collectionId: base.collectionId,
+    nodes: base.ontology.nodes,
+    edges: base.ontology.edges,
+    blueprint,
+    inputBinding: base.sourceDocuments.map((document) => ({
+      documentId: document.documentId,
+      versionKey: document.versionKey,
+      inputSha256: document.inputSha256,
+      sourceImmutableKey: document.sanitizedKey,
+    })),
+  });
+  const replaced = new Map([derived.canonicalModel, derived.turtle, derived.jsonld, derived.nodeCsv, derived.edgeCsv].map((file) => [file.path, file]));
+  return { ...base, blueprint, package: { ...base.package, files: base.package.files.map((file) => replaced.get(file.path) ?? file) } };
+}
+
 const ALL = { readableDocumentIds: new Set(["contract-a", "contract-b"]) };
 const ACTOR = { ...ALL, actorUserId: "11111111-1111-4111-8111-111111111111", patchedAt: "2026-11-23T00:00:00.000Z" };
 const node = (artifact: Stored, kind: string, index = 0) => artifact.ontology.nodes.filter((item) => item.kind === kind)[index];
 const edgesOf = (artifact: Stored, type: string) => artifact.ontology.edges.filter((edge) => edge.type === type);
 const errors = (artifact: unknown) => validateCompiledWorldPackage(filesFromArtifact(artifact)).errors;
+const codes = (artifact: unknown) => [...new Set(errors(artifact).map((error) => String(error.code)))].sort();
+const findingSet = (artifact: unknown) => new Set(errors(artifact).map((error) => JSON.stringify([error.code, error.path ?? null, error.detail ?? null])));
+const reportOf = (artifact: { package: Stored["package"] }) => JSON.parse(artifact.package.files.find((file) => file.path === "validation/report.json")!.content);
+/** Retype the entity a retrieval chunk names: validate.mjs then raises ENTITY_DANGLING, an error the base did not have. */
+function danglingEntity(artifact: Stored) {
+  const entity = node(artifact, "Entity");
+  return [
+    ...edgesOf(artifact, "mentions_entity").map((edge) => ({ op: "remove_relation", edgeId: edge.id })),
+    { op: "retype", objectId: entity.id, from: "Entity", to: "Topic" },
+    { op: "add_relation", from: node(artifact, "Document").id, to: entity.id, type: "discusses_topic", evidenceIds: [node(artifact, "Evidence").id] },
+  ];
+}
 
 function addTopic(base: Stored, label = "Payment terms") {
   return [
@@ -220,6 +273,7 @@ describe("what an ontology patch refuses", () => {
       loss: { edgesRemoved: 0, evidenceOrphaned: 0 },
       affectedObjectIds: [],
       coverage: { before: [], after: [] },
+      validation: null,
     });
   };
 
@@ -333,35 +387,119 @@ describe("what an ontology patch refuses", () => {
     }
   });
 
-  it("throws on a base that passes the promotion gate but not validate.mjs: no patch result inherits an error", () => {
-    // Graph files re-materialized under a blueprint that does not declare mentions_entity.
-    const blueprint = { ...base.blueprint, ontologyRelations: ["discusses_topic", "supported_by"] };
-    const derived = materializeLabelDerivedFiles({
-      collectionId: base.collectionId,
-      nodes: base.ontology.nodes,
-      edges: base.ontology.edges,
-      blueprint,
-      inputBinding: base.sourceDocuments.map((document) => ({
-        documentId: document.documentId,
-        versionKey: document.versionKey,
-        inputSha256: document.inputSha256,
-        sourceImmutableKey: document.sanitizedKey,
-      })),
-    });
-    const replaced = new Map([derived.canonicalModel, derived.turtle, derived.jsonld, derived.nodeCsv, derived.edgeCsv].map((file) => [file.path, file]));
-    const bad = { ...base, blueprint, package: { ...base.package, files: base.package.files.map((file) => replaced.get(file.path) ?? file) } };
+  it("PATCH_ARTIFACT_INVALID: a patch that fixes nothing but adds an error, on a review_required base", () => {
+    const flagged = outOfRange();
+    expect(codes(flagged)).toEqual(["COORDINATE_OUT_OF_RANGE"]);
+    refused(flagged, danglingEntity(flagged), null, "PATCH_ARTIFACT_INVALID");
+  });
+
+  it("PATCH_ARTIFACT_INVALID: errors compared as a set of (code, locus), so a patch cannot trade one for another", () => {
+    // The base has PREDICATE_UNDECLARED on each mentions_entity edge. Removing those edges clears
+    // them; retyping the entity the chunks name raises ENTITY_DANGLING. No more errors than
+    // before by count, and every one of them new.
+    const bad = undeclared();
+    const before = errors(bad);
+    expect(before.every((error) => error.code === "PREDICATE_UNDECLARED")).toBe(true);
+    refused(bad, danglingEntity(bad), null, "PATCH_ARTIFACT_INVALID");
+  });
+
+  it("round 1: a base recorded passed that validate.mjs refuses is patched into review_required with the base's codes, never passed", () => {
+    const bad = undeclared();
     expect(validatePromotableCollectionArtifact(bad, bad.collectionId)).not.toBeNull();
-    expect(errors(bad).map((error) => error.code)).toContain("PREDICATE_UNDECLARED");
+    expect(codes(bad)).toEqual(["PREDICATE_UNDECLARED"]);
     const entity = node(bad, "Entity");
     for (const ops of [[{ op: "relabel", objectId: entity.id, before: entity.label, after: "ACME Corporation" }], addTopic(bad)]) {
-      expect(() => applyOntologyPatch(bad, ops, ACTOR)).toThrow("PATCH_BASE_INVALID");
-      expect(() => evaluateOntologyPatch(bad, ops, { ...ALL, questions: null })).toThrow("PATCH_BASE_INVALID");
+      const result = applyOntologyPatch(bad, ops, ACTOR);
+      if (!result.ok) throw new Error(result.refusal.code);
+      const patched = result.artifact;
+      expect(codes(patched)).toEqual(["PREDICATE_UNDECLARED"]);
+      expect(patched.validation.status).toBe("review_required");
+      expect(patched.validation.reviewReasons).toEqual(["PREDICATE_UNDECLARED"]);
+      expect(patched.reviewReasons).toEqual(["PREDICATE_UNDECLARED"]);
+      expect(patched.lifecycle).toBe("review_required");
+      expect(patched.coreExecution!.status).toBe("review_required");
+      expect(reportOf(patched)).toMatchObject({ status: "review_required", reviewReasons: ["PREDICATE_UNDECLARED"] });
+      expect(validatePromotableCollectionArtifact(patched, bad.collectionId)).toBeNull();
+      expect(validateReviewableCollectionArtifact(patched, bad.collectionId)).not.toBeNull();
+      // The preview shows it, so the preview digest covers it.
+      expect(evaluateOntologyPatch(bad, ops, { ...ALL, questions: null }).validation).toEqual({ status: "review_required", errorCodes: ["PREDICATE_UNDECLARED"] });
     }
+  });
+
+  it("round 2: the compiler's own review_required output (an out-of-range box) is a patchable base", () => {
+    const flagged = outOfRange();
+    expect(flagged.lifecycle).toBe("review_required");
+    expect(validateReviewableCollectionArtifact(flagged, flagged.collectionId)).not.toBeNull();
+    const result = applyOntologyPatch(flagged, addTopic(flagged), ACTOR);
+    if (!result.ok) throw new Error(result.refusal.code);
+    const patched = result.artifact;
+    expect(codes(patched)).toEqual(["COORDINATE_OUT_OF_RANGE"]);
+    // The base's reasons are kept: a patch does not clear review_required.
+    expect(patched.validation.reviewReasons).toEqual(flagged.validation.reviewReasons);
+    expect(patched.validation.status).toBe("review_required");
+    expect(reportOf(patched).reviewReasons).toEqual(reportOf(flagged).reviewReasons);
+    expect(validateReviewableCollectionArtifact(patched, flagged.collectionId)).not.toBeNull();
+    expect(evaluateOntologyPatch(flagged, addTopic(flagged), { ...ALL, questions: null }).validation)
+      .toEqual({ status: "review_required", errorCodes: ["COORDINATE_OUT_OF_RANGE"] });
+  });
+
+  it("a patch on a passed base that adds an error is refused", () => {
+    refused(base, danglingEntity(base), null, "PATCH_ARTIFACT_INVALID");
+    expect(evaluateOntologyPatch(base, addTopic(base), { ...ALL, questions: null }).validation).toEqual({ status: "passed", errorCodes: [] });
   });
 
   it("refuses to run without the proposer's readable documents rather than assume all of them", () => {
     expect(() => applyOntologyPatch(base, addTopic(base), { actorUserId: "u", patchedAt: "t" } as unknown as typeof ACTOR)).toThrow("PATCH_CONTEXT_INVALID");
     expect(() => evaluateOntologyPatch(base, addTopic(base), { readableDocumentIds: ["contract-a"], questions: null } as never)).toThrow("PATCH_CONTEXT_INVALID");
+  });
+});
+
+/*
+  Which bases are patchable is one question with one answer (receipts/blockers/WO-KS-3.md rule 1):
+  the ones a label correction is applied to. Both label paths gate the stored candidate with
+  `validateReviewableCollectionArtifact` (through `loadWorldReadModel`) before `applyCandidatePatch`.
+*/
+describe("the ontology patch admits exactly the bases the label correction admits", () => {
+  const labelPath = (artifact: unknown) => {
+    if (!validateReviewableCollectionArtifact(artifact, (artifact as Stored).collectionId)) return { admitted: false as const };
+    const entity = node(artifact as Stored, "Entity");
+    const result = applyCandidatePatch(artifact, { objectId: entity.id, before: entity.label, after: "ACME Corporation" },
+      { evidenceId: node(artifact as Stored, "Evidence").id, actorUserId: ACTOR.actorUserId, patchedAt: ACTOR.patchedAt });
+    return result.ok ? { admitted: true as const, digest: result.artifact.manifestDigest } : { admitted: false as const };
+  };
+  const ontologyPath = (artifact: unknown) => {
+    const entity = node(artifact as Stored, "Entity");
+    try {
+      const result = applyOntologyPatch(artifact, [{ op: "relabel", objectId: entity.id, before: entity.label, after: "ACME Corporation" }], ACTOR);
+      return result.ok ? { admitted: true as const, digest: result.artifact.manifestDigest } : { admitted: false as const };
+    } catch (error) {
+      expect((error as Error).message).toBe("PATCH_BASE_INVALID");
+      return { admitted: false as const };
+    }
+  };
+
+  it("passed, review_required with a coordinate error, and structurally broken bases: accepted or refused identically", () => {
+    const clean = fallback();
+    const promoted = { ...clean, candidatePromotion: true };
+    const reportDisagrees = structuredClone(clean);
+    const report = reportDisagrees.package.files.find((file) => file.path === "validation/report.json")!;
+    const content = report.content.replace('"status": "passed"', '"status": "review_required"');
+    expect(content).not.toBe(report.content);
+    Object.assign(report, { content, sizeBytes: Buffer.byteLength(content), sha256: `sha256:${sha256(content)}` });
+    const cases: Array<[string, unknown, boolean]> = [
+      ["passed", clean, true],
+      ["review_required with COORDINATE_OUT_OF_RANGE", outOfRange(), true],
+      ["candidatePromotion true", promoted, false],
+      ["report status disagrees with the record", reportDisagrees, false],
+    ];
+    for (const [name, artifact, admitted] of cases) {
+      const label = labelPath(artifact);
+      const ontology = ontologyPath(artifact);
+      expect(label.admitted, name).toBe(admitted);
+      expect(ontology.admitted, name).toBe(admitted);
+      // Where both accept the same relabel they write the same candidate.
+      if (label.admitted && ontology.admitted) expect(ontology.digest, name).toBe(label.digest);
+    }
   });
 });
 
@@ -412,6 +550,68 @@ describe("K-5 property: evidenceOrphaned is 0 for every accepted patch", () => {
     };
   }
 
+  function generate(base: Stored, next: () => number, pick: <T>(items: readonly T[]) => T, onSupportRemoval = () => {}) {
+    const ids = [...base.ontology.nodes.map((item) => item.id), "t1", "t2"];
+    const evidence = base.ontology.nodes.filter((item) => item.kind === "Evidence").map((item) => item.id);
+    return Array.from({ length: 1 + Math.floor(next() * 4) }, (_, index) => {
+      const kind = pick(["remove_relation", "remove_relation", "add_relation", "add_relation", "add_object", "relabel", "retype"] as const);
+      if (kind === "remove_relation") {
+        const edge = pick(base.ontology.edges);
+        if (edge.type === "supported_by") onSupportRemoval();
+        return { op: kind, edgeId: edge.id };
+      }
+      if (kind === "add_relation") {
+        return { op: kind, from: pick(ids), to: pick(ids), type: pick(["discusses_topic", "mentions_entity", "mentions", "supported_by", "contradicts"]), evidenceIds: [pick(evidence)] };
+      }
+      if (kind === "add_object") {
+        return { op: kind, tempId: pick(["t1", "t2"]), kind: pick(["Topic", "Entity"]), label: `Object ${index}`, evidenceIds: [pick(evidence)] };
+      }
+      const target = pick(base.ontology.nodes);
+      if (kind === "relabel") return { op: kind, objectId: target.id, before: target.label, after: `Renamed ${index}` };
+      return { op: kind, objectId: target.id, from: target.kind, to: target.kind === "Topic" ? "Entity" : "Topic" };
+    });
+  }
+
+  /*
+    The class behind both reviews: over bases that already carry validator errors (the compiler's
+    own review_required output, and a base recorded passed that the checker refuses), every accepted
+    patch raises no (code, locus) the base did not have, records every remaining code and every base
+    reason as a reason, and is `passed` only when no reason is left -- never while the checker finds
+    an error. A patch that removes exactly what the checker objected to may come out passed; the
+    run has to find one, or it did not exercise that side.
+  */
+  it("over bases that already carry validator errors, an accepted patch adds none and never reads passed over one (1,000 runs)", () => {
+    const bases = [outOfRange(), undeclared()];
+    const next = random(20261124);
+    const pick = <T,>(items: readonly T[]) => items[Math.floor(next() * items.length)];
+    let accepted = 0;
+    let repaired = 0;
+    for (let run = 0; run < 1_000; run += 1) {
+      const base = bases[run % 2];
+      const ops = generate(base, next, pick);
+      const evaluation = evaluateOntologyPatch(base, ops, { ...ALL, questions: null });
+      const applied = applyOntologyPatch(base, ops, ACTOR);
+      expect(applied.ok, canonicalize(ops)).toBe(evaluation.valid);
+      if (!applied.ok) continue;
+      accepted += 1;
+      const patched = applied.artifact;
+      const had = findingSet(base);
+      for (const finding of findingSet(patched)) expect(had.has(finding), `${canonicalize(ops)} ${finding}`).toBe(true);
+      const reasons = patched.validation.reviewReasons ?? [];
+      for (const code of [...codes(patched), ...(base.validation.reviewReasons ?? [])]) expect(reasons, canonicalize(ops)).toContain(code);
+      const status = reasons.length > 0 ? "review_required" : "passed";
+      if (status === "passed") repaired += 1;
+      expect(patched.validation.status, canonicalize(ops)).toBe(status);
+      if (codes(patched).length > 0) expect(patched.validation.status, canonicalize(ops)).toBe("review_required");
+      expect(reportOf(patched).status, canonicalize(ops)).toBe(status);
+      const gate = status === "passed" ? validatePromotableCollectionArtifact : validateReviewableCollectionArtifact;
+      expect(gate(patched, base.collectionId), canonicalize(ops)).not.toBeNull();
+      expect(evaluation.validation, canonicalize(ops)).toEqual({ status, errorCodes: codes(patched) });
+    }
+    expect(accepted).toBeGreaterThan(50);
+    expect(repaired).toBeGreaterThan(0);
+  });
+
   it("holds over 1,000 generated patches", () => {
     const bases = [fallback(), coreShaped()];
     const next = random(20261123);
@@ -420,26 +620,7 @@ describe("K-5 property: evidenceOrphaned is 0 for every accepted patch", () => {
     let supportRemovalsTried = 0;
     for (let run = 0; run < 1_000; run += 1) {
       const base = bases[run % 2];
-      const ids = [...base.ontology.nodes.map((item) => item.id), "t1", "t2"];
-      const evidence = base.ontology.nodes.filter((item) => item.kind === "Evidence").map((item) => item.id);
-      const ops = Array.from({ length: 1 + Math.floor(next() * 4) }, (_, index) => {
-        const kind = pick(["remove_relation", "remove_relation", "add_relation", "add_relation", "add_object", "relabel", "retype"] as const);
-        if (kind === "remove_relation") {
-          const edge = pick(base.ontology.edges);
-          if (edge.type === "supported_by") supportRemovalsTried += 1;
-          return { op: kind, edgeId: edge.id };
-        }
-        if (kind === "add_relation") {
-          return { op: kind, from: pick(ids), to: pick(ids), type: pick(["discusses_topic", "mentions_entity", "mentions", "supported_by", "contradicts"]), evidenceIds: [pick(evidence)] };
-        }
-        if (kind === "add_object") {
-          return { op: kind, tempId: pick(["t1", "t2"]), kind: pick(["Topic", "Entity"]), label: `Object ${index}`, evidenceIds: [pick(evidence)] };
-        }
-        const target = pick(base.ontology.nodes);
-        if (kind === "relabel") return { op: kind, objectId: target.id, before: target.label, after: `Renamed ${index}` };
-        return { op: kind, objectId: target.id, from: target.kind, to: target.kind === "Topic" ? "Entity" : "Topic" };
-      });
-
+      const ops = generate(base, next, pick, () => { supportRemovalsTried += 1; });
       const evaluation = evaluateOntologyPatch(base, ops, { ...ALL, questions: null });
       const applied = applyOntologyPatch(base, ops, ACTOR);
       expect(applied.ok, canonicalize(ops)).toBe(evaluation.valid);

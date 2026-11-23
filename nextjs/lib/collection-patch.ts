@@ -221,10 +221,35 @@ function rebuild(artifact: StoredArtifact, nodes: Nodes, edges: Edges, recount: 
       }
     }
   }
-  const files = artifact.package.files.map((file) => replacements.get(file.path) ?? file);
+  let files = artifact.package.files.map((file) => replacements.get(file.path) ?? file);
+  // Set only when the record moves, so a label correction keeps exactly the keys it always had.
+  let record: { lifecycle: "review_required"; reviewReasons: string[] } | null = null;
+  if (recount) {
+    /*
+      The result's validation record, recomputed the way the compiler computes it
+      (collection-compiler.ts, `errorCodes` -> `reviewReasons` -> `status`): validate.mjs's error
+      codes over the files just written join the base's reasons, and any reason at all is
+      `review_required`. The base's reasons stay -- a patch does not clear `review_required`,
+      here as on the label path -- and a base recorded `passed` whose package the checker
+      refuses comes out `review_required` with the codes, never `passed` again.
+    */
+    const baseReasons = artifact.reviewReasons ?? validation.reviewReasons ?? [];
+    const reasons = [...new Set([...baseReasons, ...errorCodes(files)])].sort();
+    if (reasons.length !== baseReasons.length) {
+      const status = "review_required" as const;
+      validation = { ...validation, status, reviewReasons: reasons };
+      record = { lifecycle: status, reviewReasons: reasons };
+      // The reviewable gate parsed this report as an object, on the base it admitted.
+      const report = files.find((file) => file.path === "validation/report.json")!;
+      const content = JSON.stringify({ ...JSON.parse(report.content), status, reviewReasons: reasons }, null, 2) + "\n";
+      const rewritten = { ...report, content, sizeBytes: Buffer.byteLength(content, "utf8"), sha256: `sha256:${sha256(content)}` };
+      files = files.map((file) => (file === report ? rewritten : file));
+    }
+  }
 
   const patched = {
     ...artifact,
+    ...record,
     ontology: { nodes, edges },
     package: { ...artifact.package, files },
     validation,
@@ -266,6 +291,7 @@ function rebuild(artifact: StoredArtifact, nodes: Nodes, edges: Edges, recount: 
     coreExecution: artifact.coreExecution
       ? {
           ...artifact.coreExecution,
+          ...(record ? { status: record.lifecycle } : {}),
           runtime: artifact.coreExecution.runtime.endsWith("+human-review")
             ? artifact.coreExecution.runtime
             : `${artifact.coreExecution.runtime}+human-review`,
@@ -371,6 +397,8 @@ export type OntologyPatchEvaluation = {
   loss: { edgesRemoved: number; evidenceOrphaned: number };
   affectedObjectIds: string[];
   coverage: { before: CompetencyCoverageRow[]; after: CompetencyCoverageRow[] };
+  /** The result's recomputed record: null for a refused patch, which produces no result. */
+  validation: { status: "passed" | "review_required"; errorCodes: string[] } | null;
 };
 
 const isId = (value: unknown): value is string =>
@@ -424,30 +452,44 @@ type Built =
   | { ok: false; refusal: OntologyPatchRefusal };
 
 const refuse = (opIndex: number | null, code: OntologyPatchFailure): Built => ({ ok: false, refusal: { opIndex, code } });
-const packageInvalid = (artifact: unknown) => validateCompiledWorldPackage(filesFromArtifact(artifact)).errors.length > 0;
+
+type PackageFiles = CollectionCandidateArtifact["package"]["files"];
+const checked = (files: PackageFiles) => validateCompiledWorldPackage(filesFromArtifact({ package: { files } })).errors as
+  Array<{ code: unknown; path?: unknown; detail?: unknown }>;
+/** validate.mjs's error codes, sorted and unique, as the compiler records them. */
+function errorCodes(files: PackageFiles) {
+  return [...new Set(checked(files).map((error) => String(error.code)))].sort();
+}
+/** Each finding as (code, locus), so a patch cannot trade one error for another of the same count. */
+function findings(files: PackageFiles) {
+  return new Set(checked(files).map((error) => JSON.stringify([error.code, error.path ?? null, error.detail ?? null])));
+}
 
 /*
-  The base is the server's stored candidate, not the proposer's input, so a base that fails its own
-  gate is an integrity failure and throws. It is never answered as a refusal of the patch.
+  Which bases are patchable has one answer: the ones a label correction can be applied to. Both
+  label paths read the stored candidate through `validateReviewableCollectionArtifact` before
+  `applyCandidatePatch` (`loadWorldReadModel`, world-read-model.ts:768, which the reviews route and
+  the label-correction executor call first), so this calls that function and nothing else. A
+  `review_required` candidate the compiler emitted with validator codes is a legitimate base; what
+  it already has wrong is carried into the result, not refused.
+
+  The base is the server's stored candidate, not the proposer's input, so a base that fails the gate
+  is an integrity failure and throws. It is never answered as a refusal of the patch. The node and
+  edge arrays are checked too because the gate does not read the graph and the materializer needs it.
 */
-function readBase(source: unknown): { base: StoredArtifact; gate: "promotable" | "reviewable" } {
+function readBase(source: unknown): StoredArtifact {
   const invalid = () => new Error("PATCH_BASE_INVALID");
   if (!source || typeof source !== "object") throw invalid();
   const base = source as StoredArtifact;
-  if (typeof base.collectionId !== "string" || !Array.isArray(base.ontology?.nodes) || !Array.isArray(base.ontology?.edges)) throw invalid();
+  if (typeof base.collectionId !== "string" || !validateReviewableCollectionArtifact(base, base.collectionId)) throw invalid();
+  if (!Array.isArray(base.ontology?.nodes) || !Array.isArray(base.ontology?.edges)) throw invalid();
   if (base.ontology.nodes.some((node) => !node || typeof node !== "object") || base.ontology.edges.some((edge) => !edge || typeof edge !== "object")) throw invalid();
-  const gate = validatePromotableCollectionArtifact(base, base.collectionId) ? "promotable"
-    : validateReviewableCollectionArtifact(base, base.collectionId) ? "reviewable" : null;
-  if (!gate) throw invalid();
-  // validate.mjs is the compiler's second gate; a base it refuses could only yield a result it refuses.
-  if (packageInvalid(base)) throw invalid();
-  return { base, gate };
+  return base;
 }
 
 function buildOntologyPatch(source: unknown, rawOps: unknown, context: OntologyPatchContext): Built {
   if (!(context?.readableDocumentIds instanceof Set)) throw new Error("PATCH_CONTEXT_INVALID");
-  // The base has to pass the gate it will be judged by, or "the patch broke it" is unprovable.
-  const { base, gate: baseGate } = readBase(source);
+  const base = readBase(source);
 
   if (!Array.isArray(rawOps) || rawOps.length < 1 || rawOps.length > MAX_ONTOLOGY_PATCH_OPS) return refuse(null, "PATCH_OP_INVALID");
   const ops: OntologyPatchOp[] = [];
@@ -558,14 +600,18 @@ function buildOntologyPatch(source: unknown, rawOps: unknown, context: OntologyP
   const edgesRemoved = base.ontology.edges.filter((edge) => !kept.has(edge.id)).length;
 
   /*
-    The compiler's own two checks over the result: the gate the base passed (a patch never
-    demotes a promotable candidate), and `validate.mjs` -- the predicate allowlist, the four graph
-    serialisations agreeing, counts, dangling references -- raising nothing at all.
+    A patch never makes a candidate worse. `validate.mjs` -- the predicate allowlist, the four graph
+    serialisations agreeing, counts, dangling references -- may find in the result only what it
+    found in the base, compared finding by finding (code, path, detail), never by count. Then the
+    gate for what the result now says it is: promotable while it is `passed` (a passed base cannot
+    gain a reason without the check above refusing it, so a patch never demotes an honest one), and
+    reviewable once its recomputed record is `review_required`.
   */
   const patched = rebuild(base, nodes, edges, true);
-  const gate = baseGate === "promotable" ? validatePromotableCollectionArtifact : validateReviewableCollectionArtifact;
+  const had = findings(base.package.files);
+  if ([...findings(patched.package.files)].some((finding) => !had.has(finding))) return refuse(null, "PATCH_ARTIFACT_INVALID");
+  const gate = patched.validation.status === "passed" ? validatePromotableCollectionArtifact : validateReviewableCollectionArtifact;
   if (!gate(patched, base.collectionId)) return refuse(null, "PATCH_ARTIFACT_INVALID");
-  if (packageInvalid(patched)) return refuse(null, "PATCH_ARTIFACT_INVALID");
 
   return { ok: true, base, patched, ops, loss: { edgesRemoved, evidenceOrphaned }, affected: [...affected].sort() };
 }
@@ -597,7 +643,8 @@ export function applyOntologyPatch(
 }
 
 /**
- * The dry-run a proposal shows: validity, the refusal, what is lost, what is touched, and the
+ * The dry-run a proposal shows: validity, the refusal, what is lost, what is touched, the result's
+ * validation record (status and validate.mjs error codes, so the preview digest covers it), and the
  * competency coverage before and after against `questions` (the CQ set current at prepare time;
  * null when the World has none, and then both lists are empty).
  * A base that is not a valid candidate throws PATCH_BASE_INVALID, and coverage that cannot be
@@ -618,6 +665,7 @@ export function evaluateOntologyPatch(
       loss: { edgesRemoved: 0, evidenceOrphaned: 0 },
       affectedObjectIds: [],
       coverage: { before: [], after: [] },
+      validation: null,
     };
   }
   const coverage = (artifact: unknown) => (context.questions === null ? [] : evaluateCompetencyCoverage(artifact, context.questions).rows);
@@ -627,5 +675,6 @@ export function evaluateOntologyPatch(
     loss: built.loss,
     affectedObjectIds: built.affected,
     coverage: { before: coverage(built.base), after: coverage(built.patched) },
+    validation: { status: built.patched.validation.status, errorCodes: errorCodes(built.patched.package.files) },
   };
 }
