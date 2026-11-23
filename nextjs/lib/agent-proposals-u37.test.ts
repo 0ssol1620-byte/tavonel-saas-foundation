@@ -406,7 +406,7 @@ type Condition = (typeof CONDITIONS)[number] | `host-incompatible:${HostShape}`;
 type Phase = "dry-run" | "confirm";
 /** ANY_REFUSAL: any defined refusal (HTTP >= 400, a JSON-RPC error, or a tool refusal) -- used where the work order names no code. */
 type Outcome = { status: number; code: string; newRows: number; state: string | null; effects: string[] };
-type Case = { id: string; condition: Condition; phase: Phase; type: ActionType; inputs: string; expected: Outcome; knownGap?: string };
+type Case = { id: string; condition: Condition; phase: Phase; type: ActionType; inputs: string; expected: Outcome };
 
 const EFFECTS: Record<ActionType, string[]> = {
   compile_plan: ["compile_post"], library_label: ["decide_library_label"], ontology_label_patch: ["register_provenance", "record_patch", "r2_put"],
@@ -418,7 +418,7 @@ function expectedOf(condition: Condition, phase: Phase, type: ActionType): Outco
   if (phase === "dry-run") {
     if (host) {
       return {
-        "protocol-version": none(400, "MCP_PROTOCOL_VERSION_UNSUPPORTED"), "batch-array": none(400, "Invalid Request"), "accept-no-json": none(0, "ANY_REFUSAL"),
+        "protocol-version": none(400, "MCP_PROTOCOL_VERSION_UNSUPPORTED"), "batch-array": none(400, "Invalid Request"), "accept-no-json": none(406, "NOT_ACCEPTABLE"),
         "get-event-stream": none(405, "HTTP_405"), "unknown-method": none(200, "Method not found"), "call-as-notification": none(202, "HTTP_202"),
       }[host];
     }
@@ -440,7 +440,7 @@ function expectedOf(condition: Condition, phase: Phase, type: ActionType): Outco
   if (host) {
     return {
       "protocol-version": none(400, "MCP_PROTOCOL_VERSION_UNSUPPORTED", "proposed"), "batch-array": none(400, "Invalid Request", "proposed"),
-      "accept-no-json": none(0, "ANY_REFUSAL", "proposed"), "get-event-stream": none(405, "HTTP_405", "proposed"),
+      "accept-no-json": none(406, "NOT_ACCEPTABLE", "proposed"), "get-event-stream": none(405, "HTTP_405", "proposed"),
       "unknown-method": none(200, "Method not found", "proposed"), "call-as-notification": none(202, "HTTP_202", "proposed"),
     }[host];
   }
@@ -450,8 +450,8 @@ function expectedOf(condition: Condition, phase: Phase, type: ActionType): Outco
     case "denied-scope": return none(403, "PROPOSAL_SESSION_REQUIRED", "proposed");
     case "denied-ACL": return none(403, "CONNECTOR_SOURCE_ACCESS_DENIED", "proposed");
     case "denied-flag": return none(409, "AGENT_PROPOSALS_DISABLED", "proposed");
-    // The cohort gates the agent route; a confirmation is a person's act in a session, gated by the flag alone (§2.5).
-    case "denied-cohort": return executed();
+    // WO-AN-9F ruling: confirming an agent proposal checks the cohort as proposing does (404, the cohort refusal as the code).
+    case "denied-cohort": return none(404, "AGENT_COHORT_EXCLUDED", "proposed");
     case "duplicate": case "duplicate-other-principal": return executed(409, "PROPOSAL_NOT_DECIDABLE");
     case "expired": return none(200, "OK", "expired");
     case "stale": return none(200, "OK", "stale");
@@ -490,8 +490,6 @@ for (const condition of [...CONDITIONS, ...Object.keys(HOST_SHAPES).map((shape) 
         id: `U37-${String(CASES.length + 1).padStart(3, "0")}`, condition, phase, type,
         inputs: host ? `${HOST_INPUTS[host]} wrapping ${phase === "dry-run" ? TOOL[type] : `tools/call decide_proposal on a ${type} proposal`}` : INPUTS[condition]!,
         expected: expectedOf(condition, phase, type),
-        ...(host === "accept-no-json" && phase === "dry-run"
-          ? { knownGap: "/api/agent-mcp does not read Accept: the request is served as JSON and the proposal row is written (proposed delta)" } : {}),
       });
     }
   }
@@ -607,7 +605,7 @@ describe("U37 matrix (local half): the generator", () => {
     return { outcome, receiptVerified };
   };
 
-  it.each(CASES.filter((c) => !c.knownGap).map((c) => [`${c.id} ${c.phase} ${c.type} ${c.condition}`, c] as const))("%s", async (_name, c) => {
+  it.each(CASES.map((c) => [`${c.id} ${c.phase} ${c.type} ${c.condition}`, c] as const))("%s", async (_name, c) => {
     const { outcome, receiptVerified } = await run(c);
     expect(comparable(outcome, c.expected)).toEqual(c.expected);
     if (c.expected.state === "executed") expect(receiptVerified).toBe(true);
@@ -615,16 +613,36 @@ describe("U37 matrix (local half): the generator", () => {
     if (c.expected.state !== "executed") expect(outcome.effects).toEqual([]);
   });
 
-  /*
-    The work order expects every host-incompatible shape to be a defined error with no state change. /api/agent-mcp
-    does not read Accept, so a dry run sent with `Accept: text/event-stream` only is served and writes its proposal.
-    Recorded as a failing row (it.fails: this test passes only while the row fails); the fix is outside this work
-    order's write scope (proposed delta: 406 before authorization when Accept names neither application/json nor
-    *\/*). When the route is fixed this turns red and the row moves to the passing list.
-  */
-  it.fails.each(CASES.filter((c) => c.knownGap).map((c) => [`${c.id} ${c.phase} ${c.type} ${c.condition} (KNOWN GAP)`, c] as const))("%s", async (_name, c) => {
-    const { outcome } = await run(c);
-    expect(comparable(outcome, c.expected)).toEqual(c.expected);
+  /* WO-AN-9F item 1, the class: an Accept that names neither application/json nor a wildcard is 406 before authorization (no credential
+     needed to see it) and writes nothing; JSON, a wildcard, a list containing either, and an absent header pass the gate. */
+  it("Accept without application/json or a wildcard is 406 before authorization; the accepted forms are not", async () => {
+    const before = snapshot();
+    for (const accept of ["text/event-stream", "text/html", "application/xml, text/plain", ""]) {
+      const response = await agentMcp(new Request("https://tavonel.test/api/agent-mcp", { method: "POST", headers: { "content-type": "application/json", accept },
+        body: JSON.stringify(toolMessage(TOOL.compile_plan, argsOf("compile_plan"))) }));
+      expect({ accept, ...(await agentAnswer(response)) }).toEqual({ accept, status: 406, code: "NOT_ACCEPTABLE", proposalId: null });
+    }
+    expect(newRowsSince(before)).toBe(0);
+    for (const accept of ["application/json", "*/*", "text/event-stream, Application/JSON;q=0.9", undefined]) {
+      const response = await agentMcp(new Request("https://tavonel.test/api/agent-mcp", { method: "POST",
+        headers: { "content-type": "application/json", ...(accept === undefined ? {} : { accept }) }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }) }));
+      expect(response.status, String(accept)).toBe(401);
+    }
+  });
+
+  /* WO-AN-9F item 3, the class: every confirmation of an agent proposal outside the cohort (excluded, or a cohort that is mis-set) is the
+     propose path's 404 and decides nothing; a person's own proposal is not an agent proposal and is not gated here. */
+  it("an agent proposal is not decidable outside the cohort, and a mis-set cohort is a refusal, not an open gate", async () => {
+    for (const [cohort, code, type] of [["pilot-zzzz", "AGENT_COHORT_EXCLUDED", "library_label"], ["not a workspace", "AGENT_COHORT_CONFIG_INVALID", "ontology_label_patch"]] as const) {
+      const id = await proposed(type); // one type per round: a repeated idempotency key would replay the executed row
+      const digest = previewDigestOf(id);
+      vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", cohort);
+      const answer = await sessionAnswerOf(await decide(id, { decision: "confirm", previewDigest: digest }));
+      expect(answer).toEqual({ status: 404, code });
+      expect(proposals.get(id)!.state).toBe("proposed");
+      vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", WS);
+      expect((await sessionAnswerOf(await decide(id, { decision: "confirm", previewDigest: digest }))).code).toBe("OK");
+    }
   });
 });
 

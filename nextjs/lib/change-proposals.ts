@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   AGENT_ACL_SCAN_PAGES, AGENT_LABEL_BATCH_MAX, AGENT_OPEN_PROPOSALS_PER_PERSON, PROPOSAL_RESUME_AFTER_MS,
-  agentProposalsEnabled, deriveAgentIdempotencyKey,
+  agentProposalsCohortRefusal, agentProposalsEnabled, deriveAgentIdempotencyKey,
 } from "./agent-access";
 import { readAgentGrant } from "./agent-grants";
 import { ACTION_RECEIPT_SCHEMA, readActionReceiptSigner, signActionReceipt } from "./action-receipt-signing";
@@ -683,6 +683,9 @@ export async function decideProposal(request: Request, principal: Principal, row
 
   const agentOrigin = row.principal_kind === "agent";
   if (agentOrigin && !agentProposalsEnabled()) return failure("AGENT_PROPOSALS_DISABLED", 409);
+  // A canary that admits a confirmation outside its cohort is not a canary: 404 as the propose path answers, the cohort refusal as the code.
+  const cohortRefusal = agentOrigin ? agentProposalsCohortRefusal(principal.workspaceKey) : null;
+  if (cohortRefusal) return failure(cohortRefusal, 404);
   const denied = await checkDocuments(actor, documents);
   if (denied) return denied;
   const resuming = row.state === "confirmed";

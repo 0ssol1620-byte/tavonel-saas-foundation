@@ -299,9 +299,10 @@ function realReaderAnswer(path: string, body: Record<string, unknown> | null, js
   const counted = (rows: unknown[]) => new Response(JSON.stringify(rows), { status: 200, headers: { "content-range": `0-${rows.length}/${rows.length}` } });
   switch (table) {
     case "rpc/documents_outside_member_scope": {
-      // The agent's person owns WS: nothing is outside their scope there; any other workspace has no membership.
+      // The agent's person owns WS and AUTH_WS (the real-authorization row's workspace): nothing is outside their scope there;
+      // any other workspace has no membership.
       if (down.access) return failed(down.access);
-      return json(body!.p_workspace_key !== WS || body!.p_user_id !== PERSON);
+      return json(![WS, AUTH_WS].includes(body!.p_workspace_key as string) || body!.p_user_id !== PERSON);
     }
     case "rpc/connector_documents_blocked": {
       if (down.access) return failed(down.access);

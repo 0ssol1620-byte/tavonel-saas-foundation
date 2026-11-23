@@ -65,6 +65,9 @@ export async function POST(request: Request) {
 async function answer(request: Request): Promise<Response> {
   const version = request.headers.get("mcp-protocol-version");
   if (version !== null && !REMOTE_MCP_PROTOCOL_VERSIONS.includes(version)) return rpcError(400, null, -32600, "MCP_PROTOCOL_VERSION_UNSUPPORTED");
+  // The response is JSON only: an Accept that names neither JSON nor a wildcard is refused before authorization and any write.
+  const accept = request.headers.get("accept");
+  if (accept !== null && !["application/json", "*/*"].some((type) => accept.toLowerCase().includes(type))) return rpcError(406, null, -32600, "NOT_ACCEPTABLE");
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > AGENT_MCP_MAX_BODY_BYTES) return rpcError(413, null, -32600, "REQUEST_TOO_LARGE");
   const bytes = await readBounded(request, AGENT_MCP_MAX_BODY_BYTES);
