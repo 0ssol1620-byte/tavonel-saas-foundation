@@ -26,8 +26,8 @@ bound up to **144 documents** (§2.3), and under production's 96 MiB output budg
 regions a document it stopped at **12** (24 refused). *Growing* a World by revision (option A) is accepted
 by Core with new sources (equivalence `passed` every step) but its request carries the whole World twice
 and hits the 4.5 MB bound **sooner** than a fresh compile (at 72 documents vs never below 144 for initial,
-60 regions). A Core defect was found on the way: one entity named on more than 720 and at most 1,440 lines
-of one World turns the compile into an **HTTP 500** (an unbounded CSV field), not a named refusal (§2.4).
+60 regions). A Core defect was found on the way: one entity named on 1,440 or 2,400 lines (measured; threshold
+in (720, 1,440]) of one World turns the compile into an **HTTP 500** (an unbounded CSV field), not a named refusal (§2.4).
 `corpus_reduce`, already in the live Core in shadow (ADR-008 of the Core repository), reproduced the whole
 compile from 12-document parts **20/20** on two 24-document synthetic corpora and **247/247** on its own
 fixtures (§3.2): merging parts does **not** need the uncalibrated identity resolver, because it merges on
@@ -97,7 +97,7 @@ Files: `probe/out-{revision,initial}-{entity,crossdoc,distinct}-r60.json`.
 (Initial rows 84–132 are in the file; each 12 documents add 200,723 ± 1 request bytes and about 15.9 MB of
 response — arithmetic on the file's rows.)
 
-`crossdoc` gives the same shape (revision refused at 72 documents, 5,406,661 B; initial completes to 144,
+`crossdoc` gives the same shape (revision refused at 72 documents, 5,406,692 B; initial completes to 144,
 response 189,346,571 B) with one difference that matters for a customer: **every World is
 `review_required`**. At 12 and 24 documents Core emits contradiction candidates (979 and 759) plus
 `CONTRADICTION_PAIR_BUDGET_EXCEEDED` (45, 57); **from 36 documents on it emits no contradiction pair at all
@@ -141,7 +141,7 @@ Commands: `run.sh` step 3. Files: `probe/out-initial-distinct-r60-n156.json`,
 | b. initial, `crossdoc`, 60 regions, budget **100,663,296** (production env, recorded `LINEAGE.md:31`) | 72 (94,327,759 B) | 84 | `CORE_OUTPUT_TOO_LARGE`: 110,112,747 > 100,663,296 |
 | c. initial, `crossdoc`, **200 regions**, budget 100,663,296 | 12 (57,689,964 B) | 24 | `CORE_OUTPUT_TOO_LARGE`: 104,139,247 > 100,663,296 |
 | d. revision, `crossdoc`, 200 regions, budget 100,663,296 | 24 (99,811,887 B) | 36 | `COMPILE_INPUT_TOO_LARGE`: 7,565,013 > 4,500,000, not sent |
-| e. revision, `distinct` / `crossdoc`, 60 regions (§2.2) | 60 | 72 | `COMPILE_INPUT_TOO_LARGE`: 5,471,240 / 5,406,661 > 4,500,000 |
+| e. revision, `distinct` / `crossdoc`, 60 regions (§2.2) | 60 | 72 | `COMPILE_INPUT_TOO_LARGE`: 5,471,240 / 5,406,692 > 4,500,000 |
 | f. any path, `entity`, 60 regions (§2.4) | 12 | 24 | HTTP 500, `CORE_V2_HTTP_500` |
 
 Not reached in any run: the stored-candidate bound (largest stored artifact 137,076,126 B < 201,326,592),
@@ -168,8 +168,11 @@ answers **500 with a 21-byte body**, and Foundation records `CORE_V2_HTTP_500` �
 failure for what is a deterministic size property of the input, and no `bytes`/`budget`/`counts` for the job
 event. The diagnosis raised the field limit in its own process only, to name the row (`csv_field_diag.py`);
 Core was not edited. Same code at Core integration head `783d8d0` (`compiler.py:1313`, read, not run).
-Reachable inside today's 12-document limit for any World whose one entity label sits on more than 720 and at
-most 1,440 lines (the crossing point between them was not bisected). Not established whether production has
+Measured 500s: one entity on 1,440 lines (this probe) and on 2,400 lines (below); 720 lines passed, so the
+threshold lies in (720, 1,440], not bisected.
+Reached inside today's 12-document limit: the independent reviewer's re-run of an initial compile of 12
+documents at 200 regions (one entity on 2,400 lines) returned HTTP 500
+(`receipts/review-WO-BIG-0/r20/init-entity-r200-12.json`). Not established whether production has
 returned this 500.
 
 ## 3. Merging parts: what Core has (read and ran)
@@ -209,6 +212,14 @@ the 6b3a27bf archive). Files: `probe/reduce/synthetic-6b3a27bf.json`, `probe/red
 | Built-in synthetic fixtures (26 corpora, ≤ 12 documents) | 247 | 247 | detected |
 | `distinct` 24 documents, 1,440 regions, Foundation-built wire documents (`make_corpus.py`) | 10 strategies (Foundation's 12-split, contiguous k=2/3/4/6, interleaved k=2/3, reversed, overlap, singletons) | 10 | detected |
 | `crossdoc` 24 documents, same | 10 | 10 | detected |
+
+Two labels inside the receipt files are not what they read as. `corpus24-6b3a27bf.json` records
+`"corpusKind": "real"` and `"gatePassed": true`: the benchmark writes "real" for every input passed with
+`--corpus` (`product_core_corpus_reduce.py:420`), and the input here is the two synthetic corpora from
+`make_corpus.py`, so that `gatePassed` is split/whole equality on synthetic input, not ADR-008's real-corpus
+gate. `"coreReleaseDigest": "sha256:b3b3…b3"` in both reduce receipts is the benchmark's fixture constant
+(`:54`), not a release; the source that ran is the 6b3a27bf archive. The receipt files are kept unedited
+(their hashes are in §8); `probe/reduce/LABELS.md` says the same beside them.
 
 Synthetic regression input, not evidence about customer documents; ADR-008's rollout gate (≥ 20 real corpora
 plus > 12-document real corpora against an offline whole compile) is **not met** and was not attempted (no
@@ -254,7 +265,7 @@ reduce can verify.
   corpus card, storage and activation of a reduced World.
 - **Ladder:** contract (exists, ADR-008) → shadow (exists process-local; durable shadow needs `corpusPart` and
   stored parts) → benchmark (real corpora, 100%) → canary → rollout → deprecate the per-part list.
-- **Earliest honest range:** 2027-02-01 – 2027-04-30 (needs a consented real corpus set, a Core release with a
+- **Earliest honest range** (planning judgement, not a measurement): 2027-02-01 – 2027-04-30 (needs a consented real corpus set, a Core release with a
   storage-reading reduce, and Foundation storage; each is its own lane).
 - **Unknown:** precision of exact-label merging across companies; reduce run time and memory at 128 documents;
   the delivery-package bytes of a reduced World; where the reduce runs.
@@ -282,7 +293,7 @@ reduce can verify.
   its parts and compare with the §3.2 comparator: whole == reduce(parts) means the one World says nothing the
   parts did not) → benchmark (that comparison on real corpora + the timing run) → canary (one workspace, by
   events) → rollout.
-- **Earliest honest range:** 2026-12-14 – 2027-01-31 (one Core fix release, one Foundation qualification lane).
+- **Earliest honest range** (planning judgement, not a measurement): 2026-12-14 – 2027-01-31 (one Core fix release, one Foundation qualification lane).
 - **Unknown:** production wall time and memory above 12 documents; the founder's 33-page corpus's region and
   byte totals (counted, not copied, by WO-BIG-2 below); exact-label merge precision (as B).
 
@@ -300,7 +311,7 @@ reduce can verify.
 - **Integrity risk:** the reader assumes it is one World; mitigated only by copy and per-result labels.
 - **Ladder:** contract (public DTO naming World per result) → shadow (federated answer computed, not shown) →
   benchmark (answer-faithfulness on a fixed question set, per World) → canary → rollout. No Core change.
-- **Earliest honest range:** 2026-12-07 – 2027-01-15.
+- **Earliest honest range** (planning judgement, not a measurement): 2026-12-07 – 2027-01-15.
 - **Unknown:** answer quality when evidence comes from several Worlds; metering wording (founder-owned copy).
 
 ## 5. Dispositions
