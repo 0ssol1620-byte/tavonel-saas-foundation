@@ -73,6 +73,64 @@ export async function recordFoundationReviewDecision(input: ReviewDecisionInput)
   };
 }
 
+/*
+  A correction recorded only while its base is the correction leaf (agent proposals, WO-AN-4 §4.2).
+
+  `record_foundation_review_patch_if_leaf` takes an advisory lock on (workspace, collection, base), refuses
+  when another correction of the base is already recorded, and answers `replayed` when this exact resulting
+  digest is: the lineage claim and its check are one transaction. The human route above is unchanged.
+*/
+export async function recordFoundationReviewPatchIfLeaf(input: ReviewDecisionInput & { action: "edit"; patch: NonNullable<ReviewDecisionInput["patch"]> }):
+  Promise<{ ok: true; receipt: { decisionId: string; recordedAt: string; replayed: boolean } } | { ok: false; code: string }> {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false, code: "REVIEW_STORE_NOT_CONFIGURED" };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/record_foundation_review_patch_if_leaf", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: input.workspaceKey, p_collection_id: input.collectionId, p_manifest_digest: input.manifestDigest,
+        p_evidence_id: input.evidenceId, p_source_id: input.sourceId, p_source_version_id: input.sourceVersionId,
+        p_page_number: input.pageNumber, p_bbox_1000: input.bbox1000, p_reason: input.reason, p_actor_user_id: input.actorUserId,
+        p_patch_object_id: input.patch.objectId, p_patch_before: input.patch.before, p_patch_after: input.patch.after,
+        p_resulting_manifest_digest: input.patch.resultingManifestDigest,
+      }),
+    });
+  } catch {
+    return { ok: false, code: "REVIEW_STORE_WRITE_FAILED" };
+  }
+  const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+  if (!response.ok) {
+    return { ok: false, code: typeof body?.message === "string" && body.message.includes("review_base_not_head") ? "REVIEW_BASE_NOT_HEAD" : "REVIEW_STORE_WRITE_FAILED" };
+  }
+  if (!body || typeof body.decisionId !== "string" || typeof body.recordedAt !== "string" || typeof body.replayed !== "boolean") {
+    return { ok: false, code: "REVIEW_RECEIPT_INVALID" };
+  }
+  return { ok: true, receipt: { decisionId: body.decisionId, recordedAt: body.recordedAt, replayed: body.replayed } };
+}
+
+/**
+ * Whether a correction of this candidate is recorded: a decision on it naming a resulting digest. A candidate
+ * without one is the correction leaf of its lineage (§4.3). Storage listing order is never consulted.
+ */
+export async function hasCorrectionChild(workspaceKey: string, collectionId: string, manifestDigest: string):
+  Promise<{ ok: true; child: boolean } | { ok: false; code: string }> {
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false, code: "REVIEW_STORE_NOT_CONFIGURED" };
+  const query = new URLSearchParams({
+    workspace_key: `eq.${workspaceKey}`, collection_id: `eq.${collectionId}`, manifest_digest: `eq.${manifestDigest}`,
+    resulting_manifest_digest: "not.is.null", select: "decision_id", limit: "1",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_review_decisions?${query}`);
+    if (!response.ok) return { ok: false, code: "REVIEW_STORE_READ_FAILED" };
+    const rows = await response.json().catch(() => null) as unknown;
+    return Array.isArray(rows) ? { ok: true, child: rows.length > 0 } : { ok: false, code: "REVIEW_STORE_READ_FAILED" };
+  } catch {
+    return { ok: false, code: "REVIEW_STORE_READ_FAILED" };
+  }
+}
+
 export type ReviewDecisionRow = {
   decisionId: string;
   collectionId: string;

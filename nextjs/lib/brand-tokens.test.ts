@@ -73,6 +73,8 @@ const PUBLIC_SURFACE_SHEETS = [
   "components/public-package-proof.module.css",
   "components/marketing-consent.module.css",
   "components/signed-product-demo.module.css",
+  /* V34 (D33 §4 #7): the token sheet, the shell and every shared piece and instrument. */
+  ...files("components/v34", (path) => path.endsWith(".module.css")),
 ];
 
 /* The accent and state names a surface used to re-declare with a hex of its own. */

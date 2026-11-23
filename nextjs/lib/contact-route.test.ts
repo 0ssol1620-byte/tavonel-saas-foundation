@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "../app/api/contact/route";
+import { planIntentFrom } from "../components/contact-form";
+import { BILLING_OFFERS } from "./billing-catalog";
 
 const valid = {
   name: "Tavonel Buyer",
@@ -76,18 +78,69 @@ describe("contact route", () => {
     expect(payload.html).toContain(">ko</td>");
   });
 
-  it("carries a selected plan into the inquiry and rejects invented plan names", async () => {
-    vi.stubEnv("AKC_RESEND_API_KEY", "secret-test-key");
-    vi.stubEnv("AKC_CONTACT_FROM", "TAVONEL <no-reply@tavonel.com>");
-    vi.stubEnv("AKC_CONTACT_TO", "hello@tavonel.com");
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+  /*
+    Catalog v2 (WO-CAT-2 L3). A Request access link names its plan by label, `/contact?plan=<label>`, and the inquiry
+    stores exactly that label: the form preselects it and the route delivers it. The 2026-11-10 mapping (Developer to
+    "Starter", Team to "Pro") recorded a different plan than the one asked about, and Personal and Business were dropped.
+    The labels come from the catalog, so every v2 label is driven through, not a sample of them.
+  */
+  describe("plan intent: the label a Request access link names is the label stored", () => {
+    const deliver = () => {
+      vi.stubEnv("AKC_RESEND_API_KEY", "secret-test-key");
+      vi.stubEnv("AKC_CONTACT_FROM", "TAVONEL <no-reply@tavonel.com>");
+      vi.stubEnv("AKC_CONTACT_TO", "hello@tavonel.com");
+      return vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+    };
+    /*
+      What the form sends for `?plan=<value>`, and what the route then delivers. Each case has its own address and its
+      own email domain, so the limiter (five per address and per domain) never counts another case's submission.
+    */
+    async function stored(value: string | null, caseId: string) {
+      const fetchMock = deliver();
+      const plan = planIntentFrom(value);
+      const response = await POST(request({ ...valid, email: `buyer@plan-${caseId}.test`, plan }, "http://localhost:3000", `198.18.${caseId}`));
+      expect(response.status, String(value)).toBe(202);
+      const payload = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as Record<string, string>;
+      return { plan, text: payload.text, html: payload.html };
+    }
 
-    expect((await POST(request({ ...valid, plan: "Developer" }))).status).toBe(202);
-    const [, options] = fetchMock.mock.calls[0]!;
-    const payload = JSON.parse(String(options?.body)) as Record<string, string>;
-    expect(payload.text).toContain("Plan: Developer");
-    expect(payload.html).toContain(">Developer</td>");
-    expect((await POST(request({ ...valid, plan: "Administrator" }))).status).toBe(400);
+    const labels = [...Object.values(BILLING_OFFERS).filter((offer) => offer.status === "v2").map((offer) => offer.label), "Enterprise"];
+    it("covers every v2 plan label and Enterprise", () => {
+      expect(labels).toEqual(["Personal", "Developer", "Team", "Business", "Enterprise"]);
+    });
+
+    labels.forEach((label, index) => {
+      it(`?plan=${label} is stored as ${label}`, async () => {
+        const { plan, text, html } = await stored(label, `0.${index + 1}`);
+        expect(plan).toBe(label);
+        expect(text).toContain(`Plan: ${label}\n`);
+        expect(html).toContain(`>${label}</td>`);
+      });
+    });
+
+    // Not plan names any more: the form names no plan, and nothing is stored as one.
+    ["Starter", "Pro"].forEach((retired, index) => {
+      it(`?plan=${retired} preselects nothing and is stored as no plan`, async () => {
+        const { plan, text } = await stored(retired, `1.${index + 1}`);
+        expect(plan).toBe("");
+        expect(text).not.toContain("Plan:");
+        expect(text).not.toMatch(/Starter|\bPro\b/);
+      });
+    });
+
+    it("refuses a plan name the form never sends, old or invented, rather than store it", async () => {
+      deliver();
+      for (const [index, plan] of ["Starter", "Pro", "Administrator", "personal", "Developer (2026-09 plan)"].entries()) {
+        const response = await POST(request({ ...valid, email: `buyer@plan-2-${index}.test`, plan }, "http://localhost:3000", `198.18.2.${index + 1}`));
+        expect(response.status, plan).toBe(400);
+      }
+    });
+
+    it("the form maps only exact labels: case, padding and other parameters name no plan", () => {
+      for (const value of [null, "", "personal", " Team", "PRO", "KQU", "Developer (2026-09 plan)", "Enterprise\n"]) {
+        expect(planIntentFrom(value), String(value)).toBe("");
+      }
+    });
   });
 
   it("rejects cross-origin submissions", async () => {

@@ -9,7 +9,14 @@ const SIGNATURE_SCOPE = "tavonel.signed_export_manifest.v1" as const;
 export const COMPILE_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_compile_receipt.v1" as const;
 // W1-A5: answers are signed by the same key under a third scope.
 export const ANSWER_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_answer_receipt.v1" as const;
-export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE | typeof ANSWER_RECEIPT_SIGNATURE_SCOPE;
+// D31/D29: capability manifests and world releases are v2-only. verifyExportSignature accepts a v1 signature
+// whatever scope is expected, so new modules call isScopedSignature first.
+export const CAPABILITY_MANIFEST_SIGNATURE_SCOPE = "tavonel.signed_capability_manifest.v1" as const;
+export const WORLD_RELEASE_SIGNATURE_SCOPE = "tavonel.signed_world_release.v1" as const;
+// WO-AN-2: the receipt of an agent-originated proposal a person confirmed (lib/action-receipt-signing.ts).
+export const ACTION_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_action_receipt.v1" as const;
+export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE | typeof ANSWER_RECEIPT_SIGNATURE_SCOPE
+  | typeof CAPABILITY_MANIFEST_SIGNATURE_SCOPE | typeof WORLD_RELEASE_SIGNATURE_SCOPE | typeof ACTION_RECEIPT_SIGNATURE_SCOPE;
 
 export type ExportSignatureV1 = {
   schemaVersion: "tavonel.export_signature.v1";
@@ -256,6 +263,10 @@ function verifyBytes(payload: Uint8Array, signature: ExportSignature, publicKeyS
   } catch {
     return false;
   }
+}
+
+export function isScopedSignature(signature: ExportSignature, scope: SignatureScope) {
+  return signature.schemaVersion === "tavonel.export_signature.v2" && signature.signatureScope === scope;
 }
 
 export function verifyExportSignature(

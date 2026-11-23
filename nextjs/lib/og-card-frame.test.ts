@@ -1,4 +1,4 @@
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -24,12 +24,11 @@ import { BRAND_LINE } from "./site-navigation";
 */
 const FRAME = resolve(import.meta.dirname, "../public/og/evidence-frame.png");
 
-describe("Korean pricing fallback", () => {
-  it("reuses the registered English card and renders a valid PNG", async () => {
+describe("Pricing card", () => {
+  it("renders a valid PNG, and /ko/pricing has no card of its own (it redirects with a 308)", async () => {
     const english = await import("../app/pricing/opengraph-image");
-    const korean = await import("../app/ko/pricing/opengraph-image");
-    expect(korean.default).toBe(english.default);
-    const bytes = Buffer.from(await korean.default().arrayBuffer());
+    expect(existsSync(resolve(import.meta.dirname, "../app/ko"))).toBe(false);
+    const bytes = Buffer.from(await english.default().arrayBuffer());
     expect(pngHeader(bytes)).toEqual({ width: 1200, height: 630 });
     expect(bytes.length).toBeGreaterThan(1000);
   });

@@ -11,6 +11,9 @@
  * Not linked from anywhere. It exists so the stage can be inspected without an account.
  */
 
+// It renders the workspace's `.one-path-workspace .workspace-compile-block`, styled by these (WO-CI-16d).
+import "@/app/workspace-final-polish.css";
+import "@/app/workspace-no1.css";
 import CompileStage from "@/components/compile-stage";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import type { DocumentListItem } from "@/lib/immutable-keys";

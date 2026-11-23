@@ -1,0 +1,294 @@
+/*
+  Platform page only. Colours come from --v34-* tokens and nothing else. The bands themselves
+  (Hero, Section, FinalCta) set their own surface, so a rule here reads --v34-fg* from the band it
+  sits in. Dark art colours are stated on the figure's own panel, which is always the dark ground.
+  No animation: nothing on this page moves.
+*/
+
+/* ---- illustration ----------------------------------------------------------------------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.page {
+  fill: var(--v34-dark);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.line {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 2;
+}
+
+.region {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.head {
+  fill: var(--v34-on-dark-muted);
+}
+
+.headOn {
+  fill: var(--v34-lime);
+}
+
+.block {
+  fill: var(--v34-step-bg);
+  stroke: var(--v34-on-dark-muted);
+  stroke-width: 1.5;
+}
+
+.bar {
+  fill: var(--v34-rule-dark);
+}
+
+.barOn {
+  fill: var(--v34-lime);
+}
+
+.node {
+  fill: var(--v34-on-dark-muted);
+}
+
+.nodeOn {
+  fill: var(--v34-lime);
+}
+
+.evidence {
+  fill: none;
+  stroke: var(--v34-lime);
+  stroke-width: 2;
+  stroke-dasharray: 7 6;
+}
+
+.label {
+  fill: var(--v34-on-dark);
+  font-family: var(--v34-font);
+  font-size: 22px;
+}
+
+/* ---- lifecycle -------------------------------------------------------------------------- */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 2px solid var(--v34-fg);
+}
+
+.stepKicker {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.stepText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- what stays attached ---------------------------------------------------------------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--v34-fg-rule);
+  border-bottom: 1px solid var(--v34-fg-rule);
+}
+
+.fact {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 24px 22px 26px 24px;
+  border-left: 1px solid var(--v34-fg-rule);
+}
+
+.fact:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.factTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.factText {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.55;
+}
+
+/* ---- two-column statements -------------------------------------------------------------- */
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px clamp(30px, 8vw, 110px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pairItem {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pairTitle {
+  margin: 0;
+  font-size: var(--v34-h3);
+  font-weight: 500;
+  letter-spacing: var(--v34-track-h2);
+  line-height: 1.15;
+}
+
+.pairText {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--v34-fg-muted);
+  line-height: 1.6;
+}
+
+/* The lifecycle's link to the page that walks the method through. */
+.method {
+  margin: 20px 0 0;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.textLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.textLink:focus-visible,
+.tableLink:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+/* ---- tables ----------------------------------------------------------------------------- */
+
+.tableLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tableLink:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.path {
+  font-family: var(--v34-mono);
+  font-size: var(--v34-small);
+  overflow-wrap: anywhere;
+}
+
+/* ---- narrower screens ------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fact:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .fact:nth-child(n + 3) {
+    border-top: 1px solid var(--v34-fg-rule);
+  }
+}
+
+@media (max-width: 900px) {
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .steps,
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fact {
+    padding: 20px 0;
+    border-left: 0;
+    border-top: 1px solid var(--v34-fg-rule);
+  }
+
+  .fact:first-child {
+    border-top: 0;
+  }
+}

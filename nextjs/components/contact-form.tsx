@@ -7,7 +7,18 @@ import { CONTACT_EMAIL, contactErrorCopy, contactText, type ContactLocale } from
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 
 type State = "idle" | "sending" | "sent" | "error";
-type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
+/*
+  Catalog v2 (PB-2026-11-V22): the plan a Request access link names, stored as received. The same list is
+  `app/api/contact/route.ts`'s allow-list. "Starter" and "Pro" (the 2026-11-10 names) are no longer plan
+  names, so a link still carrying one names no plan rather than being mapped to a plan it never meant.
+*/
+const PLAN_INTENTS = ["Personal", "Developer", "Team", "Business", "Enterprise"] as const;
+export type PlanIntent = (typeof PLAN_INTENTS)[number] | "";
+
+/** The plan intent a `?plan=` value carries: one of the plan names exactly, otherwise none. */
+export function planIntentFrom(value: string | null): PlanIntent {
+  return (PLAN_INTENTS as readonly (string | null)[]).includes(value) ? value as PlanIntent : "";
+}
 
 export default function ContactForm({ locale = "en" }: { locale?: ContactLocale }) {
   const [state, setState] = useState<State>("idle");
@@ -21,8 +32,7 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
   const terminal = state === "error" && !failure.retry;
 
   useEffect(() => {
-    const plan = new URLSearchParams(window.location.search).get("plan");
-    setPlanIntent(plan === "Developer" || plan === "Team" || plan === "Enterprise" ? plan : "");
+    setPlanIntent(planIntentFrom(new URLSearchParams(window.location.search).get("plan")));
   }, []);
 
   /*
@@ -112,7 +122,7 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         inside the label beside the field name, and the word is spelled out for a screen reader
         rather than left as a bare asterisk.
       */}
-      <p className="fine">{contactText("Three fields are needed for a reply. They are marked Required.", locale)}</p>
+      <p className="fine">{contactText("The fields marked Required are needed for a reply.", locale)}</p>
       {planIntent ? (
         <p className="fine" data-plan-intent>{locale === "ko" ? `${planIntent} 요금제 문의` : `Inquiry about the ${planIntent} plan`}</p>
       ) : null}
@@ -202,12 +212,13 @@ export default function ContactForm({ locale = "en" }: { locale?: ContactLocale 
         >
           {contactText(state === "sending" ? "Sending..." : "Send inquiry", locale)}
         </button>
-        <span>
+        {/* A sentence with its link inline, so it is a paragraph: the link is a target inside running text (2.5.8). */}
+        <p>
           {contactText("We use this information to answer your inquiry.", locale)}{" "}
           <Link href="/privacy" hrefLang={locale === "ko" ? "en" : undefined}>
             {locale === "ko" ? "개인정보 처리방침 (영문)" : "Privacy notice"}
           </Link>
-        </span>
+        </p>
       </div>
       <div className="contact-status" aria-live="polite">
         {state === "sent" && <p data-state="sent">{contactText("Received. We will reply from an official TAVONEL address.", locale)}</p>}
@@ -244,7 +255,7 @@ function collect(data: FormData) {
   read as one string and the field looked as if it were called that. The marker carries its own
   class now -- a separator and the eyebrow tone, sentence case against the label's caps -- so it
   is visibly a qualifier. It stays a word inside the label element, which is what keeps it in the
-  accessible name and what the sentence above the form promises ("They are marked Required").
+  accessible name and what the sentence above the form promises ("The fields marked Required").
 */
 function RequiredMark({ label = "Required" }: { label?: string }) {
   return <small className="contact-required">{label}</small>;

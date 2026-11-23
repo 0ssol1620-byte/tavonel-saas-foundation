@@ -98,18 +98,32 @@ export const activationPolicy = {
     in the campaign ledger): the launch is staged and the workspace canary stays until after it, so
     the sentence promises no open self-serve. Review R2: there is no list, order or notification,
     so it says what happens -- signing in creates the workspace, and the workspace states whether
-    it is open ("awaiting release" outside the canary, app/workspace/page.tsx). Developer is bought
-    online once a workspace is open, Team and Enterprise are arranged with us (`saleChannel` in the
-    billing catalog). It is still rendered verbatim wherever the gate was stated, and
+    it is open ("awaiting release" outside the canary, app/workspace/page.tsx). Starter is bought online
+    once a workspace is open, Pro and Enterprise are arranged with us (`saleChannel` in the
+    billing catalog; Pro stays "contact", CAT-D4). It is still rendered verbatim wherever the gate was stated, and
     `KO_CHROME.customerDataGate` is its literal Korean.
 
     ADR 0008, 2026-11-09: the workspace canary is lifted (TAVONEL_PROCESSING_ROLLOUT=general), so the
     "opening in stages" sentence is gone. What opens a workspace is its owner accepting the
     processing terms; the release row and the grant still decide, so it still says the workspace
     shows whether it is open.
+
+    WO-REL-1 (ledger L613 item 1). "Once it is open, the Starter plan can be bought online. Pro and Enterprise are
+    arranged with us rather than enabled by a plan purchase." named two plans the V22 price book retired and said one
+    of them could be bought, whatever `planAvailability` answered -- false on every deployment where the V22 prices are
+    unset. This string is a constant rendered on prerendered pages too, so it cannot follow the price env. It now
+    names no plan and says where the answer is: /pricing renders each plan from `planAvailability`, true in both states.
   */
-  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." },
+  customerData: { enabled: true, reason: "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open. Once it is open, the pricing page shows for each plan whether it can be bought online or is arranged with us." },
 } as const;
+
+/*
+  The customerData reason without its plan sentence. The V34 route bodies name no plan outside
+  /pricing, so /capabilities and /contact print this half; every other surface prints the whole
+  reason. Both stay literal (the guide quotes the whole sentence and checks it against the source);
+  lib/v34/route-bodies.test.ts holds that the reason still begins with this half.
+*/
+export const customerDataState = "Signing in creates your workspace, and uploading and compiling your own sources open for it once its owner accepts the processing terms. Your workspace shows whether it is open.";
 
 export type ActivationCapability = keyof typeof activationPolicy;
 export function allCapabilitiesFailClosed() { return Object.values(activationPolicy).every(capability => capability.enabled === false); }

@@ -21,7 +21,8 @@ import {
   unverifiable signature is treated as no signature.
 */
 
-export const COMPILE_RECEIPT_SCHEMA = "tavonel.compile_receipt.v1" as const;
+export const COMPILE_RECEIPT_SCHEMA_V1 = "tavonel.compile_receipt.v1" as const;
+export const COMPILE_RECEIPT_SCHEMA = "tavonel.compile_receipt.v2" as const;
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -29,8 +30,8 @@ const VERSION_KEY = /^[a-f0-9]{64}$/;
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const MAX_DOCUMENTS = 128;
 
-export type CompileReceiptPayload = {
-  schemaVersion: typeof COMPILE_RECEIPT_SCHEMA;
+export type CompileReceiptV1Payload = {
+  schemaVersion: typeof COMPILE_RECEIPT_SCHEMA_V1;
   tenantId: string;
   workspaceId: string;
   collectionId: string;
@@ -44,6 +45,16 @@ export type CompileReceiptPayload = {
   sourceDocuments: Array<{ documentId: string; versionKey: string }>;
   compiledAt: string;
 };
+
+/** v2 binds what the compile ran against: source scope, the actor's ACL epoch (null when the caller had none), Core's response schema and release. */
+export type CompileReceiptV2Payload = Omit<CompileReceiptV1Payload, "schemaVersion"> & {
+  schemaVersion: typeof COMPILE_RECEIPT_SCHEMA;
+  sourceScope: "direct_upload" | "connector";
+  authorizationEpoch: number | null;
+  coreResponseSchema: string;
+  coreReleaseDigest: string;
+};
+export type CompileReceiptPayload = CompileReceiptV1Payload | CompileReceiptV2Payload;
 
 export type SignedCompileReceipt = {
   payloadJson: string;
@@ -63,8 +74,16 @@ function normalizePayload(value: unknown): CompileReceiptPayload | null {
   const input = value as Record<string, unknown>;
   const ids = ["tenantId", "workspaceId", "collectionId", "lifecycle", "coreRuntime", "coreRequestId"] as const;
   const digests = ["manifestDigest", "coreOutputSha256", "customerDataGateReceiptSha256"] as const;
+  const v2 = input.schemaVersion === COMPILE_RECEIPT_SCHEMA;
   if (
-    input.schemaVersion !== COMPILE_RECEIPT_SCHEMA ||
+    (!v2 && input.schemaVersion !== COMPILE_RECEIPT_SCHEMA_V1) ||
+    (v2 && (
+      (input.sourceScope !== "direct_upload" && input.sourceScope !== "connector") ||
+      (input.authorizationEpoch !== null &&
+        (typeof input.authorizationEpoch !== "number" || !Number.isSafeInteger(input.authorizationEpoch) || input.authorizationEpoch < 0)) ||
+      typeof input.coreResponseSchema !== "string" || !IDENTIFIER.test(input.coreResponseSchema) ||
+      typeof input.coreReleaseDigest !== "string" || !SHA256.test(input.coreReleaseDigest)
+    )) ||
     ids.some((key) => typeof input[key] !== "string" || !IDENTIFIER.test(input[key] as string)) ||
     digests.some((key) => typeof input[key] !== "string" || !SHA256.test(input[key] as string)) ||
     (input.worldStateId !== null && (typeof input.worldStateId !== "string" || !IDENTIFIER.test(input.worldStateId))) ||
@@ -79,8 +98,7 @@ function normalizePayload(value: unknown): CompileReceiptPayload | null {
       typeof row.versionKey !== "string" || !VERSION_KEY.test(row.versionKey)) return null;
     sourceDocuments.push({ documentId: row.documentId, versionKey: row.versionKey });
   }
-  return {
-    schemaVersion: COMPILE_RECEIPT_SCHEMA,
+  const base = {
     tenantId: input.tenantId as string,
     workspaceId: input.workspaceId as string,
     collectionId: input.collectionId as string,
@@ -94,6 +112,14 @@ function normalizePayload(value: unknown): CompileReceiptPayload | null {
     sourceDocuments,
     compiledAt: input.compiledAt as string,
   };
+  if (!v2) return { schemaVersion: COMPILE_RECEIPT_SCHEMA_V1, ...base };
+  return {
+    schemaVersion: COMPILE_RECEIPT_SCHEMA, ...base,
+    sourceScope: input.sourceScope as "direct_upload" | "connector",
+    authorizationEpoch: input.authorizationEpoch as number | null,
+    coreResponseSchema: input.coreResponseSchema as string,
+    coreReleaseDigest: input.coreReleaseDigest as string,
+  };
 }
 
 // The day must spell itself back: `2026-02-30` parses, and means March.
@@ -105,15 +131,15 @@ function isInstant(value: unknown) {
 
 export function signCompileReceipt(
   signer: ExportSigner,
-  input: Omit<CompileReceiptPayload, "schemaVersion">,
-): { receipt: SignedCompileReceipt; payload: CompileReceiptPayload } | null {
+  input: Omit<CompileReceiptV2Payload, "schemaVersion">,
+): { receipt: SignedCompileReceipt; payload: CompileReceiptV2Payload } | null {
   const payload = normalizePayload({ ...input, schemaVersion: COMPILE_RECEIPT_SCHEMA });
   if (!payload) return null;
   const payloadJson = JSON.stringify(payload);
   const signature = signer.signPayload(Buffer.from(payloadJson, "utf8"));
   if (signature.schemaVersion !== "tavonel.export_signature.v2" ||
     signature.signatureScope !== COMPILE_RECEIPT_SIGNATURE_SCOPE) return null;
-  return { receipt: { payloadJson, signature }, payload };
+  return { receipt: { payloadJson, signature }, payload: payload as CompileReceiptV2Payload };
 }
 
 export type CompileReceiptVerification =
@@ -166,5 +192,11 @@ export function compileReceiptAuditDetails(receipt: SignedCompileReceipt, payloa
     customerDataGateReceiptSha256: payload.customerDataGateReceiptSha256,
     documentCount: payload.sourceDocuments.length,
     compiledAt: payload.compiledAt,
+    ...(payload.schemaVersion === COMPILE_RECEIPT_SCHEMA ? {
+      sourceScope: payload.sourceScope,
+      authorizationEpoch: payload.authorizationEpoch,
+      coreResponseSchema: payload.coreResponseSchema,
+      coreReleaseDigest: payload.coreReleaseDigest,
+    } : {}),
   };
 }

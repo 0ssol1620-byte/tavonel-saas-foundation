@@ -43,8 +43,13 @@ describe("design token contract", () => {
     for (const line of code.split("\n").filter((l) => l.startsWith("@import"))) {
       expect(line, "an @import qualifier the build turns into a dead @media block").not.toMatch(/layer\(|supports\(/);
     }
+    expect(code, "product-polish.css is still imported").toContain('@import "./product-polish.css";');
+    // WO-CI-16d: the two workspace sheets left the root for the routes that render their classes
+    // (lib/landing-v2-tokens.test.ts "route-scoped global sheets" pins where they are imported now).
+    for (const sheet of ["workspace-final-polish.css", "workspace-no1.css"]) {
+      expect(code, `${sheet} is back in the root`).not.toContain(sheet);
+    }
     for (const sheet of ["product-polish.css", "workspace-final-polish.css", "workspace-no1.css"]) {
-      expect(code, `${sheet} is still imported`).toContain(`@import "./${sheet}";`);
       const body = readFileSync(new URL(`../app/${sheet}`, import.meta.url), "utf8")
         .replace(/\r\n/g, "\n")
         .replace(/\/\*[\s\S]*?\*\//g, "")

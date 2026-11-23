@@ -1765,7 +1765,7 @@
   .contact-field textarea:focus { border-color: var(--verified-dim); background: var(--g2); }
   .contact-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
   .contact-submit { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .contact-submit span,
+  .contact-submit p,
   .contact-status p { margin: 0; font-family: var(--f-sans); font-size: var(--t-1); color: var(--text-lo); }
   .contact-status { min-height: 22px; }
   .contact-status p[data-state="sent"] { color: var(--verified); }
@@ -3403,7 +3403,10 @@
          second after the motion it was pacing is already gone. */
       animation-delay: 0ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      /* 0s, not 0.01ms: a 0.01ms transition still runs for a frame, and a child inheriting a colour starts its own
+         a frame after its parent's has ended, so a label lags its fill by one frame (WO-CI-31: the /world camera
+         control, 1.08:1 for one frame on every press in Chromium and WebKit). Nothing listens for transitionend. */
+      transition-duration: 0s !important;
       /* Staggered delays would otherwise hold the end state back by half a second after the
          motion they were pacing is gone. */
       transition-delay: 0ms !important;

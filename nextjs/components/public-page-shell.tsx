@@ -6,6 +6,6 @@ import { PublicSitePage, type PageTemplate } from "@/components/public-site-chro
  * It used to carry its own header — same seven links as the landing page but a different
  * button — which is how "Try TAVONEL" and "Sign in" ended up on facing pages of the same site.
  */
-export function PublicPageShell({ children, template }: { children: React.ReactNode; template: PageTemplate }) {
-  return <PublicSitePage template={template}>{children}</PublicSitePage>;
+export function PublicPageShell({ children, template, path }: { children: React.ReactNode; template: PageTemplate; path?: string }) {
+  return <PublicSitePage template={template} path={path}>{children}</PublicSitePage>;
 }

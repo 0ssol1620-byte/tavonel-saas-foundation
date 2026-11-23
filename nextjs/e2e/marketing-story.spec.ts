@@ -1,23 +1,31 @@
 import { test, expect } from "@playwright/test";
+import { HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON } from "./support/held-feature";
 
 test("How it works explains a pipeline rather than repeating the Product World", async ({ page }) => {
+  // V34 (D33 1.1): /how-it-works answers 308 to /methods, which owns the pipeline.
   await page.goto("/how-it-works");
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/how-it-works");
-  const process = page.getByRole("list", { name: "The compilation process" });
-  await expect(process.locator("li")).toHaveCount(6);
-  await expect(process).toContainText("full-corpus compiles");
-  await expect(page.getByRole("heading", { name: "From source files to a versioned World." })).toBeVisible();
-  await expect(page.locator('.explore-frame')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/methods$/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://tavonel.com/methods");
+  const process = page.locator("main ol").filter({ has: page.getByRole("heading", { level: 3 }) }).first();
+  await expect(process.locator(":scope > li")).toHaveCount(6);
+  // Lead decision 13 (WO-CI-24): the soft "full-corpus compiles" line is retired; the V34 /methods
+  // stages have no counterpart.
+  await expect(page.getByRole("heading", { name: "From a source file to the next version." })).toBeVisible();
+  await expect(page.locator('[data-visual-world="explore"]')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
 test("Product offers output uses and a distinct process destination", async ({ page }) => {
+  // V34 (D33 1.1): /product answers 308 to /platform.
   await page.goto("/product");
-  await expect(page.getByRole("heading", { name: "Your sources. A World you can inspect." })).toBeVisible();
-  for (const name of ["Inspect the evidence", "Keep versions readable", "Give your AI the output"]) {
-    await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(1);
+  await expect(page).toHaveURL(/\/platform$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  // The three output uses are the page's own links into evidence, changes and the AI connection.
+  for (const href of ["/evidence", "/changes", "/connect"]) {
+    await expect(page.locator('main a[href="' + href + '"]').first(), href + " is offered from the body").toBeVisible();
   }
-  await expect(page.getByRole("link", { name: "Follow the compilation process" })).toHaveAttribute("href", "/how-it-works");
+  // The process has its own destination (/how-it-works, now /methods); this page links to it, and does not repeat it.
+  await expect(page.locator('main a[href="/methods"]').first()).toBeVisible();
   await expect(page.getByRole("list", { name: "The compilation process" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
@@ -35,6 +43,7 @@ test("Home leads with the product while the historical result keeps its conditio
 
 // New light-surface text must not inherit the old dark-surface palette.
 test("four-stage film controls and captions retain readable contrast", async ({ page }) => {
+  test.skip(!HOME_MOUNTS_LANDING_V2, HOME_NOT_MOUNTED_REASON);
   await page.goto("/");
   // FINAL-SPEC 2026-10-26 (D-7): Home prints no film caption row (the stage sentence is the poster's alt), so the
   // film's text on the page is its controls and the disclosure; both are still held to 4.5:1 below.

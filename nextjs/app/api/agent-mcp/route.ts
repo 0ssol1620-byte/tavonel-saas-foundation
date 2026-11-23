@@ -1,0 +1,108 @@
+import { NextResponse } from "next/server";
+import { AGENT_MCP_MAX_BODY_BYTES, agentProposalsCohortRefusal, agentProposalsEnabled } from "@/lib/agent-access";
+import { withinAgentMcpDispatch } from "@/lib/agent-mcp-dispatch";
+import { agentTool, agentToolList, callAgentTool } from "@/lib/agent-mcp-tools";
+import { authorizeAgentRequest } from "@/lib/developer-auth";
+import { REMOTE_MCP_PROTOCOL_VERSIONS } from "@/lib/remote-mcp";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+/*
+  POST /api/agent-mcp (workorders/agent-native.md §2.3, §3; WO-AN-5). JSON-RPC 2.0, one message per POST, one JSON
+  response. An agent credential (tvnl_agt_) works here and nowhere else; every request, initialize included,
+  needs it. The nine tools read or propose; none decides.
+
+  Order: flag off, or a cohort that admits nobody -> 404 before the body is read; body bound -> 413; JSON-RPC
+  shape; authorizeAgentRequest with the tool's scope inside the agent dispatch; the caller's workspace outside
+  the cohort -> 404; then the method. Every failure leaves as a constant code: an exception anywhere is
+  UNAVAILABLE, never its text. Telemetry is {event, tool, code} only.
+*/
+
+const NO_STORE = { "Cache-Control": "no-store" };
+const notFound = () => new NextResponse(null, { status: 404, headers: NO_STORE });
+
+function rpcError(status: number, id: unknown, code: number, message: string) {
+  return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status, headers: NO_STORE });
+}
+const rpcResult = (id: unknown, result: unknown) => NextResponse.json({ jsonrpc: "2.0", id, result }, { headers: NO_STORE });
+
+function telemetry(tool: string, code: string) {
+  console.info(JSON.stringify({ event: "agent_mcp_tool", tool, code }));
+}
+
+export async function POST(request: Request) {
+  if (!agentProposalsEnabled() || agentProposalsCohortRefusal("") === "AGENT_COHORT_CONFIG_INVALID") return notFound();
+  try {
+    return await answer(request);
+  } catch {
+    return rpcError(503, null, -32603, "UNAVAILABLE");
+  }
+}
+
+async function answer(request: Request): Promise<Response> {
+  const version = request.headers.get("mcp-protocol-version");
+  if (version !== null && !REMOTE_MCP_PROTOCOL_VERSIONS.includes(version)) return rpcError(400, null, -32600, "MCP_PROTOCOL_VERSION_UNSUPPORTED");
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > AGENT_MCP_MAX_BODY_BYTES) return rpcError(413, null, -32600, "REQUEST_TOO_LARGE");
+  const text = await request.text();
+  if (Buffer.byteLength(text, "utf8") > AGENT_MCP_MAX_BODY_BYTES) return rpcError(413, null, -32600, "REQUEST_TOO_LARGE");
+  let message: unknown;
+  try {
+    message = JSON.parse(text);
+  } catch {
+    return rpcError(400, null, -32700, "Parse error");
+  }
+  if (!message || typeof message !== "object" || Array.isArray(message) || (message as { jsonrpc?: unknown }).jsonrpc !== "2.0") {
+    return rpcError(400, null, -32600, "Invalid Request");
+  }
+  const { id, method, params } = message as { id?: unknown; method?: unknown; params?: unknown };
+  const rpcParams = params !== null && typeof params === "object" && !Array.isArray(params) ? params as Record<string, unknown> : {};
+  const calling = method === "tools/call";
+  const tool = calling ? agentTool(rpcParams.name) : null;
+  const toolLabel = tool?.name ?? "unknown";
+
+  // Every request needs the agent credential; a propose tool spends a unit of agent:propose, anything else agent:read.
+  const auth = await withinAgentMcpDispatch(() => authorizeAgentRequest(request, tool?.scope ?? "agent:read"));
+  if (!auth.ok) {
+    const code = auth.code === "API_RATE_LIMITED" ? "RATE_LIMITED" : auth.code;
+    if (calling) telemetry(toolLabel, code);
+    return rpcError(auth.status, id, -32001, code);
+  }
+  // The cohort is re-read on every call, so removing a workspace stops its credentials at once.
+  if (agentProposalsCohortRefusal(auth.principal.workspaceKey) !== null) return notFound();
+  // A notification or a response: accepted, nothing to answer.
+  if (typeof method !== "string" || id === undefined || id === null) return new NextResponse(null, { status: 202, headers: NO_STORE });
+
+  switch (method) {
+    case "initialize": {
+      const asked = rpcParams.protocolVersion;
+      const protocolVersion = typeof asked === "string" && REMOTE_MCP_PROTOCOL_VERSIONS.includes(asked) ? asked : REMOTE_MCP_PROTOCOL_VERSIONS[0];
+      return rpcResult(id, { protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "tavonel-agent", version: "1" } });
+    }
+    case "ping":
+      return rpcResult(id, {});
+    case "tools/list":
+      return rpcResult(id, { tools: agentToolList() });
+    case "tools/call": {
+      if (!tool) {
+        telemetry(toolLabel, "UNKNOWN_TOOL");
+        return rpcError(200, id, -32602, "Unknown tool");
+      }
+      const result = await withinAgentMcpDispatch(() => callAgentTool(tool, { principal: auth.principal, request }, rpcParams.arguments));
+      telemetry(tool.name, result.ok ? "OK" : result.code);
+      return rpcResult(id, result.ok
+        ? { content: [{ type: "text", text: JSON.stringify(result.output) }] }
+        : { content: [{ type: "text", text: result.code }], isError: true });
+    }
+    default:
+      return rpcError(200, id, -32601, "Method not found");
+  }
+}
+
+/* The JSON response form only: no server-initiated stream. */
+export function GET() {
+  if (!agentProposalsEnabled()) return notFound();
+  return new NextResponse(null, { status: 405, headers: { Allow: "POST", ...NO_STORE } });
+}

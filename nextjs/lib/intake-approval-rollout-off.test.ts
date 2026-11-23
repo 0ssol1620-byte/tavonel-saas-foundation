@@ -25,6 +25,7 @@ const PRODUCTION_FUNCTIONS = new Set([
 
 const mocks = vi.hoisted(() => ({
   calls: [] as string[],
+  admissionError: null as string | null,
   head: vi.fn(),
   presign: vi.fn(),
   enqueueSingle: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("@/lib/supabase-admin", () => ({
     const p = JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>;
     const soon = new Date(Date.now() + 5 * 60_000).toISOString();
     if (name === "reserve_foundation_intake_admission") {
+      if (mocks.admissionError) return Response.json({ code: "P0001", message: mocks.admissionError }, { status: 400 });
       return Response.json({ documentId: p.p_document_id, objectKey: p.p_object_key, expiresAt: soon, idempotentReplay: false, confirmed: false });
     }
     if (name === "reserve_foundation_compute_v3") {
@@ -156,6 +158,22 @@ describe("intake approval lineage off (the production default)", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ code: "QUALIFIED", uploadUrl: "https://upload.invalid/signed" });
       expect(mocks.calls).toEqual(["reserve_foundation_intake_admission", "reserve_foundation_compute_v3"]);
+    }
+  });
+
+  it("answers a full workspace with 402 STORAGE_ALLOWANCE_EXHAUSTED, a plan limit, before any compute is reserved (WO-CAT-8)", async () => {
+    mocks.admissionError = "foundation_storage_allowance_exhausted";
+    try {
+      for (const post of [capabilityPost, v1CapabilityPost]) {
+        mocks.calls.length = 0;
+        const response = await post(json("https://tavonel.com/api/uploads/capability", {
+          originalFilename: "report.pdf", declaredMimeType: "application/pdf", requestedBytes: 2048, estimatedPages: 2,
+        }));
+        expect([response.status, await response.json()]).toEqual([402, { code: "STORAGE_ALLOWANCE_EXHAUSTED" }]);
+        expect(mocks.calls).toEqual(["reserve_foundation_intake_admission"]);
+      }
+    } finally {
+      mocks.admissionError = null;
     }
   });
 

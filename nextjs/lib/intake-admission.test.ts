@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { confirmFoundationIntake, reserveFoundationIntake, validateIntakeAdmission } from "./intake-admission";
+import { confirmFoundationIntake, reserveFoundationIntake, STORAGE_LIMIT_BYTES, validateIntakeAdmission } from "./intake-admission";
 import { FOUNDATION_INTAKE_MAX_BYTES } from "./r2-presign";
 
 const admission = {
@@ -59,6 +59,30 @@ describe("Foundation intake admission", () => {
     }));
   });
 
+  it("sends every v2 plan's storage allowance in bytes and none for a retired plan", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      documentId: admission.documentId, objectKey: admission.objectKey,
+      expiresAt: "2026-08-29T12:00:00.000Z", idempotentReplay: false, confirmed: false,
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await reserveFoundationIntake(admission);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as Record<string, unknown>;
+    // The catalog's 10 / 10 / 100 / 500 GB, in SI bytes. A retired code is absent, so the
+    // database never caps a legacy subscriber (CAT-D8) and refuses a v2 code it cannot price.
+    expect(body.p_storage_limits).toEqual({
+      personal: 10_000_000_000,
+      developer: 10_000_000_000,
+      team: 100_000_000_000,
+      business: 500_000_000_000,
+    });
+    expect(STORAGE_LIMIT_BYTES).not.toHaveProperty("observer_access");
+    expect(STORAGE_LIMIT_BYTES).not.toHaveProperty("studio_access");
+  });
+
   it("confirms only a receipt bound to the same tenant, document and user", async () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);
@@ -80,6 +104,9 @@ describe("Foundation intake admission", () => {
     ["foundation_intake_rate_limited", "INTAKE_RATE_LIMITED"],
     ["foundation_intake_daily_quota_exceeded", "INTAKE_DAILY_QUOTA_EXCEEDED"],
     ["foundation_intake_idempotency_conflict", "INTAKE_IDEMPOTENCY_CONFLICT"],
+    ["foundation_storage_allowance_exhausted", "STORAGE_ALLOWANCE_EXHAUSTED"],
+    // No allowance for the workspace's v2 plan is a server fault, never a customer's allowance.
+    ["foundation_storage_limit_missing", "INTAKE_ADMISSION_FAILED"],
   ])("maps database guard %s without leaking service details", async (message, code) => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", `sb_secret_${"s".repeat(31)}`);

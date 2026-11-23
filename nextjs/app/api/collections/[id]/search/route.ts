@@ -7,6 +7,7 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest, revalidateFoundationAuthorization } from "@/lib/developer-auth";
 import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
+import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import { DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
@@ -14,7 +15,8 @@ import {
   resolveConfiguredProductionRetrievalRuntime,
 } from "@/lib/retrieval-runtime-config";
 import { readRetrievalIndexState, retrievalIndexNotice } from "@/lib/retrieval-index-status";
-import { getFoundationActiveWorld, getWorldFreshness } from "@/lib/world-store";
+import { getFoundationActiveWorld, getWorldFreshness, listFoundationWorldVersions } from "@/lib/world-store";
+import { parseTemporal, resolveWorldAtKnownAt, temporalBlock } from "@/lib/world-activation-history";
 import {
   attemptedRetrievalModelRoles,
   attemptedRetrievalModelRolesOnFailure,
@@ -35,13 +37,24 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+/*
+ * The same bound as /ask and /api/mcp (WO-CAT-8): a search holds a knowledge query unit from admission
+ * to settlement, and the hold stops reserving after five minutes (20261117150000). The database also
+ * refuses to count a hold that expired (20261117160000), so this is the platform half, not the proof.
+ */
+export const maxDuration = 60;
 const NO_STORE = { "Cache-Control": "no-store" };
 
 // Read failures that mean "this tenant has no queryable index yet" are a 409 (a state the
 // caller can fix by compiling), not a 500 (our fault) and not a 404 (the collection exists).
 const CONFLICT_CODES = new Set(["RETRIEVAL_RUN_NOT_FOUND", "RETRIEVAL_PROFILE_NOT_FOUND"]);
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+/** One answered search is one knowledge query unit (lib/kqu-meter.ts); a refusal or failure is none. */
+export function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  return meterKnowledgeQuery((meter) => search(request, context, meter));
+}
+
+async function search(request: Request, context: { params: Promise<{ id: string }> }, meter: KquMeter) {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(contentLength) || contentLength > 2_048) {
     return NextResponse.json({ code: "QUERY_TOO_LARGE" }, { status: 413, headers: NO_STORE });
@@ -61,7 +74,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!binding.ok) return NextResponse.json({ code: binding.code }, { status: binding.status, headers: NO_STORE });
   const bound = binding.bound ? binding : null;
 
-  let body: { query?: unknown; limit?: unknown };
+  let body: { query?: unknown; limit?: unknown; known_at?: unknown; valid_at?: unknown; as_of?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -76,6 +89,44 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 25) {
     return NextResponse.json({ code: "LIMIT_INVALID" }, { status: 400, headers: NO_STORE });
   }
+  // Typed time (D18-2) is parsed and resolved, and a historical index checked, before a trial
+  // unit is spent: a refused time is never a metered query.
+  const temporal = parseTemporal(body);
+  if (!temporal.ok) return NextResponse.json({ code: temporal.code }, { status: temporal.status, headers: NO_STORE });
+  let activeAtAdmission: Awaited<ReturnType<typeof getFoundationActiveWorld>> | null = null;
+  let historical: { manifestDigest: string; worldStateId: string } | null = null;
+  let temporalMeta: ReturnType<typeof temporalBlock> | null = null;
+  if (temporal.knownAt !== null) {
+    // A bound context names its exact World already; a second clock would contradict it.
+    if (bound) return NextResponse.json({ code: "KNOWN_AT_WITH_CONTEXT" }, { status: 400, headers: NO_STORE });
+    const resolved = await resolveWorldAtKnownAt(auth.principal.workspaceKey, id, temporal.knownAt);
+    if (!resolved.ok) return NextResponse.json({ code: resolved.code }, { status: resolved.status, headers: NO_STORE });
+    // One read of the active World, kept: whichever World is served is the one resolved for T,
+    // never "whatever is active by the time retrieval starts".
+    activeAtAdmission = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
+    if (!activeAtAdmission.ok) {
+      return NextResponse.json(
+        { code: activeAtAdmission.code },
+        { status: activeAtAdmission.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : 503, headers: NO_STORE },
+      );
+    }
+    const current = activeAtAdmission.world.manifestDigest === resolved.manifestDigest;
+    if (!current) {
+      const unavailable = () => NextResponse.json({ code: "HISTORICAL_INDEX_UNAVAILABLE" }, { status: 409, headers: NO_STORE });
+      const versions = await listFoundationWorldVersions(auth.principal.workspaceKey, id);
+      if (!versions.ok) return NextResponse.json({ code: versions.code }, { status: 503, headers: NO_STORE });
+      const version = versions.versions.find((row) => row.manifest_digest === resolved.manifestDigest);
+      if (!version) return unavailable();
+      const indexState = await readRetrievalIndexState({
+        workspaceKey: auth.principal.workspaceKey, collectionId: id, worldManifestDigest: resolved.manifestDigest,
+      });
+      if (indexState.status !== "compiled") return unavailable();
+      // The pipeline re-checks source access and derived-data admission on the hydrated units
+      // against today's state, so a source denied since T refuses the search rather than leaking.
+      historical = { manifestDigest: resolved.manifestDigest, worldStateId: version.world_state_id };
+    }
+    temporalMeta = temporalBlock(temporal.knownAt, resolved, current);
+  }
   const metered = await spendTrialSessionQuery(auth.principal);
   if (!metered.ok) return NextResponse.json({ code: metered.code }, { status: metered.status, headers: NO_STORE });
 
@@ -87,7 +138,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   const active = resolution
     ? { ok: true as const, world: resolution.world }
-    : await getFoundationActiveWorld(auth.principal.workspaceKey, id);
+    : activeAtAdmission ?? await getFoundationActiveWorld(auth.principal.workspaceKey, id);
   if (!active.ok) {
     return NextResponse.json(
       { code: active.code },
@@ -98,10 +149,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // A missing GPU runtime is a degradation, not a failure: the pipeline falls back to
   // lexical + structure and reports it in `degradations`, so the caller can tell a
   // full-pipeline result from a degraded one instead of silently receiving weaker retrieval.
+  // The allowance, before the index read and retrieval.
+  const admitted = await meter.admit(auth.principal);
+  if (!admitted.ok) return NextResponse.json({ code: admitted.code }, { status: admitted.status, headers: NO_STORE });
+  const served = historical ?? active.world;
   const indexStateAtAdmission = await readRetrievalIndexState({
     workspaceKey: auth.principal.workspaceKey,
     collectionId: id,
-    worldManifestDigest: active.world.manifestDigest,
+    worldManifestDigest: served.manifestDigest,
   });
   const runtimeResolution = await resolveConfiguredProductionRetrievalRuntime({
     workspaceKey: auth.principal.workspaceKey, collectionId: id,
@@ -115,8 +170,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const result = await runRetrievalPipeline({
     workspaceKey: auth.principal.workspaceKey,
     collectionId: id,
-    worldManifestDigest: active.world.manifestDigest,
-    worldStateId: active.world.worldStateId,
+    worldManifestDigest: served.manifestDigest,
+    worldStateId: served.worldStateId,
     question: query,
     profile: runtime.profile,
     routerDecision: runtime.routerDecision,
@@ -134,7 +189,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const attemptedRoles = attemptedRetrievalModelRolesOnFailure(runtime, result.code);
     const persisted = await persistRetrievalModelAttempt({
       endpoint: "search", workspaceKey: auth.principal.workspaceKey, collectionId: id,
-      worldManifestDigest: active.world.manifestDigest, query,
+      worldManifestDigest: served.manifestDigest, query,
       modelRoute: runtime.decision, attemptedRoles, degradations: [],
       execution: { outcome: "failed", failureClass: "downstream_failure" },
     });
@@ -179,7 +234,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     endpoint: "search",
     workspaceKey: auth.principal.workspaceKey,
     collectionId: id,
-    worldManifestDigest: active.world.manifestDigest,
+    worldManifestDigest: served.manifestDigest,
     query,
     modelRoute: runtime.decision,
     attemptedRoles,
@@ -210,6 +265,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     degradations: publicRoute.degradationClasses,
     activeWorld,
     freshness,
+    ...(temporalMeta ? { temporal: temporalMeta } : {}),
     // The packet itself is the contract every surface shares (§20). It is returned whole
     // rather than reshaped per endpoint, so /search, /ask, MCP and the CLI cannot drift
     // into four subtly different evidence formats.

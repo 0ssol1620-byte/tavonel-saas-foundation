@@ -6,7 +6,7 @@ import type { WorldEvidence } from "./world-read-model";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion, type AskCitationSource } from "./workspace-ask-copy";
 
 const helper = readFileSync(new URL("./workspace-ask-copy.ts", import.meta.url), "utf8");
-const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8").replaceAll("\r\n", "\n");
 
 const NO_EVIDENCE_NOTICE = "The active world abstained because no region-bound evidence matched the question.";
 const NO_EVIDENCE_RESULT = "No region-bound evidence matched this question.";

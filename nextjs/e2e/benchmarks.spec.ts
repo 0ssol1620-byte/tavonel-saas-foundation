@@ -113,16 +113,23 @@ test("carries no empty structural cell and never overflows its viewport", async 
   So what is asserted is reachability rather than a button: /research links here, and so does the
   hub. A page that loses its way in fails; a page that changes the shape of the link does not.
 */
-test("is reachable from research and from the resources hub", async ({ page }) => {
+test("is reachable from research", async ({ page }) => {
+  // V34: /research is the research record (components/v34/routes/research). The page body, not the
+  // footer's Trust column that every page carries, has to offer the way in.
   await page.goto("/research");
   await expect(page.locator('main a[href="/benchmarks"]').first()).toBeVisible();
   // /research names the destination the way the page is titled everywhere else on the site.
   await expect(page.locator('main a[href="/benchmarks"]').first()).toHaveText("Benchmarks");
   // And the ghost row it replaced does not come back beside the page's single next step.
   await expect(page.locator("main .actions .btn.ghost")).toHaveCount(0);
+});
 
+// /resources answers 308 to /journal (V34_REDIRECTS); the hub's body names the destination.
+test("is reachable from the resources hub, which is the journal now", async ({ page }) => {
   await page.goto("/resources");
-  await expect(page.getByRole("link", { name: "Benchmark protocol", exact: true }).first()).toHaveAttribute("href", "/benchmarks");
+  await expect(page).toHaveURL(/\/journal$/);
+  await expect(page.locator('main a[href="/benchmarks"]').first()).toBeVisible();
+  await expect(page.locator('main a[href="/benchmarks"]').first()).toHaveText("Benchmarks");
 });
 
 /*

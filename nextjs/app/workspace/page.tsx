@@ -11,11 +11,11 @@ import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualif
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
-import type { BillingStatusAccount, EntitlementWaitResult } from "@/lib/entitlement-wait";
+import { billingCardHeading, type BillingStatusAccount, type EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
-import type { BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import { putWithProgress } from "@/lib/upload-transfer";
 import {
@@ -60,11 +60,13 @@ import { hasActiveSourceWork } from "@/lib/compile-stage-view";
 import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
+import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
+import BillingRefund from "@/components/billing-refund";
 import IntakeTriageReview from "@/components/intake-triage-review";
 import workspaceStateStyles from "./workspace-states.module.css";
 import {
@@ -74,8 +76,12 @@ import {
   type WorkspaceIntent,
   type WorkspaceStateInput,
 } from "@/lib/workspace-onboarding";
+import { deriveJourney } from "@/lib/workspace-journey";
+import { useStoredPurpose } from "@/components/workspace-purpose-picker";
 import WorldStudioUltimate from "@/components/world-studio-ultimate";
 import ChangeInbox from "@/components/change-inbox";
+import ChangeProposalsPanel from "@/components/change-proposals-panel";
+import LibraryPanel from "@/components/library-panel";
 import OperationsUltimate from "@/components/operations-ultimate";
 import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
@@ -189,19 +195,7 @@ type GroundedAnswer = {
   receipt: { collectionId: string; manifestDigest: string; retrieval: string; outputSha256: string };
 };
 
-/*
-  These are action labels, not qualification claims. Workspace tells a user how access works;
-  /integrations owns the evidence-backed support level and provider-specific limitations.
-*/
-const WORKSPACE_SOURCE_CHOICES = [
-  { name: "Google Drive", availability: "Read-only" },
-  { name: "Dropbox", availability: "Read-only" },
-  { name: "OneDrive", availability: "Read-only" },
-  { name: "File Server", availability: "Assisted setup" },
-  { name: "Amazon S3", availability: "Assisted setup" },
-  { name: "Cloudflare R2", availability: "Assisted setup" },
-  { name: "MinIO", availability: "Assisted setup" },
-] as const;
+/* The source choices under the drop zone, and the server fact that decides them: components/workspace/source-choices.tsx. */
 
 /** One shape for the billing card and the post-checkout wait (journey A4) that refreshes it. */
 type BillingAccount = BillingStatusAccount;
@@ -308,7 +302,7 @@ export default function WorkspacePage() {
   const [notice, setNotice] = useState<string | { alert: string } | null>(null);
   const notifyCheckout = useCallback((text: string, tone: NoticeTone) => setNotice(tone === "alert" ? { alert: text } : text), []);
   /** Reported by the shell from /api/access/bootstrap; gates the Connections and Developer bodies, not only their nav entries. */
-  const [accessSource, setAccessSource] = useState<"owner" | "paid" | "trial" | "unentitled" | null>(null);
+  const [accessSource, setAccessSource] = useState<WorkspaceAccessSource>(null);
   const [customerDataAccess, setCustomerDataAccess] = useState<"checking" | "open" | "closed" | "unavailable">("checking");
   /** Why a closed workspace is closed, as the shell read it from the v2 bootstrap; "legacy" on v1. */
   const [sourcePending, setSourcePending] = useState<SourcePendingReason | "legacy">("legacy");
@@ -343,7 +337,17 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!resumeOffer || purchaseOpen === undefined) return;
     if (purchaseOpen === true && customerDataAccess === "checking") return;
-    const decision = decideCheckoutResume(resumeOffer, purchaseOpen, resumeAccess);
+    /*
+      Catalog v2 (WO-CAT-2 L4, N2). This page runs in the browser and holds no price environment, so it never
+      decides whether a plan is on sale: it passes no availability (null), which claims none. A current (v2)
+      offer is held through terms and release under its public label (its usual way here is the terms-first
+      link, which the checkout route sends only after its offer policy passed), and when the hold ends the
+      checkout route answers: a plan that is not sold online is its 403 BILLING_OFFER_CONTACT_REQUIRED,
+      rendered as the request-access sentence, with nothing opened or charged. A retired offer is catalog
+      data, not environment: it is never held or named, and goes straight to the route, whose refusal is the
+      sentence (as before catalog v2). An unknown code never reaches here (`readOfferParam` returns null).
+    */
+    const decision = BILLING_OFFERS[resumeOffer].status === "v2" ? decideCheckoutResume(null, purchaseOpen, resumeAccess) : "open";
     if (decision === "hold_terms" || decision === "hold_release") {
       rememberCheckoutIntent(resumeOffer);
       setNotice(heldOfferSentence(resumeOffer));
@@ -374,6 +378,7 @@ export default function WorkspacePage() {
   const [busy, setBusy] = useState(false);
   const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
+  const [purpose, setPurpose] = useStoredPurpose();
   /*
     A corpus is several compiles, followed as one run.
 
@@ -488,6 +493,7 @@ export default function WorkspacePage() {
   }, [documents]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
+  const [libraryAvailable, setLibraryAvailable] = useState(false);
   const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
   /*
@@ -2966,6 +2972,10 @@ export default function WorkspacePage() {
         run: () => { if (nextAction.surface) navigateSurface(nextAction.surface); else nextAction.run?.(); },
       }}
       onOpenWorld={() => navigateSurface("world")}
+      journey={deriveJourney({ ...workspaceStateInput, purpose, libraryAvailable })}
+      purpose={purpose}
+      onPurpose={setPurpose}
+      onOpenStep={navigateSurface}
     />
   ) : null;
 
@@ -2980,7 +2990,7 @@ export default function WorkspacePage() {
       ? { sentence: "Your processing terms are accepted and file access is awaiting release.", action: null }
       : sourcePending === "workspace_refused"
         ? { sentence: "File processing is not available for this workspace.", action: <Link className="btn" href="/contact">Contact support</Link> }
-        : { sentence: "This workspace has no active plan. Choose a plan to open it.", action: <Link className="btn" href="/pricing">See Developer access</Link> };
+        : { sentence: "This workspace has no active plan. Choose a plan to open it.", action: <Link className="btn" href="/pricing">See plans</Link> };
 
   return (
     <WorkspaceUltimateShell
@@ -3202,16 +3212,9 @@ export default function WorkspacePage() {
                 {/*
                   The availability line under each name is WORKSPACE_SOURCE_CHOICES verbatim.
                   Nothing here states a support level the capability manifest does not; the
-                  provider-specific limits stay on /integrations.
+                  provider-specific limits stay on /connect.
                 */}
-                <div className="workspace-source-choices" aria-label="Available source connections">
-                  {WORKSPACE_SOURCE_CHOICES.map((source) => (
-                    <button type="button" key={source.name} onClick={() => navigateSurface("connections")}>
-                      <span>{source.name}</span>
-                      <small>{source.availability}</small>
-                    </button>
-                  ))}
-                </div>
+                <WorkspaceSourceChoices accessSource={accessSource} onChoose={() => navigateSurface("connections")} />
               </div>
               )}
               {staging ? (
@@ -3514,6 +3517,9 @@ export default function WorkspacePage() {
               reading={readingForCurrentVersions}
               names={names}
               customerDataAccess={customerDataAccess}
+              compiledWorldActive={Boolean(activeWorld && collectionResult && activeWorld.manifestDigest === collectionResult.manifestDigest)}
+              blocked={compileJob?.blocked}
+              blockedResolution={compileJob?.blockedResolution ?? null}
               noComputeAccess={accessSource === "unentitled"}
               selectableIds={intakeOpen ? compilableDocumentIds : []}
               selectedIds={selectedDocumentIds}
@@ -3523,6 +3529,7 @@ export default function WorkspacePage() {
               onDismiss={uploads.length > 0 ? () => { setUploads([]); setReading({}); setSourceObservation(null); sourceBytesCacheRef.current.clear(); } : undefined}
             />
           </div>
+          {documents && documents.length > 0 ? <LibraryPanel documentIds={documents.map((d) => d.documentId)} names={names} onAvailability={setLibraryAvailable} /> : null}
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
             {intakeOpen ? (
             <section id="workspace-sources" className="card document-card">
@@ -3607,6 +3614,7 @@ export default function WorkspacePage() {
                 */}
                 <WorldStudioUltimate
                   model={worldReadModel}
+                  syncUrl
                   onRollback={rollbackReason.trim().length >= 8 ? (digest) => void rollbackWorld(digest) : undefined}
                   rollbackBusy={worldBusy}
                 />
@@ -3626,6 +3634,9 @@ export default function WorkspacePage() {
                   collectionId={collectionResult?.collectionId ?? null}
                   names={names}
                 />
+              ) : null}
+              {surface === "changes" ? (
+                <ChangeProposalsPanel collectionId={collectionResult?.collectionId ?? null} />
               ) : null}
               {/*
                 This control was lost when the sidebar buttons became tabs: the handler survived
@@ -3981,8 +3992,9 @@ export default function WorkspacePage() {
               {/* workspace-18 (C1): the selected tab directly above already says "Usage & billing",
                   so the card does not repeat it. It is still headed -- by the plan the account is
                   actually on, or, when that has not been read, by a neutral name for the card.
-                  Never by a plan name this panel does not have. */}
-              <h2>{billingAccount?.accessPlan ? `${billingAccount.accessPlan.replace("_access", "")} access` : "Access and balance"}</h2>
+                  Never by a plan name this panel does not have: the held plan comes from `heldOffer`
+                  (WO-CAT-3B), so a v2 holder is not named after its level's legacy plan. */}
+              <h2>{billingCardHeading(billingAccount)}</h2>
               <p>Included usage is granted only from a signed subscription transaction and settled from observed processing.</p>
             </div>
             {/*
@@ -4014,10 +4026,12 @@ export default function WorkspacePage() {
             </p>
             <div className="billing-actions">
               <button disabled={billingBusy} onClick={() => void loadBilling()}>Refresh billing</button>
+              {/* One-step buy (2026-11-10): the portal is where a subscription is changed or cancelled, so the label says both. */}
               <button disabled={billingBusy || !billingAccount?.paddleCustomerId} onClick={() => void openBillingPortal()}>
-                {billingBusy ? "Opening..." : "Manage billing"}
+                {billingBusy ? "Opening..." : "Manage or cancel subscription"}
               </button>
             </div>
+            {billingAccount?.paddleCustomerId ? <BillingRefund getToken={getAuthToken} /> : null}
             {billingAccount?.billingHold ? <p className="billing-hold" role="alert">Billing hold active. Refunded or disputed usage cannot be processed.</p> : null}
             {billingAccount?.subscriptionCancelAt ? (
               <p className="billing-hold" role="status">
@@ -4082,14 +4096,14 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on Developer and Team."}</h2>
+                : customerDataAccess === "closed" ? "Source connections are not available for this workspace yet." : "Available on a paid plan."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Google Drive and file-server connections are included on Developer and Team. The free evaluation works with files you upload directly."
-                : "Google Drive and file-server connections are included on Developer and Team. This workspace has no active plan."}</p>
+                ? "Local-folder connections are included in every paid plan. The free evaluation works with files you upload directly."
+                : "Local-folder connections are included in every paid plan. This workspace has no active plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
@@ -4102,19 +4116,19 @@ export default function WorkspacePage() {
             <section className="card workspace-access-gate" role="status">
               <h2>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "Workspace access could not be verified." : "Checking workspace access."
-                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of Developer access."}</h2>
+                : customerDataAccess === "closed" ? "AI connections are not available for this workspace yet." : "API keys are part of every paid plan."}</h2>
               <p>{accessSource === null
                 ? customerDataAccess === "unavailable" ? "No plan state was confirmed. Refresh to retry the access check." : "The access check has not completed."
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with Developer access."
-                : "This account has no active compute access. API keys and MCP setup require Developer access."}</p>
+                ? "Free evaluation reads the World inside this workspace. Keys, the OpenAPI document and MCP setup open with a paid plan."
+                : "This account has no active compute access. API keys and MCP setup require a paid plan."}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"
                 ? closedGate.action
-                : <Link className="btn" href="/pricing">See Developer access</Link>}</div>
+                : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
           ) : <DeveloperPanel />) : null}
 

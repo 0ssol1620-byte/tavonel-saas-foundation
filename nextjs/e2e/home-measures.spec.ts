@@ -1,12 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /*
-  Release 3 (2026-10-15), brief move 7: the receipted measurement band under the hero.
-
-  The unit walk (`lib/landing-v2-page.test.ts`) proves every figure is claim-bound. What only a
-  browser can show is that the band reads as a record on every width the founder checks on: three
-  facts between the hero and the workbench, one column on a phone with nothing clipped, nothing
-  moving under reduced motion, and receipt links that land on a note that prints the whole digest.
+  V34 Home (WO-CI-5b, retire commit, applied after WO-CI-9). The receipted measurement band under the hero is not on V34 Home;
+  the figures Home prints now are computed from the hash-verified corpus and bound to it by e2e/home-v34.spec.ts and
+  lib/v34/public-corpus.test.ts. What this file keeps is the research note's own promise.
 */
 
 // FINAL-SPEC 2026-10-26 §2.2: R-01 (80.6) -> R-02 (0). 2026-11-10 public-copy cleanup (founder direction): intended re-pin. R-03 left the Home band.
@@ -17,91 +14,17 @@ async function seedRefusal(page: Page) {
   await page.addInitScript(() => localStorage.setItem("tavonel.analytics-consent.v1", JSON.stringify({ allowed: false, expires: Date.now() + 86_400_000 })));
 }
 
-for (const route of ["/"]) {
-  test(`${route} prints two receipted measures between the hero and the workbench`, async ({ page }, testInfo) => {
-    test.skip(!["1440", "390"].includes(testInfo.project.name), "one desktop and one phone width");
-    await seedRefusal(page);
-    await page.goto(route);
-    const order = await page.evaluate(() =>
-      [...document.querySelectorAll("main > section")].slice(0, 3).map(node => node.id || (node.hasAttribute("data-home-measures") ? "band" : "?")),
-    );
-    expect(order).toEqual(["s1", "band", "s2"]);
-    const band = page.locator("main > section[data-home-measures]");
-    await expect(band.getByRole("heading", { level: 2 })).toHaveCount(1);
-    await expect(band.locator("li[data-claim-id]")).toHaveCount(RECEIPTS.length);
-    expect(await band.locator("a[data-receipt]").evaluateAll(links => links.map(link => link.getAttribute("href")))).toEqual(
-      RECEIPTS.map(id => `/research/notes#${id}`),
-    );
-    await expect(band).not.toContainText(route === "/ko" ? "저품질 스캔본" : "low-quality scans");
-    const text = await band.evaluate(node => {
-      const sizes = [...node.querySelectorAll<HTMLElement>("*")]
-        .filter(element => [...element.childNodes].some(child => child.nodeType === Node.TEXT_NODE && child.textContent!.trim()))
-        .map(element => Number.parseFloat(getComputedStyle(element).fontSize));
-      const figure = node.querySelector("li [data-claim]")!.parentElement!;
-      return { min: Math.min(...sizes), figure: Number.parseFloat(getComputedStyle(figure).fontSize), numeric: getComputedStyle(figure).fontVariantNumeric };
-    });
-    expect(text.min, "type floor").toBeGreaterThanOrEqual(12);
-    // §2.2: the figure is 44px at 1440 and 36px on a phone (412/390), still the band's largest type.
-    expect(text.figure).toBeGreaterThanOrEqual(testInfo.project.name === "390" ? 36 : 40);
-    expect(text.numeric).toContain("tabular-nums");
-    await band.scrollIntoViewIfNeeded();
-    await testInfo.attach(`home-measures-${route === "/" ? "en" : "ko"}-${testInfo.project.name}`, { body: await band.screenshot(), contentType: "image/png" });
-  });
-}
-
-test("phones read the band as one column, with no overflow and nothing clipped", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "390", "drives the four phone widths itself");
-  await seedRefusal(page);
-  for (const width of [360, 390, 412, 430]) {
-    await page.setViewportSize({ width, height: 844 });
-    for (const route of ["/"]) {
-      await page.goto(route);
-      const layout = await page.locator("main > section[data-home-measures]").evaluate(node => {
-        const facts = [...node.querySelectorAll("li[data-claim-id]")].map(fact => fact.getBoundingClientRect().toJSON());
-        const clipped = [...node.querySelectorAll<HTMLElement>("li *")].filter(element => element.scrollWidth > element.clientWidth + 1 && getComputedStyle(element).overflow !== "visible").length;
-        return { facts, clipped, overflow: document.documentElement.scrollWidth - innerWidth, width: innerWidth };
-      });
-      expect(layout.overflow, `${route} at ${width}`).toBeLessThanOrEqual(1);
-      expect(layout.clipped, `${route} at ${width}`).toBe(0);
-      for (const [index, fact] of layout.facts.entries()) {
-        expect(fact.left, `${route} at ${width}: one column`).toBeCloseTo(layout.facts[0]!.left, 0);
-        expect(fact.right).toBeLessThanOrEqual(layout.width - 15);
-        if (index > 0) expect(fact.top).toBeGreaterThanOrEqual(layout.facts[index - 1]!.bottom - 1);
-      }
-    }
-  }
-});
-
-test("under reduced motion nothing in the band animates or transitions", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "reduced-motion", "reduced-motion project");
-  // As in home-evidence-line.spec: the project's `use.reducedMotion` does not reach matchMedia in this runner.
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await seedRefusal(page);
-  await page.goto("/");
-  const link = page.locator("main > section[data-home-measures] a[data-receipt]").first();
-  await link.scrollIntoViewIfNeeded();
-  await link.hover();
-  await link.focus();
-  /*
-    `app/landing-v2.css` reduces every Home transition to a 120ms opacity fade under reduced motion.
-    The band never changes opacity, so the assertion is that nothing else may transition and that
-    hover and focus start no animation at all.
-  */
-  const motion = await page.locator("main > section[data-home-measures]").evaluate(node => ({
-    animations: node.getAnimations({ subtree: true }).length,
-    properties: [...new Set([node, ...node.querySelectorAll("*")].map(element => getComputedStyle(element).transitionProperty))],
-  }));
-  expect(motion.animations).toBe(0);
-  expect(motion.properties).toEqual(["opacity"]);
-});
-
-test("each receipt link lands on the research note that prints the whole digest and serves the bytes", async ({ page, request }, testInfo) => {
+/*
+  V34 Home (WO-CI-5b): Home no longer prints the receipted band, so the receipt links that opened this note are gone. The note's own promise
+  stays and is asserted where it lives, with no Home click first: each receipt prints its whole digest and serves bytes that hash to it.
+  What Home prints now is bound to the corpus file by e2e/home-v34.spec.ts and lib/v34/public-corpus.test.ts.
+*/
+test("each receipt on the research note prints the whole digest and serves the bytes", async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== "1440", "one width");
   await seedRefusal(page);
-  await page.goto("/");
-  // The last receipt on the band (R-02 since the 2026-11-10 public-copy cleanup) is the deepest anchor on the note.
+  // The last receipt (R-02 since the 2026-11-10 public-copy cleanup) is the deepest anchor on the note.
   const last = RECEIPTS[RECEIPTS.length - 1];
-  await page.locator(`a[data-receipt="${last}"]`).click();
+  await page.goto(`/research/notes#${last}`);
   await expect(page).toHaveURL(new RegExp(`/research/notes#${last}$`));
   for (const id of RECEIPTS) {
     const note = page.locator(`article[id="${id}"]`);

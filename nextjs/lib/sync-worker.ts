@@ -68,7 +68,13 @@ const PERMANENT_SOURCE_SKIPS = new Set([
   */
   "SOURCE_REVISION_SUPERSEDED",
 ]);
-const DAILY_QUOTA_RETRY_SECONDS = 60 * 60;
+/*
+  Refusals that wait for capacity rather than spend the job's retry budget: the daily intake quota
+  rolls with the day, and a workspace at its plan's storage allowance (WO-CAT-8) has room again once
+  sources are deleted. Retrying either at once fails the same way until attempts run out.
+*/
+const CAPACITY_DEFERRALS = new Set(["INTAKE_DAILY_QUOTA_EXCEEDED", "STORAGE_ALLOWANCE_EXHAUSTED"]);
+const CAPACITY_RETRY_SECONDS = 60 * 60;
 
 function decodeSyncCursor(cursorToken: string | null): SyncCursor | null {
   if (!cursorToken) return { providerCursor: null, pageOffset: 0 };
@@ -348,8 +354,8 @@ export async function runSourceImportBatch(
     }
     skipped.push({ nativeId: outcome.nativeId, code: outcome.code });
     if (!PERMANENT_SOURCE_SKIPS.has(outcome.code)) {
-      const batchOutcome = outcome.code === "INTAKE_DAILY_QUOTA_EXCEEDED"
-        ? { outcome: "deferred" as const, errorCode: outcome.code, retryAfterSeconds: DAILY_QUOTA_RETRY_SECONDS }
+      const batchOutcome = CAPACITY_DEFERRALS.has(outcome.code)
+        ? { outcome: "deferred" as const, errorCode: outcome.code, retryAfterSeconds: CAPACITY_RETRY_SECONDS }
         : { outcome: "retry" as const, errorCode: outcome.code };
       const reported = await completeJobBatch(job.workspaceKey, job.jobId, workerId, batchOutcome);
       return { ok: false, code: reported.ok ? outcome.code : reported.code };

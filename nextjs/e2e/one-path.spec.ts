@@ -29,7 +29,7 @@ async function localWorkspace(page: Page, baseURL: string | undefined, source: "
   await page.route("https://test.supabase.co/**", route => route.fulfill({ json: user }));
   await page.route("**/api/access/bootstrap", route => route.fulfill({ json: { code: "ACCESS_READY", access: { source, accessPlan: "studio_access", billingExempt: source === "owner", expiresAt: null, limits: null, customerDataEnabled: true } } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
-  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.route("**/api/documents", route => route.fulfill({ json: { documents: [] } }));
 }
 

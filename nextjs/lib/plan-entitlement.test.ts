@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BILLING_OFFERS, type BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, DELIVERED, type BillingOfferCode, type Capability } from "./billing-catalog";
 import { billingProductDecision } from "./billing-product-access";
 import type { FoundationBillingAccount } from "./billing-store";
 
@@ -100,9 +100,32 @@ describe("plan entitlement", () => {
       .flatMap((offer) => offer.features as readonly string[])
       .join(" ")
       .toLowerCase();
-    for (const unenforced of ["seat", "sso", "scim", "when qualified", "coming soon"]) {
+    for (const unenforced of ["sso", "scim", "when qualified", "coming soon"]) {
       expect(bullets, `no plan may advertise "${unenforced}" yet`).not.toContain(unenforced);
     }
+  });
+
+  /*
+    Seats, KQU and storage are metered by capabilities that are not delivered. A bullet for one is
+    allowed the day its capability is in DELIVERED (the release commit that proves it), and not before.
+  */
+  const METERED: Array<[Capability, RegExp]> = [
+    ["seat_cap", /\bseats?\b/i],
+    ["kqu_meter", /\bKQU\b|\bqueries\b/i],
+    ["storage_meter", /\bGB\b|\bstorage\b/i],
+  ];
+  const meteredBullets = (bullets: readonly string[], delivered: ReadonlySet<Capability>) =>
+    bullets.flatMap((bullet) => METERED.filter(([capability, pattern]) => pattern.test(bullet) && !delivered.has(capability)).map(([c]) => `${c}: ${bullet}`));
+
+  it("allows a seat, KQU or storage bullet only when its capability is delivered", () => {
+    for (const [code, offer] of Object.entries(BILLING_OFFERS)) {
+      expect(meteredBullets(offer.features as readonly string[], DELIVERED), code).toEqual([]);
+    }
+  });
+
+  it("catches a metered bullet whose capability is not delivered (failure path)", () => {
+    expect(meteredBullets(["Up to 5 seats", "100 GB of storage", "10,000 KQU"], new Set<Capability>())).toHaveLength(3);
+    expect(meteredBullets(["Up to 5 seats"], new Set<Capability>(["seat_cap"]))).toEqual([]);
   });
 
   it("states included pages on the card and in the ledger as one number", () => {
@@ -122,8 +145,15 @@ describe("plan entitlement", () => {
     -- would start taking cards. The gate therefore lives on the offer, not on the mode.
   */
   it("keeps a plan whose product is unfinished off self-serve checkout", () => {
+    // The gate is `planAvailability` (capabilities delivered and a configured price), not the commercial mode:
+    // WO-REL-1: DELIVERED holds the Personal/Developer line only; Team and Business wait on per-member source scopes
+    // nothing delivers, and the retired plans are never purchasable.
     expect(BILLING_OFFERS.studio_access.saleChannel).toBe("contact");
-    expect(BILLING_OFFERS.observer_access.saleChannel).toBe("self_serve");
+    expect(BILLING_OFFERS.observer_access.status).toBe("retired");
+    expect(BILLING_OFFERS.studio_access.status).toBe("retired");
+    expect(DELIVERED.has("per_member_source_scopes")).toBe(false);
+    expect(BILLING_OFFERS.team.requires).toContain("per_member_source_scopes");
+    expect(BILLING_OFFERS.business.requires).toContain("per_member_source_scopes");
     const pricing = readFileSync(new URL("../components/pricing-page-client.tsx", import.meta.url), "utf8");
     expect(pricing, "the pricing card must derive checkout from saleChannel")
       .toContain('offerCode: offer.saleChannel === "self_serve" ? offerCode : null');
@@ -131,8 +161,10 @@ describe("plan entitlement", () => {
       .toContain('if (!plan.offerCode || !liveCheckout) return `/contact?plan=${encodeURIComponent(plan.name)}`');
     expect(pricing, "a signed-out Developer buyer must carry the offer through sign-in")
       .toContain("return loginUrlForOffer(plan.offerCode)");
+    // One-step buy (2026-11-10, intended): the click goes through `buy`, which keeps the notice in the card.
     expect(pricing, "a signed-in Developer buyer must open the existing checkout")
-      .toContain("void startCheckout(plan.offerCode)");
+      .toContain("buy(plan.offerCode)");
+    expect(pricing).toContain("void startCheckout(offer)");
   });
 
   it("keeps secondary pricing detail available without leading with it", () => {

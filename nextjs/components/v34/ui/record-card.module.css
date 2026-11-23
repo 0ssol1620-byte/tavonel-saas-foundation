@@ -1,0 +1,84 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--v34-fg-rule);
+  border-radius: var(--v34-radius-panel);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.kind,
+.status {
+  margin: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-eyebrow);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.label {
+  color: var(--v34-fg);
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+
+.body {
+  min-width: 0;
+  color: var(--v34-fg-muted);
+  font-size: var(--v34-small);
+  line-height: 1.55;
+}
+
+.source {
+  margin: 0;
+  font-size: var(--v34-small);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg-link);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.link:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.link:hover {
+  color: var(--v34-fg);
+  text-decoration-thickness: 2px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+@media (forced-colors: active) {
+  .link:focus-visible { outline-color: Highlight; }
+}

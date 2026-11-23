@@ -22,7 +22,7 @@ async function installWorkspace(page: import("@playwright/test").Page) {
     { documentId: "source-ready-a", versionKey: "a".repeat(64), sanitizedKey: "immutable/ws/source-ready-a/a/sanitized.pdf", sanitizedSize: 1000, ocrJsonKey: "immutable/ws/source-ready-a/a/ocr.json", ocrJsonSize: 500, hasOcrJson: true, cdrReceiptKey: "immutable/ws/source-ready-a/a/cdr-receipt.json", ocrReviewKey: null, processingState: "ocr_ready" },
     { documentId: "source-held-b", versionKey: "b".repeat(64), sanitizedKey: "immutable/ws/source-held-b/b/sanitized.pdf", sanitizedSize: 1000, ocrJsonKey: null, ocrJsonSize: null, hasOcrJson: false, cdrReceiptKey: "immutable/ws/source-held-b/b/cdr-receipt.json", ocrReviewKey: "immutable/ws/source-held-b/b/ocr-review.json", processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW_TEXT_YIELD" },
   ] } }));
-  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
+  await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.route("**/api/v1/developer/audit?limit=100", route => route.fulfill({ json: { code: "OK", apiVersion: 1, events: [{ eventId: "event-1", action: "source.review_required", targetId: "source-held-b", actorUserId: null, actorKeyId: null, createdAt: "2026-09-01T00:00:00.000Z" }] } }));
   await page.route("**/api/v1/runs/events", route => route.fulfill({ status: 200, contentType: "text/event-stream", body: `event: snapshot\ndata: ${JSON.stringify({ code: "OK", observedAt: "2026-09-01T00:00:00.000Z", documents: [{}, {}] })}\n\n` }));
 }
@@ -124,13 +124,14 @@ test("command palette is keyboard reachable and closes with Escape", async ({ pa
 
 test("captures public architecture and authenticated run evidence", async ({ page }, testInfo) => {
   await page.goto("/enterprise");
-  // The page leads with the buyer's control outcome and carries identity, data handling,
-  // retention, audit, deployment review and support as the named sections beneath it.
-  await expect(page.getByRole("heading", { name: "Keep control of the knowledge your AI uses." })).toBeVisible();
+  // V34: the page leads with the organization it is for and carries scope, operation, activation and
+  // the security-review boundary as the named sections beneath it.
+  await expect(page.getByRole("heading", { level: 1, name: "Knowledge compiled for large organizations" })).toBeVisible();
   await testInfo.attach(`enterprise-${testInfo.project.name}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 
+  // V34 (D33 1.1): /knowledge-compiler answers 308 to /journal/compiler.
   await page.goto("/knowledge-compiler");
-  await expect(page.getByRole("heading", { name: "What is a Knowledge Compiler?" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What a knowledge compiler is and why it matters" })).toBeVisible();
   await testInfo.attach(`category-${testInfo.project.name}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 
   await installWorkspace(page);

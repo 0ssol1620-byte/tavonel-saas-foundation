@@ -1,6 +1,8 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureDocument, installFixtureSession, installWorkspaceRoutes, sseFrames } from "./fixtures/workspace-fixture";
 import { primaryCallToAction } from "../lib/commercial-state";
+import { CREATE_WORLD_LABEL } from "../components/v34/ui/create-world";
+import { WALKTHROUGH_ANCHOR } from "../components/v34/routes/home/home-content";
 
 /*
   Founder asks 2026-10-27: "pdf 어디에 올리라는거야? ... 파일 드래그앤드랍도 할 수 있게 해야하는거아냐?" (Home), and
@@ -88,28 +90,29 @@ async function onFirstScreen(page: Page, control: Locator, what: string, minHeig
   the self-serve action: sign in, then upload -- a door that is open in that posture, not a promise.
 */
 const ACCESS = primaryCallToAction();
+// The V34 hero: its primary action is the document entry ("Create your World"), its secondary the walkthrough anchor.
+const HERO_ENTRY = "main a[data-analytics='hero-primary']";
+const HERO_ACTIONS = "main a[data-analytics^='hero-']";
 const SELF_SERVE = ACCESS.href !== "/contact";
-for (const [path, label, href] of SELF_SERVE
-  ? [["/", ACCESS.label, ACCESS.href]] as const
-  : [["/", "Evaluate your documents", "/evaluation"]] as const) {
+for (const [path, label, href] of [["/", CREATE_WORLD_LABEL, ACCESS.href]] as const) {
   test(`Home's first screen names where your documents go, and the screen it opens keeps that promise (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     // A first visit: no session, no fixture user.
     await page.goto(path);
-    const entry = page.locator("#s1 a.lv2-entry");
+    const entry = page.locator(HERO_ENTRY);
     await expect(entry).toHaveCount(1);
     await expect(entry).toHaveText(label);
     await expect(entry).toHaveAttribute("href", href);
     await onFirstScreen(page, entry, "the document entry", 44);
     // Two hero actions, not three (DESIGN_MASTER_V3 §12.2). Without launch approval none of them promises an
     // upload behind sign-in; with it, the entry itself is the one sign-in door.
-    await expect(page.locator("#s1 [data-testid='landing-hero-actions'] a")).toHaveCount(2);
-    await expect(page.locator("#s1 a[href^='/login']")).toHaveCount(SELF_SERVE ? 1 : 0);
+    await expect(page.locator(HERO_ACTIONS)).toHaveCount(2);
+    await expect(page.locator(`${HERO_ENTRY}[href^='/login']`)).toHaveCount(SELF_SERVE ? 1 : 0);
     // Founder 2026-11-10: the document entry is the hero's primary action, first; the public sample is the secondary text link.
     await expect(entry).toHaveAttribute("data-analytics", "hero-primary");
-    await expect(page.locator("#s1 [data-testid='landing-hero-actions'] a").first()).toHaveClass(/\blv2-entry\b/);
-    const sample = page.locator("#s1 [data-testid='landing-hero-actions'] a.lv2-text-link");
-    await expect(sample).toHaveAttribute("href", "/explore");
+    await expect(page.locator(HERO_ACTIONS).first()).toHaveAttribute("data-analytics", "hero-primary");
+    const sample = page.locator("main a[data-analytics='hero-secondary']");
+    await expect(sample).toHaveAttribute("href", `#${WALKTHROUGH_ANCHOR}`);
     await expect(sample).toHaveAttribute("data-analytics", "hero-secondary");
     await entry.click();
     await page.waitForURL(`**${href}`);
@@ -122,12 +125,12 @@ for (const path of ["/"]) {
   test(`a file dropped on Home does not open in the tab, is not kept, and moves focus to the document entry (${path})`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "1440" && testInfo.project.name !== "390", "1440 and 390");
     await page.goto(path);
-    const entry = page.locator("#s1 a.lv2-entry");
+    const entry = page.locator(HERO_ENTRY);
     await expect(entry).toHaveCount(1);
     const stored = () => page.evaluate(async () => ({ local: localStorage.length, session: sessionStorage.length, databases: (await indexedDB.databases()).length }));
     const before = await stored();
     // The listener is attached after hydration: retry until the drop is cancelled.
-    await expect.poll(async () => (await dropPdfPrevented(page, "#lv2-hero-title")).drop, { timeout: 10_000 }).toBe(true);
+    await expect.poll(async () => (await dropPdfPrevented(page, "#v34-title")).drop, { timeout: 10_000 }).toBe(true);
     expect(await dropPdfPrevented(page, "footer"), "dragover and drop are cancelled anywhere on the page").toEqual({ dragover: true, drop: true });
     expect(new URL(page.url()).pathname, "the visitor stays on Home").toBe(path);
     await expect(entry).toBeFocused();

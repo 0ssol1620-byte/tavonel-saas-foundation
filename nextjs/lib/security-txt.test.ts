@@ -24,7 +24,7 @@ const fields = new Map(
 describe("security.txt", () => {
   it("names a security address the site already publishes", () => {
     expect(fields.get("Contact")).toBe("mailto:security@tavonel.com");
-    const contactPage = readFileSync(resolve(import.meta.dirname, "../app/contact/page.tsx"), "utf8");
+    const contactPage = readFileSync(resolve(import.meta.dirname, "../components/v34/routes/contact/contact-content.ts"), "utf8");
     expect(contactPage, "security.txt must not be the only place this address exists").toContain("security@tavonel.com");
   });
 

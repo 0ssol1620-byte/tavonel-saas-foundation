@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { createHash, randomBytes } from "node:crypto";
 import { resolve } from "node:path";
+import { installFixtureSession } from "./fixtures/workspace-fixture";
 
 /*
   G11 REMOTE-MCP (DECISION-REGISTER S6-09), contract stage.
@@ -162,6 +163,95 @@ test.describe("remote MCP with the switch on (fixture env)", () => {
       expect(overflow, `horizontal overflow at ${width}`).toBeLessThanOrEqual(0);
       await testInfo.attach(`remote-mcp-consent-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
     }
+  });
+
+  /*
+    D19 / F30-10: Allow runs the readiness precheck first. The decisions are stubbed with page.route
+    (the session is the fixture bearer; the fixture server has no service role), `describe` falls
+    through to the real server, and every decision the page posts is recorded.
+  */
+  async function consentWithReadiness(
+    { request, page }: { request: import("@playwright/test").APIRequestContext; page: import("@playwright/test").Page },
+    checks: Array<Record<string, unknown>>,
+    ready: boolean,
+  ) {
+    const registered = await request.post(`${base}/api/mcp/oauth/register`, { data: { client_name: "Fixture agent", redirect_uris: ["https://client.example/oauth/callback"] } });
+    const { client_id } = await registered.json() as { client_id: string };
+    const decisions: string[] = [];
+    await installFixtureSession(page);
+    await page.route("**/api/mcp/oauth/authorize", async (route) => {
+      const { decision } = route.request().postDataJSON() as { decision: string };
+      if (decision === "describe") return route.fallback();
+      decisions.push(decision);
+      if (decision === "precheck") return route.fulfill({ json: { code: "AUTHORIZATION_READINESS", ready, checks } });
+      return route.fulfill({ json: { code: "AUTHORIZATION_GRANTED", redirectTo: "https://client.example/oauth/callback?code=fixture" } });
+    });
+    await page.route("https://client.example/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>client</title>" }));
+    const query = new URLSearchParams({
+      response_type: "code",
+      client_id,
+      redirect_uri: "https://client.example/oauth/callback",
+      code_challenge: createHash("sha256").update("v".repeat(43)).digest("base64url"),
+      code_challenge_method: "S256",
+    });
+    await page.goto(`${base}/oauth/authorize?${query}`);
+    await expect(page.getByRole("button", { name: "Allow read-only access" })).toBeEnabled();
+    return decisions;
+  }
+  const noOverflow = async (page: import("@playwright/test").Page, label: string) =>
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), label).toBeLessThanOrEqual(0);
+
+  test("a workspace that fails readiness is told why on Allow, grants nothing and does not navigate, at three phone widths", async ({ request, page }) => {
+    const decisions = await consentWithReadiness({ request, page }, [
+      { id: "entitlement", ok: false, code: "TRIAL_FEATURE_NOT_INCLUDED" },
+      { id: "cohort", ok: false, code: "REMOTE_MCP_COHORT_EXCLUDED" },
+      { id: "active_world", ok: false, code: "NO_ACTIVE_WORLD", action: { href: "/workspace/sources" } },
+    ], false);
+    for (const width of [360, 390, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.getByRole("button", { name: "Allow read-only access" }).click();
+      const alert = page.locator(".auth-card [role=alert]");
+      await expect(alert).toContainText("Nothing was granted.");
+      await expect(alert).toContainText("a free evaluation cannot");
+      await expect(alert).toContainText("not in the current pilot group");
+      await expect(page.getByRole("button", { name: "Connect anyway" })).toHaveCount(0);
+      expect(new URL(page.url()).pathname).toBe("/oauth/authorize");
+      await noOverflow(page, `not-ready at ${width}`);
+    }
+    expect(decisions.every((decision) => decision === "precheck")).toBe(true);
+  });
+
+  test("an empty tenant sees the setup link and connects only on a second explicit click, at three phone widths", async ({ request, page }) => {
+    const decisions = await consentWithReadiness({ request, page }, [
+      { id: "entitlement", ok: true, code: "ENTITLEMENT_OK" },
+      { id: "cohort", ok: true, code: "COHORT_OK" },
+      { id: "active_world", ok: false, code: "NO_ACTIVE_WORLD", action: { href: "/workspace/sources" } },
+    ], true);
+    for (const width of [360, 390, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.getByRole("button", { name: "Allow read-only access" }).click();
+      await expect(page.getByText("No active World yet.")).toBeVisible();
+      await expect(page.getByRole("link", { name: "Add sources and compile a World" })).toHaveAttribute("href", "/workspace/sources");
+      await expect(page.getByRole("button", { name: "Connect anyway" })).toBeVisible();
+      await noOverflow(page, `no-world at ${width}`);
+      if (width !== 430) await page.reload();
+    }
+    expect(decisions).toEqual(["precheck", "precheck", "precheck"]);
+    await page.getByRole("button", { name: "Connect anyway" }).click();
+    await page.waitForURL(/^https:\/\/client\.example\/oauth\/callback\?code=fixture/);
+    expect(decisions).toEqual(["precheck", "precheck", "precheck", "approve"]);
+  });
+
+  test("a ready workspace goes straight from the precheck to the grant, with reduced motion", async ({ request, page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const decisions = await consentWithReadiness({ request, page }, [
+      { id: "entitlement", ok: true, code: "ENTITLEMENT_OK" },
+      { id: "cohort", ok: true, code: "COHORT_OK" },
+      { id: "active_world", ok: true, code: "ACTIVE_WORLD_OK" },
+    ], true);
+    await page.getByRole("button", { name: "Allow read-only access" }).click();
+    await page.waitForURL(/^https:\/\/client\.example\/oauth\/callback\?code=fixture/);
+    expect(decisions).toEqual(["precheck", "approve"]);
   });
 
   /*

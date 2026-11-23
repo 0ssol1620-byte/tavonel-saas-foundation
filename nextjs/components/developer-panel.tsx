@@ -7,6 +7,7 @@ import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import ConsumerVerificationPanel from "@/components/consumer-verification-panel";
 import { CONNECT_AI_SCOPES } from "@/components/workspace/connect-ai-panel";
+import AgentAccessPanel from "@/components/workspace/agent-access-panel";
 
 type ApiKey = {
   keyId: string;
@@ -172,6 +173,7 @@ export default function DeveloperPanel() {
           </div>
         </div>
       </div>
+      <AgentAccessPanel />
       <ConsumerVerificationPanel />
     </section>
   );

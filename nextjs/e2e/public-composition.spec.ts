@@ -23,10 +23,20 @@ const EDITORIAL_ROUTES = [
   "/terms",
 ] as const;
 
+// Lead decision 12 (WO-CI-24): the /knowledge-compiler row is retired; it answers 308 to a journal
+// article (/journal/compiler), which has no proof-registry hero to balance.
 const REGISTRY_ROUTES = [
-  "/knowledge-compiler",
   "/reproducibility",
 ] as const;
+
+/*
+  V34 (WO-CI-5a). /product, /product/compiled-world and /knowledge-compiler answer 308 to their V34
+  pages (/platform, /world, /journal/compiler), and /developers, /enterprise, /evidence and /security
+  are V34 registry pages. A V34 page has no legacy `.body` / `.document-title`: its claim is the page's
+  one H1, `#v34-title` (components/v34/ui/hero.tsx), set in the Hero's copy column, which is the first
+  column of the Hero's shell -- or, on a journal article, the article head. The same widths, line
+  counts and column counts are asserted on those elements.
+*/
 
 test("solution pages use a readable hero and visible source-bound proof", async ({ page }) => {
   for (const route of SOLUTION_ROUTES) {
@@ -101,8 +111,10 @@ test("desktop editorial pages reserve enough width for their primary claim", asy
   for (const route of EDITORIAL_ROUTES) {
     await page.goto(route);
     const result = await page.evaluate(() => {
-      const body = document.querySelector<HTMLElement>("main .body, main .product-overview .shell > div:first-child");
-      const title = document.querySelector<HTMLElement>("main .document-title");
+      const v34Title = document.querySelector<HTMLElement>("main #v34-title, main article h1");
+      const body = document.querySelector<HTMLElement>("main .body, main .product-overview .shell > div:first-child")
+        ?? v34Title?.parentElement?.parentElement ?? null;
+      const title = document.querySelector<HTMLElement>("main .document-title") ?? v34Title;
       if (!body || !title) return null;
       const first = body.firstElementChild?.getBoundingClientRect();
       const titleRange = document.createRange();
@@ -125,9 +137,13 @@ test("proof registry pages balance their category claim and explanation", async 
   for (const route of REGISTRY_ROUTES) {
     await page.goto(route);
     const geometry = await page.evaluate(() => {
-      const hero = document.querySelector<HTMLElement>("main > section")!;
+      // The section holding the page's H1 (a legacy proof registry's first section, a V34 page's Hero or article head).
+      const h1 = document.querySelector<HTMLElement>("main h1")!;
+      const hero = h1.closest<HTMLElement>("main > section, main > article, main > div > section") ?? document.querySelector<HTMLElement>("main > section")!;
       const title = hero.querySelector<HTMLElement>("h1")!;
-      const summary = hero.querySelector<HTMLElement>("aside p")!;
+      // The explanation: the legacy hero's aside, or the first paragraph after the H1.
+      const summary = hero.querySelector<HTMLElement>("aside p")
+        ?? [...hero.querySelectorAll<HTMLElement>("p")].find((p) => Boolean(title.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING))!;
       const titleRange = document.createRange();
       titleRange.selectNodeContents(title);
       const heroStyle = getComputedStyle(hero);

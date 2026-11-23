@@ -11,6 +11,7 @@ import { WORKSPACE_EXPORT_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 import { collectionSourceDocumentIds } from "@/lib/collection-source-access";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
+import { aclFreshnessHeader, authorizeConnectorCriticalRead } from "@/lib/connector-critical-read";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -106,7 +107,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {
     status: authorizedNow.status, headers: NO_STORE,
   });
-  const sourceAccessNow = await checkConnectorSourceAccessForViewer(auth.principal.workspaceKey, documentIds, auth.principal.userId);
+  // Delivery is a critical read: re-check the provider now, never the cached snapshot (F30-07).
+  const sourceAccessNow = await authorizeConnectorCriticalRead({
+    workspaceKey: auth.principal.workspaceKey, documentIds, viewerUserId: auth.principal.userId, signal: request.signal,
+  });
   if (!sourceAccessNow.ok) return NextResponse.json({ code: sourceAccessNow.code }, {
     status: sourceAccessNow.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
   });
@@ -132,6 +136,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         "Content-Length": String(signed.archive.byteLength),
         "X-Content-Type-Options": "nosniff",
         "X-Tavonel-Candidate-Promotion": "false",
+        "X-Tavonel-Acl-Freshness": aclFreshnessHeader(sourceAccessNow.freshness),
         "X-Tavonel-Export-Manifest-Sha256": signed.signature.signedPayloadSha256,
         "X-Tavonel-Export-Key-Id": signed.signature.keyId,
       },

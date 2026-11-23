@@ -1,6 +1,5 @@
-import { PHONE_HERO_STILL_REASON, phoneShowsStill } from "../lib/hero-phone-mode";
 import { expect, test } from "@playwright/test";
-const BENCH = "section#s2 article[data-case-status]";
+import { HERO } from "../components/v34/routes/home/home-content";
 
 /*
   What the landing offers as evidence, after the founder's 2026-09-20 hero decision.
@@ -25,83 +24,46 @@ const BENCH = "section#s2 article[data-case-status]";
   /explore, and `e2e/public-composition.spec.ts` on the five solution pages.
 */
 
-test("the landing makes no proof-shaped claim of its own", async ({ page }, testInfo) => {
-  test.skip(phoneShowsStill(testInfo.project.name), PHONE_HERO_STILL_REASON);
+/*
+  V34 Home (WO-CI-5b). The Landing V2 workbench (`#s2 article[data-case-status]`) is gone; the page's evidence is the
+  public reference corpus, named as such, and its figures are computed from it. The standard has not moved: the page
+  makes no proof-shaped claim of its own -- no customer proof, no certification, no figure outside the corpus.
+*/
+const HEADLINE = `${HERO.titleLead}${HERO.titleAccent}`;
+const homeHeadline = async (page: import("@playwright/test").Page) =>
+  (await page.locator("h1").innerText()).replace(/\s+/g, " ").trim();
+
+test("the landing makes no proof-shaped claim of its own", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("Context your AI can cite, compiled from your documents.");
+  await expect(page.locator("h1")).toHaveCount(1);
+  expect(await homeHeadline(page)).toBe(HEADLINE);
   await expect(page.locator("[data-proof-variant]")).toHaveCount(0);
   await expect(page.locator("[data-source-sheet]")).toHaveCount(0);
-
-  /*
-    The evidence the page does offer: a real page render with the region the compiler stored drawn
-    on it, and the passage read from that region, in the scene under the hero.
-  */
-  const raster = page.locator(`${BENCH} img`);
-  expect(await raster.count(), "the proof scene renders no source page").toBeGreaterThan(0);
-  await expect(raster.first()).toHaveAttribute("alt", /\S/);
-  expect(await page.locator(`${BENCH} [data-region-id]`).count(), "no region is drawn on it")
-    .toBeGreaterThan(0);
-  await expect(page.locator(`${BENCH} [data-hero-evidence]`))
-    .toBeVisible();
-  /*
-    The film opens in Scene 01; the source-linked specimen and Evidence Inspector follow in
-    Scene 02. Nothing is a fabricated result, and each Explore link resolves to its source.
-    Founder 2026-11-10: Scene 01's film is the four compile cuts in one tabbed slot (hero-compile-tabs.tsx), whose
-    live canvas from 900px is the only canvas the hero may hold; the recorded walkthrough sits below it, in #walkthrough.
-  */
-  await expect(page.locator(`${BENCH} button[aria-pressed]`)).toHaveCount(3);
-  await expect(page.locator(`${BENCH} details`)).not.toHaveAttribute("open");
-  await expect(page.locator(BENCH)).toContainText("processing not yet run");
-  await expect(page.locator('section#s1 canvas:not(figure[data-testid="hero-compile-tabs"] [role="tabpanel"] canvas)')).toHaveCount(0);
-  await expect(page.locator('section#s1 h1 + .lv2-hero-support + [data-testid="landing-hero-actions"] + figure[data-testid="hero-compile-tabs"]')).toHaveCount(1);
-  await expect(page.locator('section#s1 figure[data-testid="hero-compile-tabs"]').getByRole("tab")).toHaveCount(4);
-  await expect(page.locator("#walkthrough .compile-film-sequence").getByRole("tab")).toHaveCount(4);
-  await expect(page.locator("section#s2 [data-source-inspection-film]")).toHaveCount(0);
-  await expect(page.locator("section#s2 .lv2-film-note")).toHaveCount(0);
-  await expect(page.locator("section#s2 [data-compiler-specimen]")).toHaveCount(0);
-  await expect(page.getByTestId("landing-hero-film")).toBeVisible();
+  // The evidence the page does offer is labelled for what it is.
+  await expect(page.locator("#walkthrough")).toContainText("Public reference corpus");
+  await expect(page.locator("[data-world-instrument]")).toHaveAttribute("aria-label", "Public reference corpus");
+  const claims = await page.locator("main").evaluate(main => {
+    const copy = main.cloneNode(true) as HTMLElement;
+    // The figures the corpus computes are the one place a number may be printed.
+    copy.querySelectorAll("[data-world-instrument], dl, [aria-label=\"Record layers, source to change\"], [data-v34-walkthrough]").forEach(node => node.remove());
+    return copy.innerText;
+  });
+  expect(claims, "a figure printed outside the corpus").not.toMatch(/\b\d{1,3}(?:,\d{3})+\b|\d\s?%|[$€£₩]\s?\d/);
+  expect(claims).not.toMatch(/trusted by|customer success|case stud(?:y|ies)|testimonial|certified|SOC ?2|ISO ?27001|guarantee/i);
 });
 
-test("every /explore link on the landing opens a route that resolves", async ({ page, request }) => {
+test("every internal link on the landing opens a route that resolves", async ({ page, request }) => {
   await page.goto("/");
-  const hrefs = await page.locator('main a[href^="/explore"]').evaluateAll((nodes) =>
+  const hrefs = await page.locator('main a[href^="/"]').evaluateAll((nodes) =>
     [...new Set(nodes.map((node) => node.getAttribute("href")!))],
   );
-  // The bare route the hero and close open, plus proof's deep links into the evidence act.
-  expect(hrefs, "the landing offers the Explore route itself").toContain("/explore");
-  expect(hrefs.some((href) => href.startsWith("/explore?act=evidence")), "and the record behind the claim").toBe(true);
+  // The hero's primary action, the World, the journal and the plans are on it.
+  for (const path of ["/world", "/journal/compiler", "/pricing"]) expect(hrefs, `the landing offers ${path}`).toContain(path);
+  expect(hrefs.length, "the landing is more than its hero").toBeGreaterThan(10);
   for (const href of hrefs) {
     const response = await request.get(href);
     expect(response.status(), `${href} does not resolve`).toBe(200);
   }
-});
-
-test("the hero and every scene below it fit the viewport at the active product-QA width", async ({ page }) => {
-  await page.goto("/");
-  const width = page.viewportSize()?.width ?? 1440;
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-
-  const hero = page.locator("section#s1");
-  const title = page.locator("h1#lv2-hero-title");
-  const demo = page.locator(BENCH);
-  await expect(hero).toBeVisible();
-  await expect(title).toBeVisible();
-  await expect(demo).toBeVisible();
-  const box = await demo.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.x).toBeGreaterThanOrEqual(-1);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
-
-  // Every scene below it stays inside the viewport too, which is where the old frames failed.
-  for (const id of ["s2", "s3", "s4", "s5", "s6"]) {
-    const scene = page.locator(`section#${id}`);
-    await scene.scrollIntoViewIfNeeded();
-    const sceneBox = await scene.boundingBox();
-    expect(sceneBox, `${id} has no box`).not.toBeNull();
-    expect(sceneBox!.x).toBeGreaterThanOrEqual(-1);
-    expect(sceneBox!.x + sceneBox!.width).toBeLessThanOrEqual(width + 1);
-  }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
 test("a /ko link lands on the English page it names (GX-02, global-only)", async ({ page }) => {
@@ -113,7 +75,7 @@ test("a /ko link lands on the English page it names (GX-02, global-only)", async
   await page.goto("/ko");
   expect(new URL(page.url()).pathname).toBe("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.locator("h1#lv2-hero-title")).toContainText("Context your AI can cite");
+  expect(await homeHeadline(page)).toBe(HEADLINE);
   await expect(page.locator('a[hreflang="ko"], a[href="/ko"], a[href^="/ko/"]')).toHaveCount(0);
 });
 

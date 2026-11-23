@@ -5,11 +5,13 @@ import PricingPageClient, {
 } from "@/components/pricing-page-client";
 import type { Metadata } from "next";
 import { activationPolicy } from "@/lib/activation-policy";
-import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, planAvailability, readConfiguredBillingOffers, type BillingOfferCode } from "@/lib/billing-catalog";
 import { billingProductDecision, type ProductAccessLevel, type ProductAccessRole } from "@/lib/billing-product-access";
 import type { FoundationBillingAccount } from "@/lib/billing-store";
 import { readPublicStatusV2 } from "@/lib/public-status";
-import { primaryCallToAction } from "@/lib/commercial-state";
+import SiteFooter from "@/components/v34/shell/site-footer";
+import SiteHeader from "@/components/v34/shell/site-header";
+import { v34Route } from "@/lib/v34/routes";
 
 export const dynamic = "force-dynamic";
 
@@ -78,16 +80,18 @@ const CAPABILITIES: ReadonlyArray<{ capability: string; route: string; level: Pr
   { capability: "Review a candidate: continue, retry, remove, cancel", route: "app/api/v1/reviews/route.ts", level: "observer" },
   { capability: "Ask, with evidence, over what your plan can reach", route: "app/api/collections/[id]/ask/route.ts", level: "observer" },
   { capability: "API keys and MCP access", route: "app/api/developer/keys/route.ts", level: "observer" },
-  { capability: "Google Drive and file-server connections", route: "app/api/v1/oauth-connectors/authorize/route.ts", level: "connections" },
+  { capability: "Local-folder connections", route: "app/api/connections/route.ts", level: "connections" },
   { capability: "Activate a candidate World", route: "app/api/collections/[id]/promote/route.ts", level: "activation" },
   { capability: "Roll back the active World to an earlier revision", route: "app/api/collections/[id]/world/rollback/route.ts", level: "activation" },
 ];
 
+/** The entitlement function answers for the access level a plan carries; catalog v2 plans share the two levels the gates know. */
 function account(plan: BillingOfferCode): FoundationBillingAccount {
-  return { accessPlan: plan, subscriptionStatus: "active", billingHold: false } as FoundationBillingAccount;
+  return { accessPlan: BILLING_OFFERS[plan].accessLevel, subscriptionStatus: "active", billingHold: false } as FoundationBillingAccount;
 }
 
-const PLAN_CODES = Object.keys(BILLING_OFFERS) as BillingOfferCode[];
+/** The plans a visitor can choose. A retired offer stays in the catalog for its holders and is never rendered here. */
+const PLAN_CODES = (Object.keys(BILLING_OFFERS) as BillingOfferCode[]).filter((code) => BILLING_OFFERS[code].status !== "retired");
 
 const ENTITLEMENT_ROWS: PlanCapabilityRow[] = CAPABILITIES.map((row) => ({
   capability: row.capability,
@@ -151,11 +155,21 @@ const PLAN_CAPABILITIES: PlanCapabilityRow[] = [...ENTITLEMENT_ROWS, ...UNSOLD_R
 */
 export default function PricingPage() {
   const status = readPublicStatusV2();
+  /*
+    Catalog v2. Whether a plan is bought here or requested is decided once, on the server, from what the
+    product delivers and which price ids this deployment holds (`planAvailability`). The client receives
+    the answer as data and reads no environment of its own, so the markup it hydrates is the markup that
+    was sent, whatever a browser could or could not see.
+  */
+  const configured = readConfiguredBillingOffers();
+  const availability = Object.fromEntries(PLAN_CODES.map((code) => [code, planAvailability(code, configured)]));
   return (
     <PricingPageClient
+      availability={availability}
       initialLiveCheckout={status.availableActions.purchasePlan.enabled}
       initialSelfService={status.availableActions.createAccount.enabled}
-      headerStart={primaryCallToAction()}
+      header={<SiteHeader currentPath={v34Route("pricing").path} />}
+      footer={<SiteFooter />}
       gates={PURCHASE_GATES}
       planCapabilities={PLAN_CAPABILITIES}
     />

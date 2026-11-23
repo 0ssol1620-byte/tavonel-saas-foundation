@@ -231,10 +231,13 @@ export type LibraryDuplicate = Readonly<{
   /** The compare view's data: which representation matched, in public words (no method name). */
   evidence: Readonly<{ matchedOn: readonly ("file" | "text" | "text_similarity")[] }>;
 }>;
+/** A label a person rejected, and nobody has confirmed or undone since: never shown as a proposal, and its Undo is offered. */
+export type LibraryRejectedLabel = Readonly<{ kind: "doc_type" | "topic"; label: string; state: "rejected_by_person" }>;
 export type LibraryDocument = Readonly<{
   documentId: string;
   documentType: LibraryDocumentType | null;
   topics: readonly LibraryTopicTag[];
+  rejected: readonly LibraryRejectedLabel[];
   duplicates: readonly LibraryDuplicate[];
 }>;
 
@@ -285,6 +288,35 @@ export async function readLibraryInternal(workspaceKey: string, documentIds: rea
   return view ? { ok: true, view } : { ok: false, code: "LIBRARY_ORGANIZE_RESPONSE_INVALID" };
 }
 
+/** Newest first by creation time; rows created in one instant keep the store's order, the later one first. */
+const newestFirst = (labels: readonly LibraryInternalLabel[]) =>
+  labels.map((label, index) => ({ label, index }))
+    .sort((a, b) => (a.label.createdAt === b.label.createdAt ? b.index - a.index : a.label.createdAt < b.label.createdAt ? 1 : -1))
+    .map(({ label }) => label);
+/**
+ * The method version of a person's Undo row (decide_library_label with `undo_confirmed` / `undo_rejected`). It is not a
+ * decision: it withdraws the one decision row whose inputs digest is its first evidence id, which the store chose under
+ * its lock as the newest decision standing on that label.
+ */
+export const PERSON_UNDO_METHOD_VERSION = "person-undo:v1";
+/**
+ * What a person's decisions on one label kind say now, per label key: the newest decision nobody withdrew wins, whatever
+ * it follows. A Reject after a Confirm is a rejection, by whoever confirmed it; only an Undo row withdraws a decision, and
+ * withdrawing the newest one leaves exactly what stood before it. Map order is the order of each key's standing decision,
+ * so the last confirmed entry is the most recent confirmation.
+ */
+const standingDecisions = (rows: readonly LibraryInternalLabel[]) => {
+  const ref = (labelKey: string, digest: unknown) => JSON.stringify([labelKey, digest ?? null]);
+  const withdrawn = new Set(rows.filter((r) => r.methodVersion === PERSON_UNDO_METHOD_VERSION).map((r) => ref(r.labelKey, r.evidenceIds[0])));
+  const standing = new Map<string, LibraryInternalLabel>();
+  for (const row of newestFirst(rows.filter((r) => (r.disposition === "confirmed" || r.disposition === "rejected")
+    && r.methodVersion !== PERSON_UNDO_METHOD_VERSION && !withdrawn.has(ref(r.labelKey, r.inputsSha256)))).reverse()) {
+    standing.delete(row.labelKey);
+    standing.set(row.labelKey, row);
+  }
+  return standing;
+};
+
 /**
  * Internal -> public, field by field. Per document: a person's decision wins; otherwise the
  * production proposer's latest run (its newest inputs digest), so an Arena arm recorded in shadow
@@ -300,19 +332,27 @@ export function toLibraryDocuments(view: LibraryInternalView, documentIds: reado
     const documentId = raw.toLowerCase();
     const mine = view.labels.filter((label) => label.documentId === documentId);
     const types = mine.filter((label) => label.labelKind === "doc_type");
-    const confirmedType = types.find((label) => label.disposition === "confirmed" && DOC_TYPE_SET.has(label.labelKey));
+    // The document has one type: the most recently confirmed label whose newest standing decision is a confirmation.
+    // Rejecting it or undoing it falls back to the label confirmed before it, else to the production proposal, unless a
+    // person's newest standing decision on that proposal is a rejection.
+    const decided = [...standingDecisions(types).values()];
+    const confirmedType = [...decided].reverse().find((label) => label.disposition === "confirmed" && DOC_TYPE_SET.has(label.labelKey));
+    const rejectedTypes = new Set(decided.filter((label) => label.disposition === "rejected").map((label) => label.labelKey));
     const proposedType = latestRun(types.filter((label) => label.methodVersion === productionDocTypeMethodVersion
       && (label.disposition === "proposed" || label.disposition === "abstained")))[0];
     const documentType: LibraryDocumentType | null = confirmedType ? { label: confirmedType.labelKey as DocType, state: "confirmed" }
       : !proposedType ? null
-        : proposedType.disposition === "abstained" || !DOC_TYPE_SET.has(proposedType.labelKey) ? { label: null, state: "abstained" }
+        : proposedType.disposition === "abstained" || !DOC_TYPE_SET.has(proposedType.labelKey) || rejectedTypes.has(proposedType.labelKey)
+          ? { label: null, state: "abstained" }
           : { label: proposedType.labelKey as DocType, state: "proposed" };
     const topicRows = mine.filter((label) => label.labelKind === "topic");
-    const rejected = new Set(topicRows.filter((label) => label.disposition === "rejected").map((label) => label.labelKey));
+    // For a topic the standing decision per label decides: confirmed shows it, rejected hides it, even from the proposals
+    // of any later run; an undone one (confirm then undo, reject then undo) leaves the proposal as it was.
+    const topicDecisions = standingDecisions(topicRows);
     const topics = new Map<string, LibraryTopicTag>();
-    for (const label of topicRows.filter((row) => row.disposition === "confirmed")) topics.set(label.labelKey, { label: label.labelKey, state: "confirmed" });
+    for (const [key, label] of topicDecisions) if (label.disposition === "confirmed") topics.set(key, { label: key, state: "confirmed" });
     for (const label of latestRun(topicRows.filter((row) => row.disposition === "proposed" || row.disposition === "abstained"))) {
-      if (label.disposition === "proposed" && !rejected.has(label.labelKey) && !topics.has(label.labelKey)) {
+      if (label.disposition === "proposed" && !topicDecisions.has(label.labelKey) && !topics.has(label.labelKey)) {
         topics.set(label.labelKey, { label: label.labelKey, state: "proposed" });
       }
     }
@@ -328,7 +368,11 @@ export function toLibraryDocuments(view: LibraryInternalView, documentIds: reado
           .map((item) => (typeof item === "string" ? PUBLIC_MATCHED_ON[item] : undefined))
           .filter((item): item is "file" | "text" | "text_similarity" => item !== undefined))] },
       }));
-    return { documentId, documentType, topics: [...topics.values()], duplicates };
+    const rejected: LibraryRejectedLabel[] = [
+      ...decided.filter((label) => label.disposition === "rejected" && DOC_TYPE_SET.has(label.labelKey)).map((label) => ({ kind: "doc_type" as const, label: label.labelKey })),
+      ...[...topicDecisions.values()].filter((label) => label.disposition === "rejected").map((label) => ({ kind: "topic" as const, label: label.labelKey })),
+    ].map((label) => ({ ...label, state: "rejected_by_person" as const }));
+    return { documentId, documentType, topics: [...topics.values()], rejected, duplicates };
   });
 }
 
@@ -339,9 +383,8 @@ export function toLibraryDocuments(view: LibraryInternalView, documentIds: reado
  * document is not named.
  */
 export async function readLibraryDocuments(workspaceKey: string, documentIds: readonly string[], viewerUserId: string,
-  env: Env = process.env): Promise<{ ok: true; documents: LibraryDocument[] } | { ok: false; code: string }> {
-  if (libraryOrganizeMode(env) !== "on" || env.TAVONEL_PROCESSING_WORKSPACE_COHORT === undefined
-    || processingCohortRefusal(workspaceKey, env) !== null) return { ok: false, code: "LIBRARY_ORGANIZE_NOT_ENABLED" };
+  env: Env = process.env): Promise<{ ok: true; documents: LibraryDocument[]; sourceVersions: Record<string, string> } | { ok: false; code: string }> {
+  if (!libraryEnabled(workspaceKey, env)) return { ok: false, code: "LIBRARY_ORGANIZE_NOT_ENABLED" };
   const read = await readLibraryInternal(workspaceKey, documentIds, env);
   if (!read.ok) return read;
   // ponytail: one access check per document (the checker answers all-or-nothing); batch when B4 renders a full Library page.
@@ -349,9 +392,79 @@ export async function readLibraryDocuments(workspaceKey: string, documentIds: re
   const readable = new Set((await Promise.all(ids.map(async (id) =>
     (await checkConnectorSourceAccessForViewer(workspaceKey, [id], viewerUserId)).ok ? id : null)))
     .filter((id): id is string => id !== null));
+  const requested = new Set(documentIds.map((id) => id.toLowerCase()));
+  // The source version a decision must name: the newest one each readable requested document has labels for.
+  const sourceVersions: Record<string, string> = {};
+  for (const label of newestFirst(read.view.labels)) {
+    if (requested.has(label.documentId) && readable.has(label.documentId) && !(label.documentId in sourceVersions)) sourceVersions[label.documentId] = label.sourceVersionId;
+  }
   return {
     ok: true,
     documents: toLibraryDocuments(read.view, documentIds.filter((id) => readable.has(id.toLowerCase())))
       .map((document) => ({ ...document, duplicates: document.duplicates.filter((duplicate) => readable.has(duplicate.relatedDocumentId)) })),
+    sourceVersions,
   };
+}
+
+/** The Library answers only under `on` for a workspace inside an explicitly set processing cohort. */
+function libraryEnabled(workspaceKey: string, env: Env) {
+  return libraryOrganizeMode(env) === "on" && env.TAVONEL_PROCESSING_WORKSPACE_COHORT !== undefined
+    && processingCohortRefusal(workspaceKey, env) === null;
+}
+
+// Keys and idempotency keys carry no control characters (the migration checks the same).
+const CONTROL = /[\u0000-\u001f\u007f]/;
+
+/** A decision, or the Undo of the decision standing on that label (`undo_<what it withdraws>`). */
+export type LibraryDecision = "confirmed" | "rejected" | "undo_confirmed" | "undo_rejected";
+export const LIBRARY_DECISIONS: readonly LibraryDecision[] = ["confirmed", "rejected", "undo_confirmed", "undo_rejected"];
+export type LibraryDecisionInput = Readonly<{
+  documentId: string; sourceVersionId: string; labelKind: "doc_type" | "topic"; labelKey: string;
+  decision: LibraryDecision; idempotencyKey: string;
+}>;
+export type LibraryDecisionResult = { ok: true; replayed: boolean } | { ok: false; code: string; status: number };
+
+/**
+ * A person's decision is one appended row; it deletes and edits nothing. An Undo is one appended row that withdraws the
+ * decision standing on the label, chosen by the store under its lock; when that is no longer the decision the person
+ * undoes (someone decided since), the store refuses it as stale and nothing is written.
+ */
+export async function decideLibraryLabel(workspaceKey: string, input: LibraryDecisionInput, decidedByUserId: string,
+  env: Env = process.env): Promise<LibraryDecisionResult> {
+  if (!libraryEnabled(workspaceKey, env)) return { ok: false, code: "LIBRARY_ORGANIZE_NOT_ENABLED", status: 404 };
+  const invalid = { ok: false as const, code: "LIBRARY_DECISION_REQUEST_INVALID", status: 400 };
+  if (!UUID.test(input.documentId.toLowerCase()) || !UUID.test(decidedByUserId.toLowerCase()) || !/^[a-f0-9]{64}$/.test(input.sourceVersionId)
+    || (input.labelKind !== "doc_type" && input.labelKind !== "topic") || !LIBRARY_DECISIONS.includes(input.decision)
+    || input.labelKey.length < 1 || input.labelKey.length > 64 || CONTROL.test(input.labelKey)
+    || (input.labelKind === "doc_type" && !DOC_TYPE_SET.has(input.labelKey))
+    || input.idempotencyKey.length < 8 || input.idempotencyKey.length > 128 || CONTROL.test(input.idempotencyKey)) return invalid;
+  const config = readSupabaseAdminConfig(env);
+  if (!config) return { ok: false, code: "LIBRARY_ORGANIZE_STORE_NOT_CONFIGURED", status: 503 };
+  let response: Response;
+  try {
+    response = await supabaseAdminRequest(config, "/rest/v1/rpc/decide_library_label", {
+      method: "POST", body: JSON.stringify({
+        p_workspace_key: workspaceKey, p_document_id: input.documentId.toLowerCase(), p_source_version_id: input.sourceVersionId,
+        p_label_kind: input.labelKind, p_label_key: input.labelKey, p_decision: input.decision,
+        p_decided_by: decidedByUserId.toLowerCase(), p_idempotency_key: input.idempotencyKey,
+      }),
+    });
+  } catch {
+    return { ok: false, code: "LIBRARY_ORGANIZE_STORE_UNREACHABLE", status: 503 };
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: unknown; code?: unknown } | null;
+    const message = typeof body?.message === "string" ? body.message : "";
+    if (body?.code === "PGRST202" || body?.code === "42883") return { ok: false, code: "LIBRARY_ORGANIZE_MIGRATION_ABSENT", status: 503 };
+    if (message.includes("library_decision_conflict")) return { ok: false, code: "LIBRARY_DECISION_CONFLICT", status: 409 };
+    if (message.includes("library_decision_stale")) return { ok: false, code: "LIBRARY_DECISION_STALE", status: 409 };
+    if (message.includes("library_decision_target_missing")) return { ok: false, code: "LIBRARY_DECISION_TARGET_MISSING", status: 404 };
+    if (message.includes("library_decision_request_invalid")) return invalid;
+    return { ok: false, code: "LIBRARY_ORGANIZE_STORE_FAILED", status: 503 };
+  }
+  const body = await response.json().catch(() => null) as { schemaVersion?: unknown; replayed?: unknown } | null;
+  if (body?.schemaVersion !== "tavonel.library_decision.v1" || typeof body.replayed !== "boolean") {
+    return { ok: false, code: "LIBRARY_ORGANIZE_RESPONSE_INVALID", status: 503 };
+  }
+  return { ok: true, replayed: body.replayed };
 }

@@ -1,9 +1,31 @@
+import { measureInSentenceLinks } from "./in-sentence-links";
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
 const { expect, test } = "test" in playwrightModule ? playwrightModule : playwrightModule.default;
 
 const PHONE = ["360", "390"];
 const NARROW = ["360", "390", "768"];
+
+/*
+  V34 (WO-CI-5a). The chrome is the V34 shell: `[data-v34-header]`, whose phone row is the home link and
+  the drawer trigger ("Open navigation"), a native `<dialog>` drawer listing `V34_PRIMARY_NAV` with the
+  More groups as `<details>` accordions, Sign in and the start action, and the footer at the V34 page
+  root. A route the program moved answers 308 to its V34 page. The contracts are unchanged.
+*/
+const HEADER = "[data-v34-header]";
+const DRAWER = `${HEADER} dialog`;
+// V34_PRIMARY_NAV's labels and destinations (lib/v34/nav.ts; the module reaches next/navigation, so it is restated here).
+const PRIMARY = [["Product", "/platform"], ["Solutions", "/solutions"], ["Integrations", "/connect"], ["Pricing", "/pricing"], ["Journal", "/journal"]] as const;
+
+async function openDrawer(page: import("@playwright/test").Page) {
+  const trigger = page.locator(HEADER).getByRole("button", { name: "Open navigation" });
+  // The drawer opens from a hydrated handler; a press before hydration does nothing, so press until it opens.
+  await expect(async () => {
+    if (!(await page.locator(DRAWER).isVisible())) await trigger.click();
+    await expect(page.locator(DRAWER)).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  return { trigger, drawer: page.locator(DRAWER), rows: page.locator(`${DRAWER} nav[aria-label="Site"] > ul > li > a`) };
+}
 
 /*
   Landing V2 (contract D1, D13), amended by the six-beat homepage on 2026-09-20.
@@ -50,7 +72,7 @@ test("nothing on the narrow landing is laid out outside the viewport", async ({ 
       if (!(paneW > 0 && paneW <= 912)) return false;
       return getComputedStyle(element).position === "absolute" && Math.abs(element.offsetWidth - frame.clientWidth * 2880 / paneW) <= 2;
     };
-    for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
+    for (const element of document.querySelectorAll<HTMLElement>("[data-v34-header] *, main *, [data-v34-site] > footer *")) {
       const box = element.getBoundingClientRect();
       if (!box.width || !box.height) continue;
       if ((box.left < -1 || box.right > innerWidth + 1) && !clippedByScroller(element) && !declaredPhonePane(element)) result.push(`${element.tagName}.${String(element.className).slice(0, 36)}`);
@@ -71,12 +93,17 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
       const rect = element.getBoundingClientRect();
       return { left: rect.left, right: rect.right };
     };
-    return { wordmark: read("header.nav .wordmark"), menu: read("header.nav .mobile-primary-nav summary"), actions: read("header.nav .nav-actions"), viewport: innerWidth };
+    return {
+      wordmark: read('[data-v34-header] > div > a[aria-label="TAVONEL home"]'),
+      menu: read('[data-v34-header] > div > button[aria-label="Open navigation"]'),
+      viewport: innerWidth,
+    };
   });
   expect(boxes.wordmark).not.toBeNull();
   expect(boxes.menu).not.toBeNull();
-  // Brief 2026-10-15 move 6: the narrow row is the wordmark and Menu; the actions are in the sheet.
-  await expect(page.locator("header.nav .nav-actions")).toBeHidden();
+  // Brief 2026-10-15 move 6: the narrow row is the wordmark and the menu; the actions are in the drawer.
+  await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
+  await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toBeHidden();
   expect(boxes.wordmark!.right).toBeLessThanOrEqual(boxes.menu!.left + 1);
   expect(boxes.menu!.right).toBeLessThanOrEqual(boxes.viewport + 1);
 });
@@ -84,17 +111,14 @@ test("the narrow header keeps brand, menu and commercial action inside one row",
 test("the mobile menu exposes four section choices, Pricing and Sign in, and the header row hides the actions", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
   await page.goto("/");
-  const menu = page.locator("header.nav details.mobile-primary-nav");
-  await menu.locator(":scope > summary").click();
-  const panel = menu.locator(":scope > nav");
-  await expect(panel).toBeVisible();
-  const direct = panel.locator("a.mobile-nav-direct");
-  // Brief 2026-10-15 move 6: Pricing is the sheet's last section row; the hero carries the action.
-  await expect(direct).toHaveCount(5);
-  await expect(direct).toHaveText(["Product", "How it works", "Resources", "Docs", "Pricing"]);
-  await expect(direct.last()).toHaveAttribute("href", "/pricing");
-  await expect(panel.locator("a.mobile-nav-cta")).toHaveCount(0);
-  await expect(page.locator("header .nav-actions")).toBeHidden();
+  const { trigger, drawer: panel, rows: direct } = await openDrawer(page);
+  // The drawer's rows are the bar's five items, Pricing among them.
+  await expect(direct).toHaveCount(PRIMARY.length);
+  await expect(direct).toHaveText(PRIMARY.map(([label]) => label));
+  expect(await direct.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(PRIMARY.map(([, href]) => href));
+  // The drawer's one start is its own foot, not a repeat of a header action still in the row.
+  await expect(panel.locator('a[data-analytics="header-start"]')).toHaveCount(1);
+  await expect(page.locator(`${HEADER} > div > :not(dialog) a[data-analytics="header-start"]`)).toBeHidden();
   /*
     Landing V2: Sign in moved the other way, and the two halves of that are one assertion each.
 
@@ -103,46 +127,48 @@ test("the mobile menu exposes four section choices, Pricing and Sign in, and the
     last row now, with a 44px target, and the header row below the desktop switch is the wordmark,
     the toggle and the action.
   */
-  await expect(panel.locator("a.mobile-nav-signin")).toHaveCount(1);
-  await expect(page.locator("header .nav-actions .nav-signin")).toBeHidden();
-  // NAV PANELS 2026-11-09: three of the rows carry a closed group toggle (Home owns no section).
-  await expect(panel.locator('button[aria-controls][aria-expanded="false"]')).toHaveCount(3);
+  await expect(panel.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(1);
+  await expect(page.locator(`${HEADER} > div > :not(dialog)`).getByRole("link", { name: "Sign in", exact: true })).toBeHidden();
+  // NAV PANELS 2026-11-09: the groups open closed (Home owns no section). V34: the More groups, as <details>.
+  const groups = panel.locator('nav[aria-label="Site"] details');
+  expect(await groups.count(), "the drawer carries the More groups").toBeGreaterThanOrEqual(1);
+  await expect(panel.locator('nav[aria-label="Site"] details[open]')).toHaveCount(0);
   const geometry = await panel.boundingBox();
   expect(geometry).not.toBeNull();
   expect(geometry!.x).toBeGreaterThanOrEqual(-1);
   expect(geometry!.x + geometry!.width).toBeLessThanOrEqual((page.viewportSize()?.width ?? 390) + 1);
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
-  await expect(menu.locator(":scope > summary")).toBeFocused();
+  await expect(trigger).toBeFocused();
 });
 
 /*
-  The shared bar owns Product's public sections, while Research remains a footer destination.
-  A section mark says "location"; only the Product hub itself says "page". Neither case should
-  assign a second owner, and navigating from an open sheet still closes it.
+  The shared bar owns its public sections, and no page gets a second owner. A section mark says
+  "location" (V34 `current()`: "true"); only the hub itself says "page". Navigating from an open
+  drawer still closes it. V34: /research is a More row, not a primary section, so the section case
+  is a journal article under Journal.
 */
 test("Product owns its public sections and using a mobile customer link closes the sheet", async ({ page }, testInfo) => {
   test.skip(!NARROW.includes(testInfo.project.name), "the mobile disclosure only renders below the desktop breakpoint");
-  await page.goto("/research");
-  const menu = page.locator("header.nav details.mobile-primary-nav");
-  await menu.locator(":scope > summary").click();
-  await expect(menu.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "location");
-  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-  await menu.locator('a.mobile-nav-direct[href="/pricing"]').click({ noWaitAfter: true });
-  await expect(menu.locator(":scope > nav")).toBeHidden();
+  await page.goto("/journal/compiler");
+  let { drawer, rows } = await openDrawer(page);
+  await expect(rows.and(page.locator('[href="/journal"]'))).toHaveAttribute("aria-current", "true");
+  await expect(rows.and(page.locator("[aria-current]"))).toHaveCount(1);
+  await rows.and(page.locator('[href="/pricing"]')).click({ noWaitAfter: true });
+  await expect(drawer).toBeHidden();
 
   await page.goto("/sources");
-  await menu.locator(":scope > summary").click();
-  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
-  await expect(menu.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
+  ({ drawer, rows } = await openDrawer(page));
+  await expect(rows.and(page.locator("[aria-current]"))).toHaveCount(0);
+  await expect(rows.and(page.locator('[aria-current="page"]'))).toHaveCount(0);
 
-  await menu.getByRole("link", { name: "Product", exact: true }).click();
-  await expect(page).toHaveURL(/\/product\/?$/);
-  await expect(menu.locator(":scope > nav")).toBeHidden();
-  await menu.locator(":scope > summary").click();
-  await expect(menu.getByRole("link", { name: "Product", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(menu.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-  await expect(menu.locator('a.mobile-nav-direct[aria-current="location"]')).toHaveCount(0);
+  await rows.and(page.getByRole("link", { name: "Product", exact: true })).click();
+  await expect(page).toHaveURL(/\/platform\/?$/);
+  await expect(drawer).toBeHidden();
+  ({ drawer, rows } = await openDrawer(page));
+  await expect(rows.and(page.getByRole("link", { name: "Product", exact: true }))).toHaveAttribute("aria-current", "page");
+  await expect(rows.and(page.locator("[aria-current]"))).toHaveCount(1);
+  await expect(rows.and(page.locator('[aria-current="true"]'))).toHaveCount(0);
 });
 
 test.describe("on a touch screen", () => {
@@ -206,10 +232,25 @@ test.describe("on a touch screen", () => {
       }
       window.scrollTo(0, 0);
     });
-    const short = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("a, button, summary, [role='tab']")]
-      .map(element => ({ element, rect: element.getBoundingClientRect() }))
-      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.height < 43.99)
-      .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height })));
+    /* WO-CI-30, on lead decisions 23 and 25: a link inside a sentence on a V34 route is a plain inline box whose
+       target is its text (WCAG 2.5.8 excepts it), and the rows at the end of this file measure that contract.
+       This floor is not asked of those links -- only of a link that measureInSentenceLinks finds inside a sentence,
+       plain, with none of its violations. Any other short control still fails here, and so does a link inside a
+       sentence that is a hit-area link or breaks a rule of the classifier. (WO-CI-36: the exemption reads what the
+       link IS and no longer which class it carries: /pricing and /evaluation are retained bodies whose links have no
+       class of the V34 sheets, and their sentence links are plain inline boxes now, lead decisions 23 and 25.
+       /integrations answers 308 to /connect, whose two in-sentence links measured 19 and 43.8px.) */
+    const sentence = (await page.evaluate(measureInSentenceLinks))
+      .filter(link => link.contract === "plain" && link.violations.length === 0)
+      .map(link => link.index);
+    const short = await page.evaluate(exempt => {
+      const main = [...document.querySelectorAll("main a[href]")];
+      return [...document.querySelectorAll<HTMLElement>("a, button, summary, [role='tab']")]
+        .filter(element => !exempt.some(index => main[index] === element))
+        .map(element => ({ element, rect: element.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.height < 43.99)
+        .map(({ element, rect }) => ({ tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 30), height: rect.height }));
+    }, sentence);
     expect(short).toEqual([]);
 
     /* The other axis, on the filter chips. A target is two-dimensional and these held the 44px
@@ -249,7 +290,7 @@ test.describe("on a touch screen", () => {
     });
     const clipped = await page.evaluate(() => {
       const result: { selector: string; axis: string; hidden: number }[] = [];
-      for (const element of document.querySelectorAll<HTMLElement>("header.nav *, main *, footer.site *")) {
+      for (const element of document.querySelectorAll<HTMLElement>("[data-v34-header] *, main *, [data-v34-site] > footer *")) {
         const style = getComputedStyle(element);
         const box = element.getBoundingClientRect();
         if (box.width <= 1 && box.height <= 1) continue;
@@ -283,5 +324,91 @@ test.describe("on a touch screen", () => {
     });
     expect(clipped).toEqual([]);
   });
+  }
+});
+
+// The in-sentence link classes of the V34 sheets (decisions 23 and 25), as CSS Modules names them in the build
+// ("<sheet>_<class>__<hash>"). Each route must render at least one, so a renamed class or naming scheme fails
+// here. /connect has no row: its two in-sentence links (`.inlineLink`) render only while the customer-data gate is
+// closed, which no CI build is (activation-policy customerData.enabled is true), so a row there would assert something
+// that is never rendered. They were measured on a gate-closed build (WO-CI-30 receipt) and are pinned by
+// link-rows.test.ts, which renders the body with the gate closed.
+const V34_IN_SENTENCE: Record<string, RegExp> = {
+  "/research/program": /^program_inlineLink__/,
+  "/contact": /^contact_inline__/,
+  "/security": /^security_inline__/,
+  "/developers": /^developers_sentenceLink__/,
+  "/enterprise": /^enterprise_inline__/,
+};
+
+/*
+  WO-CI-36. /pricing and /evaluation are retained bodies: their links carry no class of the V34 sheets (the site's own
+  G1-TAP rule styled them, and failed this contract on 10 of 12 and 4 of 12 rows when WO-CI-30 measured them). Their
+  sentence links are plain inline boxes now (app/paper-product.css), and these rows hold them to the classifier's
+  rules like the rows above, without the class assertions that only a V34 sheet can meet.
+*/
+const RETAINED_IN_SENTENCE = ["/pricing", "/evaluation"];
+const IN_SENTENCE_ROWS: [string, RegExp | null][] = [
+  ...Object.entries(V34_IN_SENTENCE),
+  ...RETAINED_IN_SENTENCE.map((route): [string, null] => [route, null]),
+];
+
+async function checkInSentenceLinks(page: import("@playwright/test").Page, route: string, v34Class: RegExp | null) {
+  await page.goto(route);
+  // /contact's answers are in closed <details>; open every one so its links are laid out.
+  await page.evaluate(() => { for (const details of document.querySelectorAll("main details")) details.open = true; });
+  const links = await page.evaluate(measureInSentenceLinks);
+  expect(links.length, `${route} renders at least one link inside a sentence`).toBeGreaterThan(0);
+  // Every link's every violation, in one assertion: a failure names all of them, not the first. A pair of links
+  // whose boxes meet (5) is named by its rectangle and the two texts' lengths, not by the texts.
+  expect(links.flatMap(link => link.violations.map(violation => (violation.startsWith("(5)") ? violation : `"${link.text}" (${link.contract}): ${violation}`))), `${route}: links inside a sentence`).toEqual([]);
+  if (v34Class === null) return;
+  // Decision 23: no hit area comes back into the V34 sheets through the generic hit-area contract.
+  const v34 = links.filter(link => link.classes.some(name => v34Class.test(name)));
+  expect(v34.length, `${route} renders a link inside a sentence with the class ${v34Class}`).toBeGreaterThan(0);
+  expect(v34.filter(link => link.contract !== "plain").map(link => `"${link.text}" (${link.classes.join(" ")}) is a hit-area link, ${link.height.toFixed(2)}px high`), `${route}: V34 links inside a sentence are plain inline boxes`).toEqual([]);
+}
+
+/*
+  WO-CI-30 item 1. Three kinds of row, all rows of this file and not new Playwright projects (a project is the
+  whole spec file again: every test of this file would run once more to reach them):
+  - the first row of each route runs in the three width projects it names, 1440, 390 and 360, at those widths;
+  - the "at 768" rows run once, under the 1440 project (CI runs the projects 1440, 390 and 360, not the 768 one), with a
+    describe-level `test.use` viewport of 768 x 1024 (between 391 and 1,079 px, where the site's own touch rules
+    change); each asserts that the page is 768 px wide;
+  - the "with a coarse pointer" rows run once, under the 1440 project, with a describe-level
+    `test.use({ hasTouch, isMobile })`; each asserts that the page reports `(pointer: coarse)`, so a context
+    that did not get a touch screen fails instead of passing as a second fine-pointer run.
+*/
+for (const [route, v34Class] of IN_SENTENCE_ROWS) {
+  test(`a link inside a sentence on ${route} is judged by what it is, plain or hit area, and a V34 one is plain`, async ({ page }, testInfo) => {
+    test.skip(!["1440", "390", "360"].includes(testInfo.project.name), "measured at 1440, 390 and 360; 768 has its own rows below");
+    await checkInSentenceLinks(page, route, v34Class);
+  });
+}
+
+// The width projects CI runs (launch-qa.yml) do not include `768`, so 768 is a row of the 1440 project with its own
+// viewport, the way the coarse rows get their pointer; the row asserts the width it measured.
+test.describe("at 768", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+  for (const [route, v34Class] of IN_SENTENCE_ROWS) {
+    test(`a link inside a sentence on ${route} meets the same contract at 768`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "the 768 rows run once, under the 1440 project, which CI runs");
+      await page.goto(route);
+      expect(await page.evaluate(() => innerWidth), "this context is 768 px wide").toBe(768);
+      await checkInSentenceLinks(page, route, v34Class);
+    });
+  }
+});
+
+test.describe("with a coarse pointer", () => {
+  test.use({ hasTouch: true, isMobile: true });
+  for (const [route, v34Class] of IN_SENTENCE_ROWS) {
+    test(`a link inside a sentence on ${route} meets the same contract at 1440 with a coarse pointer`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "1440", "the coarse-pointer rows run once, at 1440");
+      await page.goto(route);
+      expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches), "this context reports a coarse pointer").toBe(true);
+      await checkInSentenceLinks(page, route, v34Class);
+    });
   }
 });

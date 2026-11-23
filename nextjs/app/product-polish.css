@@ -328,9 +328,10 @@
   BQ-102. The error catalogue's filter. It sits directly above its table, so the two read as one
   block rather than as a stray input on a documentation page.
 */
-.docs-table-filter { display: grid; gap: 6px; margin: 24px 0 12px; max-width: 30rem; }
+.docs-table-filter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 24px 0 12px; max-width: 30rem; }
 .docs-table-filter label { font-size: 12px; font-weight: 500; letter-spacing: .04em; color: var(--text-mid); }
 .docs-table-filter input {
+  min-width: 0; /* its intrinsic width set the grid track: 335 px on a 320 px page with the CI fonts (WO-CI-41) */
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--hairline-hi);
@@ -510,12 +511,16 @@
   text-transform: none;
   color: var(--text-lo);
 }
-.contact-submit span,
+.contact-submit p,
 .contact-status p {
   font-family: var(--f-sans);
   font-size: 12px;
   letter-spacing: 0;
   color: var(--text-lo);
+}
+/* The privacy link beside "Send inquiry": its colour does not change on hover, so the hover drops the underline. */
+@media (hover: hover) and (pointer: fine) {
+  .contact-submit a:hover { text-decoration-line: none; }
 }
 .auth-facts li {
   font-family: var(--f-sans);
@@ -687,6 +692,46 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
+}
+/*
+  WO-CI-21 (D14). Inside the V34 frame the header is sticky and in flow, so nothing on the reading
+  surface can sit under it, and the room the rules above keep for a fixed header -- the surface's own
+  top padding, the hub's header height, the shell's 18px -- became empty space under the bar. Measured
+  on the build before this change: the /docs/mcp title stood 105.2px under the header at 1440 and
+  97.2px at 390, against the B-09 reach of 80 and 64 (e2e/docs-reading-layout.spec.ts); 50 + 18px of
+  that was this padding, the rest the breadcrumb row and its gap. The page's first row (the breadcrumb,
+  or the hub's title) now starts 24px under the header, 12px on a phone, where the chapter heading
+  adds its own top padding. Scoped to the frame, so a reading surface outside it keeps the rules above.
+*/
+[data-v34-site] .scene.doc.docs-reading-surface {
+  padding-top: 24px;
+}
+[data-v34-site] .scene.doc.docs-reading-surface > .shell {
+  padding-top: 0;
+}
+@media (max-width: 760px) {
+  [data-v34-site] .scene.doc.docs-reading-surface {
+    padding-top: 12px;
+  }
+}
+/*
+  WO-CI-28 (lead decision 18). The same fixed-header allowance on the policy document (`PolicyDocument`:
+  /status, /privacy, /terms, /refunds, /subprocessors): `.public-page .scene.doc` pads 112-156px and the
+  shell adds 18, so the H1 stood 174px under the sticky header at 1440 and 110px at 390 (WO-CI-21
+  gap-after.txt). These are T5 pages, and a V34-native T5 opening sets its H1 under the hero's top
+  padding, `clamp(45px, 6vw, 92px)` (components/v34/ui/hero.module.css), and an eyebrow line,
+  `--v34-eyebrow` at line-height 1.4 with its 14px step (components/v34/ui/text.module.css): 75.8px at
+  390, 117.2px at 1440. The policy title has no eyebrow, so its top padding is that whole distance,
+  read from those same values. Pinned against the V34 T5 pages in the same run by
+  e2e/docs-reading-layout.spec.ts. Scoped to the frame; a policy body outside it keeps the rules above.
+  WO-CI-32: /trust and the framed 404 (app/not-found.tsx) open the same way and carry the same class; they
+  measured 174 / 130 / 110 / 110px (WO-CI-28 gap-after.txt) and are pinned by the same spec.
+*/
+[data-v34-site] .scene.doc.policy-page {
+  padding-top: calc(clamp(45px, 6vw, 92px) + var(--v34-eyebrow) * 1.4 + 14px);
+}
+[data-v34-site] .scene.doc.policy-page > .shell {
+  padding-top: 0;
 }
 
 /*

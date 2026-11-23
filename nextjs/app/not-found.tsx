@@ -53,7 +53,7 @@ const RECOVERY = [
 export default function NotFound() {
   return (
     <PublicSitePage template={null}>
-      <section className="scene doc">
+      <section className="scene doc policy-page">
         <div className="shell">
           <div className="body">
             <div className="stack">

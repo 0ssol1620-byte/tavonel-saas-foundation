@@ -359,7 +359,7 @@ describe("the durable compile worker", () => {
     expect(turn.note).toBe("compiled");
     expect(turn.state).toBe("ready");
     expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ["doc-a"], undefined, "cjob-00000000000000000000000000000001",
-      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" }, undefined);
+      { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job", authorizationRevision: 1 }, undefined);
   });
 
   it("names the object and its bytes in a job event before failing on JSON_TOO_LARGE", async () => {
@@ -922,6 +922,6 @@ it("compiles every document of a qualified global job into one logical collectio
     batchIndex: 0, batchCount: 1, documentIds: ids, documentsTotal: 13 }));
   expect(turn.note).toBe("compiled");
   expect(runCompile).toHaveBeenCalledWith("pilot-alpha", ids, `global-corpus/${corpusId}`, "cjob-00000000000000000000000000000001",
-    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job" }, undefined);
+    { userId: "00000000-0000-4000-8000-000000000001", provenance: "durable_job", authorizationRevision: 1 }, undefined);
   vi.unstubAllEnvs();
 });

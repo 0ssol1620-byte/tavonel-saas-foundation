@@ -1,11 +1,15 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { withinAgentMcpDispatch } from "./agent-mcp-dispatch";
 import {
   authenticateDeveloperApiKey,
   applyFoundationConnectionBatch,
   consumeDeveloperApiRateLimit,
   createDeveloperApiKey,
+  mintApiKeyToken,
   rotateDeveloperApiKey,
 } from "./developer-store";
+import { withinRemoteMcpDispatch } from "./remote-mcp-dispatch";
 
 const workspaceKey = "pilot-1234567890abcdef";
 const userId = "59d42924-a3cc-4a09-b92d-9c86b58901a1";
@@ -177,3 +181,161 @@ describe("developer credential store", () => {
     expect(JSON.stringify(requestBody)).not.toContain(result.token);
   });
 });
+
+const grantId = "29d42924-a3cc-4a09-b92d-9c86b58901a1";
+const agentToken = `tvnl_agt_abcdefghijkl_${"a".repeat(43)}`;
+
+/** A store that answers the key lookup with `row` (or a raw answer) and records every URL it was asked. */
+function keyStore(answer: unknown, status = 200) {
+  const urls: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+    urls.push(String(input));
+    return typeof answer === "string" ? new Response(answer, { status }) : Response.json(answer, { status });
+  }));
+  return urls;
+}
+const agentRow = (overrides: Record<string, unknown> = {}) => ({
+  key_id: keyId, workspace_key: workspaceKey, created_by: userId, scopes: ["agent:read", "agent:propose"],
+  expires_at: "2999-01-01T00:00:00Z", revoked_at: null, authorization_revision: 7, token_kind: "agent", agent_grant_id: grantId,
+  ...overrides,
+});
+
+describe("agent credential audience (workorders/agent-native.md §2.2, I-2, I-24)", () => {
+  it("refuses an agent token outside any dispatch before the store is asked", async () => {
+    configure();
+    const urls = keyStore([agentRow()]);
+    await expect(authenticateDeveloperApiKey(agentToken)).resolves.toEqual({ ok: false, code: "API_KEY_AUDIENCE_INVALID" });
+    expect(urls).toEqual([]);
+  });
+
+  it("refuses an agent token inside the remote MCP's dispatch: the two dispatches are separate stores", async () => {
+    configure();
+    const urls = keyStore([agentRow()]);
+    await expect(withinRemoteMcpDispatch(() => authenticateDeveloperApiKey(agentToken)))
+      .resolves.toEqual({ ok: false, code: "API_KEY_AUDIENCE_INVALID" });
+    expect(urls).toEqual([]);
+  });
+
+  it("authenticates an agent key stored as token_kind 'agent' inside the agent dispatch, with no developer scope", async () => {
+    configure();
+    const urls = keyStore([agentRow()]);
+    const result = await withinAgentMcpDispatch(() => authenticateDeveloperApiKey(agentToken));
+    expect(result).toEqual({
+      ok: true,
+      principal: {
+        kind: "api-key", audience: "agent", keyId, workspaceKey, userId, scopes: [],
+        agent: { grantId, scopes: ["agent:read", "agent:propose"] }, authorizationRevision: 7,
+      },
+    });
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain("agent_grant_id");
+    expect(urls[0]).not.toContain(agentToken);
+    expect(urls[0]).toContain(createHash("sha256").update(agentToken).digest("hex"));
+  });
+
+  it.each([
+    ["stored as the form's own text 'agt'", { token_kind: "agt" }],
+    ["stored as a live key", { token_kind: "live" }],
+    ["with no grant", { agent_grant_id: null }],
+    ["holding a developer scope", { scopes: ["agent:read", "worlds:read"] }],
+    ["holding no scope", { scopes: [] }],
+    ["revoked", { revoked_at: "2026-11-17T00:00:00Z" }],
+  ])("refuses an agent token whose row is %s", async (_label, overrides) => {
+    configure();
+    keyStore([agentRow(overrides)]);
+    await expect(withinAgentMcpDispatch(() => authenticateDeveloperApiKey(agentToken))).resolves.toEqual({ ok: false, code: "API_KEY_INVALID" });
+  });
+
+  it("refuses a live token whose row is an agent key", async () => {
+    configure();
+    keyStore([agentRow()]);
+    await expect(authenticateDeveloperApiKey(`tvnl_live_abcdefghijkl_${"a".repeat(43)}`)).resolves.toEqual({ ok: false, code: "API_KEY_INVALID" });
+  });
+
+  it("treats an expiry it cannot read as expired, never as no expiry", async () => {
+    configure();
+    for (const expires_at of ["not a date", 42, "2000-01-01T00:00:00Z"]) {
+      keyStore([agentRow({ expires_at })]);
+      await expect(withinAgentMcpDispatch(() => authenticateDeveloperApiKey(agentToken))).resolves.toEqual({ ok: false, code: "API_KEY_EXPIRED" });
+    }
+  });
+
+  it("mints an agent token of the agt form whose stored digest is its sha256", async () => {
+    const minted = await mintApiKeyToken("agt");
+    expect(minted.token).toMatch(/^tvnl_agt_[A-Za-z0-9_-]{12}_[A-Za-z0-9_-]{43}$/);
+    expect(minted.token.slice(9, 21)).toBe(minted.prefix);
+    expect(minted.sha256).toBe(createHash("sha256").update(minted.token).digest("hex"));
+  });
+
+  it("an agent:propose call the store refuses is API_RATE_LIMITED", async () => {
+    configure();
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Response.json(false);
+    }));
+    await expect(consumeDeveloperApiRateLimit({ keyId, workspaceKey, scope: "agent:propose", limit: 10 }))
+      .resolves.toEqual({ ok: false, code: "API_RATE_LIMITED" });
+    expect(bodies[0]).toMatchObject({ p_scope: "agent:propose", p_limit: 10 });
+  });
+});
+
+/*
+  Property: authentication never throws and answers only its three refusals or a well-formed
+  principal, whatever the token and whatever the store sends back. Seeded, so a failure reproduces.
+*/
+function seeded(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const pick = <T,>(rng: () => number, items: readonly T[]): T => items[Math.floor(rng() * items.length)]!;
+function randomJson(rng: () => number, depth = 0): unknown {
+  const kind = Math.floor(rng() * (depth > 2 ? 5 : 7));
+  if (kind === 0) return null;
+  if (kind === 1) return rng() < 0.5;
+  if (kind === 2) return pick(rng, [0, -1, 7, 1.5, Number.MAX_SAFE_INTEGER + 2]);
+  if (kind === 3) return pick(rng, ["", "agent", "live", "mcp", "agt", "x".repeat(300), "2999-01-01T00:00:00Z", "\u0000", grantId]);
+  if (kind === 4) return pick(rng, [[], ["agent:read"], ["worlds:read"], [null]]);
+  if (kind === 5) return Array.from({ length: Math.floor(rng() * 3) }, () => randomJson(rng, depth + 1));
+  return Object.fromEntries(["key_id", "workspace_key", "created_by", "scopes", "expires_at", "revoked_at", "authorization_revision", "token_kind", "agent_grant_id"]
+    .filter(() => rng() < 0.7).map((k) => [k, rng() < 0.5 ? agentRow()[k as keyof ReturnType<typeof agentRow>] : randomJson(rng, depth + 1)]));
+}
+
+describe("authenticateDeveloperApiKey under arbitrary input (property)", () => {
+  it("never throws and answers only a known refusal or a well-formed principal", async () => {
+    configure();
+    const rng = seeded(20261117);
+    const tokens = [agentToken, `tvnl_live_abcdefghijkl_${"a".repeat(43)}`, `tvnl_mcp_abcdefghijkl_${"a".repeat(43)}`,
+      "", "tvnl_agt_", "tvnl_xyz_abcdefghijkl_" + "a".repeat(43), "Bearer x", "tvnl_agt_abcdefghijkl_" + "a".repeat(44), "\uD800"];
+    for (let i = 0; i < 400; i += 1) {
+      const answer = rng() < 0.15 ? pick(rng, ["not json", "", "<html>"]) : rng() < 0.6 ? [randomJson(rng)] : randomJson(rng);
+      const status = pick(rng, [200, 200, 200, 400, 500]);
+      if (rng() < 0.05) vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+      else keyStore(answer, status);
+      const token = pick(rng, tokens);
+      const run = () => authenticateDeveloperApiKey(token);
+      const result = await (rng() < 0.5 ? withinAgentMcpDispatch(run) : rng() < 0.5 ? withinRemoteMcpDispatch(run) : run());
+      if (!result.ok) {
+        expect(["API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_AUDIENCE_INVALID"], `iteration ${i}`).toContain(result.code);
+        continue;
+      }
+      const p = result.principal;
+      expect(typeof p.keyId === "string" && typeof p.workspaceKey === "string" && typeof p.userId === "string", `iteration ${i}`).toBe(true);
+      expect(Number.isSafeInteger(p.authorizationRevision) && p.authorizationRevision >= 1).toBe(true);
+      if (p.audience === "agent") {
+        expect(p.scopes).toEqual([]);
+        expect(typeof p.agent?.grantId).toBe("string");
+        expect(p.agent!.scopes.length > 0 && p.agent!.scopes.every((s) => s === "agent:read" || s === "agent:propose")).toBe(true);
+      } else {
+        expect(p.agent).toBeNull();
+      }
+    }
+  });
+});
+

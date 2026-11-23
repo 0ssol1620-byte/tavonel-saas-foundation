@@ -55,18 +55,22 @@ const COPY_MODULES = [
   // render on `/` and `/ko`, and no list read either file, so a hedge reached /ko through a limit label.
   "components/landing-v2/specimen-strip.tsx",
   "lib/specimen-sources.ts",
+  // WO-FND-INT-2: surfaces a customer meets that no list named. The OAuth consent page, the two
+  // workspace panels, the purpose picker and the pipeline board; named so a move cannot drop them.
+  "app/oauth/authorize/page.tsx",
+  "components/change-proposals-panel.tsx",
+  "components/library-panel.tsx",
+  "components/workspace-purpose-picker.tsx",
+  "components/pipeline-board.tsx",
 ] as const;
 
 /** The marketing routes named in the campaign brief, each as the file that carries its copy. */
 const MARKETING_PAGES = [
   "app/page.tsx",
-  "app/ko/page.tsx",
   "app/product/page.tsx",
   "app/knowledge-compiler/page.tsx",
   "app/explore/page.tsx",
   "app/pricing/page.tsx",
-  // P2-10: the Korean twin of /pricing (UX-PLAN §5.3 R12), now that the list below reads Korean.
-  "app/ko/pricing/page.tsx",
   "app/enterprise/page.tsx",
   "app/solutions/page.tsx",
   "app/integrations/page.tsx",
@@ -85,10 +89,11 @@ const DISCLOSURE_SURFACES: Record<string, string> = {
   "app/sources/page.tsx": "the support-tier table: what a tier costs to earn, and which formats are refused",
   "app/trust/page.tsx": "the trust index: the draft DPA label and what a qualified review provides",
   "app/security/page.tsx": "the control rows, including the fail-closed refusals",
+  "components/v34/routes/security/security-content.ts": "the control rows, including the fail-closed refusals",
   "app/status/page.tsx": "the probe table, where an unprobed dependency has to say so",
   "app/benchmarks/page.tsx": "the protocol: what a result must carry before it may be published",
   "app/reproducibility/page.tsx": "the frozen fixtures and what rerunning them does and does not settle",
-  "app/research/page.tsx": "13.20 puts the open problems and the failed experiments here",
+  "app/research/program/page.tsx": "13.20 puts the open problems and the failed experiments here",
   "app/research/notes/page.tsx": "13.20 puts the failure records here, with their context",
   "app/product/continuous-knowledge/page.tsx": "the eight contract clauses and the state each one holds here",
   "app/product/document-understanding/page.tsx": "what the read recovers, derived from the capability manifest",
@@ -167,7 +172,24 @@ function prose(relative: string) {
     .replace(/^[ \t]*\/\/.*$/gm, " ");
 }
 
-const GUARDED = [...COPY_MODULES, ...MARKETING_PAGES];
+/*
+  V34: the marketing pages above are thin files that render a body from components/v34, so every
+  source file there is a first-impression surface too, walked so a new one arrives guarded. A V34
+  file that is a disclosure surface is named in DISCLOSURE_SURFACES with its reason instead.
+*/
+function v34Sources(dir = "components/v34"): string[] {
+  return readdirSync(new URL(dir, ROOT), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return v34Sources(path);
+    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+const GUARDED = [
+  ...COPY_MODULES,
+  ...MARKETING_PAGES,
+  ...v34Sources().filter((file) => !(file in DISCLOSURE_SURFACES)),
+];
 
 describe("copy trust guard", () => {
   it("checks a file that exists, so a renamed module cannot silently drop out", () => {

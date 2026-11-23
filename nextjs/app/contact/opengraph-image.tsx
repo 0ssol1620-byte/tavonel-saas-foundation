@@ -1,5 +1,8 @@
 import { ogCard } from "@/lib/og-card";
+import { v34Route } from "@/lib/v34/routes";
 
 export { alt, contentType, size } from "@/lib/og-card";
 
-export default ogCard("Talk to TAVONEL", "Tell us what your documents need to become, without sending the documents themselves.");
+const route = v34Route("contact");
+
+export default ogCard(route.ogLabel, route.description);

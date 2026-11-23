@@ -18,21 +18,39 @@
  * owns the allow-list, and a URL a visitor can edit must not be able to name a number.
  */
 
-import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode } from "./billing-catalog";
+import { BILLING_OFFERS, isBillingOfferCode, type BillingOfferCode, type PlanAvailability } from "./billing-catalog";
 
 const KEY = "tavonel.checkout-intent";
+
+declare const servedByTheServer: unique symbol;
+
+/**
+ * A plan's availability as a server computed it (WO-CAT-2 L4, N3). The brand is what keeps a browser from answering
+ * for the server: a string literal or a `PlanAvailability` constant does not type as one. A server page makes it with
+ * `servedAvailability(planAvailability(code, readConfiguredBillingOffers()))` and hands it down as a prop; a browser
+ * module receives it and never makes one -- `lib/cta-truth.test.ts` refuses a browser module that calls
+ * `servedAvailability` or casts its way to this type.
+ */
+export type ServedAvailability = PlanAvailability & { readonly [servedByTheServer]: true };
+
+/** Server-side only: brands an availability the server computed. */
+export function servedAvailability(availability: PlanAvailability): ServedAvailability {
+  return availability as ServedAvailability;
+}
 
 /**
  * Whether /login may promise this offer's checkout (B-07). The one predicate the intent notice and
  * the H1 both read, so they cannot disagree.
  *
  * `purchaseOpen` is the deployment's `purchasePlan`; it says whether any plan can be bought. The
- * offer's `saleChannel` says whether this one is sold online at all -- Team is "contact" and its
- * checkout answers 403 BILLING_OFFER_CONTACT_REQUIRED (`checkout-policy.ts`), which is why /pricing
- * already decides per offer. null: the deployment has not answered, so nothing is said either way.
+ * plan's availability says whether this one is sold online at all -- a plan the product does not
+ * deliver in full is "request_access" and its checkout answers 403 BILLING_OFFER_CONTACT_REQUIRED
+ * (`checkout-policy.ts`). It is the server's answer and nothing else: there is no form that takes an
+ * offer code and resolves it here, because a browser has no price environment to resolve it from.
+ * null: the deployment has not answered, so nothing is said either way.
  */
-export function checkoutSellable(offerCode: BillingOfferCode, purchaseOpen: boolean | null): boolean | null {
-  return purchaseOpen === null ? null : purchaseOpen && BILLING_OFFERS[offerCode].saleChannel === "self_serve";
+export function checkoutSellable(availability: ServedAvailability, purchaseOpen: boolean | null): boolean | null {
+  return purchaseOpen === null ? null : purchaseOpen && availability === "purchasable";
 }
 
 /** Where a signed-out visitor goes when they pick an offer. */
@@ -97,11 +115,14 @@ export type CheckoutResume = "open" | "hold_terms" | "hold_release" | "drop_owne
  *                 production processing -- including a qualification grant and an unread access.
  */
 export function decideCheckoutResume(
-  offer: BillingOfferCode,
+  availability: ServedAvailability | null,
   purchaseOpen: boolean | null,
   access: ResumeAccess | null,
 ): CheckoutResume {
-  if (checkoutSellable(offer, purchaseOpen) !== true) return "open";
+  // null: no server answer on this page. The offer is held as one on sale would be, which claims nothing about it --
+  // when the hold ends the checkout route answers, and its refusal is the sentence (the workspace, N2).
+  const holdable = availability === null ? purchaseOpen === true : checkoutSellable(availability, purchaseOpen) === true;
+  if (!holdable) return "open";
   if (access?.source === "owner" && access.billingExempt) return "drop_owner";
   if (access?.processingStage === "production") return "open";
   return access?.sourcePending === "terms_acceptance_required" ? "hold_terms" : "hold_release";

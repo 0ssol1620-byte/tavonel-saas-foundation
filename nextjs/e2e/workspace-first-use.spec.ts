@@ -51,7 +51,7 @@ async function installCommonRoutes(page: import("@playwright/test").Page) {
   }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [] } }));
   await page.route("**/api/billing/status", route => route.fulfill({ json: {
-    account: { accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null },
+    account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null },
   } }));
 }
 

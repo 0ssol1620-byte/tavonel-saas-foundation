@@ -18,7 +18,9 @@ const TOPICS = {
 } as const;
 
 type Topic = keyof typeof TOPICS;
-type PlanIntent = "Developer" | "Team" | "Enterprise" | "";
+/* The plan a Request access link names (`components/contact-form.tsx` `PLAN_INTENTS`), stored as received; "" is none. */
+const PLAN_INTENTS = ["", "Personal", "Developer", "Team", "Business", "Enterprise"] as const;
+type PlanIntent = (typeof PLAN_INTENTS)[number];
 type Contact = {
   name: string;
   email: string;
@@ -169,7 +171,7 @@ function parseContact(raw: unknown): Contact | null {
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
     company.length > 120 ||
     !(topic in TOPICS) ||
-    !["", "Developer", "Team", "Enterprise"].includes(plan) ||
+    !(PLAN_INTENTS as readonly string[]).includes(plan) ||
     message.length < 20 || message.length > 5_000 ||
     website.length > 200 ||
     typeof startedAt !== "number" || !Number.isInteger(startedAt) || startedAt <= 0

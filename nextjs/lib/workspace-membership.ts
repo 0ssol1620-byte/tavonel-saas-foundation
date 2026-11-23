@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { BILLING_OFFERS } from "./billing-catalog";
 import { getRequestUser } from "./foundation-pilot";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
@@ -27,6 +28,16 @@ export type WorkspaceMembershipPrincipal = {
   role: WorkspaceRole;
   authorizationRevision: number;
 };
+
+/**
+ * Seats each v2 plan includes, from the catalog. The invite and accept functions apply the entry
+ * for the workspace's `plan_code` under one lock (20261117150200); a workspace without one (a
+ * legacy plan, or none) or whose owner holds an operator grant is uncapped, and a plan code with
+ * no entry is refused. Retired offers are absent on purpose.
+ */
+export const WORKSPACE_SEAT_LIMITS: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(BILLING_OFFERS).flatMap(([code, offer]) => (offer.included ? [[code, offer.included.seats]] : [])),
+);
 
 type Failure = { ok: false; code: string; status: number };
 
@@ -63,9 +74,11 @@ async function responseError(response: Response, fallback: string) {
     "workspace_member_role_input_invalid", "workspace_member_role_forbidden", "workspace_member_not_found",
     "workspace_last_owner_protected", "workspace_member_revoke_input_invalid",
     "workspace_member_revoke_forbidden", "workspace_invite_revoke_input_invalid",
-    "workspace_invite_revoke_forbidden",
+    "workspace_invite_revoke_forbidden", "workspace_seat_limit_reached", "workspace_seat_limit_unavailable",
   ].find((code) => message.includes(code));
   if (!known) return failure(fallback);
+  if (known === "workspace_seat_limit_reached") return failure("WORKSPACE_SEAT_LIMIT_REACHED", 402);
+  if (known === "workspace_seat_limit_unavailable") return failure("WORKSPACE_SEAT_LIMIT_UNAVAILABLE");
   if (known.endsWith("input_invalid")) return failure(known.toUpperCase(), 400);
   if (known.endsWith("not_found")) return failure(known.toUpperCase(), 404);
   if (known.includes("forbidden") || known.includes("identity_mismatch")) return failure(known.toUpperCase(), 403);
@@ -199,6 +212,7 @@ export async function createWorkspaceInvite(input: {
     p_idempotency_key: input.idempotencyKey,
     p_expires_at: input.expiresAt,
     p_request_id: input.requestId ?? randomUUID(),
+    p_seat_limits: WORKSPACE_SEAT_LIMITS,
   }, "WORKSPACE_INVITE_CREATE_FAILED");
   return result.ok ? { ...result, token } : result;
 }
@@ -209,6 +223,7 @@ export async function acceptWorkspaceInvite(input: { userId: string; token: stri
     p_actor_user_id: input.userId,
     p_token_hash: tokenHash(input.token),
     p_request_id: input.requestId ?? randomUUID(),
+    p_seat_limits: WORKSPACE_SEAT_LIMITS,
   }, "WORKSPACE_INVITE_ACCEPT_FAILED");
 }
 

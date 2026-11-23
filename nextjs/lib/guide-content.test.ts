@@ -36,7 +36,9 @@ vi.mock("next/navigation", () => ({
 
 const { GuideMedia, guideVideoReady, vttCueText } = await import("../components/guide/guide-media");
 const { default: EnglishGuide } = await import("../app/guide/page");
-const { default: KoreanGuide } = await import("../app/ko/guide/page");
+const { GuidePage } = await import("../components/guide/guide-page");
+/* /ko/guide answers 308 to /guide; the Korean chapter text is still rendered through the component it was rendered by. */
+const KoreanGuide = () => createElement(GuidePage, { language: "ko" });
 const { default: DocsSectionPage } = await import("../app/docs/[section]/page");
 const { default: ApiReferencePage } = await import("../app/api/page");
 
@@ -68,7 +70,11 @@ const LITERAL_IDS = new Set(
  * docs section derives (`tocEntries`), or a literal id in the source. `/explore?act=` must be a
  * deep-link act the stage knows.
  */
-function unresolved(href: string): string | null {
+/* A /ko path answers 308 to the same path without the prefix (GX-02), so it resolves where its English target does. */
+const throughKoRedirect = (href: string) => (href === "/ko" ? "/" : href.startsWith("/ko/") || href.startsWith("/ko?") || href.startsWith("/ko#") ? href.slice(3) : href);
+
+function unresolved(rawHref: string): string | null {
+  const href = throughKoRedirect(rawHref);
   if (href.startsWith("mailto:")) return /^mailto:[a-z]+@tavonel\.com(\?subject=.+)?$/.test(href) ? null : "not a tavonel.com address";
   if (!href.startsWith("/")) return "not a site path";
   const [beforeHash, fragment] = href.split("#");
@@ -230,8 +236,12 @@ const isLive = (quote: string) => {
   return SOURCE_TEXT.includes(sentence) || SOURCE_TEXT.includes(sentence.replace(/'/g, "\\'"));
 };
 
+/*
+  The Korean quotes are not required to be live: the /ko pages that published them were deleted and /ko/guide answers
+  308, so no reader reaches that text. The English quotes stay held to the live sources.
+*/
 describe("every quoted sentence is live text", () => {
-  const quotes = [...new Set(LANGUAGES.flatMap((language) => guideText(language).flatMap(quotesIn)))];
+  const quotes = [...new Set((["en"] as const).flatMap((language) => guideText(language).flatMap(quotesIn)))];
 
   it("has quotes to check, in both languages", () => {
     expect(quotes.length).toBeGreaterThan(12);
@@ -476,13 +486,11 @@ describe("the two pages", () => {
       }
     }
     // UX-L7 (P2-11): every public root declares its template; the guide reads as T3 Reference, like /docs.
-    expect(ko).toContain('<div class="page public-page" lang="ko" data-template="T3">');
-    expect(en).toContain('<div class="page public-page" data-template="T3">');
+    expect(ko).toMatch(/<div class="[^"]*page public-page"[^>]* data-template="T3">/);
+    expect(en).toMatch(/<div class="[^"]*page public-page"[^>]* data-template="T3">/);
   });
 
-  it("send a Korean reader to the Korean page where one exists, and say when a link is English", () => {
-    expect(ko).toContain('href="/ko/contact"');
-    expect(ko).not.toMatch(/href="\/contact"[^>]*>이용 문의/);
+  it("say when a link is English-only, on the Korean text", () => {
     expect(ko).toMatch(/hrefLang="en"[^>]*>Compiled World 살펴보기 \(영문\)/);
     expect(ko).toMatch(/href="\/developer\/channel\.json"[^>]*>channel\.json</);
   });

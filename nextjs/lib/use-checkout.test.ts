@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { failureSentence } from "./workspace-failure-copy";
 import { ENTITLEMENT_PENDING_SENTENCE, type BillingStatusAccount, type EntitlementWaitResult } from "./entitlement-wait";
 import { readOfferParam } from "./checkout-intent";
+import type { CheckoutHandlers } from "./use-checkout";
+import { BILLING_OFFERS, isBillingOfferCode } from "./billing-catalog";
 
 /* ---------------------------------------------------------------- module doubles */
 
@@ -47,7 +49,7 @@ vi.mock("./paddle-browser", () => ({
  * Drives the hook without a DOM. `useCallback`/`useState` are the only React features it uses,
  * so a two-hook dispatcher is enough and keeps the test free of a renderer dependency.
  */
-async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWaitResult) => void) {
+async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWaitResult) => void, handlers?: CheckoutHandlers) {
   const notices: string[] = [];
   const React = await import("react");
   const states: unknown[] = [];
@@ -76,13 +78,14 @@ async function runCheckout(offer: string, onEntitlement?: (wait: EntitlementWait
 
   let start: (code: string) => Promise<void>;
   try {
-    const hook = useCheckout((m, tone, link) => { notices.push(m); tones.push(tone); links.push(link); }, onEntitlement) as { start: (code: string) => Promise<void> };
+    const hook = useCheckout((m, tone, link) => { notices.push(m); tones.push(tone); links.push(link); }, onEntitlement, handlers as never) as { start: (code: string) => Promise<void> };
     start = hook.start;
   } finally {
     if (internals && "H" in internals) internals.H = previous;
     else if (internals?.ReactCurrentDispatcher) internals.ReactCurrentDispatcher.current = previous;
   }
 
+  startedOffer = offer;
   await start(offer);
   return notices;
 }
@@ -95,10 +98,18 @@ const tones: string[] = [];
 /** The link each notice carried, in order (hotfix 2026-11-10). */
 const links: unknown[] = [];
 
+let startedOffer = "";
+/** A ready response carries the quote the server would build for the offer being started, unless the test sets its own. */
+function withQuote(body: unknown) {
+  const ready = body as { offer?: { priceId?: string }; quote?: unknown } | null;
+  if (!ready?.offer?.priceId || "quote" in ready || !isBillingOfferCode(startedOffer)) return body;
+  return { ...ready, quote: { offerCode: startedOffer, priceUsd: BILLING_OFFERS[startedOffer].priceUsd } };
+}
+
 function respondWith(body: unknown, ok = true, status = ok ? 200 : 402) {
   globalThis.fetch = (async (url: string, init: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
-    return { ok, status, json: async () => body } as unknown as Response;
+    return { ok, status, json: async () => withQuote(body) } as unknown as Response;
   }) as unknown as typeof fetch;
 }
 
@@ -133,7 +144,7 @@ afterEach(() => {
 describe("checkout", () => {
   it("asks the server for nothing until there is a session", async () => {
     session.token = null;
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
 
     expect(fetchCalls).toHaveLength(0);
     expect(paddle.opened).toHaveLength(0);
@@ -146,18 +157,28 @@ describe("checkout", () => {
       offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
     });
 
-    await runCheckout("credit_starter");
+    await runCheckout("developer");
 
     expect(fetchCalls).toHaveLength(1);
     const body = JSON.parse(String(fetchCalls[0].init.body));
-    expect(body).toEqual({ offerCode: "credit_starter" });
+    expect(body).toEqual({ offerCode: "developer" });
     // The allow-list belongs to the server. A client that can name a price can name any price.
     expect(JSON.stringify(body)).not.toMatch(/pri_|price|amount|\$/i);
   });
 
+  it("opens nothing when the quoted price differs from the plan's price, or the quote is missing", async () => {
+    const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1" }, customData: { u: "1" } };
+    for (const quote of [{ offerCode: "developer", priceUsd: 1 }, { offerCode: "team", priceUsd: 49 }, undefined]) {
+      respondWith({ ...ready, quote });
+      const notices = await runCheckout("developer");
+      expect(notices.join(" ")).toMatch(/quoted price did not match/i);
+    }
+    expect(paddle.opened).toHaveLength(0);
+  });
+
   it("carries the session as a bearer token", async () => {
     respondWith({ clientToken: "ct", environment: "sandbox", offer: { priceId: "p" }, customData: {} });
-    await runCheckout("credit_starter");
+    await runCheckout("developer");
     const headers = fetchCalls[0].init.headers as Record<string, string>;
     expect(headers.authorization).toBe("Bearer session-token");
   });
@@ -170,7 +191,7 @@ describe("checkout", () => {
   ] as const) {
     it(`refuses to open when the response is missing ${missing}`, async () => {
       respondWith(body);
-      const notices = await runCheckout("credit_starter");
+      const notices = await runCheckout("developer");
 
       // A partial response is a failure, not something to route around.
       expect(paddle.opened).toHaveLength(0);
@@ -180,14 +201,14 @@ describe("checkout", () => {
 
   it("refuses to open on a non-ok response even when the body looks complete", async () => {
     respondWith({ clientToken: "ct", environment: "sandbox", offer: { priceId: "p" }, customData: {} }, false);
-    await runCheckout("credit_starter");
+    await runCheckout("developer");
     expect(paddle.opened).toHaveLength(0);
   });
 
   it("changes no entitlement when Paddle fails to initialize", async () => {
     paddle.init = null;
     respondWith({ clientToken: "ct", environment: "sandbox", offer: { priceId: "p" }, customData: {} });
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
     expect(paddle.opened).toHaveLength(0);
     expect(notices.join(" ")).toMatch(/could not initialize/i);
   });
@@ -198,7 +219,7 @@ describe("checkout", () => {
       offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
     });
 
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
     const said = notices.join(" ").toLowerCase();
 
     expect(paddle.opened).toHaveLength(1);
@@ -214,7 +235,7 @@ describe("checkout", () => {
       offer: { priceId: "pri_123", label: "Starter" }, customData: { u: "1" },
     });
 
-    const notices = await runCheckout("credit_starter");
+    const notices = await runCheckout("developer");
     const said = notices.join(" ").toLowerCase();
 
     expect(paddle.opened).toHaveLength(1);
@@ -269,6 +290,30 @@ describe("checkout refusals", () => {
     expect(links).toEqual([{ href: "/workspace?checkout=observer_access", label: "Accept the processing terms" }]);
     const href = (links[0] as { href: string }).href;
     expect(readOfferParam(new URL(href, "https://tavonel.com").search)).toBe("observer_access");
+  });
+
+  /*
+    One-step buy (2026-11-10). A page that can collect the terms itself (/pricing) takes the terms
+    refusal: no sentence, no link, no Paddle -- the offer goes to its handler, which opens the
+    terms dialog. Any other refusal stays a sentence even with a handler present.
+  */
+  it("hands a pre-terms refusal to a page that collects the terms itself, with no sentence", async () => {
+    respondWith({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, false, 403);
+    const owed: string[] = [];
+    const notices = await runCheckout("observer_access", undefined, { onTermsRequired: (offer) => owed.push(offer) });
+
+    expect(owed).toEqual(["observer_access"]);
+    expect(notices).toEqual([]);
+    expect(paddle.opened).toHaveLength(0);
+  });
+
+  it("keeps any other refusal a sentence when a terms handler is present", async () => {
+    respondWith({ code: "BILLING_HOLD" }, false, 403);
+    const owed: string[] = [];
+    const notices = await runCheckout("observer_access", undefined, { onTermsRequired: (offer) => owed.push(offer) });
+
+    expect(owed).toEqual([]);
+    expect(notices).toEqual([`Checkout is unavailable. ${failureSentence("BILLING_HOLD", 403)}`]);
   });
 
   it("links nothing on a refusal the terms cannot change", async () => {
@@ -348,7 +393,7 @@ describe("checkout overlay look", () => {
 describe("waiting for the entitlement after checkout", () => {
   const ready = { clientToken: "ct", environment: "sandbox", offer: { priceId: "pri_1", label: "Developer" }, customData: { u: "1" } };
   const inactive = {
-    accessPlan: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0,
+    accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0,
     billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null,
   } satisfies BillingStatusAccount;
   const active = { ...inactive, accessPlan: "observer_access", subscriptionStatus: "active", creditBalance: 2_000, paddleCustomerId: "ctm_1" };
@@ -358,7 +403,7 @@ describe("waiting for the entitlement after checkout", () => {
     let reads = 0;
     globalThis.fetch = (async (url: string, init: RequestInit) => {
       fetchCalls.push({ url: String(url), init });
-      if (String(url) !== "/api/billing/status") return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+      if (String(url) !== "/api/billing/status") return { ok: true, status: 200, json: async () => withQuote(ready) } as unknown as Response;
       const answer = statusAnswers[Math.min(reads++, statusAnswers.length - 1)];
       return { ok: answer.ok, status: answer.status, json: async () => answer.body } as unknown as Response;
     }) as unknown as typeof fetch;
@@ -375,6 +420,33 @@ describe("waiting for the entitlement after checkout", () => {
     await vi.advanceTimersByTimeAsync(120_000);
     return { notices, settled };
   }
+
+  it("closes the overlay and tells a page that states the outcome itself, once Paddle reports the payment", async () => {
+    serve([{ ok: true, status: 200, body: { account: active } }]);
+    const completed: string[] = [];
+    const closed: number[] = [];
+    vi.stubGlobal("window", { Paddle: { Checkout: { close: () => closed.push(1) } }, dispatchEvent: () => true });
+    await runCheckout("observer_access", undefined, { onCompleted: (offer) => completed.push(offer) });
+    expect(completed).toEqual([]);
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(completed).toEqual(["observer_access"]);
+    expect(closed).toHaveLength(1);
+  });
+
+  it("leaves the overlay to the buyer on a page with no outcome handler (the workspace)", async () => {
+    serve([{ ok: true, status: 200, body: { account: active } }]);
+    const closed: number[] = [];
+    vi.stubGlobal("window", { Paddle: { Checkout: { close: () => closed.push(1) } }, dispatchEvent: () => true });
+    await runCheckout("observer_access");
+    vi.useFakeTimers();
+    paddle.eventCallback?.({ name: "checkout.completed" });
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(closed).toHaveLength(0);
+  });
 
   it("reads nothing before Paddle reports the payment, and nothing on other Paddle events", async () => {
     serve([{ ok: true, status: 200, body: { account: active } }]);
@@ -475,7 +547,7 @@ describe("notice tone", () => {
     globalThis.fetch = (async (url: string, init: RequestInit) => {
       fetchCalls.push({ url: String(url), init });
       if (String(url) === "/api/billing/status") return { ok: true, status: 200, json: async () => ({ account: null }) } as unknown as Response;
-      return { ok: true, status: 200, json: async () => ready } as unknown as Response;
+      return { ok: true, status: 200, json: async () => withQuote(ready) } as unknown as Response;
     }) as unknown as typeof fetch;
     const notices = await runCheckout("observer_access");
     vi.useFakeTimers();

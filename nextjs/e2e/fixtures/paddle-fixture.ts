@@ -9,6 +9,7 @@
  */
 
 import type { BrowserContext, Page } from "@playwright/test";
+import { BILLING_OFFERS } from "../../lib/billing-catalog";
 
 /** The script `lib/paddle-browser.ts` appends. Same URL, so the shipped CSP is what is exercised. */
 export const PADDLE_SCRIPT_URL = "https://cdn.paddle.com/paddle/v2/paddle.js";
@@ -67,7 +68,7 @@ export async function installNetworkFence(context: BrowserContext, baseURL: stri
   arrives unless a spec sends it.
 */
 const FAKE_PADDLE_SCRIPT = `(() => {
-  const state = { environments: [], initialized: [], opened: [], callback: null };
+  const state = { environments: [], initialized: [], opened: [], closed: 0, callback: null };
   Object.defineProperty(window, "__fakePaddle", { value: state });
   window.Paddle = {
     Environment: { set(environment) { state.environments.push(environment); } },
@@ -75,7 +76,10 @@ const FAKE_PADDLE_SCRIPT = `(() => {
       state.initialized.push({ token: options.token });
       state.callback = typeof options.eventCallback === "function" ? options.eventCallback : null;
     },
-    Checkout: { open(options) { state.opened.push(JSON.parse(JSON.stringify(options))); } },
+    Checkout: {
+      open(options) { state.opened.push(JSON.parse(JSON.stringify(options))); },
+      close() { state.closed += 1; },
+    },
   };
 })();`;
 
@@ -108,6 +112,11 @@ export function paddleCalls(page: Page): Promise<FakePaddleCalls | null> {
   });
 }
 
+/** How often the page closed the overlay itself (one-step buy, 2026-11-10: after checkout.completed on /pricing). */
+export function paddleClosed(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { __fakePaddle?: { closed: number } }).__fakePaddle?.closed ?? 0);
+}
+
 /** Plays Paddle's side of the overlay: delivers one event to the callback the page registered. */
 export function emitPaddleEvent(page: Page, name: string): Promise<boolean> {
   return page.evaluate((eventName) => {
@@ -118,14 +127,29 @@ export function emitPaddleEvent(page: Page, name: string): Promise<boolean> {
   }, name);
 }
 
-/** A labelled sandbox `CHECKOUT_READY`, in the shape `app/api/billing/checkout/route.ts` returns. */
+/*
+  A labelled sandbox `CHECKOUT_READY`, in the shape `app/api/billing/checkout/route.ts` returns, for the v2 `personal` plan
+  (catalog v2: the retired 2026-09 offers are never sold). It carries the route's `quote`, because `use-checkout` opens no
+  overlay without a quote naming the offer and its catalog price (WO-D28-2); the figures are read from the catalog.
+*/
+const PERSONAL = BILLING_OFFERS.personal;
 export const SANDBOX_CHECKOUT_READY = {
   code: "CHECKOUT_READY",
   environment: "sandbox",
   clientToken: "test_fixture_journey_client_token",
-  offer: { code: "observer_access", kind: "subscription", label: "Developer", priceId: "pri_01journeyfixture0000000000", credits: 2_000 },
+  offer: { code: "personal", kind: PERSONAL.kind, label: PERSONAL.label, priceId: "pri_01journeyfixture0000000000", credits: PERSONAL.credits },
+  quote: {
+    offerCode: "personal",
+    label: PERSONAL.label,
+    priceUsd: PERSONAL.priceUsd,
+    currency: "USD",
+    interval: "month",
+    includedPages: PERSONAL.includedPages,
+    included: PERSONAL.included,
+    overage: "stops_at_limit",
+  },
   customer: { email: "audit-e2e@example.invalid" },
-  customData: { tavonel_binding: "fixture-binding-not-signed", tavonel_offer: "observer_access" },
+  customData: { tavonel_binding: "fixture-binding-not-signed", tavonel_offer: "personal" },
 } as const;
 
 /** The billing portal stub page a `PORTAL_READY` URL lands on. */

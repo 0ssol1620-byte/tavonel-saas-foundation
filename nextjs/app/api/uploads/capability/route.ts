@@ -179,7 +179,9 @@ export async function POST(request: Request) {
     requestedBytes, declaredMimeType: qualified.normalizedMimeType,
   });
   if (!admission.ok) return NextResponse.json({ code: admission.code }, {
-    status: admission.code.includes("LIMIT") || admission.code.includes("QUOTA") ? 429 : admission.code.includes("TRIAL") ? 402 : 503,
+    // A full workspace is its plan's limit, not a server fault (WO-CAT-8): 402, as the catalogue states.
+    status: admission.code === "STORAGE_ALLOWANCE_EXHAUSTED" ? 402
+      : admission.code.includes("LIMIT") || admission.code.includes("QUOTA") ? 429 : admission.code.includes("TRIAL") ? 402 : 503,
     headers: NO_STORE,
   });
   const compute = await reserveFoundationIntakeApprovedFile({
@@ -305,6 +307,7 @@ async function legacyCapability(request: Request, input: {
     const trialLimited = admission.code === "TRIAL_FILE_LIMIT_EXCEEDED" || admission.code === "TRIAL_NOT_ACTIVE";
     const tooLarge = admission.code === "INTAKE_FILE_TOO_LARGE" || admission.code === "TRIAL_FILE_TOO_LARGE";
     const conflict = admission.code === "INTAKE_IDEMPOTENCY_CONFLICT" || admission.code === "SOURCE_DELETED";
+    const planLimited = admission.code === "STORAGE_ALLOWANCE_EXHAUSTED";
     return NextResponse.json(
       {
         // The admission RPC guards at the same ceiling this route does (migration 0051), so this
@@ -317,7 +320,7 @@ async function legacyCapability(request: Request, input: {
         } : {}),
       },
       {
-        status: tooLarge ? 413 : rateLimited ? 429 : trialLimited ? 402 : conflict ? 409 : 503,
+        status: tooLarge ? 413 : rateLimited ? 429 : trialLimited || planLimited ? 402 : conflict ? 409 : 503,
         headers: {
           ...NO_STORE,
           ...(rateLimited ? { "Retry-After": admission.code === "INTAKE_RATE_LIMITED" ? "60" : "3600" } : {}),

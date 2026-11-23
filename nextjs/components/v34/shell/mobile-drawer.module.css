@@ -1,0 +1,236 @@
+.trigger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: transparent;
+  color: var(--v34-fg);
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--v34-fg-hover);
+}
+
+.trigger:focus-visible,
+.close:focus-visible,
+.brand:focus-visible,
+.primaryLink:focus-visible,
+.summary:focus-visible,
+.link:focus-visible,
+.signIn:focus-visible,
+.cta:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+@media (max-width: 1000px) {
+  .trigger {
+    display: inline-flex;
+  }
+}
+
+/*
+  The dialog is a paper surface and takes its own colour pair from it. A closed <dialog> keeps the
+  user agent's display: none, so nothing here sets display. Full viewport, and it scrolls itself.
+*/
+.dialog {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0 18px 32px;
+  border: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Scroll lock: the page behind the open drawer does not move. */
+:global(html):has(.dialog[open]) {
+  overflow: hidden;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--v34-header-h);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-size: 1.24rem;
+  font-weight: 850;
+  letter-spacing: -0.055em;
+  text-decoration: none;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--v34-fg-border);
+  border-radius: var(--v34-radius-panel);
+  background: transparent;
+  color: var(--v34-fg);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--v34-fg-hover);
+}
+
+.nav {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.primary {
+  display: grid;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.primaryLink {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--v34-fg);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.primaryLink[aria-current="page"] {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.group {
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  color: var(--v34-fg);
+  font-size: var(--v34-text);
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The mark states open or closed; it is drawn from the details' own attribute. */
+.summary::after {
+  content: "+";
+  font-size: 1.4rem;
+  font-weight: 400;
+}
+
+.group[open] .summary::after {
+  content: "\2212";
+}
+
+.list {
+  margin: 0;
+  padding: 0 0 12px;
+  list-style: none;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-size: 0.98rem;
+  text-decoration: none;
+}
+
+.link[aria-current="page"] {
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--v34-fg-rule);
+}
+
+.signIn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 10px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--v34-radius-pill);
+  background: var(--v34-header-btn);
+  color: var(--v34-white);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cta:hover {
+  background: var(--v34-header-btn-hover);
+}
+
+/* The drawer's links answer the pointer the way the header's do, the current page's included. */
+.brand:hover,
+.primaryLink:hover,
+.summary:hover,
+.link:hover,
+.signIn:hover {
+  color: var(--v34-header-btn-hover);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+@media (forced-colors: active) {
+  .cta { border: 1px solid ButtonText; }
+  .trigger:focus-visible,
+  .close:focus-visible,
+  .brand:focus-visible,
+  .primaryLink:focus-visible,
+  .summary:focus-visible,
+  .link:focus-visible,
+  .signIn:focus-visible,
+  .cta:focus-visible { outline-color: Highlight; }
+}

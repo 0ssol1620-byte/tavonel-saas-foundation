@@ -290,6 +290,11 @@ describe("where the Change Inbox is wired", () => {
   const railCss = readFileSync(new URL("../app/workspace/workspace-ultimate.module.css", import.meta.url), "utf8");
   const navRows = [...shell.matchAll(/\{ surface: "(\w+)"/g)].map((match) => match[1]);
 
+  it("mounts the LibraryPanel only once the page knows there are documents (fail closed)", () => {
+    expect(workspace).toContain("documents && documents.length > 0 ? <LibraryPanel");
+    expect(workspace).not.toContain("documents?.map((d) => d.documentId) ?? []");
+  });
+
   it("sits immediately after Review in the rail, and ahead of the secondary group", () => {
     expect(shell).toContain(`{ surface: "changes", label: "Changes"`);
     expect(navRows.indexOf("changes")).toBe(navRows.indexOf("review") + 1);

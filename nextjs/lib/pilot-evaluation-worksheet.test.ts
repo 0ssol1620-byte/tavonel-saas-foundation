@@ -2,14 +2,15 @@ import { describe, it, expect, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import EvaluationPage from "@/components/evaluation-page";
 import { activationPolicy } from "@/lib/activation-policy";
+import { KO_CHROME } from "@/lib/site-navigation";
 
 // Only the public site chrome is replaced, as in components/evaluation-page.test.tsx; the page,
 // the contact form, the activation policy and the static worksheets are the real ones.
-vi.mock("@/components/public-site-chrome", () => ({ PublicSiteHeader: () => null, PublicSiteFooter: () => null }));
+vi.mock("@/components/public-site-chrome", () => ({ PublicSitePage: ({ children }: { children: ReactNode }) => createElement("main", null, children) }));
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicDir = path.join(packageRoot, "public");
@@ -87,8 +88,11 @@ function worksheetBytes(locale: Locale) {
 function worksheet(locale: Locale) {
   return new TextDecoder("utf-8", { fatal: true }).decode(worksheetBytes(locale));
 }
+/* /ko/evaluation redirects with a 308 (GX-02); the page renders in English only, the Korean worksheet file stays a static asset. */
+const PAGE_LOCALES: readonly Locale[] = ["en"];
 function render(locale: Locale) {
-  return renderToStaticMarkup(createElement(EvaluationPage, { korean: LOCALES[locale].korean }));
+  if (!PAGE_LOCALES.includes(locale)) throw new Error(`the evaluation page has no ${locale} rendering`);
+  return renderToStaticMarkup(createElement(EvaluationPage));
 }
 
 /** The body of the numbered `## n.` section, up to the next `## ` heading (subsections stay in). */
@@ -118,7 +122,7 @@ function worksheetAnchors(html: string) {
 }
 
 describe("pilot evaluation worksheet: native same-origin download link", () => {
-  for (const locale of LOCALE_KEYS) {
+  for (const locale of PAGE_LOCALES) {
     const other = locale === "en" ? "ko" : "en";
     it(`offers exactly the ${locale} worksheet as a plain download on the ${locale} page`, () => {
       const anchors = worksheetAnchors(render(locale));
@@ -279,7 +283,7 @@ describe("pilot evaluation worksheet: provenance, ground truth, change, support 
 });
 
 describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, gates and links", () => {
-  for (const locale of LOCALE_KEYS) {
+  for (const locale of PAGE_LOCALES) {
     it(`${locale}: still renders one form with exactly three required fields and the inquiry boundary`, () => {
       const html = render(locale);
       expect(html.match(/<form\b/g)?.length).toBe(1);
@@ -301,8 +305,9 @@ describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, ga
       expect(html).toContain(`lang="${locale}"`);
       expect(html).toContain('href="/explore"');
       expect(html).toContain(locale === "en" ? 'href="/pricing"' : 'href="/ko/pricing"');
-      // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale.
-      expect(html).toContain(locale === "en" ? "Once it is open, the Developer plan can be bought online. Team and Enterprise are arranged with us rather than enabled by a plan purchase." : "열린 뒤에는 Developer 요금제를 바로 구매할 수 있고, Team과 Enterprise는 저희와 함께 정합니다.");
+      // D-12 (delegated decision 2026-11-09): the switch-on sentence, in each locale. WO-REL-1: it names no plan as bought online.
+      // WO-REL-1 r4: taken from the source constants, so a rewording cannot strand this pin (the English wording is pinned in customer-data-live-path.test.ts).
+      expect(html).toContain(locale === "en" ? activationPolicy.customerData.reason : KO_CHROME.customerDataGate);
       expect(html).not.toMatch(/<script\b/);
     });
   }
@@ -312,7 +317,7 @@ describe("pilot evaluation worksheet: the real EvaluationPage keeps its form, ga
     expect(source).not.toMatch(/\bon[A-Z]\w*=/);
     expect(source).not.toMatch(/\buse(?:State|Effect|Ref|Reducer|Transition)\b/);
     expect(source).not.toMatch(/\b(?:fetch|localStorage|sessionStorage|document\.cookie|navigator\.sendBeacon|trackFunnel\w*)\b/);
-    expect(source.match(/download="tavonel-pilot-worksheet\.(?:en|ko)\.md"/g)).toHaveLength(2);
+    expect(source.match(/download="tavonel-pilot-worksheet\.(?:en|ko)\.md"/g)).toHaveLength(1);
   });
 });
 
@@ -346,15 +351,17 @@ describe("pilot worksheet copy correction: download retrieval boundary and singl
   for (const locale of LOCALE_KEYS) {
     const other = locale === "en" ? "ko" : "en";
     it(`${locale}: page and worksheet say a download retrieves the blank file and filling it in does not by itself submit its contents`, () => {
-      const html = render(locale);
-      const intro = html.slice(html.indexOf('class="evaluation-intro"'), html.indexOf('class="evaluation-grid"'));
+      const html = PAGE_LOCALES.includes(locale) ? render(locale) : null;
+      const intro = html ? html.slice(html.indexOf('class="evaluation-intro"'), html.indexOf('class="evaluation-grid"')) : null;
       const text = worksheet(locale);
       const about = text.split(/^## /m)[1];
-      for (const phrase of RETRIEVAL[locale].page) expect(intro).toContain(phrase);
-      expect(intro).toContain(LOCALES[locale].noStart);
+      if (intro) {
+        for (const phrase of RETRIEVAL[locale].page) expect(intro).toContain(phrase);
+        expect(intro).toContain(LOCALES[locale].noStart);
+      }
       for (const phrase of RETRIEVAL[locale].sheet) expect(about).toContain(phrase);
-      for (const body of [html, text]) for (const phrase of SUPERSEDED) expect(body).not.toContain(phrase);
-      for (const body of [intro, about]) expect(body).not.toMatch(GENERIC_PROMISE);
+      for (const body of html ? [html, text] : [text]) for (const phrase of SUPERSEDED) expect(body).not.toContain(phrase);
+      for (const body of intro ? [intro, about] : [about]) expect(body).not.toMatch(GENERIC_PROMISE);
       const source = readFileSync(path.join(packageRoot, "components", "evaluation-page.tsx"), "utf-8");
       expect(source).toContain("an ordinary GET that retrieves the blank static file; it submits no worksheet or form contents");
       expect(source).not.toContain("no request to us");
@@ -365,6 +372,7 @@ describe("pilot worksheet copy correction: download retrieval boundary and singl
       for (const phrase of OTHER_EDITION) expect(text).not.toContain(phrase);
       for (let n = 1; n <= 12; n++) expect(() => section(text, n)).not.toThrow();
       for (const field of LOCALES[locale].fields) expect(text).toContain(field);
+      if (!PAGE_LOCALES.includes(locale)) return;
       const html = render(locale);
       const anchors = worksheetAnchors(html);
       expect(anchors).toHaveLength(1);

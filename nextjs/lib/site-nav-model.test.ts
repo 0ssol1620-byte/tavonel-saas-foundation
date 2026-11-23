@@ -4,6 +4,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import sitemap from "@/app/sitemap";
+import nextConfig from "@/next.config.mjs";
+import { resolveEntries, resolveGroups, V34_FOOTER_GROUPS, V34_MORE_GROUPS, V34_PRIMARY_NAV } from "@/lib/v34/nav";
+import { V34_LIVE_PATHS } from "@/lib/v34/routes";
 import { DesktopPrimaryNav, NavSections } from "@/components/public-site-chrome";
 import { navCurrent } from "@/components/site-nav/desktop-primary-nav";
 import { exploreSampleDocuments } from "./explore-sample";
@@ -24,7 +27,6 @@ import {
   navHrefs,
   navSectionForPath,
   KO_CHROME,
-  KO_NAV_PANELS,
   navAlsoOwns,
 } from "./site-navigation";
 
@@ -49,6 +51,18 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/docs/mcp" }));
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
 const SITEMAP_PATHS = new Set(sitemap().map((entry) => new URL(entry.url).pathname.replace(/\/$/, "") || "/"));
+/*
+  V34 (D33 §1.1). The model below is the rollback landing's chrome (Landing V2 stays in the tree until
+  after D36, decision 11) and it still names the nine retired routes. A link to one of them is not a
+  link the site cannot answer: it answers 308 with the V34 destination. So a destination is answerable
+  when it is a sitemap route or a permanent redirect whose target is one. Nothing else is.
+*/
+const REDIRECTED = new Set(
+  ((await nextConfig.redirects!()) as Array<{ source: string; destination: string; permanent: boolean }>)
+    .filter((redirect) => redirect.permanent && SITEMAP_PATHS.has(redirect.destination))
+    .map((redirect) => redirect.source),
+);
+const answers = (href: string) => SITEMAP_PATHS.has(href) || REDIRECTED.has(href);
 const panelItems = NAV_GROUPS.flatMap((group) => [
   ...group.columns.flatMap((column) => column.items),
   ...(group.featured ? [group.featured] : []),
@@ -72,7 +86,7 @@ describe("the global menu's destinations", () => {
 
   it("offers no link the site cannot answer", () => {
     const unreachable = navHrefs().filter(
-      (href) => !SITEMAP_PATHS.has(href) && !NAV_PENDING_HREFS.includes(href),
+      (href) => !answers(href) && !NAV_PENDING_HREFS.includes(href),
     );
     expect(unreachable, "menu destinations that are neither a published route nor declared pending").toEqual([]);
   });
@@ -176,8 +190,8 @@ describe("the global menu's destinations", () => {
     const hrefs = FOOTER_GROUPS.flatMap((group) => group.links.map((link) => link.href));
     for (const href of hrefs) expect(KO_CHROME.footerLinks[href], href).toBeTruthy();
     expect(Object.keys(KO_CHROME.footerLinks).sort()).toEqual([...hrefs].sort());
-    expect(read("../components/public-site-chrome.tsx"), "and the footer renders them")
-      .toContain("korean ? KO_CHROME.footerLinks[link.href] ?? link.label : link.label");
+    expect(read("../components/public-site-chrome.tsx"), "the footer chrome itself is English only")
+      .not.toContain("KO_CHROME");
   });
 
   it("closes the footer with the copyright and the security inbox, and no language switch", () => {
@@ -226,14 +240,13 @@ describe("the production customer destinations in the bar", () => {
 
   it("offers no link the site cannot answer", () => {
     for (const item of CUSTOMER_NAV) {
-      expect(SITEMAP_PATHS.has(item.href), `${item.href} is not in app/sitemap.ts`).toBe(true);
+      expect(answers(item.href), `${item.href} is neither in app/sitemap.ts nor a 308 to a sitemap route`).toBe(true);
     }
   });
 
-  it("gives every one of them a Korean label, and names no route it does not carry", () => {
-    const hrefs = CUSTOMER_NAV.map((item) => item.href);
-    for (const href of hrefs) expect(KO_CHROME.nav[href], href).toBeTruthy();
-    expect(Object.keys(KO_CHROME.nav).sort()).toEqual([...hrefs].sort());
+  it("carries no Korean label table for the bar: /ko redirects with a 308, so the bar is English only", () => {
+    expect(KO_CHROME).not.toHaveProperty("nav");
+    expect(read("../lib/site-navigation.ts")).not.toContain("KO_NAV_PANELS");
   });
 
   it("writes each label once, and points each destination at one item", () => {
@@ -317,25 +330,10 @@ describe("the Solutions column of the Product panel", () => {
   has a Korean spelling, and the table names nothing the panels do not carry. The corpus line is a
   number in two languages: the Korean one is held to the same figures as the English one.
 */
-describe("the panels in Korean", () => {
-  const items = NAV_GROUPS.flatMap((group) => [
-    ...group.columns.flatMap((column) => column.items),
-    ...(group.featured ? [group.featured] : []),
-  ]);
-
-  it("translates every column, link and description, and nothing else", () => {
-    const titles = NAV_GROUPS.flatMap((group) => group.columns.map((column) => column.title));
-    expect(Object.keys(KO_NAV_PANELS.columns).sort()).toEqual([...new Set(titles)].sort());
-    expect(Object.keys(KO_NAV_PANELS.links).sort()).toEqual([...new Set(items.map((item) => item.href))].sort());
-    const described = items.filter((item) => item.description).map((item) => item.href);
-    expect(Object.keys(KO_NAV_PANELS.descriptions).sort()).toEqual([...new Set(described)].sort());
-  });
-
-  it("states the sample corpus with the figures the English line has", () => {
-    const regions = exploreSampleDocuments.reduce((total, document) => total + document.regionCount, 0);
-    expect(KO_NAV_PANELS.descriptions["/explore"]).toBe(
-      `Apple SEC 코퍼스 · 공시 ${exploreSampleDocuments.length}건 · 영역 ${regions.toLocaleString("en-US")}개`,
-    );
+describe("the panels carry no Korean table", () => {
+  it("the panels render their English labels and descriptions only", () => {
+    const html = renderToStaticMarkup(createElement(NavSections, { sheet: true }));
+    expect(html).not.toMatch(/[\uac00-\ud7a3]/);
   });
 });
 
@@ -402,16 +400,15 @@ describe("the rendered panels", () => {
     }
   });
 
-  it("renders the same groups as the phone sheet's rows, in Korean on /ko", () => {
-    const html = renderToStaticMarkup(createElement(NavSections, { korean: true, sheet: true }));
+  it("renders the same groups as the phone sheet's rows", () => {
+    const html = renderToStaticMarkup(createElement(NavSections, { sheet: true }));
     expect(anchors(html, "mobile-nav-direct").map(hrefOf)).toEqual(HEADER_NAV.map((item) => item.href));
     for (const group of NAV_GROUPS) {
       const panel = panelOf(html, `sheet-nav-panel-${group.section}`);
       for (const href of groupHrefs(group.section)) {
         expect(panel).toContain(`href="${href}"`);
-        expect(panel).toContain(KO_NAV_PANELS.links[href]);
       }
-      expect(html).toContain(`aria-label="${KO_CHROME.nav[group.overviewHref]} ${KO_NAV_PANELS.menu}"`);
+      expect(html).toContain(`aria-label="${group.label} menu"`);
     }
   });
 });
@@ -506,5 +503,45 @@ describe("the customer navigation's current page and section", () => {
     expect(customerNavCurrent("/docs", "/docs/mcp")).toBe("location");
     expect(navSectionForPath("/sources")).toBe("product");
     expect(customerNavCurrent("/product", "/sources")).toBeUndefined();
+  });
+});
+
+/*
+  V34 (D33 §3.5, §4 #6). The navigation a visitor actually gets: five bar items and the four More
+  columns, from `lib/v34/nav.ts`, which derives every href from the typed registry. What is pinned
+  here is the shape the architecture fixes; that every entry is a live registry route is pinned again
+  in `lib/v34/nav.test.ts` and `lib/v34/integration.test.ts`.
+*/
+describe("the V34 navigation", () => {
+  const primary = resolveEntries(V34_PRIMARY_NAV);
+  const more = resolveGroups(V34_MORE_GROUPS);
+  const footer = resolveGroups(V34_FOOTER_GROUPS);
+
+  it("carries five bar items: Product, Solutions, Integrations, Pricing, Journal", () => {
+    expect(primary.map((link) => link.label)).toEqual(["Product", "Solutions", "Integrations", "Pricing", "Journal"]);
+    expect(primary.map((link) => link.href)).toEqual(["/platform", "/solutions", "/connect", "/pricing", "/journal"]);
+  });
+
+  it("opens More into four columns", () => {
+    expect(more.map((group) => group.title)).toEqual(["Product", "For you", "Build & trust", "TAVONEL"]);
+  });
+
+  it("offers a link only to a live registry route or a retained one the sitemap lists", () => {
+    const live = new Set<string>(V34_LIVE_PATHS);
+    for (const link of [...primary, ...more.flatMap((group) => group.links)]) {
+      expect(live.has(link.href), `${link.href} is in the bar or More and is not a live registry route`).toBe(true);
+    }
+    // The footer also carries retained routes. /research/program arrives with batch B.
+    for (const link of footer.flatMap((group) => group.links)) {
+      if (link.href === "/research/program") continue;
+      expect(SITEMAP_PATHS.has(link.href), `${link.href} is in the footer and not in the sitemap`).toBe(true);
+    }
+  });
+
+  it("lists a destination once per column", () => {
+    for (const group of [...more, ...footer]) {
+      const hrefs = group.links.map((link) => link.href);
+      expect(new Set(hrefs).size, group.title).toBe(hrefs.length);
+    }
   });
 });

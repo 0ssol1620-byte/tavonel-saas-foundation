@@ -108,4 +108,16 @@
   .row { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .protocol li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
+/*
+  WO-CI-28 (lead decision 18). Inside the V34 frame the header is sticky and in flow, so the hero's
+  112-156px top padding and its 58vh floor, sized for a fixed header over a scenic band, left the H1
+  242px under the header at 1440 and 123px at 390 (WO-CI-21 gap-after.txt). /reproducibility is T5, and
+  in the frame its opening is the V34 T5 hero's: no floor, the hero's top padding `clamp(45px, 6vw, 92px)`
+  (components/v34/ui/hero.module.css), and the eyebrow line at line-height 1.4 with its 14px step to the
+  title (components/v34/ui/text.module.css). Specific enough to win over the media rules above at every
+  width; outside the frame they stand as they are.
+*/
+:global([data-v34-site]) .hero { min-height: 0; padding-top: clamp(45px, 6vw, 92px); align-items: start; }
+:global([data-v34-site]) .heroLead { gap: 14px; }
+:global([data-v34-site]) .heroLead > :global(.eyebrow) { line-height: 1.4; }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }

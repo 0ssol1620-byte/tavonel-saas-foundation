@@ -1,4 +1,9 @@
 import { test, expect, type Locator, type Page, type TestInfo } from "@playwright/test";
+import { createWorldAction } from "../components/v34/ui/create-world";
+
+// V34 /solutions: the five documented workflows are the cards that carry an Input/Action/Output list.
+// The hub's other cards (roles, fields) link to their own pages and carry no such list.
+const TASK_CARDS = 'main article:has(dl[aria-label="Input, action and output"])';
 
 const routes = ["ai-ready-knowledge", "document-intelligence", "knowledge-graph", "source-grounded-assistants", "knowledge-operations"] as const;
 
@@ -29,14 +34,36 @@ async function contrast(target: Locator) {
   });
 }
 
-async function ctaStates(page: Page, info: TestInfo, name: string, width: number) {
-  const cta = page.locator("main .actions .btn:not(.ghost)").first();
+// The hub's primary action is the V34 pill (colours from the V34 tokens); a workflow page still draws
+// its own legacy button, which keeps its own hover colour.
+async function ctaStates(page: Page, info: TestInfo, name: string, width: number, kind: "v34" | "legacy" = "legacy") {
+  const cta = kind === "v34"
+    ? page.locator("main").getByRole("link", { name: createWorldAction().label, exact: true }).first()
+    : page.locator("main .actions .btn:not(.ghost)").first();
   await page.mouse.move(0, 0);
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-normal.png`);
+  const rest = await cta.evaluate((element) => getComputedStyle(element).backgroundColor);
   await cta.hover();
-  // decision.md G-H: hover is --tv-action-hover #0169cd (tavonel.css), adopted by solutions.module.css in P2-03.
-  await expect(cta).toHaveCSS("background-color", "rgb(1, 105, 205)");
+  // decision.md G-H: a workflow page's hover was --tv-action-hover #0169cd (tavonel.css), adopted by
+  // solutions.module.css in P2-03. Inside the V34 frame the retained .btn is painted by the token sheet
+  // (WO-CI-19, lead decision 15) and hovers to the frame's action-hover token; the V34 pill hovers to its
+  // own token. Both are read from the page, not typed.
+  const token = kind === "v34" ? "var(--v34-header-btn-hover)" : "var(--v34-fg-action-hover, var(--v34-header-btn-hover))";
+  const hover = await cta.evaluate((element, value) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = value;
+    element.append(probe);
+    const resolved = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return resolved;
+  }, token);
+  expect(hover, "the hover token resolves").not.toBe("rgba(0, 0, 0, 0)");
+  // The first token named is the one the page is expected to define; the fallback after it must not be what answers.
+  const first = token.match(/--[\w-]+/)![0];
+  expect(await cta.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name).trim(), first), `${first} is defined on the page`).not.toBe("");
+  expect(rest, "the CTA at rest is not painted the hover colour").not.toBe(hover);
+  await expect(cta).toHaveCSS("background-color", hover);
   await expect.poll(() => contrast(cta)).toBeGreaterThanOrEqual(4.5);
   await capture(cta, info, `solutions-${name}-${width}-cta-hover.png`);
   await page.mouse.move(0, 0);
@@ -56,20 +83,25 @@ for (const width of [390, 1440, 1920]) {
     await page.goto("/solutions", { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
     await capture(page, info, `solutions-hub-${width}.png`);
-    await expect(page.locator("main article")).toHaveCount(5);
-    await expect(page.locator("#design-partners-title")).toHaveCount(1);
+    await expect(page.locator(TASK_CARDS)).toHaveCount(5);
+    // Lead decision 13 (WO-CI-24): the soft #design-partners-title row is retired; the V34 hub and
+    // the prototype carry no design-partner section.
     const hubTitle = page.locator("main h1");
-    const hubLede = page.locator("main .lede").first();
+    const hubLede = page.locator("main h1 + div p").first();
     expect(Math.abs((await hubTitle.boundingBox())!.x - (await hubLede.boundingBox())!.x)).toBeLessThan(2);
-    for (const card of await page.locator("main article").all()) {
+    for (const card of await page.locator(TASK_CARDS).all()) {
       await expect(card.locator('dl[aria-label="Input, action and output"] dt')).toHaveText(["Input", "Action", "Output"]);
       await expect(card.locator("a")).toHaveCount(1);
       const link = card.locator("a");
       await link.focus();
       await expect(link).toBeFocused();
-      expect(await card.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe("none");
+      // A V34 card is drawn by its border where the legacy card was drawn by a shadow; either makes it a card.
+      expect(await card.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return style.boxShadow !== "none" || parseFloat(style.borderTopWidth) > 0;
+      })).toBe(true);
     }
-    await ctaStates(page, info, "hub", width);
+    await ctaStates(page, info, "hub", width, "v34");
     for (const slug of routes) {
       await page.goto(`/solutions/${slug}`, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
@@ -92,7 +124,7 @@ for (const width of [390, 1440, 1920]) {
       expect(proofHref.pathname).toBe("/explore");
       expect(proofHref.searchParams.get("evidence")).toBe(selectedEvidence);
       const packageLink = proof.getByRole("link", { name: "Inspect the full sample package" });
-      if (await packageLink.count()) await expect(packageLink).toHaveAttribute("href", "/product/compiled-world#public-package-proof");
+      if (await packageLink.count()) await expect(packageLink).toHaveAttribute("href", "/world#public-package-proof");
       for (const link of await proof.locator("a").all()) {
         expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         await link.focus();
@@ -159,7 +191,8 @@ for (const width of [390, 1440, 1920]) {
         await page.goto(`/solutions/${slug}`, { waitUntil: "networkidle" });
         const packageLink = page.getByRole("link", { name: "Inspect the full sample package" });
         await tabTo(page, packageLink);
-        await Promise.all([page.waitForURL("**/product/compiled-world#public-package-proof"), page.keyboard.press("Enter")]);
+        // Lead decision 9 (WO-CI-24): the package section is ported to /world and the link names it there.
+        await Promise.all([page.waitForURL("**/world#public-package-proof"), page.keyboard.press("Enter")]);
         await expect(page.locator("#public-package-proof")).toBeVisible();
         await capture(page, info, `solutions-${slug}-${width}-package-destination.png`);
       }

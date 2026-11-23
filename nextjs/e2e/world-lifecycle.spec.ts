@@ -86,6 +86,7 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
       json: {
         account: {
           accessPlan: null,
+          planCode: null,
           subscriptionStatus: "inactive",
           creditBalance: 0,
           lifetimeCreditsPurchased: 0,

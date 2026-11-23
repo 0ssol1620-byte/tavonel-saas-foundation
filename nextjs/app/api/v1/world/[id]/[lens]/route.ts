@@ -7,7 +7,9 @@ import {
 } from "@/lib/consumer-context-api";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
-import { getFoundationActiveWorld } from "@/lib/world-store";
+import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
+import { getFoundationActiveWorld, getWorldFreshness } from "@/lib/world-store";
+import { parseTemporal, resolveWorldAtKnownAt, temporalBlock } from "@/lib/world-activation-history";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +38,12 @@ const LENSES = new Set(["objects", "relations", "evidence", "history", "files", 
 */
 const PAGE_MAX = 50;
 const PAGEABLE = new Set(["objects", "relations", "evidence"]);
+const PAGE_TOKEN_PURPOSE = "tavonel.world_lens_page.v1";
+const PAGE_TOKEN_TTL_MS = 15 * 60 * 1000;
+// The same rule as SAFE_ID in lib/world-read-model.ts, which every lens id already passes, and
+// the pattern the WORLD_IDS_INVALID catalog entry publishes; world-lens-by-id.test.ts holds the
+// three equal. Local because a route file cannot export it and that module is outside this scope.
+const LENS_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 
 type Identified = { id: string };
 
@@ -62,17 +70,60 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
   const search = new URL(request.url).searchParams;
   const rawLimit = search.get("limit");
-  const cursor = search.get("cursor");
-  const paged = rawLimit !== null || cursor !== null;
-  if (paged && !PAGEABLE.has(lens)) {
-    return NextResponse.json({ code: "WORLD_LENS_NOT_PAGEABLE" }, { status: 400, headers: NO_STORE });
+  let cursor = search.get("cursor");
+  const rawIds = search.get("ids");
+  const pageToken = search.get("page_token");
+  const fail = (code: string, status: number) => NextResponse.json({ code }, { status, headers: NO_STORE });
+  const paged = rawLimit !== null || cursor !== null || pageToken !== null;
+  if ((paged || rawIds !== null) && !PAGEABLE.has(lens)) return fail("WORLD_LENS_NOT_PAGEABLE", 400);
+
+  // Typed time (D18-2): validated before anything is read. A repeated parameter is passed on as
+  // an array, which the parser refuses, so it can never read as "not sent".
+  const one = (name: string) => (search.getAll(name).length > 1 ? search.getAll(name) : search.get(name));
+  const temporal = parseTemporal({ known_at: one("known_at"), valid_at: one("valid_at"), as_of: one("as_of") });
+  if (!temporal.ok) return fail(temporal.code, temporal.status);
+  // A bound context names its exact World already; a second clock would contradict it.
+  if (temporal.knownAt !== null && binding.bound) return fail("KNOWN_AT_WITH_CONTEXT", 400);
+
+  // By-id read (F30-06): the named items only, never mixed with paging.
+  let ids: string[] | null = null;
+  if (rawIds !== null) {
+    if (paged) return fail("WORLD_IDS_WITH_PAGE", 400);
+    if (search.getAll("ids").length > 1) return fail("WORLD_IDS_INVALID", 400);
+    ids = rawIds.split(",");
+    if (ids.length > PAGE_MAX || new Set(ids).size !== ids.length || !ids.every((value) => LENS_ID.test(value))) {
+      return fail("WORLD_IDS_INVALID", 400);
+    }
   }
-  const limit = rawLimit === null ? null : Number(rawLimit);
+
+  // A page token carries its own limit and cursor. Its claims are checked against the principal
+  // and path before anything is read, and against the served World and access revision after.
+  const tokenKey = pageTokenKey();
+  let limit = rawLimit === null ? null : Number(rawLimit);
+  let tokenClaims: Record<string, unknown> | null = null;
+  if (pageToken !== null) {
+    if (search.getAll("page_token").length > 1) return fail("PAGE_TOKEN_INVALID", 400);
+    if (!tokenKey) return fail("PAGE_TOKEN_SIGNER_NOT_CONFIGURED", 503);
+    if (rawLimit !== null || cursor !== null) return fail("PAGE_TOKEN_INVALID", 400);
+    tokenClaims = unsealClaims(PAGE_TOKEN_PURPOSE, pageToken, tokenKey);
+    if (
+      !tokenClaims || tokenClaims.v !== 1 || tokenClaims.w !== auth.principal.workspaceKey || tokenClaims.c !== id ||
+      tokenClaims.l !== lens || typeof tokenClaims.k !== "string" || typeof tokenClaims.d !== "string" ||
+      typeof tokenClaims.exp !== "number" || !Number.isInteger(tokenClaims.n)
+    ) return fail("PAGE_TOKEN_INVALID", 400);
+    if (tokenClaims.exp < Date.now()) return fail("PAGE_TOKEN_STALE", 400);
+    limit = tokenClaims.n as number;
+    cursor = tokenClaims.k;
+  }
   if (paged && (limit === null || !Number.isInteger(limit) || limit < 1 || limit > PAGE_MAX)) {
     // A cursor with no limit lands here too: it asks for "the next page" of an unbounded read,
     // which is not a page this endpoint can produce.
     return NextResponse.json({ code: "WORLD_PAGE_LIMIT_INVALID" }, { status: 400, headers: NO_STORE });
   }
+
+  // The activation log is read only once every cheap check above has passed.
+  const resolvedAt = temporal.knownAt === null ? null : await resolveWorldAtKnownAt(auth.principal.workspaceKey, id, temporal.knownAt);
+  if (resolvedAt && !resolvedAt.ok) return fail(resolvedAt.code, resolvedAt.status);
 
   // Bound: resolved before the World is read, and the read is the resolved digest, never the
   // preferred candidate. Legacy reads the active World list_worlds reports, and the preferred
@@ -81,6 +132,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const snapshot = binding.bound ? await resolveBoundSnapshot(binding, auth.principal.workspaceKey) : null;
   if (snapshot && !snapshot.ok) return NextResponse.json({ code: snapshot.code }, { status: snapshot.status, headers: NO_STORE });
   let selected: string | undefined;
+  let current = true;
   if (snapshot) selected = snapshot.resolved.snapshot.manifestDigest;
   else {
     const active = await getFoundationActiveWorld(auth.principal.workspaceKey, id);
@@ -88,19 +140,52 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     else if (active.code !== "ACTIVE_WORLD_NOT_FOUND") {
       return NextResponse.json({ code: active.code }, { status: active.code === "WORLD_ID_INVALID" ? 400 : 503, headers: NO_STORE });
     }
+    // known_at: the World activated at T. loadWorldReadModel applies today's source access and
+    // derived-data admission to it, so a source denied since then is refused, not served from history.
+    if (resolvedAt) {
+      current = selected === resolvedAt.manifestDigest;
+      selected = resolvedAt.manifestDigest;
+    }
   }
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
   if (!loaded.ok) return NextResponse.json({ code: loaded.code, bytes: loaded.bytes, bound: loaded.bound }, { status: loaded.status, headers: NO_STORE });
+  /*
+    loadWorldReadModel calls every digest that is not the active one a "candidate" and hands it to
+    the freshness read as the candidate awaiting activation. For a World the log says was activated
+    and has since been replaced, both are wrong: it is superseded, and nothing newer is waiting
+    because of it. Say so, and read the freshness again without that digest as a hint.
+  */
+  const past = resolvedAt !== null && !current;
+  const freshness = past ? await getWorldFreshness(auth.principal.workspaceKey, id) : loaded.model.freshness;
+  const pastStatus = <T extends { status: string }>(items: T[]) => (past ? items.map((item) => ({ ...item, status: "superseded" })) : items);
+  const served = past
+    ? { ...loaded.model, world: { ...loaded.model.world, status: "superseded" }, objects: pastStatus(loaded.model.objects), relations: pastStatus(loaded.model.relations) }
+    : loaded.model;
   const shared = {
     code: "OK",
-    world: loaded.model.world,
+    world: served.world,
     contract: loaded.model.contract,
-    freshness: loaded.model.freshness,
+    freshness,
+    ...(resolvedAt && temporal.knownAt !== null ? { temporal: temporalBlock(temporal.knownAt, resolvedAt, current) } : {}),
   };
 
+  if (tokenClaims && (tokenClaims.a !== auth.principal.authorizationRevision || tokenClaims.d !== loaded.model.world.manifestDigest)) {
+    // Access or the World moved between pages: a walk must not splice two of them.
+    return fail("PAGE_TOKEN_STALE", 409);
+  }
+
   let body: Record<string, unknown>;
-  if (paged && limit !== null) {
-    const all = loaded.model[lens as "objects" | "relations" | "evidence"] as Identified[];
+  if (ids) {
+    const byId = new Map((served[lens as "objects" | "relations" | "evidence"] as Identified[]).map((item) => [item.id, item]));
+    const items = ids.flatMap((value) => byId.get(value) ?? []);
+    body = {
+      ...shared,
+      [lens]: items,
+      selection: { requested: ids.length, found: items.length, missing: ids.filter((value) => !byId.has(value)) },
+      page: { limit: null, cursor: null, nextCursor: null, total: null },
+    };
+  } else if (paged && limit !== null) {
+    const all = served[lens as "objects" | "relations" | "evidence"] as Identified[];
     const page = paginate(all, limit, cursor);
     if (!page) {
       return NextResponse.json({ code: "WORLD_PAGE_CURSOR_INVALID" }, { status: 400, headers: NO_STORE });
@@ -108,12 +193,20 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     body = {
       ...shared,
       [lens]: page.items,
-      page: { limit, cursor, nextCursor: page.nextCursor, total: page.total },
+      page: {
+        limit, cursor, nextCursor: page.nextCursor, total: page.total,
+        ...(tokenKey ? {
+          nextPageToken: page.nextCursor === null ? null : sealClaims(PAGE_TOKEN_PURPOSE, {
+            v: 1, w: auth.principal.workspaceKey, c: id, l: lens, d: loaded.model.world.manifestDigest,
+            a: auth.principal.authorizationRevision, k: page.nextCursor, n: limit, exp: Date.now() + PAGE_TOKEN_TTL_MS,
+          }, tokenKey),
+        } : {}),
+      },
     };
   } else {
     const payload = lens === "files"
       ? { files: loaded.model.files, signature: loaded.model.signature }
-      : { [lens]: loaded.model[lens as keyof Pick<typeof loaded.model, "objects" | "relations" | "evidence" | "history" | "review">] };
+      : { [lens]: served[lens as keyof Pick<typeof served, "objects" | "relations" | "evidence" | "history" | "review">] };
     const whole = (payload as Record<string, unknown>)[lens];
     body = {
       ...shared,

@@ -56,8 +56,13 @@ test("integration marketing copy uses access modes instead of beta badges", asyn
     once more than the rows that carry it: three managed connectors plus the legend's own <dt>,
     two customer-run rows plus its <dt>. The contract is the one this always measured -- every row
     declares who holds the credential, and none of them says "Beta".
+
+    WO-REL-4: /integrations redirects to /connect, whose managed-connector cards (and the legend's
+    Read-only term with them) are shown only for a provider the deployment can connect
+    (configuredOAuthProviders). The fixture build configures no OAuth provider, so none is shown;
+    the configured case is rendered in lib/v34/routes-connect.test.ts.
   */
-  await expect(main.getByText("Read-only", { exact: true })).toHaveCount(4);
+  await expect(main.getByText("Read-only", { exact: true })).toHaveCount(0);
   await expect(main.getByText("Customer-run", { exact: true })).toHaveCount(3);
 });
 
@@ -100,13 +105,23 @@ test("odd two-column record grids do not expose an empty placeholder cell", asyn
     .toBeGreaterThan(0);
 });
 
+/*
+  V34 (WO-CI-5a): /integrations answers 308 to /connect, and the footer is the V34 shell's (the page's
+  contentinfo landmark); its link groups are the labelled <nav> elements, and the grid that holds them
+  is their common parent. The measurements and budgets are unchanged.
+
+  WO-CI-22 (lead decision 7): on a phone each group is a native <details>, closed until its summary is
+  pressed. The height budget is read with the groups closed, as the page first paints; every summary is
+  a 44px target; then every group is opened by its summary and the links are measured open -- a closed
+  group's links are not painted, so their boxes say nothing about the touch floor or overlap.
+*/
 test("the public footer stays compact and fully painted on narrow screens", async ({ page }) => {
   await page.goto("/integrations");
-  const footer = page.locator("footer.site");
+  const footer = page.locator("[data-v34-site] > footer");
   await footer.scrollIntoViewIfNeeded();
 
-  const result = await footer.evaluate((element) => {
-    const group = element.querySelector<HTMLElement>(".site-footer-groups")!;
+  const measure = () => footer.evaluate((element) => {
+    const group = element.querySelector<HTMLElement>("nav[aria-label]")!.parentElement!;
     const navs = [...group.querySelectorAll<HTMLElement>(":scope > nav")];
     const links = [...group.querySelectorAll<HTMLElement>("a")];
     const intersects = (a: DOMRect, b: DOMRect) =>
@@ -124,15 +139,39 @@ test("the public footer stays compact and fully painted on narrow screens", asyn
       footerHeight: element.getBoundingClientRect().height,
       groupHeight: group.getBoundingClientRect().height,
       linkHeights: links.map((link) => link.getBoundingClientRect().height),
+      links: links.length,
+      paintedLinks: links.filter((link) => link.checkVisibility()).length,
+      summaryHeights: [...group.querySelectorAll<HTMLElement>("summary")]
+        .filter((summary) => summary.getClientRects().length > 0)
+        .map((summary) => summary.getBoundingClientRect().height),
       navOverlapCount,
       linkOverlapCount,
     };
   });
 
+  const phone = (page.viewportSize()?.width ?? 0) <= 480;
+  const closed = await measure();
+  expect(closed.navOverlapCount).toBe(0);
+  expect(closed.groupHeight).toBeGreaterThan(100);
+  expect(closed.links, "the footer groups carry their links in the document").toBeGreaterThan(0);
+  if (!phone) {
+    // Wide: no disclosure is drawn and every link is painted.
+    expect(closed.summaryHeights).toEqual([]);
+    expect(closed.paintedLinks).toBe(closed.links);
+  }
+  // Wide this is the same state; on a phone every group is opened by its own summary first.
+  const summaries = footer.locator("nav[aria-label] > details > summary");
+  if (phone) {
+    expect(closed.summaryHeights.length, "every group is a disclosure on a phone").toBe(await page.locator("[data-v34-site] > footer nav[aria-label]").count());
+    expect(closed.summaryHeights.every((height) => height >= 43.99), `summary heights ${closed.summaryHeights}`).toBe(true);
+    expect(closed.paintedLinks, "a closed group paints none of its links").toBe(0);
+    for (const summary of await summaries.all()) await summary.click();
+  }
+  const result = phone ? await measure() : closed;
+  expect(result.paintedLinks, "every link is painted once its group is open").toBe(result.links);
   expect(result.navOverlapCount).toBe(0);
   expect(result.linkOverlapCount).toBe(0);
-  expect(result.groupHeight).toBeGreaterThan(100);
-  if ((page.viewportSize()?.width ?? 0) <= 480) {
+  if (phone) {
     expect(result.columns).toBe(2);
     /*
       Re-derived from a measurement, not raised to go green (Release 2, 2026-10-15). The phone footer
@@ -142,7 +181,8 @@ test("the public footer stays compact and fully painted on narrow screens", asyn
       viewport (760px) budget the R1 sub-grid met. The new budget is 1.1 x viewport (928px at 844):
       the measured height plus ~4%, so a further row of links still fails here.
     */
-    expect(result.footerHeight).toBeLessThan((page.viewportSize()?.height ?? 844) * 1.1);
+    // WO-CI-22: the budget is unchanged and read closed, the way the page first paints.
+    expect(closed.footerHeight).toBeLessThan((page.viewportSize()?.height ?? 844) * 1.1);
     expect(result.linkHeights.every((height) => height >= 43.99)).toBe(true);
   }
 });

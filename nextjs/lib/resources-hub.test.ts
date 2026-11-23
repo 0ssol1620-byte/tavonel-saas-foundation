@@ -38,6 +38,30 @@ import { COOKBOOKS } from "./cookbook-content";
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, path), "utf8");
 const ALL_TAGS = [...RESOURCE_PURPOSES, ...RESOURCE_WORKFLOWS];
 
+const HUB_RULE = /\.hub:has\(\[id="find-([^"]*)"\]:target\) \[data-tags\]:not\(\[data-tags~="([^"]*)"\]\)/g;
+
+/**
+ * Everything wrong with a V34 sheet's hub filter rules for these tags, in sheet order and then tag
+ * order; empty when every tag has a rule that hides the entries without it and no rule is stray.
+ */
+function hubRuleProblems(css: string, tags: readonly string[]): string[] {
+  const problems: string[] = [];
+  const hiddenBy = new Set<string>();
+  for (const chunk of css.replace(/\/\*[\s\S]*?\*\//g, "").split("}")) {
+    const open = chunk.lastIndexOf("{");
+    if (open < 0) continue;
+    const hides = /^\s*display:\s*none;?\s*$/.test(chunk.slice(open + 1));
+    for (const [, control, hidden] of chunk.slice(0, open).matchAll(HUB_RULE)) {
+      if (!tags.includes(control!)) problems.push(`${control}: a rule for a tag that is not in the lists`);
+      else if (hidden !== control) problems.push(`${control}: the control hides by "${hidden}"`);
+      else if (!hides) problems.push(`${control}: a rule that does not hide`);
+      else hiddenBy.add(control!);
+    }
+  }
+  for (const tag of tags) if (!hiddenBy.has(tag)) problems.push(`${tag}: no rule hides the other entries`);
+  return problems;
+}
+
 describe("the resources hub can be narrowed by purpose and workflow", () => {
   it("tags every entry, so nothing drops out of a filtered view", () => {
     for (const link of RESOURCE_LINKS) {
@@ -62,6 +86,36 @@ describe("the resources hub can be narrowed by purpose and workflow", () => {
         .toContain(`.hub:has(:global(#find-${tag}):target) [data-tags]:not([data-tags~="${tag}"])`);
       expect(RESOURCE_TAG_LABELS[tag], `${tag} has no label`).toBeTruthy();
     }
+  });
+
+  /*
+    WO-CI-24 (lead decision 10): /journal's Reference section carries the same filter in a V34
+    sheet, which takes no :global, so each rule names its control as [id="find-<tag>"]. The same
+    silent failures apply there and are checked over the whole sheet: a tag with no rule (its
+    control filters nothing), a rule left for a tag that is gone, a rule whose control and hidden
+    tag differ, and a rule outside the block that hides (it selects and does nothing).
+  */
+  it("has a hiding rule on /journal for every tag, and none for anything else", () => {
+    const css = read("../components/v34/routes/journal/journal.module.css");
+    expect(hubRuleProblems(css, ALL_TAGS)).toEqual([]);
+  });
+
+  it("names each kind of broken /journal filter rule, on the real sheet mutated", () => {
+    const css = read("../components/v34/routes/journal/journal.module.css");
+    const line = (tag: string) => `.hub:has([id="find-${tag}"]:target) [data-tags]:not([data-tags~="${tag}"])`;
+    const [first, second] = ALL_TAGS;
+    expect(css).toContain(line(first!));
+    // A tag in the lists without its rule.
+    expect(hubRuleProblems(css.replace(`${line(first!)},`, ""), ALL_TAGS)).toEqual([`${first}: no rule hides the other entries`]);
+    // A rule for a tag the lists no longer carry.
+    expect(hubRuleProblems(css, ALL_TAGS.filter((tag) => tag !== first))).toEqual([`${first}: a rule for a tag that is not in the lists`]);
+    // A control that hides by another tag.
+    expect(hubRuleProblems(css.replace(line(first!), line(first!).replace(`~="${first}"`, `~="${second}"`)), ALL_TAGS))
+      .toEqual([`${first}: the control hides by "${second}"`, `${first}: no rule hides the other entries`]);
+    // A rule that selects but does not hide.
+    expect(hubRuleProblems(`${css}\n${line(first!)} { color: red; }`, ALL_TAGS)).toEqual([`${first}: a rule that does not hide`]);
+    // A sheet with no rules at all fails for every tag.
+    expect(hubRuleProblems("", ALL_TAGS)).toHaveLength(ALL_TAGS.length);
   });
 
   it("keeps all nine descriptions in the HTML at every filter state", () => {

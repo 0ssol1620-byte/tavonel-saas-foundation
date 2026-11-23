@@ -1,16 +1,15 @@
 /**
- * The customer mobile menu, exercised in Chromium, Firefox and WebKit.
+ * The V34 phone and tablet menu, exercised in Chromium, Firefox and WebKit.
  *
- * The public header exposes four section choices: Product, How it works, Resources and Docs.
- * Pricing is the one emphasized header action. Explore and Developers stay reachable through the
- * Home call to action, the footer and the hub. Trust, legal and the remaining
- * technical destinations stay in the footer/docs instead of becoming nested disclosures in the
- * phone menu. These tests keep the parts
- * only a browser can prove: viewport containment, 44px targets, keyboard escape/focus behaviour,
- * active-route ownership and closing after navigation.
+ * Below 1001px the header (`[data-v34-header]`) gives its bar items to a native modal `<dialog>`
+ * drawer that lists `V34_PRIMARY_NAV`, the More groups as accordions, and the account actions.
+ * These tests keep the parts only a browser can prove: viewport containment, AA contrast, 44px
+ * targets, keyboard Escape and focus return, section-aware `aria-current`, closing after a link,
+ * footer reachability and the consent notice staying off the header and the headline.
  */
 
 import type { Page } from "@playwright/test";
+import { v34Route, type V34RouteKey } from "../lib/v34/routes";
 
 const playwrightPackage = process.env.PLAYWRIGHT_TEST_PACKAGE ?? "@playwright/test";
 const playwrightModule = await import(playwrightPackage);
@@ -18,27 +17,32 @@ const { expect, test } = "test" in playwrightModule ? playwrightModule : playwri
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-const CUSTOMER_LINKS = [
-  { label: "Product", href: "/product" },
-  { label: "How it works", href: "/how-it-works" },
-  { label: "Resources", href: "/resources" },
-  { label: "Docs", href: "/docs" },
-  // Brief 2026-10-15 move 6: Pricing is the sheet's last section row below the desktop switch.
-  { label: "Pricing", href: "/pricing" },
-] as const;
+// The items of V34_PRIMARY_NAV (lib/v34/nav.ts), by label and registry key. The spec cannot import that
+// module: it reaches next/navigation, which Playwright's ESM loader cannot resolve. The path comes from
+// the registry and a held route is dropped as the shell drops it; the tests below fail if this list and
+// the rendered header ever disagree.
+const PRIMARY = ([
+  ["platform", "Product"],
+  ["solutions", "Solutions"],
+  ["connect", "Integrations"],
+  ["pricing", "Pricing"],
+  ["journal", "Journal"],
+] as const satisfies readonly (readonly [V34RouteKey, string])[])
+  .filter(([key]) => v34Route(key).release !== "held")
+  .map(([key, label]) => ({ href: v34Route(key).path as string, label }));
+const HEADER = "[data-v34-header]";
+const PRIMARY_LINKS = "nav[aria-label='Site'] > ul > li > a";
 
 async function openMenu(page: Page) {
-  const menu = page.locator("header.nav details.mobile-primary-nav");
-  await expect(menu).toBeVisible();
-  await menu.locator(":scope > summary").click();
-  const panel = menu.locator(":scope > nav");
-  await expect(panel).toBeVisible();
-  await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
-  // A short runner-side delay is more reliable than requestAnimationFrame here: headless WebKit
-  // may throttle rAF for a disclosure page that is not the foreground window. Visibility above
-  // has already forced layout; this only lets the native <details> paint settle before geometry.
-  await page.waitForTimeout(50);
-  return { menu, panel };
+  const header = page.locator(HEADER);
+  const trigger = header.getByRole("button", { name: "Open navigation" });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  const dialog = header.locator("dialog");
+  await expect(dialog).toBeVisible();
+  const links = dialog.locator(PRIMARY_LINKS);
+  await expect(links).toHaveCount(PRIMARY.length);
+  return { header, trigger, dialog, links };
 }
 
 function rgbChannels(value: string): [number, number, number] {
@@ -61,289 +65,253 @@ function contrastRatio(foreground: string, background: string) {
   return (first + 0.05) / (second + 0.05);
 }
 
-test("the open menu keeps AA contrast and stays inside 760, 768, and 900px viewports", async ({ page }) => {
-  await page.goto("/product");
-  const menu = page.locator("header.nav details.mobile-primary-nav");
-  const summary = menu.locator(":scope > summary");
-  const panel = menu.locator(":scope > nav");
+test("the open drawer keeps AA contrast and stays inside 760, 768, and 900px viewports", async ({ page }) => {
+  await page.goto("/platform");
+  const header = page.locator(HEADER);
+  const trigger = header.getByRole("button", { name: "Open navigation" });
+  const dialog = header.locator("dialog");
 
   for (const width of [760, 768, 900]) {
     await page.setViewportSize({ width, height: 900 });
-    await expect(menu).toBeVisible();
-    await expect(panel, "closed disclosure links must not be displayed or measured").toHaveCSS("display", "none");
+    await expect(trigger).toBeVisible();
+    await expect(dialog, "a closed drawer must not be displayed or measured").toBeHidden();
 
-    await summary.click();
-    await expect(panel).toBeVisible();
-    const bounds = await panel.evaluate(element => {
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    const bounds = await dialog.evaluate(element => {
       const { left, right } = element.getBoundingClientRect();
       return { left, right };
     });
-    expect(bounds.left, `panel left edge at ${width}px`).toBeGreaterThanOrEqual(0);
-    expect(bounds.right, `panel right edge at ${width}px`).toBeLessThanOrEqual(width);
+    expect(bounds.left, `drawer left edge at ${width}px`).toBeGreaterThanOrEqual(0);
+    expect(bounds.right, `drawer right edge at ${width}px`).toBeLessThanOrEqual(width);
 
-    // Every customer choice plus the sheet's one Sign in link.
-    const links = panel.locator("a.mobile-nav-direct, a.mobile-nav-signin");
-    await expect(links).toHaveCount(CUSTOMER_LINKS.length + 1);
-    const measurements = await links.evaluateAll(elements => elements.map(element => {
-      const style = getComputedStyle(element);
-      return {
-        text: element.textContent?.trim() ?? "",
-        foreground: style.color,
-        background: style.backgroundColor,
-        fontSize: Number.parseFloat(style.fontSize),
-      };
-    }));
+    await expect(dialog.locator(PRIMARY_LINKS)).toHaveCount(PRIMARY.length);
+    // Every link and group heading the drawer draws, the account actions included. The colour is
+    // measured against the nearest painted surface: the element's own fill, else an ancestor's.
+    const measurements = await dialog.locator("a, summary").evaluateAll(elements => elements
+      .filter(element => element.getClientRects().length > 0)
+      .map(element => {
+        let background = "rgba(0, 0, 0, 0)";
+        for (let node: Element | null = element; node && background === "rgba(0, 0, 0, 0)"; node = node.parentElement) {
+          background = getComputedStyle(node).backgroundColor;
+        }
+        return {
+          text: element.textContent?.trim() ?? "",
+          fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+          foreground: getComputedStyle(element).color,
+          background,
+        };
+      }));
+    expect(measurements.length, "the drawer draws links").toBeGreaterThan(PRIMARY.length);
     for (const measurement of measurements) {
       const ratio = contrastRatio(measurement.foreground, measurement.background);
       expect(measurement.fontSize, `${measurement.text} remains body text`).toBeGreaterThanOrEqual(15);
       expect(ratio, `${measurement.text} at ${width}px: ${measurement.foreground} on ${measurement.background}`).toBeGreaterThanOrEqual(4.5);
     }
 
-    await summary.click();
-    await expect(panel).toHaveCSS("display", "none");
+    await dialog.getByRole("button", { name: "Close navigation" }).click();
+    await expect(dialog).toBeHidden();
   }
 });
 
-test("the mobile menu ships only the customer choices and one commercial action", async ({ request }) => {
-  // Verify destinations from the server response rather than repeatedly asking Windows WebKit's
-  // DOM bridge for attributes. In long stress runs WebKit has returned an empty attribute value
-  // for an element whose failure snapshot still shows href="/product". The response is the source
-  // shipped to every browser, while the browser assertions below remain responsible for layout.
+test("the server response carries the V34 header and one native drawer with every primary choice", async ({ request }) => {
+  // The response is what every browser receives; the browser tests below own layout.
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   const html = await response.text();
-  for (const item of CUSTOMER_LINKS) expect(html).toContain(`href="${item.href}"`);
-
-  for (const item of CUSTOMER_LINKS) expect(html).toContain(item.label);
-  // BQ-059: the action lives in the header at every width and is no longer drawn a second time
-  // inside the phone sheet, forty pixels below the first copy of it.
-  expect(html.match(/mobile-nav-cta/g)?.length ?? 0, "the phone sheet does not repeat the header action").toBe(0);
-  expect(html.match(/nav-actions/g)?.length ?? 0, "and the header still carries it").toBeGreaterThan(0);
-  // Landing V2: Sign in moved the other way -- out of the narrow header row and into the sheet.
-  expect(html.match(/mobile-nav-signin/g)?.length ?? 0, "the sheet carries Sign in").toBe(1);
-  // Conversion pass 2026-11-09: below the desktop switch the header's action is hidden, so the sheet ends on the
-  // start action -- once, and not the header's sample action (that would be `mobile-nav-cta`, still zero above).
-  expect(html.match(/mobile-nav-start/g)?.length ?? 0, "the sheet ends on the start action").toBe(1);
+  for (const item of PRIMARY) {
+    expect(html, `${item.label} links to ${item.href}`).toContain(`href="${item.href}"`);
+    expect(html).toContain(item.label);
+  }
+  expect(html.match(/<header\b[^>]*data-v34-header/g)?.length ?? 0, "one V34 header").toBe(1);
+  expect(html.match(/<dialog\b/g)?.length ?? 0, "the drawer is one native dialog").toBe(1);
 });
 
-/*
-  Docs owns the existing documentation and API routes as a location inside its section, not as
-  the exact page. Explore is the public sample itself and is reached from the Home action.
-*/
-test("Docs owns its documentation routes", async ({ page }) => {
-  await page.goto("/docs/mcp");
-  const { panel } = await openMenu(page);
-  await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
-  await expect(panel.getByRole("link", { name: "Docs", exact: true })).toHaveAttribute("aria-current", "location");
-  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-  await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
+test("the drawer lists exactly the primary choices, then Sign in", async ({ page }) => {
+  await page.goto("/platform");
+  const { dialog, links } = await openMenu(page);
+  await expect(links).toHaveText(PRIMARY.map(item => item.label));
+  for (const [index, item] of PRIMARY.entries()) await expect(links.nth(index)).toHaveAttribute("href", item.href);
+  await expect(dialog.getByRole("link", { name: "Sign in", exact: true })).toHaveAttribute("href", "/login");
 });
 
-for (const item of CUSTOMER_LINKS) {
+for (const item of PRIMARY) {
   test(`the exact ${item.label} destination is the current page`, async ({ page }) => {
     await page.goto(item.href);
-    const { panel } = await openMenu(page);
-    await expect(panel.getByRole("link", { name: item.label, exact: true })).toHaveAttribute("aria-current", "page");
-    await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-    await expect(panel.locator('a.mobile-nav-direct[aria-current="location"]')).toHaveCount(0);
+    const { links } = await openMenu(page);
+    await expect(links.filter({ hasText: item.label })).toHaveAttribute("aria-current", "page");
+    await expect(links.and(page.locator("[aria-current]"))).toHaveCount(1);
   });
 }
 
-test("Explore opens its current sample surface from Home and exits back to the mobile menu", async ({ page }) => {
-  await page.goto("/");
-  await page.locator('#s1 a[href="/explore"]').click();
-  await expect(page).toHaveURL(/\/explore$/);
-  const stage = page.locator('[data-visual-world="explore"]');
-  await expect(stage).toBeVisible();
-  await expect(stage).toHaveAttribute("data-world-act", "entry");
-  await expect(page.locator("header.nav")).toHaveCount(0);
-  await expect(stage.getByLabel("Selected sample answer").locator("blockquote")).not.toBeEmpty();
-  await stage.getByRole("button", { name: "Relations ↗", exact: true }).click();
-  await expect(stage).toHaveAttribute("data-world-act", "world");
-  const acts = stage.getByRole("navigation", { name: "Acts", exact: true });
-  await expect(acts.getByRole("button", { name: "WORLD", exact: true })).toHaveAttribute("aria-current", "step");
-  await expect(acts.locator("button[aria-current]")).toHaveCount(1);
-  const exit = page.locator("main > header").getByRole("link", { name: /Back to TAVONEL/ });
-  await expect(exit).toHaveAttribute("href", "/");
-  await exit.click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator("header.nav details.mobile-primary-nav")).not.toHaveAttribute("open", "");
-  const home = await openMenu(page);
-  await expect(home.panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+test("a page inside a section marks that item as a location, not the page", async ({ page }) => {
+  await page.goto("/journal/compiler");
+  const { links } = await openMenu(page);
+  await expect(links.filter({ hasText: "Journal" })).toHaveAttribute("aria-current", "true");
+  await expect(links.and(page.locator("[aria-current]"))).toHaveCount(1);
+  await expect(links.and(page.locator('[aria-current="page"]'))).toHaveCount(0);
 });
 
-/*
-  Landing V2: /sources lost its owner when Integrations left the bar, and /research gained one.
-
-  The rule this was written for is unchanged -- a page the bar speaks for is marked, and the bar
-  does not grow another choice to say so. What changed is which page that is: Resources speaks for
-  the five hub pages with no item of their own, and nothing speaks for /sources, which is a footer
-  row. Marking some other item current there would tell a reader something false about where they
-  are, so the no-owner test asserts the mark is absent.
-*/
-test("Resources owns the hub pages without adding another top-level choice", async ({ page }) => {
-  await page.goto("/research");
-  const { panel } = await openMenu(page);
-  await expect(panel.locator("a.mobile-nav-direct")).toHaveCount(CUSTOMER_LINKS.length);
-  await expect(panel.getByRole("link", { name: "Resources", exact: true })).toHaveAttribute("aria-current", "location");
-  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-});
-
-for (const path of ["/sources", "/contact"]) {
-  test(`no customer choice claims ${path}, a page the bar does not own`, async ({ page }) => {
+for (const path of ["/", "/contact", "/research"]) {
+  test(`no primary choice claims ${path}, a page the bar does not own`, async ({ page }) => {
     await page.goto(path);
-    const { panel } = await openMenu(page);
-    await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(0);
+    const { links } = await openMenu(page);
+    await expect(links.and(page.locator("[aria-current]"))).toHaveCount(0);
   });
 }
 
-test("Research stays footer-reachable under its Resources owner", async ({ page }) => {
-  // FINAL-SPEC 2026-10-26 §2.8: Home's footer is compact (seven links, no directory), so the footer that
-  // carries Research is the one every other public page prints, one bar link from Home ("Product").
-  await page.goto("/product");
-  const researchLink = page.locator('footer.site a[href="/research"]').first();
-  await researchLink.scrollIntoViewIfNeeded();
+test("Research stays footer-reachable and is current in its drawer group", async ({ page }) => {
+  await page.goto("/platform");
+  const researchLink = page.locator('footer a[href="/research"]').first();
+  // WO-CI-22 (lead decision 7): at 390 each footer group is a native <details>; open Research's group, then the row.
+  const researchGroup = page.locator("footer nav[aria-label] > details").filter({ has: page.locator('a[href="/research"]') });
+  await researchGroup.locator(":scope > summary").scrollIntoViewIfNeeded();
+  await expect(researchLink).toBeHidden();
+  await researchGroup.locator(":scope > summary").click();
+  await expect(researchGroup).toHaveAttribute("open", "");
   await expect(researchLink).toBeVisible();
   await researchLink.click();
-  await expect(page).toHaveURL(new RegExp('/research$'));
+  await expect(page).toHaveURL(/\/research$/);
 
-  const { panel } = await openMenu(page);
-  await expect(panel.locator("a.mobile-nav-direct[aria-current]")).toHaveCount(1);
-  await expect(panel.locator('a.mobile-nav-direct[aria-current="page"]')).toHaveCount(0);
+  const { dialog, links } = await openMenu(page);
+  await expect(links.and(page.locator("[aria-current]"))).toHaveCount(0);
+  const group = dialog.locator("details").filter({ has: page.locator('a[href="/research"]') }).first();
+  await group.locator(":scope > summary").click();
+  await expect(group.locator('a[href="/research"]')).toHaveAttribute("aria-current", "page");
 });
 
-test("Escape closes the menu and returns focus to the control that opened it", async ({ page }) => {
+test("Escape closes the drawer and returns focus to the control that opened it", async ({ page }) => {
   await page.goto("/");
-  const { menu, panel } = await openMenu(page);
+  const { trigger, dialog } = await openMenu(page);
   await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
-  await expect(menu.locator(":scope > summary")).toBeFocused();
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
-test("following a customer link closes the menu", async ({ page }) => {
+test("following a primary link closes the drawer", async ({ page }) => {
   await page.goto("/");
-  const { panel } = await openMenu(page);
-  const docs = panel.getByRole("link", { name: "Docs", exact: true });
-  // The destination is separately direct-entry tested by the launch route suite. Abort this one
-  // navigation so the assertion measures the interaction contract itself: the disclosure closes
-  // synchronously on activation, before the destination network request can complete or fail.
-  await page.route("**/docs", route => route.abort());
-  // Windows WebKit's headless compositor can stall while Playwright performs a forced pointer
-  // click on a native <details> descendant. dispatchEvent still sends the real DOM click that
-  // React handles here, but removes the unrelated compositor/actionability bridge from this test.
-  await docs.dispatchEvent("click");
-  await expect(panel).toBeHidden();
+  const { dialog, links } = await openMenu(page);
+  await links.filter({ hasText: "Pricing" }).click();
+  await expect(page).toHaveURL(/\/pricing$/);
+  await expect(dialog).toBeHidden();
 });
 
-test("the menu keeps a visible focus ring and does not trap the keyboard", async ({ page }) => {
+test("following a link to the page already open closes the drawer", async ({ page }) => {
+  await page.goto("/pricing");
+  const { dialog, links } = await openMenu(page);
+  await links.filter({ hasText: "Pricing" }).click();
+  await expect(page).toHaveURL(/\/pricing$/);
+  await expect(dialog).toBeHidden();
+});
+
+test("the drawer keeps a visible focus ring, contains focus while open and does not trap the keyboard", async ({ page }) => {
   await page.goto("/");
-  const summary = page.locator("header.nav details.mobile-primary-nav > summary");
-  await summary.focus();
+  const trigger = page.locator(HEADER).getByRole("button", { name: "Open navigation" });
+  await trigger.focus();
+  // The V34 ring is 3px, offset 4px, in the surface's focus token (--v34-fg-focus).
+  await expect(trigger).toHaveCSS("outline-width", "3px");
+  await expect(trigger).toHaveCSS("outline-offset", "4px");
+  await expect(trigger).not.toHaveCSS("outline-style", "none");
+  const ring = await trigger.evaluate(element => ({
+    color: getComputedStyle(element).outlineColor,
+    ground: getComputedStyle(element.closest("header")!).backgroundColor,
+  }));
+  expect(contrastRatio(ring.color, ring.ground), "visible keyboard ring contrast").toBeGreaterThanOrEqual(3);
+
   await page.keyboard.press("Enter");
-  const panel = page.locator("header.nav details.mobile-primary-nav > nav");
-  await expect(panel).toBeVisible();
-  // The source-first paper surface uses the same 2px blue keyboard ring for every control.
-  // Release 2 (main dbe22b1e) drew it in the header cobalt #244ac8; Release 3 (main bcba7173) draws it in
-  // the 255° accent, var(--action, #005bb3) (`.one-path-mobile-nav > summary:focus-visible` in
-  // components/public-site-chrome.module.css). Measured on tavonel.com (dpl_3JjTwcBhpjARzmQ6xGYR8JU2cdm2)
-  // at 390x844 on / and /ko, 2026-10-16: 2px solid rgb(0, 91, 179), offset 2px.
-  await expect(summary, "the disclosure must show where the keyboard is").toHaveCSS("outline-width", "2px");
-  await expect(summary).toHaveCSS("outline-offset", "2px");
-  await expect(summary).toHaveCSS("outline-color", "rgb(0, 91, 179)");
-  await expect(summary).not.toHaveCSS("outline-style", "none");
-  const ring = await summary.evaluate(element => ({ color: getComputedStyle(element).outlineColor, background: getComputedStyle(element).backgroundColor }));
-  expect(contrastRatio(ring.color, ring.background), "visible keyboard ring contrast").toBeGreaterThanOrEqual(3);
-
-  await panel.locator(":scope > a").last().focus();
-  await page.keyboard.press("Tab");
-  await expect(panel.locator(":scope > a:focus"), "focus must be able to leave the disclosure").toHaveCount(0);
+  const dialog = page.locator(`${HEADER} dialog`);
+  await expect(dialog).toBeVisible();
+  // The page behind a modal dialog is inert: Tab never lands on it. It stays on the drawer's own
+  // controls or leaves the document for the browser's own UI (activeElement is then <body>).
+  for (let step = 0; step < 40; step += 1) {
+    await page.keyboard.press("Tab");
+    const where = await dialog.evaluate(element => {
+      const active = document.activeElement;
+      return element.contains(active) ? "drawer" : active === document.body || active === null ? "browser" : `page: ${active.tagName} ${active.textContent?.slice(0, 30)}`;
+    });
+    expect(["drawer", "browser"], `Tab ${step + 1} reached ${where}`).toContain(where);
+  }
+  // ...and Escape always leaves.
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 });
 
-const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/docs", "/docs/quickstart", "/product"] as const;
-/*
-  Home (PR #148, main 0969755b) paints its whole page, header disclosure included, in its paper token
-  (--paper #faf9f6 in components/landing-v2/source-first-home.module.css). Release 2 (main dbe22b1e) makes
-  the Menu control a borderless 44px icon with a transparent fill everywhere else
-  (components/public-site-chrome.module.css), so on those routes it sits on the header ground and its
-  three lines are drawn in #15191d. Measured on the merged build at 390x844: Home summary fill
-  rgb(250, 249, 246); other routes rgba(0, 0, 0, 0) over rgb(251, 250, 247); label and ::before glyph
-  rgb(21, 25, 29). The contrast assertions below measure against the surface the control actually sits on.
-*/
-const HOME_ROUTES: readonly string[] = ["/"];
-// Direction C (2026-11-04): Home paints the warm canvas #f5f3ee.
-const HOME_PAPER = "rgb(245, 243, 238)";
+const PUBLIC_HEADER_ROUTES = ["/", "/pricing", "/platform", "/journal", "/contact"] as const;
 
 for (const route of PUBLIC_HEADER_ROUTES) {
-  test(`the mobile menu has a high-contrast paper surface on ${route}`, async ({ page }) => {
+  test(`the drawer control has a high-contrast paper surface on ${route}`, async ({ page }) => {
     await page.addInitScript(() => window.localStorage.clear());
     await page.goto(route);
-    const summary = page.locator("header.nav details.mobile-primary-nav > summary");
-    await expect(summary).toBeVisible();
-    await expect(summary).toHaveCSS("background-color", HOME_ROUTES.includes(route) ? HOME_PAPER : "rgba(0, 0, 0, 0)");
-    await expect(summary).toHaveCSS("color", "rgb(21, 25, 29)");
-    await expect(summary).toHaveCSS("border-radius", "6px");
-    const style = await summary.evaluate((element) => {
+    const trigger = page.locator(HEADER).getByRole("button", { name: "Open navigation" });
+    await expect(trigger).toBeVisible();
+    const style = await trigger.evaluate(element => {
       // The nearest painted surface: the control's own fill, else the first ancestor with one.
       let background = "rgba(0, 0, 0, 0)";
       for (let node: Element | null = element; node && background === "rgba(0, 0, 0, 0)"; node = node.parentElement) {
         background = getComputedStyle(node).backgroundColor;
       }
-      return { background, color: getComputedStyle(element).color, glyph: getComputedStyle(element, "::before").color };
+      return {
+        background,
+        headerBackground: getComputedStyle(element.closest("header")!).backgroundColor,
+        color: getComputedStyle(element).color,
+        glyph: getComputedStyle(element.querySelector("path")!).stroke,
+      };
     });
-    expect(style.background, "the Menu control sits on a painted surface").not.toBe("rgba(0, 0, 0, 0)");
-    expect(style.glyph).toBe("rgb(21, 25, 29)");
-    expect(contrastRatio(style.color, style.background), "Menu label contrast").toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(style.glyph, style.background), "Menu glyph contrast").toBeGreaterThanOrEqual(4.5);
-    const bounds = await summary.boundingBox();
-    expect(bounds!.width, "Menu target width").toBeGreaterThanOrEqual(44);
-    expect(bounds!.height, "Menu target height").toBeGreaterThanOrEqual(44);
+    expect(style.background, "the control sits on a painted surface").not.toBe("rgba(0, 0, 0, 0)");
+    expect(style.background, "and that surface is the header's own paper").toBe(style.headerBackground);
+    expect(contrastRatio(style.color, style.background), "control contrast").toBeGreaterThanOrEqual(4.5);
+    // The glyph strokes in currentColor, so it is the control's colour.
+    expect(style.glyph).toBe(style.color);
+    const bounds = await trigger.boundingBox();
+    expect(bounds!.width, "control target width").toBeGreaterThanOrEqual(44);
+    expect(bounds!.height, "control target height").toBeGreaterThanOrEqual(44);
   });
 }
 
-/* The source-first Home leads with its headline; it is the first content band under the header. */
-async function expectHomeLeadBelowHeader(page: Page) {
-  await expect.poll(async () => page.evaluate(() => {
-    const text = document.querySelector("h1#lv2-hero-title");
-    const nav = document.querySelector("header.nav");
-    if (!text || !nav) return false;
-    return text.getBoundingClientRect().top >= nav.getBoundingClientRect().bottom;
-  })).toBe(true);
-}
-
 /*
-  Release 2 (main dbe22b1e): the consent card is not on the first paint. It appears after the first
-  scroll past 200px or 8 s (CONSENT_REVEAL in components/marketing-consent.tsx) and then stays until
-  answered, so these tests reveal it with a scroll and measure the first screen back at the top.
+  The consent notice is not on the first paint: it appears after the first scroll past 200px or 8 s
+  (CONSENT_REVEAL in components/marketing-consent.tsx). These tests reveal it with a scroll and
+  measure the first screen back at the top. Whatever the notice does there, it never sits over the
+  header or the headline, and the headline starts below the header.
 */
-async function revealConsentAtTop(page: Page) {
+async function revealConsent(page: Page) {
   await page.evaluate(() => window.scrollTo(0, 300));
   const panel = page.locator("section[data-marketing-consent-panel]");
   await expect(panel).toBeVisible();
-  await page.evaluate(() => window.scrollTo(0, 0));
   return panel;
+}
+
+/** At the top of the page: the headline is below the header, and the panel (when drawn) overlaps neither. */
+async function expectNoticeClearOfHeaderAndHeadline(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => page.evaluate(() => {
+    const header = document.querySelector("[data-v34-header]")?.getBoundingClientRect();
+    const headline = document.querySelector("main h1")?.getBoundingClientRect();
+    if (!header || !headline) return "header or headline missing";
+    if (headline.top < header.bottom) return `headline top ${headline.top} is above the header bottom ${header.bottom}`;
+    const panel = document.querySelector("section[data-marketing-consent-panel]")?.getBoundingClientRect();
+    if (!panel || panel.width === 0) return "ok";
+    const overlaps = (box: DOMRect) => panel.left < box.right && panel.right > box.left && panel.top < box.bottom && panel.bottom > box.top;
+    if (overlaps(header)) return "the notice covers the header";
+    if (overlaps(headline)) return "the notice covers the headline";
+    return "ok";
+  })).toBe("ok");
 }
 
 test("the consent notice, header, and home headline occupy separate phone bands", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await revealConsentAtTop(page);
-  await expectHomeLeadBelowHeader(page);
+  await revealConsent(page);
+  await expectNoticeClearOfHeaderAndHeadline(page);
 });
 
-/*
-  Release 3 (main bcba7173): on a Home phone the sheet waits while the hero film or its reading line is in
-  its zone (homeSheetClear in components/marketing-consent.tsx). At 390x844 that is the top of the page:
-  measured on tavonel.com, the sheet is present after the 300px scroll and absent back at scroll 0. So it is
-  answered where it shows, and the header and headline are measured back at the top.
-*/
-test("dismissing the consent notice leaves the fixed header above the home headline", async ({ page }) => {
+test("dismissing the consent notice leaves the header above the home headline", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await page.evaluate(() => window.scrollTo(0, 300));
-  const panel = page.locator("section[data-marketing-consent-panel]");
-  await expect(panel).toBeVisible();
+  const panel = await revealConsent(page);
   await panel.locator("button").first().click();
   await expect(panel).toBeHidden();
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expectHomeLeadBelowHeader(page);
+  await expectNoticeClearOfHeaderAndHeadline(page);
 });

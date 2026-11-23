@@ -47,6 +47,10 @@ const INPUT = {
   coreOutputSha256: `sha256:${"b".repeat(64)}`,
   customerDataGateReceiptSha256: `sha256:${"c".repeat(64)}`,
   sourceDocuments: [{ documentId: "doc-1", versionKey: "d".repeat(64) }],
+  sourceScope: "direct_upload" as "direct_upload" | "connector",
+  authorizationEpoch: 7 as number | null,
+  coreResponseSchema: "tavonel.product_core.compile_response.v2",
+  coreReleaseDigest: `sha256:${"e".repeat(64)}`,
   compiledAt: NOW.toISOString(),
 };
 
@@ -56,13 +60,51 @@ function signed(env = signingEnv(), input: Record<string, unknown> = INPUT) {
   return { env, trust: readExportTrustStoreEnv(env)!, ...result };
 }
 
+describe("compile receipt v2 (WO-D13-3)", () => {
+  const { compiledAt: _c, sourceScope: _s, authorizationEpoch: _a, coreResponseSchema: _r, coreReleaseDigest: _d, ...V1 } = INPUT;
+  const forTenant = { tenantId: "tenant-a", workspaceId: "tenant-a" };
+  const resign = (patch: Record<string, unknown>) => {
+    const { env, trust, receipt } = signed();
+    const payloadJson = JSON.stringify({ ...JSON.parse(receipt.payloadJson), ...patch });
+    const forged = { payloadJson, signature: readCompileReceiptSigner(env, NOW)!.signPayload(Buffer.from(payloadJson, "utf8")) as SignedCompileReceipt["signature"] };
+    return verifyCompileReceipt(forged, forTenant, trust, NOW);
+  };
+
+  it("still verifies a v1 receipt", () => {
+    const env = signingEnv();
+    const payloadJson = JSON.stringify({ schemaVersion: "tavonel.compile_receipt.v1", ...V1, compiledAt: INPUT.compiledAt });
+    const receipt = { payloadJson, signature: readCompileReceiptSigner(env, NOW)!.signPayload(Buffer.from(payloadJson, "utf8")) as SignedCompileReceipt["signature"] };
+    expect(verifyCompileReceipt(receipt, forTenant, readExportTrustStoreEnv(env)!, NOW)).toMatchObject({ ok: true });
+  });
+
+  it("round-trips a v2 receipt with a null epoch and audits it as null", () => {
+    const { receipt, payload, trust } = signed(signingEnv(), { ...INPUT, authorizationEpoch: null });
+    expect(verifyCompileReceipt(receipt, forTenant, trust, NOW)).toMatchObject({ ok: true, payload: { authorizationEpoch: null } });
+    expect(compileReceiptAuditDetails(receipt, payload)).toMatchObject({ authorizationEpoch: null, sourceScope: "direct_upload",
+      coreResponseSchema: INPUT.coreResponseSchema, coreReleaseDigest: INPUT.coreReleaseDigest });
+  });
+
+  it("refuses an unknown key, a negative epoch, a fractional epoch, an unknown scope and a bad digest", () => {
+    for (const patch of [{ extra: 1 }, { authorizationEpoch: -1 }, { authorizationEpoch: 1.5 }, { sourceScope: "elsewhere" },
+      { coreReleaseDigest: "e".repeat(64) }, { coreResponseSchema: "has spaces" }]) {
+      expect(resign(patch)).toEqual({ ok: false, code: "COMPILE_RECEIPT_MALFORMED" });
+    }
+  });
+
+  it("refuses to sign a v2 receipt that lacks a v2 field", () => {
+    const signer = readCompileReceiptSigner(signingEnv(), NOW)!;
+    expect(signCompileReceipt(signer, V1 as unknown as typeof INPUT)).toBeNull();
+    expect(signCompileReceipt(signer, { ...INPUT, authorizationEpoch: -1 })).toBeNull();
+  });
+});
+
 describe("signed compile receipts (gate precondition 8)", () => {
   it("signs a receipt that verifies against the trust store for its own tenant", () => {
     const { receipt, trust } = signed();
 
     const verified = verifyCompileReceipt(receipt, { tenantId: "tenant-a", workspaceId: "tenant-a" }, trust, NOW);
 
-    expect(verified).toEqual({ ok: true, payload: { schemaVersion: "tavonel.compile_receipt.v1", ...INPUT } });
+    expect(verified).toEqual({ ok: true, payload: { schemaVersion: "tavonel.compile_receipt.v2", ...INPUT } });
     expect(receipt.signature).toMatchObject({
       schemaVersion: "tavonel.export_signature.v2",
       signatureScope: "tavonel.signed_compile_receipt.v1",

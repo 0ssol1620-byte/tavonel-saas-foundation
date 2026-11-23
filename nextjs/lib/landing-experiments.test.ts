@@ -156,7 +156,7 @@ describe("the cookie, and what may travel with the arm", () => {
     expect(LANDING_VARIANT_COOKIE).toBe("tavonel.lp-variant");
     expect(LANDING_VARIANT_COOKIE_MAX_AGE).toBe(60 * 60 * 24 * 30);
     expect(LANDING_VARIANT_QUERY).toBe("lp");
-    expect([...LANDING_VARIANT_PATHS]).toEqual(["/", "/ko"]);
+    expect([...LANDING_VARIANT_PATHS], "the V34 home reads no arm, so no path is in scope").toEqual([]);
     expect([...LANDING_VARIANTS]).toEqual(["a", "b", "c"]);
     expect([...LANDING_EXPERIMENTS]).toEqual(["headline", "cta_order"]);
   });
@@ -198,9 +198,13 @@ describe("the cookie, and what may travel with the arm", () => {
     expect(middleware).toContain('sameSite: "lax"');
     // A functional preference, not a credential: the reader may read which arm they are in.
     expect(middleware).not.toContain("httpOnly: true");
-    for (const page of ["app/page.tsx", "app/ko/page.tsx"]) {
+    // Every path the edge writes for is a page that reads the arm on the server; with the set empty (the
+    // V34 home carries no variant) the edge writes nothing, and the entry page still sets no cookie.
+    for (const path of LANDING_VARIANT_PATHS) {
+      const page = path === "/" ? "app/page.tsx" : `app${path}/page.tsx`;
       expect(read(page), `${page} reads the arm on the server`).toContain("landingVariantState({");
       expect(read(page), `${page} must not set a cookie from a Server Component`).not.toContain(".set(");
     }
+    expect(read("app/page.tsx"), "the home must not set a cookie from a Server Component").not.toContain(".set(");
   });
 });

@@ -1,0 +1,153 @@
+/* The bar is a paper surface (tokens.paper) and takes its pair from it; this sheet is layout and state only. */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--v34-rule);
+}
+
+/* No position here: the More panel positions against the header so it spans the bar's full width. */
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  width: var(--v34-shell);
+  min-height: var(--v34-header-h);
+  margin-inline: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--v34-fg);
+  text-decoration: none;
+}
+
+.brand:hover { color: var(--v34-header-btn-hover); }
+
+.brand:focus-visible,
+.link:focus-visible,
+.signIn:focus-visible,
+.cta:focus-visible {
+  outline: 3px solid var(--v34-fg-focus);
+  outline-offset: 4px;
+}
+
+.wordmark {
+  font-size: 1.24rem;
+  font-weight: 850;
+  letter-spacing: -0.055em;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--v34-header-btn-hover);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.link[aria-current="page"] {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.signIn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--v34-fg);
+  font-size: var(--v34-small);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.signIn:hover {
+  color: var(--v34-header-btn-hover);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--v34-radius-pill);
+  background: var(--v34-header-btn);
+  color: var(--v34-white);
+  font-size: var(--v34-small);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--v34-move) ease;
+}
+
+.cta:hover {
+  background: var(--v34-header-btn-hover);
+  color: var(--v34-white);
+}
+
+@media (max-width: 1100px) {
+  .center,
+  .list {
+    gap: 13px;
+  }
+}
+
+/* At 1000 and below the items, More and the account actions leave; the drawer takes over. */
+@media (max-width: 1000px) {
+  .center,
+  .actions {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .inner {
+    gap: 12px;
+  }
+}
+
+@media (forced-colors: active) {
+  .cta { border: 1px solid ButtonText; }
+  .link[aria-current="page"] { outline: 2px solid Highlight; outline-offset: 2px; }
+  .brand:focus-visible,
+  .link:focus-visible,
+  .signIn:focus-visible,
+  .cta:focus-visible { outline-color: Highlight; }
+}

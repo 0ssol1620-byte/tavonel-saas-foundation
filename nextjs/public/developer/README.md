@@ -214,8 +214,10 @@ key scoped to `connections:sync` and `documents:intake`; add
 `connections:read` only when the same key also needs inventory access. The key
 is read from `TAVONEL_API_KEY` only and never from a command argument.
 
-Mounted SMB, NFS, and SFTP filesystems use the local agent and operating-system
-credentials. S3, R2, and MinIO use the same agent with an existing AWS profile,
+A local folder on an NTFS or ReFS drive (Windows) or a supported local Linux file system
+uses the local agent and operating-system permissions; the runbook
+(`source-agent-operations.md`) lists what the agent refuses before it lists
+anything. S3, R2, and MinIO use the same agent with an existing AWS profile,
 workload role, or provider environment. Credential values are rejected by the
 API and database. The schema reserves external secret references for a future
 managed worker, but the production UI does not expose that path until a worker
