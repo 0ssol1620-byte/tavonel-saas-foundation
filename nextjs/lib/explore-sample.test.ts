@@ -27,6 +27,7 @@ import {
   exploreSampleWorld,
 } from "./explore-sample";
 import { validateCollectionOcrInput } from "./collection-compiler";
+import { markedWindow } from "./ask-evidence-window";
 import {
   EVIDENCE_EXCEEDS_ANSWER_LIMIT,
   FALLBACK_ANSWER_CHARACTER_LIMIT,
@@ -324,8 +325,8 @@ const COMPANY_QUESTION = "What products does Apple's Company Background say it d
 const CHUNKS = parseChunks(exploreSampleArtifact);
 type SampleCitation = (typeof exploreSampleAnswers)[number]["citations"][number];
 
-/** The cited region's whole text, normalized the way the answer builder normalizes it. */
-function fullTextOf(citation: SampleCitation) {
+/** The cited region's stored text, unnormalized: what its window is a verbatim substring of. */
+function rawTextOf(citation: SampleCitation) {
   const matches = CHUNKS.filter(
     (chunk) =>
       chunk.sourceId === citation.sourceId &&
@@ -333,7 +334,12 @@ function fullTextOf(citation: SampleCitation) {
       chunk.bbox1000.join(",") === citation.bbox1000.join(","),
   );
   expect(matches, `${citation.sourceId} p${citation.pageNumber1}`).toHaveLength(1);
-  return matches[0].text.replace(/\s+/g, " ").trim();
+  return matches[0].text;
+}
+
+/** The cited region's whole text, whitespace-normalized, for measuring how long the evidence is. */
+function fullTextOf(citation: SampleCitation) {
+  return rawTextOf(citation).replace(/\s+/g, " ").trim();
 }
 
 describe("the Ask panel is answered by the retriever", () => {
@@ -354,39 +360,39 @@ describe("the Ask panel is answered by the retriever", () => {
     }
   });
 
-  it("answers the supported questions with the complete selected evidence, never a preview", () => {
-    const grounded = exploreSampleAnswers.filter((answer) => answer.question !== COMPANY_QUESTION);
-    expect(grounded).toHaveLength(EXPLORE_SAMPLE_QUESTIONS.length - 1);
-    for (const answer of grounded) {
+  it("answers every sample question with verbatim windows of its cited regions, never a preview", () => {
+    // WO-ASK-0: each excerpt is the stored text at its window; the answer joins them, cut edges marked "…".
+    expect(exploreSampleAnswers).toHaveLength(EXPLORE_SAMPLE_QUESTIONS.length);
+    for (const answer of exploreSampleAnswers) {
       expect(answer.status, answer.question).toBe("grounded");
       expect(answer.reason, answer.question).toBeNull();
-      const full = answer.citations.map(fullTextOf);
-      expect(answer.answer, answer.question).toBe(full.join("\n\n"));
+      expect(answer.answer, answer.question).toBe(
+        answer.citations.map((citation) => markedWindow(rawTextOf(citation), citation.window)).join("\n\n"),
+      );
       expect(answer.answer.length, answer.question).toBeLessThanOrEqual(FALLBACK_ANSWER_CHARACTER_LIMIT);
-      // The citation excerpt stays the list's bounded preview of the same text, not the answer.
-      for (const [index, citation] of answer.citations.entries()) {
-        expect(citation.excerpt, answer.question).toBe(
-          full[index].length <= 420 ? full[index] : `${full[index].slice(0, 417)}...`,
-        );
+      for (const citation of answer.citations) {
+        const raw = rawTextOf(citation);
+        expect(raw.slice(citation.window.start, citation.window.end), answer.question).toBe(citation.excerpt);
+        expect(citation.window.regionLength, answer.question).toBe(raw.length);
+        expect(citation.excerpt.length, answer.question).toBeLessThanOrEqual(420);
       }
     }
   });
 
-  it("keeps the Company Background question as an explicit overflow abstention with its citations", () => {
+  it("answers the Company Background question, whose evidence exceeds the envelope, with windows marked as such", () => {
     /*
-      The regression this sample once failed at import on. Its selected evidence is measured here
-      to exceed the fallback answer limit, so the only truthful states are an abstention with no
-      answer text and the reason the retriever gave -- not a clipped preview standing in for one.
+      This question used to abstain with EVIDENCE_EXCEEDS_ANSWER_LIMIT and no text. Its selected
+      evidence is still measured here to exceed the fallback answer limit; the answer is now one
+      window per cited region, and a window shorter than its region says so through `window`.
     */
     const company = exploreSampleAnswers.find((answer) => answer.question === COMPANY_QUESTION);
     expect(company).toBeTruthy();
-    expect(company!.status).toBe("abstained");
-    expect(company!.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
-    expect(company!.answer).toBe("");
-    expect(company!.citations.length).toBeGreaterThan(0);
+    expect(company!.status).toBe("grounded");
+    expect(company!.reason).not.toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
     const full = company!.citations.map(fullTextOf);
     const length = full.reduce((total, text) => total + text.length, 0) + 2 * (full.length - 1);
     expect(length).toBeGreaterThan(FALLBACK_ANSWER_CHARACTER_LIMIT);
+    expect(company!.citations.some((citation) => citation.window.end - citation.window.start < citation.window.regionLength)).toBe(true);
   });
 
   it("cites regions that exist in the World, at the same coordinates", () => {

@@ -232,13 +232,13 @@ describe("every citation the Ask offers can be opened", () => {
       expect(view.reason, view.question).toBe(source.reason);
       expect(view.regions.map((region) => region.excerpt)).toEqual(source.citations.map((citation) => citation.excerpt));
     }
-    // The prepared Company Background question is the overflow regression: no text, its reason, its regions.
+    // The Company Background question used to abstain on length; since WO-ASK-0 it answers with windows.
     const company = views.find((view) => view.question.includes("Company Background"));
-    expect(company?.status).toBe("abstained");
-    expect(company?.answer).toBe("");
-    expect(company?.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(company?.status).toBe("grounded");
+    expect(company?.answer).not.toBe("");
+    expect(company?.reason).not.toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
     expect(company!.regions.length).toBeGreaterThan(0);
-    expect(views.filter((view) => view.status === "grounded").length).toBe(views.length - 1);
+    expect(views.filter((view) => view.status === "grounded").length).toBe(views.length);
   });
 
   it("has words for every abstention reason it accepts, keyed by the retriever's own code", () => {
@@ -284,6 +284,8 @@ describe("the answer adapter carries the retriever's state and refuses a malform
     authorityTier: "official",
     relevanceBreakdown: { lexical: 1, graph: 0, temporal: 0, authority: 1 },
     excerpt: PREVIEW,
+    // The citation shape since WO-ASK-0; the view builder under test does not read it.
+    window: { start: 0, end: 417, regionLength: FULL.length },
     ...overrides,
   });
   const fixture = (overrides: Partial<ExploreSampleAnswer>): ExploreSampleAnswer => ({

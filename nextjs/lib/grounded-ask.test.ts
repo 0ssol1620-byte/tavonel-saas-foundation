@@ -201,102 +201,51 @@ describe("active-world grounded Ask", () => {
     expect(answerGroundedQuestion(invalid, "revenue increase")).toBeNull();
   });
 
-  it("answers with the complete selected evidence while the citation preview stays bounded", () => {
+  // WO-ASK-0: these cases used to abstain with EVIDENCE_EXCEEDS_ANSWER_LIMIT. The lead ruling
+  // replaced that rule: each cited region contributes a verbatim window, and the answer marks a cut.
+  it("answers a long region with a verbatim window that holds the question's words, cut edges marked", () => {
     expect(FULL.indexOf("except where the buyer")).toBeGreaterThan(417);
     const result = answerGroundedQuestion(artifactOf([row("chunk-a", RAW)]), "renewal notice");
-    // Explicit, so an abstention (empty answer) can never satisfy the preservation checks below.
     expect(result?.status).toBe("grounded");
     expect(result?.reason).toBeNull();
-    expect(result?.answer).toBe(FULL);
-    for (const kept of [
-      "except where the buyer waives notice in writing.",
-      "The 30-day rule does not apply to renewals signed after 2027-01-01.",
-      "적용되지 않으며",
-      "2026년 3월 31일",
-      "120억원",
-    ])
-      expect(result?.answer).toContain(kept);
-    expect(result?.citations[0].excerpt).toHaveLength(420);
-    expect(result?.citations[0].excerpt).toBe(`${FULL.slice(0, 417)}...`);
+    const citation = result!.citations[0]!;
+    expect(RAW.slice(citation.window.start, citation.window.end)).toBe(citation.excerpt);
+    expect(citation.window.regionLength).toBe(RAW.length);
+    expect(citation.excerpt.length).toBeLessThanOrEqual(416);
+    expect(citation.excerpt.startsWith("Renewal notice applies")).toBe(true);
+    // The region continues past the window, so the answer says so in-band.
+    expect(result?.answer).toBe(`${citation.excerpt} …`);
     expect(result?.receipt.outputSha256).toBe(expectedSha(result!));
   });
 
-  it("keeps short answers, their order and citation metadata exactly as before", () => {
-    const first = answerGroundedQuestion(artifact(), "When was the 2026 security policy approved?");
-    const again = answerGroundedQuestion(artifact(), "When was the 2026 security policy approved?");
-    expect(first?.status).toBe("grounded");
-    expect(first?.citations.map(citation => citation.evidenceId)).toEqual(["evidence-2", "evidence-1"]);
-    // Every short excerpt is its whole normalized text, so the answer is unchanged.
-    expect(first?.answer).toBe(
-      "The TAVONEL board approved the security policy in August 2026.\n\n2026년 분기 매출은 120억원으로 증가했습니다."
-    );
-    expect(first?.answer).toBe(first?.citations.map(citation => citation.excerpt).join("\n\n"));
-    expect(first?.citations[1]).toMatchObject({
-      sourceId: "source-1",
-      sourceVersionId: "version-1",
-      pageNumber1: 2,
-      bbox1000: [100, 200, 900, 300],
-      authority: "official",
-      claimIds: ["claim-semantic-1"],
-    });
-    expect(again).toEqual(first);
-    expect(first?.receipt.outputSha256).toBe(expectedSha(first!));
-  });
-
-  it("changes the answer and receipt when only text past character 417 changes", () => {
+  it("changes the answer and receipt when text inside the window changes, and keeps the citation when text outside it does", () => {
     const before = answerGroundedQuestion(artifactOf([row("chunk-a", RAW)]), "renewal notice");
-    const after = answerGroundedQuestion(artifactOf([row("chunk-a", RAW.replace("120억원", "130억원"))]), "renewal notice");
-    expect(before?.status).toBe("grounded");
-    expect(after?.status).toBe("grounded");
-    expect(after?.citations[0].excerpt).toBe(before?.citations[0].excerpt);
-    expect(after?.answer).not.toBe(before?.answer);
-    expect(after?.answer).toContain("130억원");
-    expect(after?.receipt.outputSha256).not.toBe(before?.receipt.outputSha256);
+    const inside = answerGroundedQuestion(artifactOf([row("chunk-a", RAW.replace("every supplier", "every vendors"))]), "renewal notice");
+    const outside = answerGroundedQuestion(artifactOf([row("chunk-a", RAW.replace("120억원", "130억원"))]), "renewal notice");
+    expect(inside?.answer).not.toBe(before?.answer);
+    expect(inside?.receipt.outputSha256).not.toBe(before?.receipt.outputSha256);
+    expect(outside?.citations[0].excerpt).toBe(before?.citations[0].excerpt);
+    expect(outside?.answer.endsWith(" …")).toBe(true);
   });
 
-  it("accepts evidence of exactly the fallback limit and abstains one character over it", () => {
+  it("answers within the fallback envelope however long the evidence, keeping every citation and its metadata in order", () => {
     expect(FALLBACK_ANSWER_CHARACTER_LIMIT).toBe(1264);
-    const exact = answerGroundedQuestion(artifactOf([row("chunk-a", sized(1264))]), "renewal clause");
-    expect(exact?.status).toBe("grounded");
-    expect(exact?.answer).toHaveLength(1264);
-
-    const over = answerGroundedQuestion(artifactOf([row("chunk-a", sized(1265))]), "renewal clause");
-    expect(over).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
-    expect(over?.citations.map(citation => citation.evidenceId)).toEqual(["evidence-chunk-a"]);
-    expect(over?.citations[0].excerpt).toHaveLength(420);
-
-    // Counted after whitespace normalization: raw spacing does not push evidence over the limit.
-    const spaced = sized(1264).replace("Renewal clause", "Renewal \n\n\t   clause");
-    expect(answerGroundedQuestion(artifactOf([row("chunk-a", spaced)]), "renewal clause")?.answer).toBe(sized(1264));
-  });
-
-  it("counts the double-newline separators toward the limit", () => {
-    const fits = answerGroundedQuestion(artifactOf([row("chunk-a", sized(800)), row("chunk-b", sized(462))]), "renewal clause");
-    expect(fits?.status).toBe("grounded");
-    expect(fits?.answer).toBe(`${sized(800)}\n\n${sized(462)}`);
-    expect(fits?.answer).toHaveLength(1264);
-
-    // 800 + 463 = 1263 characters of evidence, 1265 with the separator.
-    const over = answerGroundedQuestion(artifactOf([row("chunk-a", sized(800)), row("chunk-b", sized(463))]), "renewal clause");
-    expect(over).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
-    expect(over?.citations.map(citation => citation.evidenceId)).toEqual(["evidence-chunk-a", "evidence-chunk-b"]);
-  });
-
-  it("abstains rather than dropping a later oversized item, and keeps every selected citation in order", () => {
-    const result = answerGroundedQuestion(
-      artifactOf([row("chunk-a", sized(60)), row("chunk-b", sized(90)), row("chunk-c", sized(1200))]),
-      "renewal clause"
-    );
-    expect(result?.status).toBe("abstained");
-    expect(result?.answer).toBe("");
-    expect(result?.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
-    expect(result?.citations.map(citation => citation.evidenceId)).toEqual([
-      "evidence-chunk-a",
-      "evidence-chunk-b",
-      "evidence-chunk-c",
-    ]);
-    expect(result?.citations.map(citation => citation.excerpt.length)).toEqual([60, 90, 420]);
-    expect(result?.citations[2]).toMatchObject({
+    for (const sizes of [[1264], [1265], [800, 462], [800, 463], [60, 90, 1200], [420, 420, 421]]) {
+      const ids = sizes.map((_, index) => `chunk-${"abc"[index]}`);
+      const texts = sizes.map(sized);
+      const result = answerGroundedQuestion(artifactOf(ids.map((id, index) => row(id, texts[index]!))), "renewal clause");
+      expect(result?.status, String(sizes)).toBe("grounded");
+      expect(result?.reason, String(sizes)).toBeNull();
+      expect(result?.answer.length, String(sizes)).toBeLessThanOrEqual(FALLBACK_ANSWER_CHARACTER_LIMIT);
+      expect(result?.citations.map(citation => citation.evidenceId), String(sizes)).toEqual(ids.map(id => `evidence-${id}`));
+      result!.citations.forEach((citation, index) => {
+        expect(texts[index]!.slice(citation.window.start, citation.window.end)).toBe(citation.excerpt);
+        expect(citation.excerpt.length).toBeLessThanOrEqual(416);
+      });
+      expect(result?.receipt.outputSha256).toBe(expectedSha(result!));
+    }
+    const long = answerGroundedQuestion(artifactOf([row("chunk-a", sized(60)), row("chunk-b", sized(90)), row("chunk-c", sized(1200))]), "renewal clause");
+    expect(long?.citations[2]).toMatchObject({
       sourceId: "source-chunk-c",
       sourceVersionId: "version-chunk-c",
       pageNumber1: 7,
@@ -304,21 +253,18 @@ describe("active-world grounded Ask", () => {
       authority: "official",
       claimIds: ["claim-chunk-c"],
     });
-    expect(result?.receipt.outputSha256).toBe(expectedSha(result!));
   });
 
-  it("abstains when items that each fit a preview overflow together", () => {
-    const rows = [row("chunk-a", sized(420)), row("chunk-b", sized(420)), row("chunk-c", sized(420))];
-    expect(answerGroundedQuestion(artifactOf(rows), "renewal clause")?.answer).toHaveLength(1264);
-
-    rows[2] = row("chunk-c", sized(421));
-    const over = answerGroundedQuestion(artifactOf(rows), "renewal clause");
-    expect(over).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
-    expect(over?.citations).toHaveLength(3);
+  it("keeps a region that fits whole, verbatim, with no cut marker", () => {
+    const text = "Renewal clause applies.\n\n   Notice is 30 days.";
+    const result = answerGroundedQuestion(artifactOf([row("chunk-a", text)]), "renewal clause");
+    expect(result?.citations[0].excerpt).toBe(text);
+    expect(result?.answer).toBe(text);
   });
 
-  it("keeps the no-match abstention distinct from an overflow", () => {
+  it("keeps the no-match abstention, and never produces the retired overflow reason", () => {
     const result = answerGroundedQuestion(artifactOf([row("chunk-a", sized(5000))]), "양자 중력 실험 결과");
     expect(result).toMatchObject({ status: "abstained", answer: "", reason: "NO_REGION_BOUND_EVIDENCE_MATCH", citations: [] });
+    expect(answerGroundedQuestion(artifactOf([row("chunk-a", sized(5000))]), "renewal clause")?.reason).not.toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
   });
 });

@@ -80,12 +80,15 @@ describe("workspace Ask abstention copy", () => {
         expect(askAbstentionCopy(reason, languages)).toEqual({ notice: NO_EVIDENCE_NOTICE, result: NO_EVIDENCE_RESULT, action: null });
   });
 
-  it("matches what the fallback builder returns on overflow, citations included", () => {
+  it("is no longer what the fallback builder returns for long evidence; the copy stays for remembered replays", () => {
+    // WO-ASK-0: evidence over the envelope now answers with a window, citations included.
     const result = answerGroundedQuestion(overflowingArtifact(), "renewal clause");
-    expect(result).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
+    expect(result).toMatchObject({ status: "grounded", reason: null });
+    expect(result?.answer.startsWith("Renewal clause")).toBe(true);
     expect(result?.citations).toHaveLength(1);
     expect(result?.citations[0]).toMatchObject({ evidenceId: "evidence-a", sourceId: "source-a", pageNumber1: 4 });
-    expect(askAbstentionCopy(result!.reason, "ko").action).toBe("더 좁은 질문하기");
+    // An answer remembered under an idempotency key before the change can still replay the reason.
+    expect(askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, "ko").action).toBe("더 좁은 질문하기");
   });
 
   /*
@@ -186,7 +189,8 @@ function compiledOverflow(units: RankedRetrievalUnit[]) {
     question: "renewal clause",
   });
   const answer = answerFromContextPacket(packet, { collectionId: packet.worldId, manifestDigest: packet.worldVersion });
-  expect(answer).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
+  // Long evidence used to abstain here; since WO-ASK-0 it answers with windows, citations unchanged.
+  expect(answer).toMatchObject({ status: "grounded", reason: null });
   expect(answer.citations).toHaveLength(units.length);
   return answer;
 }
@@ -245,7 +249,7 @@ describe("resolving a cited source region against the active read model", () => 
 
   it("opens fallback citations, overflow or grounded, and checks the sourceId they carry", () => {
     const overflow = answerGroundedQuestion(overflowingArtifact(), "renewal clause");
-    expect(overflow?.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(overflow?.citations[0]!.window.regionLength).toBeGreaterThan(overflow!.citations[0]!.excerpt.length);
     expect(resolveCitationRegion(overflow!.citations[0]!, [region("evidence-a", "chunk-a")])).toBe("evidence-a:chunk-a");
 
     const grounded = answerGroundedQuestion(groundedArtifact([ROW]), "renewal clause");
