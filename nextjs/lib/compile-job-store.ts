@@ -2,7 +2,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 import { CORPUS_ID_PATTERN, planCorpusBatches, type CorpusBatch } from "./corpus-batching";
 import { corpusIdFor } from "./corpus-id";
-import { globalCollectionCompileEnabled } from "./global-collection-compile";
+import {
+  globalCollectionCompileEnabled, judgeOneWorldSelection, type OneWorldSelection, type OneWorldVerdict,
+} from "./global-collection-compile";
 import { COMPILE_MAX_DOCUMENTS, CORPUS_MAX_DOCUMENTS } from "./compile-limits";
 import { googleDriveAclMaxAgeSeconds } from "./connector-source-access";
 import { compileJobAuthorityEnabled } from "./compile-job-authority";
@@ -962,16 +964,35 @@ export async function enqueueCorpusCompile(input: {
   authorizationRevision: number;
   connectorViewerEnabled: boolean;
   documentIds: readonly string[];
+  /** Figures for exactly these documents; read only behind the global-collection flag. */
+  selection?: OneWorldSelection;
 }): Promise<CompileJobResult<{
   corpusId: string;
   batchCount: number;
   parts: Array<{ jobId: string; batchIndex: number; state: CompileState; created: boolean }>;
   incompleteReason: CompileJobFailure | null;
+  /** Present only with the global-collection flag on. Internal: only `sentence` may reach a public DTO. */
+  oneWorld?: OneWorldVerdict;
 }>> {
   if (!WORKSPACE_KEY.test(input.workspaceKey)) return fail("COMPILE_JOB_SCOPE_INVALID");
-  const globalCollection = globalCollectionCompileEnabled();
   const ordered = [...new Set(input.documentIds)].sort();
   if (ordered.length > CORPUS_MAX_DOCUMENTS) return fail("COMPILE_JOB_SCOPE_INVALID");
+  /*
+    The enqueue choice (ADR 0011 §4 C). Flag off: today's parts, nothing judged. Flag on: one
+    whole-collection job only when every bound is shown to fit; `does_not_fit` and `unknown` keep
+    the parts, and the verdict's sentence says why they are separate Worlds. Figures that name other
+    documents than the selection are refused, never judged as if they were this selection's.
+  */
+  let oneWorld: OneWorldVerdict | undefined;
+  if (globalCollectionCompileEnabled()) {
+    const named = input.selection?.documents;
+    if (named !== undefined && (!Array.isArray(named) || named.length !== ordered.length
+      || [...named.map((d) => d?.documentId)].sort().some((id, index) => id !== ordered[index]))) {
+      return fail("COMPILE_JOB_SCOPE_INVALID");
+    }
+    oneWorld = judgeOneWorldSelection(ordered, input.selection);
+  }
+  const globalCollection = oneWorld?.verdict === "fits";
   const batches: CorpusBatch[] = globalCollection
     ? [{ index: 0, count: 1, documentIds: ordered }]
     : planCorpusBatches(input.documentIds);
@@ -998,12 +1019,12 @@ export async function enqueueCorpusCompile(input: {
       if (parts.length === 0) return enqueued;
       return {
         ok: true,
-        value: { corpusId, batchCount: batches.length, parts, incompleteReason: enqueued.code },
+        value: { corpusId, batchCount: batches.length, parts, incompleteReason: enqueued.code, ...(oneWorld ? { oneWorld } : {}) },
       };
     }
     parts.push({ ...enqueued.value, batchIndex: batch.index });
   }
-  return { ok: true, value: { corpusId, batchCount: batches.length, parts, incompleteReason: null } };
+  return { ok: true, value: { corpusId, batchCount: batches.length, parts, incompleteReason: null, ...(oneWorld ? { oneWorld } : {}) } };
 }
 
 /** Every part of one corpus, in position order. */
