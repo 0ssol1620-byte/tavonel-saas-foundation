@@ -369,6 +369,34 @@ class ReadNativeSpreadsheetTest(unittest.TestCase):
         self.assertEqual(result["workbookCalculation"], {"fullCalcOnLoad": False})
         self.assertFalse(result["coverage"]["formulasExecuted"])
 
+    def test_s11_a_formula_whose_source_is_not_formula_text_is_never_emitted_as_one(self) -> None:
+        # The class: openpyxl hands every formula that is not a plain `<f>` -- a dynamic array, a
+        # legacy CSE array, a what-if data table -- to the parser as an object, and the Core parser
+        # stringifies it with str(), which is the object's repr (memory address included). Only text
+        # that is formula source (`=...`) is emitted as a source; anything else is null and flagged.
+        variants = {
+            "dynamic array": ('<c r="B1" cm="1"><f t="array" ref="B1:B1">_xlfn.SEQUENCE(1)</f><v>1</v></c>', "1"),
+            "legacy array": ('<c r="B1"><f t="array" ref="B1:B1">SUM(A1:A1*2)</f><v>2</v></c>', "2"),
+            "data table": ('<c r="B1"><f t="dataTable" ref="B1" dt2D="0" dtr="0" r1="A1"/><v>7</v></c>', "7"),
+        }
+        for name, (cell_xml, cached) in variants.items():
+            with self.subTest(variant=name):
+                payload = nf.xlsx([("Data", "visible", nf.sheet_xml(row(1, value("A1", "1"), cell_xml, formula("C1", "A1+1", "2"))))])
+                first, second = read_bytes(payload), read_bytes(payload)
+                self.assertEqual(first["native_read"], "available", first)
+                cells = cells_by_address(first)
+                unreadable = cells[(0, "B1")]
+                self.assertEqual(unreadable["kind"], "formula")
+                self.assertIsNone(unreadable["text"])
+                self.assertEqual(unreadable["formula"], {"source": None, "cachedValue": cached, "cachedValueState": "cached_unverified"})
+                self.assertIn("formula_source_unreadable", unreadable["qualityFlags"])
+                # A plain formula beside it keeps its source and is not flagged.
+                self.assertEqual(cells[(0, "C1")]["formula"]["source"], "=A1+1")
+                self.assertNotIn("formula_source_unreadable", cells[(0, "C1")]["qualityFlags"])
+                self.assertNotIn("openpyxl", json.dumps(first))
+                # Same bytes in, same bytes out: nothing process-specific reaches the document.
+                self.assertEqual(json.dumps(first, sort_keys=True), json.dumps(second, sort_keys=True))
+
     def test_s11_a_workbook_that_declares_its_cache_stale_is_reported_so(self) -> None:
         for attribute in ('fullCalcOnLoad="1"', 'fullCalcOnLoad="true"'):
             with self.subTest(attribute=attribute):

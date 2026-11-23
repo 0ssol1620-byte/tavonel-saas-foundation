@@ -390,14 +390,21 @@ def to_native_read(document: Any, *, input_sha256: str, reader: dict[str, Any], 
                     flags.add("hidden_sheet")
                 if "formula_preserved_not_executed" in flags:
                     formula = formulas[(container_index0, address)]
-                    _require(formula["formula"] == cell.raw_text, "formula source")
+                    source = formula["formula"]
+                    _require(isinstance(source, str) and source == cell.raw_text, "formula source")
+                    if not source.startswith("="):
+                        # openpyxl returns an array (`<f t="array">`, dynamic or CSE) or data-table
+                        # formula as an object, and Core's `_cell_text` keeps str() of it: a repr
+                        # with a memory address, not the source. Not emitted, not reconstructed.
+                        source = None
+                        flags.add("formula_source_unreadable")
                     if not formula["cachedValuePresent"]:
                         state = "cached_missing"
                     elif stale_cache:
                         state = "cached_declared_stale"
                     else:
                         state = "cached_unverified"
-                    formula_out = {"source": formula["formula"], "cachedValue": formula["cachedValue"], "cachedValueState": state}
+                    formula_out = {"source": source, "cachedValue": formula["cachedValue"], "cachedValueState": state}
             else:
                 _require("formula_preserved_not_executed" not in flags, "formula outside a workbook")
             cells.append({

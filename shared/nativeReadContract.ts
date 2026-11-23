@@ -60,7 +60,11 @@ export type NativeReadCell = {
   kind: "value" | "formula";
   /** The cell's text; null for a formula cell, whose source and cache are in `formula`. */
   text: string | null;
-  formula: { source: string; cachedValue: string | null; cachedValueState: CachedValueState } | null;
+  /**
+   * `source` is the formula text (`=...`), or null when the parser handed over something that is
+   * not formula text (an array or data-table formula); such a cell carries `formula_source_unreadable`.
+   */
+  formula: { source: string | null; cachedValue: string | null; cachedValueState: CachedValueState } | null;
   location: {
     containerIndex0: number;
     tableIndex0: number;
