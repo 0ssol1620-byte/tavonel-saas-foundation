@@ -9,7 +9,10 @@ import {
   askWorldPanel,
   ConfirmDialogBody,
   discoverActiveWorlds,
+  discoveryFailureCopy,
+  discoveryOutcome,
   requestConfirm,
+  type ActiveWorldDiscovery,
   type ConfirmRequest,
 } from "@/components/workspace/in-page-choices";
 
@@ -68,13 +71,23 @@ describe("discoverActiveWorlds", () => {
 
   it("failed: a refused listing is 'could not check', with the server's code", async () => {
     const { fetchImpl } = stub(listing([], null, 503, "WORLD_STORE_READ_FAILED"));
-    expect(await discoverActiveWorlds("tok", fetchImpl)).toEqual({ kind: "failed", code: "WORLD_STORE_READ_FAILED" });
+    expect(await discoverActiveWorlds("tok", fetchImpl)).toEqual({ kind: "failed", code: "WORLD_STORE_READ_FAILED", status: 503 });
+  });
+
+  it("failed: carries the response status of a refusal, and none when no answer came back or an OK answer was malformed", async () => {
+    for (const status of [401, 402, 403]) {
+      expect(await discoverActiveWorlds("tok", stub(listing([], null, status, "AUTH_REQUIRED")).fetchImpl)).toEqual({ kind: "failed", code: "AUTH_REQUIRED", status });
+    }
+    expect(await discoverActiveWorlds("tok", stub(new Error("offline")).fetchImpl)).toEqual({ kind: "failed", code: null, status: null });
+    // 200 with the wrong code: the server did not do what it said; not a refusal and not "200".
+    expect(await discoverActiveWorlds("tok", stub(listing([], null, 200, "SOMETHING_ELSE")).fetchImpl)).toEqual({ kind: "failed", code: "SOMETHING_ELSE", status: null });
+    expect(await discoverActiveWorlds("tok", stub(listing([null])).fetchImpl)).toEqual({ kind: "failed", code: "ACTIVE_WORLD_BINDING_INVALID", status: null });
   });
 
   it("failed: a thrown fetch, a non-JSON body or an unknown code shape never reads as 'none'", async () => {
-    expect(await discoverActiveWorlds("tok", stub(new Error("offline")).fetchImpl)).toEqual({ kind: "failed", code: null });
-    expect(await discoverActiveWorlds("tok", stub(new Response("<html>", { status: 200 })).fetchImpl)).toEqual({ kind: "failed", code: null });
-    expect(await discoverActiveWorlds("tok", stub(listing([], null, 500, "<script>")).fetchImpl)).toEqual({ kind: "failed", code: null });
+    expect(await discoverActiveWorlds("tok", stub(new Error("offline")).fetchImpl)).toEqual({ kind: "failed", code: null, status: null });
+    expect(await discoverActiveWorlds("tok", stub(new Response("<html>", { status: 200 })).fetchImpl)).toEqual({ kind: "failed", code: null, status: null });
+    expect(await discoverActiveWorlds("tok", stub(listing([], null, 500, "<script>")).fetchImpl)).toEqual({ kind: "failed", code: null, status: 500 });
     expect(await discoverActiveWorlds("tok", stub(new Response(JSON.stringify({ code: "COLLECTIONS_LISTED" }))).fetchImpl).then((r) => r.kind)).toBe("failed");
   });
 
@@ -91,19 +104,19 @@ describe("discoverActiveWorlds", () => {
       good, // the same World twice
     ]) {
       const found = await discoverActiveWorlds("tok", stub(listing([good, bad])).fetchImpl);
-      expect(found).toEqual({ kind: "failed", code: "ACTIVE_WORLD_BINDING_INVALID" });
+      expect(found).toEqual({ kind: "failed", code: "ACTIVE_WORLD_BINDING_INVALID", status: null });
     }
   });
 
   it("failed: a malformed cursor, a missing page object or an endless listing", async () => {
     expect(await discoverActiveWorlds("tok", stub(listing([world("a", "2026-11-01T00:00:00Z")], "../x")).fetchImpl))
-      .toEqual({ kind: "failed", code: "WORLD_PAGE_CURSOR_INVALID" });
+      .toEqual({ kind: "failed", code: "WORLD_PAGE_CURSOR_INVALID", status: null });
     expect(await discoverActiveWorlds("tok", stub(new Response(JSON.stringify({ code: "COLLECTIONS_LISTED", collections: [] }))).fetchImpl))
-      .toEqual({ kind: "failed", code: "WORLD_PAGE_CURSOR_INVALID" });
+      .toEqual({ kind: "failed", code: "WORLD_PAGE_CURSOR_INVALID", status: null });
     // Distinct ids per page so the cap, not the duplicate check, is what stops it.
     const distinct = Array.from({ length: 20 }, (_, n) => listing([{ ...world("a", "2026-11-01T00:00:00Z"), collectionId: `collection-${n.toString(16).padStart(32, "0")}` }], id("f")));
     const { fetchImpl, calls } = stub(...distinct);
-    expect(await discoverActiveWorlds("tok", fetchImpl)).toEqual({ kind: "failed", code: "ACTIVE_WORLD_LIST_TOO_LONG" });
+    expect(await discoverActiveWorlds("tok", fetchImpl)).toEqual({ kind: "failed", code: "ACTIVE_WORLD_LIST_TOO_LONG", status: null });
     expect(calls).toHaveLength(20);
   });
 });
@@ -117,11 +130,18 @@ describe("Ask's World panel reads what was observed, not what is missing now", (
     expect(activeWorldOpenOutcome(undefined)).toEqual({ kind: "open-failed" });
   });
 
-  it("after a successful open, clearing the loaded World (a new compile) never says it could not be opened", () => {
+  it("after a successful open, clearing the loaded World (a new compile) is 'checking' until the listing answers again", () => {
     const afterOpen = activeWorldOpenOutcome(loaded);
     expect(askWorldPanel(loaded, afterOpen)).toBeNull();
-    // compileCollection runs clearWorldState(): activeWorld becomes null, and nothing failed to open.
-    expect(askWorldPanel(null, afterOpen)).toBe("none");
+    // A compile runs clearSelection(): activeWorld becomes null and the listing runs again. Nothing
+    // failed to open, and nothing about the workspace has been checked yet.
+    expect(askWorldPanel(null, afterOpen)).toBe("checking");
+  });
+
+  it("never says 'No active World yet' before a listing answered 'none'", () => {
+    // WO-WS-3 item 1: the page is still starting (the document list loading), so no listing ran.
+    expect(askWorldPanel(null, "idle")).toBe("checking");
+    expect(askWorldPanel(null, { kind: "none" })).toBe("none");
   });
 
   it("each state names its own panel; only an observed open failure says 'could not be opened'", () => {
@@ -129,11 +149,53 @@ describe("Ask's World panel reads what was observed, not what is missing now", (
     expect(askWorldPanel(null, "checking")).toBe("checking");
     expect(askWorldPanel(null, "opening")).toBe("opening");
     expect(askWorldPanel(null, several)).toBe(several);
-    expect(askWorldPanel(null, { kind: "failed", code: "X" })).toEqual({ kind: "failed", code: "X" });
+    expect(askWorldPanel(null, { kind: "failed", code: "X", status: 503 })).toEqual({ kind: "failed", code: "X", status: 503 });
     expect(askWorldPanel(null, { kind: "open-failed" })).toEqual({ kind: "open-failed" });
     expect(askWorldPanel(null, { kind: "none" })).toBe("none");
-    expect(askWorldPanel(null, "idle")).toBe("none");
+    expect(askWorldPanel(null, "idle")).toBe("checking");
     expect(askWorldPanel(loaded, { kind: "open-failed" })).toBeNull();
+  });
+});
+
+describe("what the page does with a listing", () => {
+  const one = world("a", "2026-11-01T00:00:00Z");
+
+  it("opens the only active World when the page holds no collection", () => {
+    expect(discoveryOutcome({ kind: "one", world: one }, false)).toEqual({ open: one });
+  });
+
+  it("offers even a single World for a choice when a collection is already selected, so it is never replaced silently", () => {
+    expect(discoveryOutcome({ kind: "one", world: one }, true)).toEqual({ show: { kind: "several", worlds: [one] } });
+    const html = renderToStaticMarkup(createElement(ActiveWorldPicker, { worlds: [one], onChoose: () => undefined }));
+    expect(html).toContain("This workspace has 1 active World.");
+  });
+
+  it("passes none, several and failed through unchanged, selected or not", () => {
+    const passed: ActiveWorldDiscovery[] = [
+      { kind: "none" },
+      { kind: "several", worlds: [one, world("b", "2026-11-02T00:00:00Z")] },
+      { kind: "failed", code: null, status: null },
+    ];
+    for (const found of passed) {
+      expect(discoveryOutcome(found, false)).toEqual({ show: found });
+      expect(discoveryOutcome(found, true)).toEqual({ show: found });
+    }
+  });
+
+  it("through the real loader: a refused listing is worded as a refusal, an outage as an outage", async () => {
+    for (const status of [401, 402, 403]) {
+      const found = await discoverActiveWorlds("tok", stub(listing([], null, status, "NOT_A_KNOWN_CODE")).fetchImpl);
+      if (found.kind !== "failed") throw new Error("expected failed");
+      const copy = discoveryFailureCopy(found);
+      expect(copy.title, String(status)).toBe("This session may not list the workspace's active Worlds.");
+      expect(copy.sentence, String(status)).not.toMatch(/servers could not complete/);
+    }
+    const outage = await discoverActiveWorlds("tok", stub(listing([], null, 503, "NOT_A_KNOWN_CODE")).fetchImpl);
+    if (outage.kind !== "failed") throw new Error("expected failed");
+    expect(discoveryFailureCopy(outage)).toEqual({ title: "Active Worlds could not be checked.", sentence: "Our servers could not complete this. Nothing was changed. (Reference NOT_A_KNOWN_CODE.)" });
+    const offline = await discoverActiveWorlds("tok", stub(new Error("offline")).fetchImpl);
+    if (offline.kind !== "failed") throw new Error("expected failed");
+    expect(discoveryFailureCopy(offline)).toEqual({ title: "Active Worlds could not be checked.", sentence: "Our servers could not complete this. Nothing was changed." });
   });
 });
 
@@ -160,13 +222,13 @@ function buttons(node: unknown, found: Node[] = []): Node[] {
 }
 
 describe("in-page confirmation", () => {
-  async function open(message = "Roll the active pointer back? No package bytes will be deleted or rewritten.") {
+  async function open(message = "Roll the active pointer back? No package bytes will be deleted or rewritten.", pending: { current: ConfirmRequest | null } = { current: null }) {
     let current: ConfirmRequest | null = null;
-    const answer = requestConfirm((request) => { current = request; }, message, "Roll back the active pointer");
+    const answer = requestConfirm(pending, (request) => { current = request; }, message, "Roll back the active pointer");
     const request = current as ConfirmRequest | null;
     if (!request) throw new Error("no request opened");
     const dialog = ConfirmDialogBody({ request, titleId: "t" }) as Node;
-    return { answer, dialog, cleared: () => current === null };
+    return { answer, dialog, request, cleared: () => current === null };
   }
 
   it("shows the native dialog's text and puts the consequence on the confirm button", async () => {
@@ -197,6 +259,48 @@ describe("in-page confirmation", () => {
     (confirm.props.onClick as () => void)();
     (cancel.props.onClick as () => void)();
     await expect(answer).resolves.toBe(true);
+  });
+
+  it("a confirmation superseded by a second one settles false, and the second is its own request", async () => {
+    const pending: { current: ConfirmRequest | null } = { current: null };
+    const first = await open("First?", pending);
+    const second = await open("Second?", pending);
+    await expect(first.answer).resolves.toBe(false);
+    expect(second.request.id).not.toBe(first.request.id);
+    expect(pending.current).toBe(second.request);
+    // The superseded request's late buttons cannot close or answer the one now open.
+    (buttons(first.dialog)[1].props.onClick as () => void)();
+    expect(pending.current).toBe(second.request);
+    expect(second.cleared()).toBe(false);
+    (buttons(second.dialog)[1].props.onClick as () => void)();
+    await expect(second.answer).resolves.toBe(true);
+    expect(pending.current).toBeNull();
+  });
+});
+
+describe("page.tsx wiring the helpers cannot show", () => {
+  const page = readFileSync(path.resolve(import.meta.dirname, "../app/workspace/page.tsx"), "utf8").replace(/\r\n/g, "\n");
+
+  it("keys the dialog by request, so a superseding confirmation opens (and focuses) as a new dialog", () => {
+    expect(page).toMatch(/<ConfirmDialog key=\{confirmRequest\.id\} request=\{confirmRequest\} \/>/);
+  });
+
+  it("every place that lets go of the selected collection re-checks the workspace (clearSelection), including Back to a URL without one", () => {
+    // The class: a bare setCollectionResult(null) that leaves Ask's listing answer standing.
+    const bare = [...page.matchAll(/setCollectionResult\(null\);\s*clearWorldState\(\);/g)];
+    expect(bare.length, "only clearSelection itself pairs the two").toBe(1);
+    const popstate = /const restoreRevision = \(\) => \{[\s\S]*?\n {4}\};/.exec(page)?.[0] ?? "";
+    expect(popstate).toMatch(/else \{[^}]*clearSelection\(\);[^}]*\}/);
+  });
+
+  it("an integrity abstention (CITED_EVIDENCE_NOT_IN_PACKET) offers no 'add a source' or 'review' action", () => {
+    const integrity = page.indexOf('askResult.reason === CITED_EVIDENCE_NOT_IN_PACKET ? (');
+    const generic = page.indexOf(') : askResult.status === "abstained" ? (');
+    expect(integrity).toBeGreaterThan(-1);
+    expect(generic).toBeGreaterThan(integrity);
+    const branch = page.slice(integrity, generic);
+    expect(branch).not.toMatch(/<button/);
+    expect(page).toMatch(/import \{[^}]*CITED_EVIDENCE_NOT_IN_PACKET[^}]*\} from "@\/lib\/workspace-ask-copy";/);
   });
 });
 

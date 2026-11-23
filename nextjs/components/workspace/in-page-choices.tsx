@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import { formatTimestamp } from "@/lib/format";
+import { failureSentence } from "@/lib/workspace-failure-copy";
 import type { ActiveWorldSummary } from "@/lib/world-store";
 
 /*
@@ -30,7 +31,9 @@ export type ActiveWorldDiscovery =
   | { kind: "none" }
   | { kind: "one"; world: ActiveWorldSummary }
   | { kind: "several"; worlds: ActiveWorldSummary[] }
-  | { kind: "failed"; code: string | null };
+  /* `status` is the HTTP status of a refused or failed answer; null when no answer came back, or when
+     an OK answer was malformed (the server did not do what it said -- not a refusal). */
+  | { kind: "failed"; code: string | null; status: number | null };
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -68,11 +71,11 @@ export async function discoverActiveWorlds(token: string, fetchImpl: FetchLike =
       const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
       if (!response.ok || !body || body.code !== "COLLECTIONS_LISTED" || !Array.isArray(body.collections)) {
         const code = typeof body?.code === "string" && CODE.test(body.code) ? body.code : null;
-        return { kind: "failed", code };
+        return { kind: "failed", code, status: response.ok ? null : response.status };
       }
       for (const item of body.collections) {
         const world = parseWorld(item);
-        if (!world || seen.has(world.collectionId)) return { kind: "failed", code: "ACTIVE_WORLD_BINDING_INVALID" };
+        if (!world || seen.has(world.collectionId)) return { kind: "failed", code: "ACTIVE_WORLD_BINDING_INVALID", status: null };
         seen.add(world.collectionId);
         worlds.push(world);
       }
@@ -83,13 +86,38 @@ export async function discoverActiveWorlds(token: string, fetchImpl: FetchLike =
         if (worlds.length === 1) return { kind: "one", world: worlds[0] };
         return { kind: "several", worlds };
       }
-      if (typeof next !== "string" || !COLLECTION_ID.test(next)) return { kind: "failed", code: "WORLD_PAGE_CURSOR_INVALID" };
+      if (typeof next !== "string" || !COLLECTION_ID.test(next)) return { kind: "failed", code: "WORLD_PAGE_CURSOR_INVALID", status: null };
       cursor = next;
     }
-    return { kind: "failed", code: "ACTIVE_WORLD_LIST_TOO_LONG" };
+    return { kind: "failed", code: "ACTIVE_WORLD_LIST_TOO_LONG", status: null };
   } catch {
-    return { kind: "failed", code: null };
+    return { kind: "failed", code: null, status: null };
   }
+}
+
+/*
+  What a failed listing says. A 401/402/403 is the server refusing this session the listing -- a
+  refusal, worded as one -- not an outage. With no HTTP answer (a thrown or timed-out fetch, or an OK
+  answer that was malformed) the server did not complete the read, which is the 5xx sentence.
+*/
+export function discoveryFailureCopy(failed: { code: string | null; status: number | null }) {
+  const refused = failed.status === 401 || failed.status === 402 || failed.status === 403;
+  return {
+    title: refused ? "This session may not list the workspace's active Worlds." : "Active Worlds could not be checked.",
+    sentence: failureSentence(failed.code, failed.status ?? 503),
+  };
+}
+
+/*
+  What the page does with a listing. It opens the only active World on its own only when the page
+  holds no collection; with one already selected (a candidate just compiled, a revision from the
+  URL) even a single World is offered for a choice, so the selection is never replaced silently.
+*/
+export function discoveryOutcome(found: ActiveWorldDiscovery, selected: boolean):
+  | { open: ActiveWorldSummary }
+  | { show: Exclude<AskWorldState, "idle" | "checking" | "opening" | { kind: "open-failed" }> } {
+  if (found.kind !== "one") return { show: found };
+  return selected ? { show: { kind: "several", worlds: [found.world] } } : { open: found.world };
 }
 
 /*
@@ -110,10 +138,15 @@ export function activeWorldOpenOutcome(loaded: { manifestDigest: string } | null
   return loaded ? "idle" : { kind: "open-failed" };
 }
 
-/** The panel Ask renders: nothing once a World is loaded, "none" when no discovery says otherwise. */
+/*
+  The panel Ask renders: nothing once a World is loaded. "idle" is a listing that has not run yet --
+  the page is still starting, or the World state was just cleared and the listing runs again -- so it
+  reads "checking". "No active World yet" is said only after a listing answered "none".
+*/
 export function askWorldPanel(activeWorld: unknown, state: AskWorldState) {
   if (activeWorld) return null;
-  if (state === "idle" || (typeof state === "object" && state.kind === "none")) return "none";
+  if (state === "idle") return "checking";
+  if (typeof state === "object" && state.kind === "none") return "none";
   return state;
 }
 
@@ -140,7 +173,7 @@ export function ActiveWorldPicker({
       className="notice static"
       onSubmit={(event) => { event.preventDefault(); if (world) onChoose(world); }}
     >
-      <strong>This workspace has {worlds.length} active Worlds.</strong> Choose the one Ask should read.
+      <strong>{worlds.length === 1 ? "This workspace has 1 active World." : `This workspace has ${worlds.length} active Worlds.`}</strong> Choose the one Ask should read.
       <label htmlFor={id}>Active World</label>
       <select id={id} value={chosen} disabled={disabled} onChange={(event) => setChosen(event.target.value)}>
         <option value="">Choose an active World…</option>
@@ -153,29 +186,42 @@ export function ActiveWorldPicker({
   );
 }
 
-export type ConfirmRequest = { message: string; confirmLabel: string; settle: (confirmed: boolean) => void };
+export type ConfirmRequest = { id: number; message: string; confirmLabel: string; settle: (confirmed: boolean) => void };
+
+let confirmSequence = 0;
 
 /**
  * Opens one in-page confirmation and resolves with the person's answer. `settle` clears the
  * request before resolving, and only the first settle counts, so a double click cannot act twice.
+ * A confirmation opened while another is pending supersedes it: the earlier one settles false (it
+ * was never answered yes), and the dialog is keyed by `id`, so the new one opens as its own dialog.
+ * `pending` is the page's ref to the open request; the state setter alone cannot see it.
  */
 export function requestConfirm(
+  pending: { current: ConfirmRequest | null },
   setRequest: (request: ConfirmRequest | null) => void,
   message: string,
   confirmLabel: string,
 ): Promise<boolean> {
+  pending.current?.settle(false);
   return new Promise((resolve) => {
     let settled = false;
-    setRequest({
+    const request: ConfirmRequest = {
+      id: ++confirmSequence,
       message,
       confirmLabel,
       settle: (confirmed) => {
         if (settled) return;
         settled = true;
-        setRequest(null);
+        if (pending.current === request) {
+          pending.current = null;
+          setRequest(null);
+        }
         resolve(confirmed === true);
       },
-    });
+    };
+    pending.current = request;
+    setRequest(request);
   });
 }
 

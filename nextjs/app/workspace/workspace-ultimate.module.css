@@ -201,6 +201,9 @@
   the rule above that one whatever order the two sheets load in, and leaves `.auth` as it is.
   --changed keeps --tv-changed: V34 has no amber, and the state keeps its measured 5.68:1.
   --text-max is the one-step-lighter fill a filled button takes on hover: V34's button hover.
+  --source (the evidence region's outline and fill) is V34 ink, not the link green: the link green
+  (#205135) stands 1.42:1 from --verified (#256b39), the same hue, so a source region and a verified
+  state could not be told apart at a glance; ink stands 2.47:1 from it (WO-WS-3 item 9).
   lib/workspace-v34-tokens.test.ts measures every text and state pair below on every ground.
 */
 .shell[data-surface] {
@@ -216,7 +219,7 @@
   --text-max: var(--v34-header-btn-hover);
   --text-mid: var(--v34-body);
   --text-lo: var(--v34-muted);
-  --source: var(--v34-link);
+  --source: var(--v34-ink);
   --verified: var(--v34-ok);
   --unresolved: var(--v34-error);
   --failed: var(--v34-error);
@@ -227,7 +230,7 @@
 /* The rail stands on the paper; the current place is V34's pressed control (forest, white label). */
 .rail { border-right: 0; background: var(--ground); }
 .brand { border: 0; background: var(--v34-white); border-radius: var(--v34-radius-panel); box-shadow: 0 0 0 1px var(--v34-line); }
-.nav button { border-radius: var(--v34-radius-panel); }
+.nav button { border-radius: var(--v34-radius-control); }
 .nav button.current { color: var(--v34-white); background: var(--v34-step-bg); box-shadow: none; }
 .nav button.current svg { color: var(--v34-step-small); }
 .nav button b { color: var(--v34-white); border-color: var(--v34-ink); background: var(--v34-ink); }
@@ -275,11 +278,19 @@
 .stateHero[data-decision] > button.stateUpload { background: var(--v34-white); }
 .stateHero > button:disabled { box-shadow: none; }
 
-/* V34 eyebrow: 12px, 650, upper case, open tracking. Its colour stays the one each region gives it. */
+/* V34 eyebrow: 12px, 650, upper case, open tracking. Its colour stays the one each region gives it.
+   Korean keeps app/tavonel.css's contract (`:lang(ko) .eyebrow`, .02em: Hangul at open tracking crowds). */
 .shell[data-surface] :global(.eyebrow) { font: 650 var(--v34-eyebrow)/1.3 var(--v34-font); letter-spacing: .1em; text-transform: uppercase; }
-/* V34 field: white, a 3:1 control border, the field radius. Check boxes, radios, files and ranges keep their own faces. */
+.shell[data-surface] :global(.eyebrow:lang(ko)) { letter-spacing: 0.02em; }
+/* V34 field: white, a 3:1 control border, the field radius. Check boxes, radios, files and ranges keep their own faces.
+   The border colour stays off a field that is invalid or focused: those borders are state the component paints
+   (world-ontology-viewer's rejected name, the review form's and board search's focus), and this unlayered rule
+   would otherwise win over every one of them. */
 .shell[data-surface] :global(.workspace-content) :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="hidden"]), select, textarea) {
-  border-color: var(--v34-control-border); border-radius: var(--v34-radius-field); background-color: var(--v34-white); color: var(--v34-ink);
+  border-radius: var(--v34-radius-field); background-color: var(--v34-white); color: var(--v34-ink);
+}
+.shell[data-surface] :global(.workspace-content) :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="hidden"]), select, textarea):not([aria-invalid="true"]):not(:focus) {
+  border-color: var(--v34-control-border);
 }
 /* At phone width every input is 16px, so focusing one does not zoom the page. */
 @media (max-width: 650px) {

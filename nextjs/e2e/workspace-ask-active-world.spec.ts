@@ -8,6 +8,7 @@ const { expect, test } =
   WO-WS-1: /workspace/ask opened without `collection` and `manifest` asks the server which Worlds
   are active. Several are offered for a choice and none is loaded silently; a failed listing says
   it could not check instead of "No active World yet". Fixture build only; every API is mocked.
+  WO-WS-3: until the listing answers the panel says it is checking, and a 401/402/403 is a refusal.
 */
 
 type Route = {
@@ -68,6 +69,30 @@ test("a failed listing says it could not check, never 'No active World yet'", as
   await page.goto("/workspace/ask");
   await expect(page.getByText("Active Worlds could not be checked.")).toBeVisible();
   await expect(page.getByText("No active World yet.")).toHaveCount(0);
+});
+
+test("a refused listing (403) is worded as a refusal, not an outage", async ({ page }: { page: Page }) => {
+  await signedInWorkspace(page, { status: 403, json: { code: "NOT_A_KNOWN_CODE" } });
+  await page.goto("/workspace/ask");
+  await expect(page.getByText("This session may not list the workspace's active Worlds.")).toBeVisible();
+  await expect(page.getByText("Our servers could not complete this.", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("No active World yet.")).toHaveCount(0);
+});
+
+test("until the listing answers, Ask says it is checking -- never 'No active World yet'", async ({ page }: { page: Page }) => {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await signedInWorkspace(page, { status: 200, json: { code: "COLLECTIONS_LISTED", collections: [], page: { limit: 50, cursor: null, nextCursor: null } } });
+  // Registered last, so it answers first: the listing is held until the assertions below ran.
+  await page.route("**/api/v1/collections?**", async (route) => {
+    await held;
+    await route.fulfill({ status: 200, json: { code: "COLLECTIONS_LISTED", collections: [], page: { limit: 50, cursor: null, nextCursor: null } } });
+  });
+  await page.goto("/workspace/ask");
+  await expect(page.getByText("Checking this workspace for an active World…")).toBeVisible();
+  await expect(page.getByText("No active World yet.")).toHaveCount(0);
+  release();
+  await expect(page.getByText("No active World yet.")).toBeVisible();
 });
 
 test("an empty listing keeps 'No active World yet'", async ({ page }: { page: Page }) => {

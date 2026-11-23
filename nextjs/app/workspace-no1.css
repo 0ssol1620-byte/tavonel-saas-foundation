@@ -587,8 +587,13 @@
    above a bottom bar that is correct -- it is the desktop rail, where the same rule opened the
    panel off the top of the viewport, that BQ-095 is about. */
 .workspace.one-path-workspace :is(button, summary, a, input, select, textarea):focus-visible {
-  outline: 2px solid var(--verified); outline-offset: 2px;
+  outline: 2px solid var(--v34-focus); outline-offset: 2px;
 }
+/* WO-WS-3: inside the workspace the ring is V34's focus colour (#4880ba), from the token sheet's `.site` on
+   <main>, so its forced-colors block (--v34-focus: Highlight) reaches it. Every other focusable keeps the
+   global ring's shape (app/tavonel.css) and takes the same colour. 3:1 or more on every workspace ground
+   (lib/workspace-v34-tokens.test.ts). */
+.workspace.one-path-workspace :focus-visible { outline-color: var(--v34-focus); }
 @media (max-width: 1023px) {
   .workspace.one-path-workspace .one-path-more-panel {
     position: fixed; left: auto; right: 12px; top: auto; bottom: calc(76px + env(safe-area-inset-bottom));
@@ -703,7 +708,7 @@
 .one-path-workspace .workspace-intake { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-paper); box-shadow: inset 0 0 0 1.5px var(--v34-control-border); }
 .one-path-workspace .workspace-intake[data-active="true"] { background: var(--verified-deep); box-shadow: inset 0 0 0 1.5px var(--verified); }
 .one-path-workspace .workspace-source-choices { border-top-color: var(--hairline); }
-.one-path-workspace .workspace-source-choices button { border: 0; border-radius: var(--v34-radius-panel); background: var(--v34-white); box-shadow: var(--tv-shadow-1); }
+.one-path-workspace .workspace-source-choices button { border: 0; border-radius: var(--v34-radius-panel); background: var(--v34-white); box-shadow: none; }
 .one-path-workspace .workspace-attention { padding: clamp(20px, 2.4vw, 28px); border-radius: var(--v34-radius-screen); background: var(--v34-green); }
 .one-path-workspace .workspace-complete { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-green); }
 .one-path-workspace .workspace-compile-block { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-cases); }
@@ -756,7 +761,7 @@
    At 0 selected the pill is visibly off -- a sunk fill, no shadow, muted label -- not a hairline outline. */
 .one-path-workspace .compile-selection-actions {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
-  margin-top: 8px; padding: 10px 10px 10px 20px; border: 0; border-radius: var(--v34-radius-pill); background: var(--v34-white); box-shadow: var(--tv-shadow-1);
+  margin-top: 8px; padding: 10px 10px 10px 20px; border: 0; border-radius: var(--v34-radius-pill); background: var(--v34-white); box-shadow: var(--v34-shadow-screen);
 }
 .one-path-workspace .compile-selection-actions small { flex: 1 1 260px; min-width: 0; color: var(--text-lo); }
 .one-path-workspace .compile-selection-actions small b { color: var(--text-hi); font-weight: 600; }
