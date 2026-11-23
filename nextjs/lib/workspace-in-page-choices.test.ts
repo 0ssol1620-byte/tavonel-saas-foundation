@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   ActiveWorldPicker,
+  activeWorldOpenOutcome,
+  askWorldPanel,
   ConfirmDialogBody,
   discoverActiveWorlds,
   requestConfirm,
@@ -40,6 +42,8 @@ describe("discoverActiveWorlds", () => {
     expect(await discoverActiveWorlds("tok", fetchImpl)).toEqual({ kind: "none" });
     expect(calls[0].url).toBe("/api/v1/collections?limit=50");
     expect((calls[0].init.headers as Record<string, string>).authorization).toBe("Bearer tok");
+    // Bounded: a listing that never answers aborts into the thrown-fetch "failed" case below.
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("one: exactly one active World is returned for loading", async () => {
@@ -101,6 +105,35 @@ describe("discoverActiveWorlds", () => {
     const { fetchImpl, calls } = stub(...distinct);
     expect(await discoverActiveWorlds("tok", fetchImpl)).toEqual({ kind: "failed", code: "ACTIVE_WORLD_LIST_TOO_LONG" });
     expect(calls).toHaveLength(20);
+  });
+});
+
+describe("Ask's World panel reads what was observed, not what is missing now", () => {
+  const loaded = { manifestDigest: digest("a") };
+
+  it("an open that loaded the active World leaves discovery idle; one that did not is open-failed", () => {
+    expect(activeWorldOpenOutcome(loaded)).toBe("idle");
+    expect(activeWorldOpenOutcome(null)).toEqual({ kind: "open-failed" });
+    expect(activeWorldOpenOutcome(undefined)).toEqual({ kind: "open-failed" });
+  });
+
+  it("after a successful open, clearing the loaded World (a new compile) never says it could not be opened", () => {
+    const afterOpen = activeWorldOpenOutcome(loaded);
+    expect(askWorldPanel(loaded, afterOpen)).toBeNull();
+    // compileCollection runs clearWorldState(): activeWorld becomes null, and nothing failed to open.
+    expect(askWorldPanel(null, afterOpen)).toBe("none");
+  });
+
+  it("each state names its own panel; only an observed open failure says 'could not be opened'", () => {
+    const several = { kind: "several" as const, worlds: [world("a", "2026-11-01T00:00:00Z"), world("b", "2026-11-02T00:00:00Z")] };
+    expect(askWorldPanel(null, "checking")).toBe("checking");
+    expect(askWorldPanel(null, "opening")).toBe("opening");
+    expect(askWorldPanel(null, several)).toBe(several);
+    expect(askWorldPanel(null, { kind: "failed", code: "X" })).toEqual({ kind: "failed", code: "X" });
+    expect(askWorldPanel(null, { kind: "open-failed" })).toEqual({ kind: "open-failed" });
+    expect(askWorldPanel(null, { kind: "none" })).toBe("none");
+    expect(askWorldPanel(null, "idle")).toBe("none");
+    expect(askWorldPanel(loaded, { kind: "open-failed" })).toBeNull();
   });
 });
 

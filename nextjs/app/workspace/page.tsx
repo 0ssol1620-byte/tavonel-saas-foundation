@@ -61,7 +61,7 @@ import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
-import { ActiveWorldPicker, ConfirmDialog, discoverActiveWorlds, requestConfirm, type ActiveWorldDiscovery, type ConfirmRequest } from "@/components/workspace/in-page-choices";
+import { activeWorldOpenOutcome, ActiveWorldPicker, askWorldPanel, ConfirmDialog, discoverActiveWorlds, requestConfirm, type ActiveWorldDiscovery, type AskWorldState, type ConfirmRequest } from "@/components/workspace/in-page-choices";
 import type { ActiveWorldSummary } from "@/lib/world-store";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
@@ -778,8 +778,9 @@ export default function WorkspacePage() {
   const askWorldModel = qualifyAskWorldModel(worldReadModel, collectionResult, askResult?.receipt);
 
   /* WO-WS-1: Ask with no collection in the URL asks the server which Worlds are active. "opening"
-     is a World being loaded; "one" after loading with no active World means it could not be opened. */
-  const [askWorlds, setAskWorlds] = useState<"idle" | "checking" | "opening" | ActiveWorldDiscovery>("idle");
+     is a World being loaded; "open-failed" is recorded only by an open that loaded no active World. */
+  const [askWorlds, setAskWorlds] = useState<AskWorldState>("idle");
+  const askPanel = askWorldPanel(activeWorld, askWorlds);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const confirmInPage = (message: string, confirmLabel: string) => requestConfirm(setConfirmRequest, message, confirmLabel);
 
@@ -905,7 +906,7 @@ export default function WorkspacePage() {
     setBillingNotices(readBillingNotices(json.notices));
   };
 
-  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string) => {
+  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string, observeActiveWorld?: (loaded: ActiveWorld | null | undefined) => void) => {
     const sequence = ++candidateLoadSequence.current;
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId) || (manifestDigest && !/^sha256:[a-f0-9]{64}$/.test(manifestDigest))) return;
     const client = getSupabaseBrowserClient();
@@ -959,6 +960,7 @@ export default function WorkspacePage() {
     }
     const loadedActiveWorld = await loadWorldState(collectionId, token, sequence);
     if (sequence !== candidateLoadSequence.current) return;
+    observeActiveWorld?.(loadedActiveWorld);
     if (loadedActiveWorld === undefined) return artifact.lifecycle;
     const verifiedPackage = "Its required package entries and state were checked.";
     setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
@@ -993,26 +995,38 @@ export default function WorkspacePage() {
 
   /* The World Ask reads goes into the URL before it loads, so a reload keeps the same choice.
      `history` is "push" for a choice the person made and "replace" when there was only one. */
-  const openActiveWorld = async (world: ActiveWorldSummary, history: "push" | "replace", after: ActiveWorldDiscovery) => {
+  const openActiveWorld = async (world: ActiveWorldSummary, history: "push" | "replace") => {
     const url = new URL(window.location.href);
     url.searchParams.set("collection", world.collectionId);
     url.searchParams.set("manifest", world.manifestDigest);
     if (history === "push") window.history.pushState(null, "", url);
     else window.history.replaceState(null, "", url);
     setAskWorlds("opening");
-    await loadCollectionCandidate(world.collectionId, world.manifestDigest)
+    // The open records what it observed; the panel never infers a failure from later page state.
+    const sequence = candidateLoadSequence.current + 1;
+    let loaded: ActiveWorld | null | undefined;
+    await loadCollectionCandidate(world.collectionId, world.manifestDigest, (observed) => { loaded = observed; })
       .catch(() => setNotice("The selected revision could not be read. Reload to recheck access; no revision was changed."));
-    setAskWorlds(after);
+    // Superseded by another load: nothing was observed about this one.
+    setAskWorlds(candidateLoadSequence.current === sequence ? activeWorldOpenOutcome(loaded) : "idle");
   };
 
   useEffect(() => {
     if (surface !== "ask" || session !== "signed-in" || !workspaceStartupReady || collectionResult || askWorlds !== "idle") return;
     if (new URLSearchParams(window.location.search).has("collection")) return;
     setAskWorlds("checking");
+    const started = candidateLoadSequence.current;
     void (async () => {
-      const token = await getAuthToken();
-      const found: ActiveWorldDiscovery = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED" };
-      if (found.kind === "one") await openActiveWorld(found.world, "replace", found);
+      let found: ActiveWorldDiscovery;
+      try {
+        const token = await getAuthToken();
+        found = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED" };
+      } catch {
+        found = { kind: "failed", code: null };
+      }
+      // Another collection was loaded meanwhile: this answer is stale and must not replace it.
+      if (candidateLoadSequence.current !== started) { setAskWorlds("idle"); return; }
+      if (found.kind === "one") await openActiveWorld(found.world, "replace");
       else setAskWorlds(found);
     })();
     // The loaders only use auth and state setters.
@@ -3930,16 +3944,16 @@ export default function WorkspacePage() {
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
                 </div>
-                {activeWorld ? null : askWorlds === "checking" || askWorlds === "opening" ? (
+                {askPanel === null ? null : askPanel === "checking" || askPanel === "opening" ? (
                   <p className="notice static" role="status">
-                    {askWorlds === "checking" ? "Checking this workspace for an active World…" : "Opening the active World…"}
+                    {askPanel === "checking" ? "Checking this workspace for an active World…" : "Opening the active World…"}
                   </p>
-                ) : askWorlds !== "idle" && askWorlds.kind === "several" ? (
-                  <ActiveWorldPicker worlds={askWorlds.worlds} onChoose={(world) => void openActiveWorld(world, "push", askWorlds)} />
-                ) : askWorlds !== "idle" && (askWorlds.kind === "failed" || askWorlds.kind === "one") ? (
+                ) : askPanel !== "none" && askPanel.kind === "several" ? (
+                  <ActiveWorldPicker worlds={askPanel.worlds} onChoose={(world) => void openActiveWorld(world, "push")} />
+                ) : askPanel !== "none" ? (
                   <p className="notice static" role="status">
-                    <strong>{askWorlds.kind === "failed" ? "Active Worlds could not be checked." : "The active World could not be opened."}</strong>{" "}
-                    {askWorlds.kind === "failed" ? failureSentence(askWorlds.code, 503) : "Ask stays closed until it can read it."}
+                    <strong>{askPanel.kind === "failed" ? "Active Worlds could not be checked." : "The active World could not be opened."}</strong>{" "}
+                    {askPanel.kind === "failed" ? failureSentence(askPanel.code, 503) : "Ask stays closed until it can read it."}
                     <button type="button" onClick={() => {
                       const url = new URL(window.location.href);
                       url.searchParams.delete("collection"); url.searchParams.delete("manifest");

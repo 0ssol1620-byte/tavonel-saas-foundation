@@ -62,6 +62,8 @@ export async function discoverActiveWorlds(token: string, fetchImpl: FetchLike =
         cache: "no-store",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
+        // A listing that never answers is "could not check", not a panel stuck on "Checking…".
+        signal: AbortSignal.timeout(15_000),
       });
       const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
       if (!response.ok || !body || body.code !== "COLLECTIONS_LISTED" || !Array.isArray(body.collections)) {
@@ -88,6 +90,31 @@ export async function discoverActiveWorlds(token: string, fetchImpl: FetchLike =
   } catch {
     return { kind: "failed", code: null };
   }
+}
+
+/*
+  What Ask's panel shows while the page has no active World. "one" is never a resting state: the
+  page opens that World at once and records what the open observed, so "could not be opened" is
+  said only after an open that did not load an active World -- never inferred later from
+  `activeWorld` being empty (a new compile clears it, and nothing failed to open).
+*/
+export type AskWorldState =
+  | "idle"
+  | "checking"
+  | "opening"
+  | Exclude<ActiveWorldDiscovery, { kind: "one" }>
+  | { kind: "open-failed" };
+
+/** The state after opening a discovered World, from the active World the load returned. */
+export function activeWorldOpenOutcome(loaded: { manifestDigest: string } | null | undefined): "idle" | { kind: "open-failed" } {
+  return loaded ? "idle" : { kind: "open-failed" };
+}
+
+/** The panel Ask renders: nothing once a World is loaded, "none" when no discovery says otherwise. */
+export function askWorldPanel(activeWorld: unknown, state: AskWorldState) {
+  if (activeWorld) return null;
+  if (state === "idle" || (typeof state === "object" && state.kind === "none")) return "none";
+  return state;
 }
 
 export function activeWorldOptionLabel(world: ActiveWorldSummary) {

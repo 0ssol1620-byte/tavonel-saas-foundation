@@ -75,3 +75,14 @@ test("an empty listing keeps 'No active World yet'", async ({ page }: { page: Pa
   await page.goto("/workspace/ask");
   await expect(page.getByText("No active World yet.")).toBeVisible();
 });
+
+test("one active World whose open is refused says it could not be opened", async ({ page }: { page: Page }) => {
+  await signedInWorkspace(page, { status: 200, json: { code: "COLLECTIONS_LISTED", collections: [
+    { collectionId: first, manifestDigest: `sha256:${"a".repeat(64)}`, revision: 1, updatedAt: "2026-11-01T00:00:00.000Z" },
+  ], page: { limit: 50, cursor: null, nextCursor: null } } });
+  await page.route("**/api/collections/collection-*", (route) => route.fulfill({ status: 404, json: { code: "COLLECTION_NOT_FOUND" } }));
+  await page.goto("/workspace/ask");
+  await expect(page.getByText("The active World could not be opened.")).toBeVisible();
+  await expect(page.getByText("No active World yet.")).toHaveCount(0);
+  await expect.poll(() => new URL(page.url()).searchParams.get("collection")).toBe(first);
+});
