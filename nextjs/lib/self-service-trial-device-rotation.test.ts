@@ -8,6 +8,8 @@ vi.mock("./account-grants", () => ({
 vi.mock("./billing-store", () => ({ getFoundationBillingAccount: vi.fn(async () => ({ ok: true, account: {} })) }));
 vi.mock("./billing-product-access", () => ({
   billingProductDecision: () => ({ ok: false, code: "PAID_ACCESS_REQUIRED", status: 402 }),
+  // WO-C-T2: the grant-and-account read moved here from self-service-trial; same answer as the two mocks above.
+  resolveWorkspaceEntitlement: async () => ({ ok: true, grant: null, account: {}, member: false }),
 }));
 vi.mock("./foundation-pilot", () => ({ readAccessMode: () => "self_service" }));
 // No store: the bootstrap stops right after the device token is resolved, which is all this checks.

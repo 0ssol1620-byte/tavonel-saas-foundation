@@ -1,10 +1,14 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
-import { getFoundationAccountGrant, getFoundationSelfServiceTrial } from "./account-grants";
+import { getFoundationSelfServiceTrial } from "./account-grants";
 import { previousBillingHmac } from "./billing-binding";
 import { billingSecret } from "./billing-secrets";
-import { billingProductDecision, planReachesLevel, type ProductAccessLevel } from "./billing-product-access";
-import { getFoundationBillingAccount } from "./billing-store";
+import {
+  billingProductDecision,
+  planReachesLevel,
+  resolveWorkspaceEntitlement,
+  type ProductAccessLevel,
+} from "./billing-product-access";
 import { readAccessMode } from "./foundation-pilot";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
 
@@ -89,37 +93,39 @@ export async function authorizeFoundationSessionProduct(
   userId: string,
   required: ProductAccessLevel,
 ) {
-  const grantResult = await getFoundationAccountGrant(userId);
-  if (!grantResult.ok) return { ok: false as const, code: grantResult.code, status: 503 };
-  if (grantResult.grant) {
-    if (!planReachesLevel(grantResult.grant.accessPlan, required)) {
+  // The workspace's grant and account (WO-C-T2): the caller's own in their own workspace, the
+  // workspace payer's for an active admin or member.
+  const entitlement = await resolveWorkspaceEntitlement(workspaceKey, userId);
+  if (!entitlement.ok) return entitlement;
+  if (entitlement.grant) {
+    if (!planReachesLevel(entitlement.grant.accessPlan, required)) {
       return { ok: false as const, code: "STUDIO_SUBSCRIPTION_REQUIRED", status: 402 };
     }
     return {
       ok: true as const,
       access: {
         source: "owner" as const,
-        accessPlan: grantResult.grant.accessPlan,
-        billingExempt: grantResult.grant.billingExempt,
+        accessPlan: entitlement.grant.accessPlan,
+        billingExempt: entitlement.grant.billingExempt,
         expiresAt: null,
       } satisfies EffectiveSessionAccess,
     };
   }
 
-  const billing = await getFoundationBillingAccount(workspaceKey, userId);
-  if (!billing.ok) return { ok: false as const, code: billing.code, status: 503 };
-  const paid = billingProductDecision(billing.account, required);
+  const paid = billingProductDecision(entitlement.account, required);
   if (paid.ok) {
     return {
       ok: true as const,
       access: {
         source: "paid" as const,
-        accessPlan: billing.account.accessPlan as "observer_access" | "studio_access",
+        accessPlan: entitlement.account.accessPlan as "observer_access" | "studio_access",
         billingExempt: false,
         expiresAt: null,
       } satisfies EffectiveSessionAccess,
     };
   }
+  // A free evaluation is one person's: a member never draws on the owner's (reserve_foundation_compute_v3).
+  if (entitlement.member) return { ok: false as const, code: paid.code, status: paid.status };
 
   const trialResult = await getFoundationSelfServiceTrial(workspaceKey, userId);
   if (!trialResult.ok) return { ok: false as const, code: trialResult.code, status: 503 };
