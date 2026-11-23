@@ -8,12 +8,15 @@ import { expandedTokens } from "./lexical-tokens";
 
   Per competency question: the evidence packet the ask route's artifact-chunk path builds
   (`answerGroundedQuestion` over `parseChunks`), never the DB retrieval index, so the result depends
-  only on the artifact's bytes; the answerability verdict over that packet; and the structural links,
-  the Topic/Entity/Claim nodes whose evidenceIds intersect the packet's, with the edges among them.
+  only on the artifact's bytes; the answerability verdict over every chunk of the cited evidenceIds
+  (the ask route's shadow input); and the structural links, the Topic/Entity/Claim nodes whose own
+  evidenceIds, or whose outgoing `supported_by` edges' evidenceIds, intersect the packet's, with the
+  edges among them. Core V2 gives Claim nodes evidenceIds [] and binds evidence on those edges.
 
   Held conflicts: the chunk path carries none of its own, so the count is the artifact's `contradicts`
-  edges (Core V2 contradiction candidates, held for review and never resolved) touching a linked
-  Claim. A fallback-compiled artifact has no `contradicts` edge, and 0 is then what it holds.
+  edges (Core V2 contradiction candidates, held for review and never resolved) whose evidenceIds
+  intersect the packet or that touch a linked Claim. A fallback-compiled artifact has no
+  `contradicts` edge, and 0 is then what it holds.
 
   No clock, no randomness, no network, not metered. The threshold is the shadow's uncalibrated 0 and
   the output says so. CQ text never reaches the output.
@@ -57,7 +60,7 @@ export type CompetencyCoverage = {
 };
 
 type Node = { id: string; kind: string; evidenceIds: string[] };
-type Edge = { id: string; type: string; from: string; to: string };
+type Edge = { id: string; type: string; from: string; to: string; evidenceIds: string[] };
 
 function fail(code: "COVERAGE_ARTIFACT_INVALID" | "COVERAGE_QUESTIONS_INVALID"): never {
   throw new Error(code);
@@ -78,10 +81,10 @@ function readOntology(value: unknown): { nodes: Node[]; edges: Edge[] } {
   });
   const edges = ontology.edges.map(raw => {
     const edge = raw as Record<string, unknown> | null;
-    if (!edge || typeof edge.id !== "string" || typeof edge.type !== "string" || typeof edge.from !== "string" || typeof edge.to !== "string") {
+    if (!edge || typeof edge.id !== "string" || typeof edge.type !== "string" || typeof edge.from !== "string" || typeof edge.to !== "string" || !isStrings(edge.evidenceIds)) {
       fail("COVERAGE_ARTIFACT_INVALID");
     }
-    return { id: edge.id, type: edge.type, from: edge.from, to: edge.to };
+    return { id: edge.id, type: edge.type, from: edge.from, to: edge.to, evidenceIds: edge.evidenceIds };
   });
   return { nodes, edges };
 }
@@ -103,7 +106,8 @@ function readQuestions(value: unknown): CompetencyQuestion[] {
       typeof question.text !== "string" ||
       question.text.length > 300 ||
       CONTROL.test(question.text) ||
-      normalized(question.text).length < 8
+      normalized(question.text).length < 8 ||
+      normalized(question.text).length > 300
     ) fail("COVERAGE_QUESTIONS_INVALID");
     seen.add(question.cqId);
     return { cqId: question.cqId, text: question.text };
@@ -125,8 +129,6 @@ export function evaluateCompetencyCoverage(artifact: unknown, questions: unknown
     ?.find(item => item.path === "rag/chunks.jsonl");
   const rowCount = typeof file?.content === "string" ? file.content.split("\n").filter(Boolean).length : 0;
   if (chunks.length === 0 || chunks.length !== rowCount) fail("COVERAGE_ARTIFACT_INVALID");
-  const textByEvidence = new Map<string, string>();
-  for (const chunk of chunks) if (!textByEvidence.has(chunk.evidenceId)) textByEvidence.set(chunk.evidenceId, chunk.text);
   const processedSources = new Set(chunks.map(chunk => chunk.sourceVersionId)).size;
 
   const rows = cqs.map((cq): CompetencyCoverageRow => {
@@ -135,14 +137,18 @@ export function evaluateCompetencyCoverage(artifact: unknown, questions: unknown
     if (answer === null && expandedTokens(normalized(cq.text)).length > 0) fail("COVERAGE_ARTIFACT_INVALID");
     const packetIds = [...new Set((answer?.citations ?? []).map(citation => citation.evidenceId))];
     const packet = new Set(packetIds);
+    const touches = (ids: string[]) => ids.some(id => packet.has(id));
+    const supported = new Set(edges.filter(edge => edge.type === "supported_by" && touches(edge.evidenceIds)).map(edge => edge.from));
 
     const linked = nodes
-      .filter(node => LINKABLE.has(node.kind) && node.evidenceIds.some(id => packet.has(id)))
+      .filter(node => LINKABLE.has(node.kind) && (touches(node.evidenceIds) || supported.has(node.id)))
       .map(node => node.id)
       .sort();
     const linkedSet = new Set(linked);
     const linkedClaims = new Set(nodes.filter(node => node.kind === "Claim" && linkedSet.has(node.id)).map(node => node.id));
-    const heldConflicts = edges.filter(edge => edge.type === "contradicts" && (linkedClaims.has(edge.from) || linkedClaims.has(edge.to))).length;
+    const heldConflicts = edges.filter(edge =>
+      edge.type === "contradicts" && (touches(edge.evidenceIds) || linkedClaims.has(edge.from) || linkedClaims.has(edge.to))
+    ).length;
     const relations = edges
       .filter(edge => linkedSet.has(edge.from) && linkedSet.has(edge.to))
       .map(edge => edge.id)
@@ -150,7 +156,9 @@ export function evaluateCompetencyCoverage(artifact: unknown, questions: unknown
 
     const verdict = evaluateAnswerability({
       question: cq.text,
-      evidence: packetIds.map(evidenceId => ({ evidenceId, text: textByEvidence.get(evidenceId)! })),
+      // Every chunk of each cited evidenceId, as the ask route's shadow builds it: the fallback
+      // compiler gives all chunks of a document one evidenceId.
+      evidence: chunks.filter(chunk => packet.has(chunk.evidenceId)).map(chunk => ({ evidenceId: chunk.evidenceId, text: chunk.text })),
       heldConflicts,
       worldCoverage: { processedSources, unprocessedSources: null },
     }, { coverageThreshold: ANSWERABILITY_COVERAGE_THRESHOLD });

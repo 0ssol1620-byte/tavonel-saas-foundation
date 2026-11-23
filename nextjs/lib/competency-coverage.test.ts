@@ -89,6 +89,55 @@ describe("evaluateCompetencyCoverage", () => {
     expect(free).toMatchObject({ status: "ANSWERABLE", reason: null, linkedRelations: [] });
   });
 
+  // Core V2's projection gives Claim/Entity nodes evidenceIds [] and binds evidence on the edges
+  // (core-runtime-v2.ts). Class: any artifact whose claim-evidence binding lives on edges, not nodes.
+  it("a Core V2 shaped artifact (node evidenceIds [], evidence on edges) reports its held conflict", () => {
+    const coreV2 = (withSupport: boolean) => ({
+      ...artifact(),
+      ontology: {
+        nodes: [
+          ...CHUNKS.map(item => ({ id: `ev-node-${item.evidenceId}`, kind: "Evidence", label: "e", evidenceIds: [item.evidenceId] })),
+          { id: "claim-3", kind: "Claim", label: "Headcount 120", evidenceIds: [] },
+          { id: "claim-4", kind: "Claim", label: "Headcount 90", evidenceIds: [] },
+        ],
+        edges: [
+          ...(withSupport
+            ? [
+              { id: "rel-s3", type: "supported_by", from: "claim-3", to: "ev-node-evidence-c3", evidenceIds: ["evidence-c3"] },
+              { id: "rel-s4", type: "supported_by", from: "claim-4", to: "ev-node-evidence-c4", evidenceIds: ["evidence-c4"] },
+            ]
+            : []),
+          { id: "rel-contradicts-34", type: "contradicts", from: "claim-3", to: "claim-4", evidenceIds: ["evidence-c3", "evidence-c4"], reason: "numeric_disagreement" },
+        ],
+      },
+    });
+    expect(evaluateCompetencyCoverage(coreV2(true), [QUESTIONS[2]]).rows[0]).toStrictEqual({
+      cqId: CQ_HEADCOUNT, status: "CONFLICTED", reason: "HELD_CONFLICT", evidenceIds: ["evidence-c3", "evidence-c4"],
+      linkedObjectIds: ["claim-3", "claim-4"], linkedRelations: ["rel-contradicts-34"],
+    });
+    // The contradicts edge's own evidence holds the conflict even with no claim linked.
+    expect(evaluateCompetencyCoverage(coreV2(false), [QUESTIONS[2]]).rows[0]).toMatchObject({ status: "CONFLICTED", linkedObjectIds: [] });
+  });
+
+  // The fallback compiler gives every chunk of a document the same evidenceId. Class: answerability
+  // judged on any chunk other than the ones the packet cited.
+  it("judges answerability on every chunk of a cited evidenceId, as the ask route's shadow does", () => {
+    const shared = (id: string, text: string) => ({ ...chunk(id, text), evidenceId: "evidence-d1", sourceId: "source-d1", sourceVersionId: "version-d1" });
+    const lines = [
+      shared("d1a", "Introduction to the annual staffing report."),
+      shared("d1b", "Headcount reached 120 staff in 2026."),
+      chunk("c2", "Office parking passes are issued on Mondays."),
+    ].map(item => JSON.stringify(item));
+    const row = evaluateCompetencyCoverage(artifact({ chunkLines: lines }), [{ cqId: CQ_HEADCOUNT, text: "How many staff did headcount reach in 2026?" }]).rows[0];
+    expect(row).toMatchObject({ status: "ANSWERABLE", reason: null, evidenceIds: ["evidence-d1"] });
+  });
+
+  it("refuses an edge without its evidenceIds", () => {
+    const bad = artifact();
+    delete (bad.ontology.edges[0] as { evidenceIds?: string[] }).evidenceIds;
+    expect(() => evaluateCompetencyCoverage(bad, QUESTIONS)).toThrow("COVERAGE_ARTIFACT_INVALID");
+  });
+
   it("is byte-identical for the same input whatever the clock says", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
@@ -134,6 +183,8 @@ describe("evaluateCompetencyCoverage", () => {
       [{ cqId: "not-a-uuid", text: ok.text }],
       [{ cqId: CQ_RENEWAL, text: "short" }],
       [{ cqId: CQ_RENEWAL, text: "x".repeat(301) }],
+      // 49 raw chars that NFKC expands past 300: the question is out of bounds, not the artifact.
+      [{ cqId: CQ_RENEWAL, text: `supplier ${"ﷺ".repeat(40)}` }],
       [{ cqId: CQ_RENEWAL, text: "supplier\u0000contract renewals" }],
       [{ cqId: CQ_RENEWAL, text: 42 }],
       [null],
