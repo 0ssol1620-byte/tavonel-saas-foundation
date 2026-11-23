@@ -95,12 +95,13 @@ import { connectorSyncPageKey } from "./connector-sync-page";
 import { authorizeConnectorCriticalRead } from "./connector-critical-read";
 import { readCompileReceiptSigner, signCompileReceipt, verifyCompileReceipt } from "./compile-receipt-signing";
 import { readExportTrustStoreEnv } from "./export-signing";
-import { runSourceImportBatch } from "./sync-worker";
+import { REINVENTORY_PAGE_LIMIT, REINVENTORY_ROUND_LIMIT, runSourceImportBatch } from "./sync-worker";
 import type { ClaimedJob } from "./job-store";
 
 type Fixture = {
   synthetic: true; source: string[]; retrievedAt: string;
-  request: { method: string; url: string; cursor: string | null };
+  // `path` is list_folder's scope; a page recorded without one answers the root ("").
+  request: { method: string; url: string; cursor: string | null; path?: string };
   status: number; headers: Record<string, string>; body: unknown;
 };
 const FIXTURE_DIR = path.resolve(import.meta.dirname, "__fixtures__", "connector-pages");
@@ -110,10 +111,12 @@ const FIXTURES = new Map(readdirSync(FIXTURE_DIR).filter(file => file.endsWith("
 /** Serves a recorded page for exactly the request it records; any other request is refused, not answered. */
 async function providerFetch(input: RequestInfo | URL, init?: RequestInit) {
   const url = String(input instanceof Request ? input.url : input);
-  state.requests.push(url);
-  const cursor = init?.body ? (JSON.parse(String(init.body)) as { cursor?: string }).cursor ?? null : null;
+  const body = init?.body ? JSON.parse(String(init.body)) as { cursor?: string; path?: string } : null;
+  state.requests.push(body ? `${url} ${JSON.stringify(body.cursor ?? body.path)}` : url);
+  const cursor = body?.cursor ?? null;
   const recorded = [...FIXTURES.values()].find(page => page.request.url === url
-    && (url.startsWith("https://graph.microsoft.com/") || page.request.cursor === cursor));
+    && (url.startsWith("https://graph.microsoft.com/")
+      || (page.request.cursor === cursor && (cursor !== null || (page.request.path ?? "") === body?.path))));
   if (!recorded) throw new Error(`UNRECORDED_PROVIDER_REQUEST ${url}`);
   return new Response(JSON.stringify(recorded.body), {
     status: recorded.status, headers: { "content-type": "application/json", ...recorded.headers },
@@ -123,9 +126,10 @@ async function providerFetch(input: RequestInfo | URL, init?: RequestInit) {
 const WS = "pilot-acme01";
 const CONNECTION = "22222222-2222-4222-8222-222222222222";
 const VIEWER = "11111111-1111-4111-8111-111111111111";
-const job = (cursorToken: string | null): ClaimedJob => ({
+const job = (cursorToken: string | null, target?: Record<string, string>): ClaimedJob => ({
   jobId: `job-${"a".repeat(32)}`, workspaceKey: WS, jobType: "source_import", attempt: 1, maxAttempts: 5,
-  oauthConnectionId: CONNECTION, collectionId: null, payload: { userId: VIEWER }, cursorToken, itemsSeen: 0, itemsDone: 0,
+  oauthConnectionId: CONNECTION, collectionId: null, payload: target ? { userId: VIEWER, target } : { userId: VIEWER },
+  cursorToken, itemsSeen: 0, itemsDone: 0,
 });
 const names = () => state.calls.map(call => call.name);
 const completions = () => state.calls.filter(call => call.name === "complete_foundation_job_batch").map(call => call.body!);
@@ -156,7 +160,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("recorded pages", () => {
   it("are labelled synthetic and name the documentation they were written from", () => {
-    expect(FIXTURES.size).toBe(8);
+    expect(FIXTURES.size).toBe(16);
     for (const page of FIXTURES.values()) {
       expect(page.synthetic).toBe(true);
       expect(page.source.length).toBeGreaterThan(0);
@@ -212,30 +216,278 @@ describe("Dropbox: a deleted folder, reconciliation switch on", () => {
   });
 });
 
-describe("cursor resets never purge and never move the checkpoint", () => {
-  it.each([true, false])("Dropbox list_folder/continue 409 reset (reconciliation %s)", async reconcile => {
+/** A source imported and bound before the scenario starts; the critical read answers for its document. */
+const boundSource = async (provider: "dropbox" | "microsoft_graph", nativeId: string, revision: string) => {
+  const id = await connectorSourceIdentity({ workspaceKey: WS, connectionId: CONNECTION, provider, nativeId, revision });
+  const row = { document_id: id.documentId, source_id: id.sourceId, source_version_id: id.sourceVersionId,
+    oauth_connection_id: CONNECTION, native_id: nativeId, provider };
+  state.bindings.push(row);
+  return row;
+};
+const criticalRead = (documentId: string) => authorizeConnectorCriticalRead({ workspaceKey: WS, documentIds: [documentId], viewerUserId: VIEWER });
+/** Turns the crank until the job settles or `limit` turns pass. */
+const runToEnd = async (start: string | null, target?: Record<string, string>, limit = 8) => {
+  let cursor = start;
+  const results: Array<Awaited<ReturnType<typeof runSourceImportBatch>>> = [];
+  for (let turn = 0; turn < limit; turn += 1) {
+    const result = await runSourceImportBatch(job(cursor, target), "worker-1");
+    results.push(result);
+    const last = completions().at(-1)!;
+    if (last.p_outcome !== "progress") break;
+    cursor = (last.p_cursor_token as string | null) ?? cursor;
+  }
+  return results;
+};
+const DRIVE = "https://graph.microsoft.com/v1.0/drives/SYNTHDRIVE2/root/delta";
+const TEAM = { rootPath: "/team" };
+
+describe("a dead cursor (Graph 410 resync, Dropbox 409 reset) starts a bounded re-inventory that never purges", () => {
+  it.each([true, false])("Dropbox reset: re-lists /team from list_folder, keeps the unlisted source (reconciliation %s)", async reconcile => {
     state.reconcile = reconcile;
-    expect(await runSourceImportBatch(job("AAHsynthetic-dropbox-cursor-3"), "worker-1")).toEqual({ ok: false, code: "SOURCE_LIST_FAILED" });
-    expect(completions()).toEqual([expect.objectContaining({ p_outcome: "retry", p_cursor_token: null, p_items_seen_delta: 0 })]);
-    expect(state.pages.size).toBe(0);
+    state.reconcileAnswers.push([], []);
+    const gone = await boundSource("dropbox", "id:SYNTHteamGone00000000001", "015a1c10ce0dd70");
+    expect(await criticalRead(gone.document_id)).toMatchObject({ ok: true });
+
+    const results = await runToEnd("AAHsynthetic-dropbox-cursor-3", TEAM);
+    expect(results[0]).toEqual({ ok: true, value: { state: "queued", scanned: 0, imported: 0, skipped: [], complete: false, reinventoryRound: 1 } });
+    expect(completions().map(row => [row.p_outcome, row.p_cursor_token])).toEqual([
+      ["progress", "tavonel-resync-v1:1:0:0:"],
+      ["progress", "tavonel-resync-v1:1:1:0:AAHsynthetic-dropbox-fresh-1"],
+      // The page that ends the listing commits a bare provider cursor: the connection checkpoint.
+      ["succeeded", "AAHsynthetic-dropbox-fresh-2"],
+    ]);
+    // The dead cursor is sent once; the fresh listing is list_folder on the job's own scope.
+    expect(state.requests).toEqual([
+      'https://api.dropboxapi.com/2/files/list_folder/continue "AAHsynthetic-dropbox-cursor-3"',
+      'https://api.dropboxapi.com/2/files/list_folder "/team"',
+      'https://api.dropboxapi.com/2/files/list_folder/continue "AAHsynthetic-dropbox-fresh-1"',
+    ]);
+    expect(imported().map(item => item.nativeId)).toEqual(["id:SYNTHteamA0000000000000001", "id:SYNTHteamB0000000000000002"]);
+    // No purge: the source the re-inventory did not name is neither suspended nor tombstoned, and still reads.
     expect(state.suspensions).toEqual([]);
     expect(names()).not.toContain("request_connector_source_deletion");
-    expect(names()).not.toContain("reconcile_dropbox_source_page");
-    expect(importSourceObject).not.toHaveBeenCalled();
+    expect(await criticalRead(gone.document_id)).toMatchObject({ ok: true });
+    if (reconcile) {
+      // Each round page is reconciled under the round's own durable key.
+      expect(state.calls.filter(call => call.name === "reconcile_dropbox_source_page").map(call => call.body!.p_page_key))
+        .toEqual(["tavonel-resync-v1:1:", "tavonel-resync-v1:1:AAHsynthetic-dropbox-fresh-1"].map(c => connectorSyncPageKey(job(null, TEAM), c)));
+    } else {
+      expect(names()).not.toContain("reconcile_dropbox_source_page");
+    }
   });
 
-  it("Graph 410 with a resync code: no source deleted, the stored delta link kept, the Location never followed", async () => {
+  it("Graph 410: re-enumerates the drive from its root delta, never the Location, keeps the unlisted source, duplicates none", async () => {
     state.provider = "microsoft_graph";
-    const deltaLink = "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHdelta1";
-    expect(await runSourceImportBatch(job(deltaLink), "worker-1")).toEqual({ ok: false, code: "SOURCE_LIST_FAILED" });
-    expect(completions()).toEqual([expect.objectContaining({ p_outcome: "retry", p_cursor_token: null })]);
-    expect(state.requests).toEqual([deltaLink]);
-    expect(state.pages.size).toBe(0);
+    state.reconcile = false;
+    const gone = await boundSource("microsoft_graph", "SYNTHGONE01", "eSYNTHgone01v1");
+    const kept = await boundSource("microsoft_graph", "SYNTHKEEP01", "eSYNTHkeep01v1");
+
+    await runToEnd(`${DRIVE}?token=SYNTHdead2`, { driveId: "SYNTHDRIVE2" });
+    expect(completions().map(row => [row.p_outcome, row.p_cursor_token])).toEqual([
+      ["progress", "tavonel-resync-v1:1:0:0:"],
+      ["progress", `tavonel-resync-v1:1:1:0:${DRIVE}?token=SYNTHfresh1`],
+      ["succeeded", `${DRIVE}?token=SYNTHfresh2`],
+    ]);
+    expect(state.requests).toEqual([`${DRIVE}?token=SYNTHdead2`, `${DRIVE}?%24top=25`, `${DRIVE}?token=SYNTHfresh1`]);
+    expect(state.requests.join(" ")).not.toContain("SYNTHlocation");
     expect(state.suspensions).toEqual([]);
     expect(names()).not.toContain("request_connector_source_deletion");
+    expect(await criticalRead(gone.document_id)).toMatchObject({ ok: true });
+    // Re-listing an unchanged item lands on the source, version and document it already had.
+    const again = imported().find(item => item.nativeId === "SYNTHKEEP01")!;
+    const identity = await connectorSourceIdentity({ workspaceKey: WS, connectionId: CONNECTION, provider: "microsoft_graph",
+      nativeId: again.nativeId, revision: again.revision });
+    expect([identity.sourceId, identity.documentId]).toEqual([kept.source_id, kept.document_id]);
+  });
+
+  it("a round's first page is listed fresh, never replayed from the job's own first page", async () => {
+    state.provider = "microsoft_graph";
+    state.reconcile = false;
+    const target = { driveId: "SYNTHDRIVE2" };
+    // The job's original first page (cursor null) is already durable, naming an item the drive no longer has.
+    state.pages.set(connectorSyncPageKey(job(null, target), null), { items: [{ nativeId: "SYNTHSTALE01", name: "stale.pdf",
+      revision: "eSTALE", mimeType: "application/pdf", sizeBytes: 1, modifiedAt: null, kind: "file" }],
+    cursor: `${DRIVE}?token=SYNTHfresh1`, complete: false });
+    await runSourceImportBatch(job("tavonel-resync-v1:1:0:0:", target), "worker-1");
+    expect(state.requests).toEqual([`${DRIVE}?%24top=25`]);
+    expect(imported().map(item => item.nativeId)).toEqual(["SYNTHKEEP01"]);
+  });
+
+  it.each([
+    ["Graph 503", "microsoft_graph", `${DRIVE}?token=SYNTHbusy2`],
+    ["Dropbox 500", "dropbox", "AAHsynthetic-dropbox-busy"],
+    ["Dropbox 409 that is not a reset (path/not_found)", "dropbox", "AAHsynthetic-dropbox-gone-root"],
+  ] as const)("%s is an outage, not a resync: retried with the checkpoint held, in or out of a round", async (_name, provider, cursor) => {
+    state.provider = provider;
+    for (const token of [cursor, `tavonel-resync-v1:1:7:0:${cursor}`]) {
+      state.calls.length = 0;
+      state.requests.length = 0;
+      expect(await runSourceImportBatch(job(token), "worker-1")).toEqual({ ok: false, code: "SOURCE_LIST_FAILED" });
+      expect(completions()).toEqual([expect.objectContaining({ p_outcome: "retry", p_cursor_token: null, p_error_code: "SOURCE_LIST_FAILED" })]);
+      expect(state.requests).toHaveLength(1);
+    }
+    expect(state.pages.size).toBe(0);
+    expect(state.suspensions).toEqual([]);
     expect(importSourceObject).not.toHaveBeenCalled();
   });
 
+  it("page bound: the round stops, failed and named, on the turn after its last allowed page; a page that ends the listing still succeeds", async () => {
+    state.reconcile = false;
+    const last = REINVENTORY_PAGE_LIMIT - 1;
+    expect(await runToEnd(`tavonel-resync-v1:1:${last}:0:`, TEAM)).toEqual([
+      expect.objectContaining({ ok: true }),
+      { ok: false, code: "SOURCE_REINVENTORY_BOUND_EXCEEDED" },
+    ]);
+    expect(completions().map(row => [row.p_outcome, row.p_cursor_token ?? row.p_error_code])).toEqual([
+      ["progress", `tavonel-resync-v1:1:${REINVENTORY_PAGE_LIMIT}:0:AAHsynthetic-dropbox-fresh-1`],
+      ["failed", "SOURCE_REINVENTORY_BOUND_EXCEEDED"],
+    ]);
+    expect(state.requests).toHaveLength(1);
+
+    state.calls.length = 0;
+    expect(await runSourceImportBatch(job(`tavonel-resync-v1:1:${last}:0:AAHsynthetic-dropbox-fresh-1`, TEAM), "worker-1"))
+      .toMatchObject({ ok: true, value: { complete: true } });
+    expect(completions()).toEqual([expect.objectContaining({ p_outcome: "succeeded", p_cursor_token: "AAHsynthetic-dropbox-fresh-2" })]);
+    expect(state.suspensions).toEqual([]);
+  });
+
+  it("round bound: a reset inside a round starts the next round until the last, then the job stops failed and named", async () => {
+    state.reconcile = false;
+    expect(await runSourceImportBatch(job("tavonel-resync-v1:1:3:0:AAHsynthetic-dropbox-cursor-3"), "worker-1"))
+      .toMatchObject({ ok: true, value: { reinventoryRound: 2 } });
+    expect(completions().at(-1)).toMatchObject({ p_outcome: "progress", p_cursor_token: "tavonel-resync-v1:2:0:0:" });
+
+    state.calls.length = 0;
+    expect(await runSourceImportBatch(job(`tavonel-resync-v1:${REINVENTORY_ROUND_LIMIT}:3:0:AAHsynthetic-dropbox-cursor-3`), "worker-1"))
+      .toEqual({ ok: false, code: "SOURCE_REINVENTORY_BOUND_EXCEEDED" });
+    expect(completions()).toEqual([expect.objectContaining({ p_outcome: "failed", p_error_code: "SOURCE_REINVENTORY_BOUND_EXCEEDED", p_cursor_token: null })]);
+    expect(state.suspensions).toEqual([]);
+    expect(names()).not.toContain("request_connector_source_deletion");
+  });
+
+  it.each([
+    "tavonel-resync-v1:0:0:0:", `tavonel-resync-v1:${REINVENTORY_ROUND_LIMIT + 1}:0:0:`, `tavonel-resync-v1:1:${REINVENTORY_PAGE_LIMIT + 1}:0:`,
+    "tavonel-resync-v1:01:0:0:", "tavonel-resync-v1:1:-1:0:", "tavonel-resync-v1:1:1e2:0:", "tavonel-resync-v1:1:0:", "tavonel-resync-v1:",
+    "tavonel-resync-v1:1:0:NaN:", "tavonel-resync-v1: 1:0:0:", "tavonel-resync-v1:1:0:9999999:",
+  ])("a round token out of range or malformed (%s) is refused before any provider request", async token => {
+    expect(await runSourceImportBatch(job(token), "worker-1")).toEqual({ ok: false, code: "JOB_CURSOR_INVALID" });
+    expect(completions()).toEqual([expect.objectContaining({ p_outcome: "failed", p_error_code: "JOB_CURSOR_INVALID" })]);
+    expect(state.requests).toEqual([]);
+  });
+});
+
+/*
+  The class, not the inputs above: "the provider says this continuation is dead" is the ONLY thing
+  that starts a round. Generated provider answers -- every status from 200 to 599, bodies that put a
+  resync code or a reset tag in the right place, the wrong place, the wrong type, the wrong case,
+  too deep, or not at all, non-JSON, redirects, thrown transports -- go through the real adapter and
+  the real worker. Each generator states whether its answer is a resync; the worker must agree, and
+  whatever it decides, it never imports, suspends or deletes on that turn.
+*/
+describe("generated provider answers: only a dead-continuation signal starts a round", () => {
+  type Answer = { resync: boolean; status: number; body: string | null; headers?: Record<string, string>; throws?: boolean };
+  const seeded = (seed: number) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+  const GRAPH_CODES = ["resyncRequired", "resyncChangesApplyDifferences", "resyncChangesUploadDifferences"];
+  const DECOYS = ["ResyncRequired", "resync", "reset", "Reset", "resyncrequired", "serviceNotAvailable", "itemNotFound", "__proto__",
+    "constructor", "", "resyncRequired ", "activityLimitReached", "path", "other"];
+  const nest = (code: unknown, depth: number, key: "innererror" | "innerError") => {
+    let error: Record<string, unknown> = { code };
+    for (let level = 0; level < depth; level += 1) error = { code: "generalException", [key]: error };
+    return error;
+  };
+
+  const generators: Array<(pick: () => number, provider: "dropbox" | "microsoft_graph") => Answer> = [
+    // The signal, in every documented shape.
+    (pick, provider) => provider === "microsoft_graph"
+      ? { resync: true, status: 410, body: JSON.stringify({ error: nest(GRAPH_CODES[Math.floor(pick() * 3)], Math.floor(pick() * 8), pick() < 0.5 ? "innererror" : "innerError") }) }
+      : { resync: true, status: 409, body: JSON.stringify({ error_summary: "reset/..", error: { ".tag": "reset" } }) },
+    // The right code or tag under any other status.
+    (pick, provider) => {
+      let status = 200 + Math.floor(pick() * 400);
+      if (status === (provider === "microsoft_graph" ? 410 : 409)) status += 1;
+      return { resync: false, status, body: JSON.stringify(provider === "microsoft_graph"
+        ? { error: { code: GRAPH_CODES[Math.floor(pick() * 3)] } } : { error: { ".tag": "reset" } }) };
+    },
+    // The right status, a decoy code or tag, or the right one in the wrong place or type, or nested past the walk.
+    (pick, provider) => {
+      const decoy = DECOYS[Math.floor(pick() * DECOYS.length)];
+      const shapes = provider === "microsoft_graph"
+        ? [{ error: { code: decoy } }, { code: "resyncRequired" }, { error: { code: ["resyncRequired"] } }, { error: "resyncRequired" },
+          { error: [{ code: "resyncRequired" }] }, { error: { message: "resyncRequired" } }, { error: nest("resyncRequired", 8, "innererror") }, null, 7]
+        : [{ error: { ".tag": decoy } }, { ".tag": "reset" }, { error: "reset" }, { error: [{ ".tag": "reset" }] },
+          { error: { ".tag": ["reset"] } }, { error_summary: "reset/..", error: { ".tag": "path", path: { ".tag": "reset" } } }, null, "reset"];
+      return { resync: false, status: provider === "microsoft_graph" ? 410 : 409, body: JSON.stringify(shapes[Math.floor(pick() * shapes.length)]) };
+    },
+    // Not JSON at all, or nothing.
+    (pick, provider) => ({ resync: false, status: provider === "microsoft_graph" ? 410 : 409,
+      body: ["", "reset", "<html>Gone</html>", "{\"error\":{\".tag\":\"reset\"}", "\u0000", "{".repeat(64)][Math.floor(pick() * 6)]! }),
+    // Outages: 5xx and 429.
+    pick => ({ resync: false, status: [429, 500, 502, 503, 504, 507, 509][Math.floor(pick() * 7)]!, body: JSON.stringify({ error: { code: "serviceNotAvailable" } }),
+      headers: { "retry-after": "30" } }),
+    // A redirect, followed until the hop limit or refused without a Location.
+    pick => ({ resync: false, status: 301 + Math.floor(pick() * 7), body: null,
+      headers: pick() < 0.5 ? {} as Record<string, string> : { location: "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHloop" } }),
+    // A transport that throws (timeout, reset connection).
+    () => ({ resync: false, status: 0, body: null, throws: true }),
+  ];
+
+  it.each(["dropbox", "microsoft_graph"] as const)("%s: 600 generated answers, in and out of a round", async provider => {
+    state.provider = provider;
+    state.reconcile = provider === "dropbox";
+    const pick = seeded(provider === "dropbox" ? 0x5eed : 0xbeef);
+    const continuation = provider === "dropbox" ? "AAHfuzz-cursor" : "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHfuzz";
+    const seen = { resync: 0, other: 0 };
+    for (let index = 0; index < 600; index += 1) {
+      const answer = generators[Math.floor(pick() * generators.length)]!(pick, provider);
+      const round = Math.floor(pick() * (REINVENTORY_ROUND_LIMIT + 1));
+      const token = round === 0 ? continuation : `tavonel-resync-v1:${round}:${Math.floor(pick() * REINVENTORY_PAGE_LIMIT)}:0:${continuation}`;
+      state.calls.length = 0;
+      state.requests.length = 0;
+      vi.stubGlobal("fetch", vi.fn(async () => {
+        if (answer.throws) throw new TypeError("fetch failed");
+        return new Response(answer.status === 204 || answer.status === 205 || answer.status === 304 ? null : answer.body,
+          { status: answer.status, headers: answer.headers ?? {} });
+      }));
+      const result = await runSourceImportBatch(job(token), "worker-1");
+      const label = `${provider} #${index} round ${round} ${answer.status} ${String(answer.body).slice(0, 80)}`;
+      expect(completions(), label).toHaveLength(1);
+      const [done] = completions();
+      if (answer.resync && round < REINVENTORY_ROUND_LIMIT) {
+        expect(result, label).toMatchObject({ ok: true, value: { reinventoryRound: round + 1, scanned: 0 } });
+        expect(done, label).toMatchObject({ p_outcome: "progress", p_cursor_token: `tavonel-resync-v1:${round + 1}:0:0:` });
+      } else if (answer.resync) {
+        expect(result, label).toEqual({ ok: false, code: "SOURCE_REINVENTORY_BOUND_EXCEEDED" });
+        expect(done, label).toMatchObject({ p_outcome: "failed", p_cursor_token: null });
+      } else {
+        // Outage or unreadable answer: never a round, and the checkpoint stays where it was.
+        expect(result.ok, label).toBe(false);
+        expect(["SOURCE_LIST_FAILED", "OAUTH_SOURCE_PAGE_INVALID", "OAUTH_SOURCE_CURSOR_INVALID"], label).toContain(done!.p_error_code);
+        expect(done, label).toMatchObject({ p_outcome: "retry", p_cursor_token: null });
+      }
+      seen[answer.resync ? "resync" : "other"] += 1;
+      expect(state.suspensions, label).toEqual([]);
+      expect(names(), label).not.toContain("request_connector_source_deletion");
+      expect(names(), label).not.toContain("reconcile_dropbox_source_page");
+      expect(importSourceObject, label).not.toHaveBeenCalled();
+      expect(state.pages.size, label).toBe(0);
+    }
+    // Both sides of the property were exercised, not just the common one.
+    expect(seen.resync).toBeGreaterThan(50);
+    expect(seen.other).toBeGreaterThan(300);
+  }, 60_000);
+
+  it("a provider that starts no continuation (the first listing) cannot ask for a round", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error_summary: "reset/..", error: { ".tag": "reset" } }, { status: 409 })));
+    expect(await runSourceImportBatch(job(null), "worker-1")).toEqual({ ok: false, code: "SOURCE_LIST_FAILED" });
+    state.provider = "microsoft_graph";
+    state.calls.length = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: { code: "resyncRequired" } }, { status: 410 })));
+    expect(await runSourceImportBatch(job(null), "worker-1")).toEqual({ ok: false, code: "SOURCE_LIST_FAILED" });
+    expect(completions()).toEqual([expect.objectContaining({ p_outcome: "retry", p_cursor_token: null })]);
+  });
+});
+
+describe("a listed page is durable before its cursor moves", () => {
   it("a page that cannot be made durable commits no cursor", async () => {
     state.pageStoreDown = true;
     expect(await runSourceImportBatch(job(null), "worker-1")).toEqual({ ok: false, code: "CONNECTOR_PAGE_STORE_UNAVAILABLE" });
@@ -356,7 +608,8 @@ describe("the Dropbox reconciliation switch is apart from the upload-approval li
     const approval = read("lib/intake-approval-rollout.ts");
     expect(approval).toContain("const APPROVAL_LINEAGE_SWITCH = false;");
     expect(approval).not.toContain("dropbox-reconciliation-switch");
-  });
+    // Reads every source file under lib, app and components: 5.3 s on a cold cache (r20 probe control).
+  }, 30_000);
 
   it("ships off; with it off and the lineage off, Dropbox runs main's path", async () => {
     const actual = await vi.importActual<typeof import("./dropbox-reconciliation-switch")>("./dropbox-reconciliation-switch");

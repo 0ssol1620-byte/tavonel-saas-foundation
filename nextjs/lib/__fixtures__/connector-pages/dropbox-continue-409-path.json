@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/master/files.stone",
+    "https://docs.dropboxapi.com/dropbox-api/docs/error-handling"
+  ],
+  "retrievedAt": "2026-11-23T02:09:20Z",
+  "scenario": "A 409 from list_folder/continue that is not a reset: ListFolderContinueError.path (LookupError not_found). Same status as a reset, different meaning.",
+  "assumes": "The error union serialised with '.tag', nested for the LookupError; the error page gives no example 409 body.",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dropboxapi.com/2/files/list_folder/continue",
+    "cursor": "AAHsynthetic-dropbox-gone-root"
+  },
+  "status": 409,
+  "headers": {},
+  "body": {
+    "error_summary": "path/not_found/..",
+    "error": {
+      ".tag": "path",
+      "path": {
+        ".tag": "not_found"
+      }
+    }
+  }
+}

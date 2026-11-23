@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://docs.dropboxapi.com/dropbox-api/docs/error-handling"
+  ],
+  "retrievedAt": "2026-11-23T02:09:20Z",
+  "scenario": "An outage, not a reset: 500, 'undefined errors on the Dropbox side ... expected to be brief ... use exponential backoff'.",
+  "assumes": "No body: the page gives none. Recorded as JSON null.",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dropboxapi.com/2/files/list_folder/continue",
+    "cursor": "AAHsynthetic-dropbox-busy"
+  },
+  "status": 500,
+  "headers": {},
+  "body": null
+}
