@@ -12,6 +12,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
 // WO-WS-2: <main> carries the V34 token layer's `.site`, so the workspace sheets can read every --v34-* name.
 import v34 from "@/components/v34/tokens.module.css";
+import { Screen } from "@/components/v34/ui/screen";
+import { worldScreenStatus } from "@/app/workspace/screen-status";
 
 export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
 
@@ -358,14 +360,16 @@ export default function WorkspaceUltimateShell({
 
         <div className={`workspace-content ${styles.content}`}>
           {surface === "home" && stateHero ? (
-            <section className={styles.stateHero} aria-labelledby="workspace-state-title" data-activity={activityCount > 0 ? "running" : "quiet"} data-decision={candidateReady && activityCount === 0 ? "1" : undefined}>
+            /* WO-WS-4: the state is the Home screen -- its tag is which World is active, its foot the counted facts. */
+            <Screen title="Overview" status={worldScreenStatus(activeRevision)} foot={stateFacts}
+              bodyClassName={styles.stateHero} aria-labelledby="workspace-state-title"
+              data-activity={activityCount > 0 ? "running" : "quiet"} data-decision={candidateReady && activityCount === 0 ? "1" : undefined}>
               <div>
                 {/* BQ-099: "Your knowledge" sat above "Loading your knowledge." / "Your published
                     knowledge · v3" / "Add your knowledge." It restated the heading in every branch,
                     so it is deleted rather than restyled. */}
                 <h1 id="workspace-state-title">{stateTitle}</h1>
                 <span>{stateDescription}</span>
-                {stateFacts ? <small className={styles.stateFacts}>{stateFacts}</small> : null}
               </div>
               {/* Founder 2026-10-27 (AUDIT C3): adding a source is one press from the state, in every mode. onUpload
                   keeps the intake-closed guard: a closed workspace gets its closed sentence, not a picker. */}
@@ -373,7 +377,7 @@ export default function WorkspaceUltimateShell({
               {/* While the workspace state is still resolving there is no honest next action, so
                   the control says so and stays inert rather than offering a guess. */}
               <button type="button" disabled={!nextAction.surface && !nextAction.run} onClick={() => runAction(nextAction)}>{nextAction.label}</button>
-            </section>
+            </Screen>
           ) : surface === "home" ? null : (
             <h1 className={styles.surfaceTitle}>{SURFACE_TITLES[surface]}</h1>
           )}

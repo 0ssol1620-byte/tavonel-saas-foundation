@@ -103,6 +103,8 @@ import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store"
 import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
+import { Screen } from "@/components/v34/ui/screen";
+import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus } from "./screen-status";
 import {
   buildReviewQueue,
   currentReviewLedger,
@@ -3467,9 +3469,9 @@ export default function WorkspacePage() {
             second blocked state can no longer hide behind the first one's heading.
           */}
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
-            <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
+            <Screen title="Needs attention" titleAs="h2" titleId="workspace-attention-title" status={attentionScreenStatus(attentionItems)}
+              bodyClassName="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
               <div>
-                <h2 id="workspace-attention-title">Needs attention</h2>
                 <ul className="workspace-attention-items">
                   {attentionItems.map((item) => (
                     <li key={item.id}>
@@ -3497,7 +3499,7 @@ export default function WorkspacePage() {
                   <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
                 </div>
               ) : null}
-            </section>
+            </Screen>
           ) : null}
 
           {/*
@@ -3517,12 +3519,10 @@ export default function WorkspacePage() {
               point of the candidate stage is that automated extraction is not yet organizational
               truth; a heading that skips it undoes the guarantee.
             */
-            <section className="workspace-complete" aria-labelledby="workspace-complete-title">
+            /* Round 3: the state hero above already says "Ready for your review."; this screen says what the candidate holds. */
+            <Screen title={activeWorld ? "Your Compiled World is ready." : "What the candidate holds."} titleAs="h2" titleId="workspace-complete-title"
+              status={worldScreenStatus(activeWorld?.revision ?? null)} bodyClassName="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
-                <h2 id="workspace-complete-title">
-                  {/* Round 3: the state hero above already says "Ready for your review."; this card says what the candidate holds. */}
-                  {activeWorld ? "Your Compiled World is ready." : "What the candidate holds."}
-                </h2>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
                 {activeWorld ? null : (
                   <p className="fine">
@@ -3558,7 +3558,7 @@ export default function WorkspacePage() {
                   trackFunnel("workspace_ai_connect_opened");
                 }}
               />
-            </section>
+            </Screen>
           ) : null}
 
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
@@ -3603,8 +3603,9 @@ export default function WorkspacePage() {
           {documents && documents.length > 0 ? <LibraryPanel documentIds={documents.map((d) => d.documentId)} names={names} onAvailability={setLibraryAvailable} /> : null}
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
             {intakeOpen ? (
-            <section id="workspace-sources" className="card document-card">
-              <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
+            <Screen id="workspace-sources" title={documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}
+              titleAs="h2" titleId="workspace-sources-title" aria-labelledby="workspace-sources-title"
+              status={readyScreenStatus(readyDocumentCount)} bodyClassName="document-card">
               {documents && documents.length > 0 ? (
                 <>
                 <p>Compile one or more ready sources into the next candidate. Tick them on the board above; nothing becomes active until you review it.</p>
@@ -3625,7 +3626,7 @@ export default function WorkspacePage() {
                   <p>Add files in the box above, or connect the system where your knowledge already lives.</p>
                 </div>
               )}
-            </section>
+            </Screen>
             ) : null}
             {/*
               A candidate that exists but was never run through Core is the one case Home cannot
@@ -3730,8 +3731,8 @@ export default function WorkspacePage() {
                 reasons that already exist; a synthesised number would be an uncalibrated
                 threshold dressed up as a measurement.
               */}
-              <section className="card" aria-labelledby="review-queue-title">
-                <p className="eyebrow">Review queue</p>
+              {/* WO-WS-4: the eyebrow is the screen's name now; the tag is the count the top bar prints. */}
+              <Screen title="Review queue" status={reviewScreenStatus(reviewCount, Boolean(collectionResult))} aria-labelledby="review-queue-title">
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
@@ -3739,8 +3740,10 @@ export default function WorkspacePage() {
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
                   onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
-              </section>
-              <section className="card review-comparison" aria-labelledby="review-comparison-title">
+              </Screen>
+              {/* The blueprint's /evidence frame names this the evidence reader; the tag counts what it can open. */}
+              <Screen title="Evidence reader" status={evidenceScreenStatus(worldReadModel?.evidence.length ?? 0)}
+                bodyClassName="review-comparison" aria-labelledby="review-comparison-title">
                 <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
                 {worldReadModel?.evidence.length ? (
                   <>
@@ -3855,17 +3858,11 @@ export default function WorkspacePage() {
                     ) : null}
                   </>
                 ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
-              </section>
-              <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
-                <div className="world-heading">
-                  <div>
-                    <p className="eyebrow">Activate</p>
-                    <h2 id="world-studio-title">Make this the version your AI reads.</h2>
-                  </div>
-                  <output className={activeWorld ? "world-status active" : "world-status"}>
-                    {activeWorld ? `ACTIVE · REVISION ${activeWorld.revision}` : "NO ACTIVE WORLD"}
-                  </output>
-                </div>
+              </Screen>
+              {/* WO-WS-4: the activation block's eyebrow names the screen and its status output is the screen's tag. */}
+              <Screen id="workspace-review" className="world-studio" title="Activate" status={activationScreenStatus(activeWorld?.revision ?? null)}
+                statusAs="output" aria-labelledby="world-studio-title">
+                <h2 id="world-studio-title">Make this the version your AI reads.</h2>
                 {!collectionResult ? (
                   <p className="world-empty">Compile or reload a verified collection candidate to begin review.</p>
                 ) : (
@@ -3934,7 +3931,7 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                 )}
-              </section>
+              </Screen>
               {/*
                 The raw material check, behind a disclosure. It verifies the immutable OCR result
                 against its receipt and activates nothing; a reviewer reaches for it when a
@@ -3955,11 +3952,18 @@ export default function WorkspacePage() {
               </details>
               </> : null}
               {surface === "ask" ? (
-              <section id="workspace-ask" className="card ask-studio" aria-labelledby="ask-title">
-                <div className="one-path-ai-options">
+              /*
+                WO-WS-4: two product screens on one surface, as the blueprint's /connect and /evidence frames
+                draw them -- the setup (its tag is what its own foot line says: nothing verified) and the Ask
+                panel (its tag is which World it reads). Same controls, same order.
+              */
+              <div id="workspace-ask" className="ask-studio workspace-screens">
+                <Screen title="Connect your AI" titleId="workspace-ai-setup-title" aria-labelledby="workspace-ai-setup-title"
+                  status={AI_SETUP_SCREEN_STATUS} bodyClassName="one-path-ai-options">
                   <WorkspaceUseWithAi open onDownload={collectionResult ? () => void downloadCollection() : undefined}
                     downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
-                </div>
+                </Screen>
+                <Screen title="Ask" status={worldScreenStatus(activeWorld?.revision ?? null)} aria-labelledby="ask-title">
                 <div>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
@@ -4064,7 +4068,8 @@ export default function WorkspacePage() {
                 {askWorldModel && askEvidenceId !== undefined ? (
                   <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
-              </section>
+                </Screen>
+              </div>
               ) : null}
             </>
           ) : null}

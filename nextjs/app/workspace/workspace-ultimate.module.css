@@ -69,14 +69,15 @@
   the rail collapses to a single column and the cap never binds, so nothing changes there.
 */
 .content { max-width: 1520px; width: 100%; margin: 0; }
-.surfaceTitle { margin: 0 0 4px; color: var(--text-hi); font-size: clamp(22px, 2vw, 28px); font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
-.stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: 24px; padding: 8px 0 24px; border-bottom: 1px solid var(--hairline-hi); }
+/* WO-WS-4: the page title takes the V34 display rhythm (weight 500, tight tracking, 1.08 leading) at a
+   product size; the step below it is the section title in workspace-no1.css (--v34-h3). */
+.surfaceTitle { margin: 0 0 4px; color: var(--text-hi); font: 500 clamp(1.75rem, 2.6vw, 2.5rem)/1.08 var(--v34-font); letter-spacing: var(--v34-track-display); }
+/* The state hero is the body of the Home screen (components/v34/ui/screen.tsx): the screen draws the frame and
+   the padding, the facts line is its foot. */
+.stateHero { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: 24px; }
 .stateHero > div { display: grid; gap: 8px; }
-.stateHero h1 { max-width: 24ch; margin: 0; color: var(--text-hi); font-size: clamp(26px, 2.4vw, 34px); line-height: 1.12; letter-spacing: -.02em; text-wrap: balance; }
-.stateHero span { max-width: 62ch; color: var(--text-lo); font-size: 15px; line-height: 1.55; }
-/* workspace-07: "being read", "need review" and "No active World" are prose. Mono is for hashes,
-   paths, ids and codes; the counts keep their alignment with tabular-nums instead. */
-.stateFacts { color: var(--text-lo); font: 13px var(--f-sans); font-variant-numeric: tabular-nums; }
+.stateHero h1 { max-width: 24ch; margin: 0; color: var(--text-hi); font: 500 clamp(1.75rem, 2.6vw, 2.5rem)/1.08 var(--v34-font); letter-spacing: var(--v34-track-display); text-wrap: balance; }
+.stateHero span { max-width: 62ch; color: var(--text-mid); font-size: 1rem; line-height: 1.6; }
 .stateHero > button { min-width: 180px; min-height: 40px; padding: 0 16px; background: var(--text-hi); color: var(--ground); border: 1px solid var(--text-hi); border-radius: var(--r-inst, 6px); font: 500 14px var(--f-sans); transition: background-color 140ms var(--ease), transform 140ms var(--ease); }
 
 .stateHero > button:active { transform: scale(.98); }
@@ -158,7 +159,6 @@
   .accessStrip a { grid-column: 1; grid-row: auto; justify-self: start; }
   .content { padding: 20px 16px 48px; }
   .stateHero { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }
-  .stateHero h1, .surfaceTitle { font-size: 24px; }
   .stateHero > button { width: 100%; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -230,18 +230,21 @@
 /* The rail stands on the paper; the current place is V34's pressed control (forest, white label). */
 .rail { border-right: 0; background: var(--ground); }
 .brand { border: 0; background: var(--v34-white); border-radius: var(--v34-radius-panel); box-shadow: 0 0 0 1px var(--v34-line); }
-.nav button { border-radius: var(--v34-radius-control); }
+.nav button { border-radius: var(--v34-radius-control); font-weight: 600; }
 .nav button.current { color: var(--v34-white); background: var(--v34-step-bg); box-shadow: none; }
 .nav button.current svg { color: var(--v34-step-small); }
 .nav button b { color: var(--v34-white); border-color: var(--v34-ink); background: var(--v34-ink); }
 .nav button.current b { color: var(--v34-lime-ink); border-color: var(--v34-lime); background: var(--v34-lime); }
 .secondaryStart { border-top-color: transparent; }
-/* The working area is the product "screen" frame: white, one rule, the screen radius and its soft shadow.
-   Inside it --ground is the screen and --g1 the paper, so a card reads as a quiet block on the screen. */
-.body { --ground: var(--v34-white); --g1: var(--v34-paper); --g2: var(--v34-green); background: var(--ground); }
-.topbar { gap: 8px; padding: 8px 12px 8px 20px; border-bottom: 1px solid var(--hairline); background: var(--ground); }
+/* WO-WS-4: the working area is the V34 page -- paper, like every blueprint route -- and each work surface
+   draws its product "screen" frames on it (components/v34/ui/screen.tsx). Inside it --ground is the paper and
+   --g1 the white sheet, so a card that is not yet a screen still reads as a white sheet on the page. */
+.body { --ground: var(--v34-paper); --g1: var(--v34-white); --g2: var(--v34-green); background: var(--ground); }
+/* The top bar is the V34 header: paper, one rule under it, the header's height. */
+.topbar { gap: 8px; min-height: var(--v34-header-h); padding: 8px 12px 8px 20px; border-bottom: 1px solid var(--v34-line); background: var(--ground); }
 .workspaceIdentity, .topStatus, .commandButton { border-right: 0; }
 .workspaceIdentity { padding-inline: 8px; }
+.workspaceIdentity strong { font-weight: 650; letter-spacing: -0.01em; }
 .topStatus { flex-direction: row; align-items: center; gap: 8px; align-self: center; min-height: 44px; padding: 0 16px; border-radius: var(--v34-radius-pill); background: var(--v34-paper); box-shadow: inset 0 0 0 1px var(--v34-line); }
 .topStatus[data-review] { background: var(--v34-green); }
 .topStatus small { letter-spacing: 0; }
@@ -249,7 +252,6 @@
 .commandButton { align-self: center; min-height: 44px; border-radius: var(--v34-radius-pill); background: var(--v34-paper); box-shadow: inset 0 0 0 1px var(--v34-line); }
 .accessStrip, .ownerStrip { background: var(--ground); }
 .accessStrip a { border-radius: var(--v34-radius-pill); }
-.stateHero { border-bottom-color: var(--hairline); }
 /* The one filled action is V34's button: the dark fill, a white label, a pill. The upload beside it is the secondary. */
 .stateHero > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center; min-height: 44px; padding: 0 22px; border-color: var(--v34-header-btn); border-radius: var(--v34-radius-pill); background: var(--v34-header-btn); color: var(--v34-white); box-shadow: none; }
 .stateHero > button.stateUpload { border-color: var(--v34-control-border); background: transparent; color: var(--v34-ink); }
@@ -257,7 +259,6 @@
 .paletteBackdrop { background: color-mix(in srgb, var(--v34-forest) 18%, transparent); }
 .paletteResults button { border-radius: var(--v34-radius-panel); }
 @media (min-width: 1024px) {
-  .body { margin: 12px 12px 12px 0; border: 1px solid var(--v34-rule); border-radius: var(--v34-radius-screen); box-shadow: var(--v34-shadow-screen); overflow: clip; min-height: calc(100vh - 24px); }
   .topbar { top: 0; }
 }
 @media (max-width: 1023px) {
@@ -271,11 +272,10 @@
   .stateHero > button.stateUpload:hover { border-color: var(--v34-control-border); background: var(--v34-secondary-hover); color: var(--v34-ink); }
 }
 /*
-  When a candidate waits on the reader and nothing is still running, the state hero is the activation
-  card -- the one place a person's decision is asked for -- and takes V34's pale-green band.
+  WO-WS-4: the pale-green decision band is gone with the frame. The state hero is the Home screen's body now,
+  and the screen's top bar is the pale-green ground; a candidate waiting on the reader is said by the hero's
+  own sentence and by the top bar's "Needs your review", not by a second green block inside the screen.
 */
-.stateHero[data-decision] { padding: clamp(20px, 2.4vw, 32px); border-bottom: 0; border-radius: var(--v34-radius-screen); background: var(--v34-green); }
-.stateHero[data-decision] > button.stateUpload { background: var(--v34-white); }
 .stateHero > button:disabled { box-shadow: none; }
 
 /* V34 eyebrow: 12px, 650, upper case, open tracking. Its colour stays the one each region gives it.
