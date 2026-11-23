@@ -10,6 +10,8 @@ import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import type { ResumeAccess } from "@/lib/checkout-intent";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "@/app/workspace/workspace-ultimate.module.css";
+// WO-WS-2: <main> carries the V34 token layer's `.site`, so the workspace sheets can read every --v34-* name.
+import v34 from "@/components/v34/tokens.module.css";
 
 export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
 
@@ -254,7 +256,7 @@ export default function WorkspaceUltimateShell({
     : null;
 
   return (
-    <main id="main" className={`workspace one-path-workspace ${styles.shell}`} data-surface={surface} data-privacy={privacyMode} data-access={access?.source ?? "unknown"} tabIndex={-1}>
+    <main id="main" className={`workspace one-path-workspace ${styles.shell} ${v34.site}`} data-surface={surface} data-privacy={privacyMode} data-access={access?.source ?? "unknown"} tabIndex={-1}>
       <aside className={styles.rail} aria-label="Workspace navigation" onKeyDown={moveRailFocus}>
         <Link href="/" className={styles.brand} aria-label="TAVONEL home"><Logomark size={23} /></Link>
         <nav className={styles.nav}>

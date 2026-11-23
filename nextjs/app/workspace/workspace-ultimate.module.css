@@ -190,63 +190,98 @@
 }
 
 /*
-  Direction C, warm tactile (2026-11-04; BRIEF outputs/.../design-20261104/impl/BRIEF.md), workspace.
+  V34 (WO-WS-2, 2026-11-23): the signed-in workspace wears the public site's V34 design, through the
+  same token layer the public routes read (components/v34/tokens.module.css). The workspace <main>
+  carries that sheet's `.site`, so every --v34-* name is defined on it; nothing is copied from the
+  offline route_preview HTML (TARGET-DESIGN-SYSTEM §2, §5; route_preview/studio).
 
-  The workspace leaves the dark instrument ground for the site's warm canvas. Every rule above reads
-  the ground and state tokens, so the change is one token remap (app/chrome-v2.css, shared with the
-  sign-in pages) rather than a rewrite of each sheet:
-  the shell and its rail stand on the canvas, and at 1024px and up the working area is one white
-  sheet floating on it (radius 28, the resting shadow) with the top bar inside. The state values are
-  the light-ground ones the public pages already use; the remap carries their measured ratios.
+  Every workspace sheet paints with the semantic names below. They were given their Direction C
+  values by app/chrome-v2.css (`:is(.auth, .one-path-workspace)`, shared with the sign-in pages); here
+  they are re-pointed to V34 on the workspace <main> only. `[data-surface]` (always rendered) lifts
+  the rule above that one whatever order the two sheets load in, and leaves `.auth` as it is.
+  --changed keeps --tv-changed: V34 has no amber, and the state keeps its measured 5.68:1.
+  --text-max is the one-step-lighter fill a filled button takes on hover: V34's button hover.
+  lib/workspace-v34-tokens.test.ts measures every text and state pair below on every ground.
 */
+.shell[data-surface] {
+  --ground: var(--v34-paper);
+  --g1: var(--v34-white);
+  --g2: var(--v34-green);
+  --g3: var(--v34-route-foot);
+  --seam: var(--v34-line);
+  --hairline: var(--v34-line);
+  --hairline-hi: var(--v34-rule);
+  --border-dark: var(--v34-line);
+  --text-hi: var(--v34-ink);
+  --text-max: var(--v34-header-btn-hover);
+  --text-mid: var(--v34-body);
+  --text-lo: var(--v34-muted);
+  --source: var(--v34-link);
+  --verified: var(--v34-ok);
+  --unresolved: var(--v34-error);
+  --failed: var(--v34-error);
+  --danger: var(--v34-error);
+  --depth-focus: 0 0 0 1px var(--v34-focus);
+}
+
+/* The rail stands on the paper; the current place is V34's pressed control (forest, white label). */
 .rail { border-right: 0; background: var(--ground); }
-.brand { border: 0; background: var(--tv-sheet); border-radius: var(--tv-r-small); box-shadow: var(--tv-shadow-1); }
-.nav button { border-radius: var(--tv-r-small); }
-.nav button.current { color: var(--text-hi); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
-.nav button.current svg { color: var(--tv-action); }
-.nav button b { color: #fff; border-color: var(--tv-ink); background: var(--tv-ink); }
+.brand { border: 0; background: var(--v34-white); border-radius: var(--v34-radius-panel); box-shadow: 0 0 0 1px var(--v34-line); }
+.nav button { border-radius: var(--v34-radius-panel); }
+.nav button.current { color: var(--v34-white); background: var(--v34-step-bg); box-shadow: none; }
+.nav button.current svg { color: var(--v34-step-small); }
+.nav button b { color: var(--v34-white); border-color: var(--v34-ink); background: var(--v34-ink); }
+.nav button.current b { color: var(--v34-lime-ink); border-color: var(--v34-lime); background: var(--v34-lime); }
 .secondaryStart { border-top-color: transparent; }
-/* The working area: a white sheet. Inside it --ground is the sheet and --g1 the canvas, so a card
-   that paints --g1 reads as a quiet block on the sheet rather than a box drawn round it. */
-.body { --ground: var(--tv-sheet); --g1: var(--tv-canvas); --g2: var(--tv-paper-sunk); background: var(--ground); }
+/* The working area is the product "screen" frame: white, one rule, the screen radius and its soft shadow.
+   Inside it --ground is the screen and --g1 the paper, so a card reads as a quiet block on the screen. */
+.body { --ground: var(--v34-white); --g1: var(--v34-paper); --g2: var(--v34-green); background: var(--ground); }
 .topbar { gap: 8px; padding: 8px 12px 8px 20px; border-bottom: 1px solid var(--hairline); background: var(--ground); }
 .workspaceIdentity, .topStatus, .commandButton { border-right: 0; }
 .workspaceIdentity { padding-inline: 8px; }
-/* "N to review" is a tint pill; the published version beside it a quiet one. */
-.topStatus { flex-direction: row; align-items: center; gap: 8px; align-self: center; min-height: 44px; padding: 0 16px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
-.topStatus[data-review] { background: var(--tv-tint); }
+.topStatus { flex-direction: row; align-items: center; gap: 8px; align-self: center; min-height: 44px; padding: 0 16px; border-radius: var(--v34-radius-pill); background: var(--v34-paper); box-shadow: inset 0 0 0 1px var(--v34-line); }
+.topStatus[data-review] { background: var(--v34-green); }
 .topStatus small { letter-spacing: 0; }
-.topStatus b { color: var(--tv-action); font-weight: 600; }
-.commandButton { align-self: center; min-height: 44px; border-radius: var(--tv-r-pill); background: var(--tv-canvas); }
+.topStatus b { color: var(--v34-link); font-weight: 600; }
+.commandButton { align-self: center; min-height: 44px; border-radius: var(--v34-radius-pill); background: var(--v34-paper); box-shadow: inset 0 0 0 1px var(--v34-line); }
 .accessStrip, .ownerStrip { background: var(--ground); }
-.accessStrip a { border-radius: var(--tv-r-pill); }
+.accessStrip a { border-radius: var(--v34-radius-pill); }
 .stateHero { border-bottom-color: var(--hairline); }
-/* Centred like every other pill: at 560px and below the two actions stretch to the full width, and a stretched label read left-aligned. */
-.stateHero > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center; min-height: 44px; padding: 0 22px; border-color: var(--tv-action); border-radius: var(--tv-r-pill); background: var(--tv-action); color: #fff; box-shadow: var(--tv-shadow-action); }
-.stateHero > button:disabled { box-shadow: none; }
-.stateHero > button.stateUpload { border-color: transparent; background: var(--tv-sand); box-shadow: none; }
-.palette { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); }
-.paletteBackdrop { background: rgb(40 32 20 / 0.18); }
-.paletteResults button { border-radius: var(--tv-r-small); }
+/* The one filled action is V34's button: the dark fill, a white label, a pill. The upload beside it is the secondary. */
+.stateHero > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center; min-height: 44px; padding: 0 22px; border-color: var(--v34-header-btn); border-radius: var(--v34-radius-pill); background: var(--v34-header-btn); color: var(--v34-white); box-shadow: none; }
+.stateHero > button.stateUpload { border-color: var(--v34-control-border); background: transparent; color: var(--v34-ink); }
+.palette { border: 1px solid var(--v34-rule); border-radius: var(--v34-radius-screen); background: var(--v34-white); box-shadow: var(--v34-shadow-screen); }
+.paletteBackdrop { background: color-mix(in srgb, var(--v34-forest) 18%, transparent); }
+.paletteResults button { border-radius: var(--v34-radius-panel); }
 @media (min-width: 1024px) {
-  .body { margin: 12px 12px 12px 0; border-radius: 28px; box-shadow: var(--tv-shadow-1); overflow: clip; min-height: calc(100vh - 24px); }
+  .body { margin: 12px 12px 12px 0; border: 1px solid var(--v34-rule); border-radius: var(--v34-radius-screen); box-shadow: var(--v34-shadow-screen); overflow: clip; min-height: calc(100vh - 24px); }
   .topbar { top: 0; }
 }
 @media (max-width: 1023px) {
-  .rail { border-top: 1px solid var(--hairline); background: var(--tv-canvas); }
-  .nav button.current { box-shadow: none; background: var(--tv-sand); }
+  .rail { border-top: 1px solid var(--hairline-hi); background: var(--v34-paper); }
   .topbar { padding: 6px 8px 6px 12px; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .nav button:hover:not(.current) { background: rgb(255 255 255 / 0.6); }
-  .topStatus:hover, .commandButton:hover { background: var(--tv-sand); }
-  .stateHero > button:hover:not(:disabled) { background: var(--tv-action-hover); color: #fff; }
-  .stateHero > button.stateUpload:hover { background: var(--tv-sand-2); color: var(--text-hi); }
+  .nav button:hover:not(.current) { background: var(--v34-secondary-hover); }
+  .topStatus:hover, .commandButton:hover { background: var(--v34-secondary-hover); }
+  .stateHero > button:hover:not(:disabled) { border-color: var(--v34-header-btn-hover); background: var(--v34-header-btn-hover); color: var(--v34-white); }
+  .stateHero > button.stateUpload:hover { border-color: var(--v34-control-border); background: var(--v34-secondary-hover); color: var(--v34-ink); }
 }
 /*
-  Round 2 (CRITIQUE-R1 #4): when a candidate waits on the reader and nothing is still running, the state hero is the
-  activation card -- "You decide when this version becomes active" -- so it takes the sand block the attention items
-  use: the one place on the page where a person's decision is asked for.
+  When a candidate waits on the reader and nothing is still running, the state hero is the activation
+  card -- the one place a person's decision is asked for -- and takes V34's pale-green band.
 */
-.stateHero[data-decision] { padding: clamp(20px, 2.4vw, 32px); border-bottom: 0; border-radius: var(--tv-r-card); background: var(--tv-sand); }
-.stateHero[data-decision] > button.stateUpload { background: var(--tv-sheet); }
+.stateHero[data-decision] { padding: clamp(20px, 2.4vw, 32px); border-bottom: 0; border-radius: var(--v34-radius-screen); background: var(--v34-green); }
+.stateHero[data-decision] > button.stateUpload { background: var(--v34-white); }
+.stateHero > button:disabled { box-shadow: none; }
+
+/* V34 eyebrow: 12px, 650, upper case, open tracking. Its colour stays the one each region gives it. */
+.shell[data-surface] :global(.eyebrow) { font: 650 var(--v34-eyebrow)/1.3 var(--v34-font); letter-spacing: .1em; text-transform: uppercase; }
+/* V34 field: white, a 3:1 control border, the field radius. Check boxes, radios, files and ranges keep their own faces. */
+.shell[data-surface] :global(.workspace-content) :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="hidden"]), select, textarea) {
+  border-color: var(--v34-control-border); border-radius: var(--v34-radius-field); background-color: var(--v34-white); color: var(--v34-ink);
+}
+/* At phone width every input is 16px, so focusing one does not zoom the page. */
+@media (max-width: 650px) {
+  .shell[data-surface] :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="hidden"]), select, textarea) { font-size: 16px; }
+}
