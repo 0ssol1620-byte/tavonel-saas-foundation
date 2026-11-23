@@ -397,6 +397,46 @@ class ReadNativeSpreadsheetTest(unittest.TestCase):
                 # Same bytes in, same bytes out: nothing process-specific reaches the document.
                 self.assertEqual(json.dumps(first, sort_keys=True), json.dumps(second, sort_keys=True))
 
+    def test_s11_a_bare_equals_sign_is_not_a_formula_source(self) -> None:
+        sheet = nf.sheet_xml(row(1, '<c r="A1"><f></f><v>3</v></c>', formula("B1", "1+1", "2")))
+        cells = cells_by_address(read_bytes(nf.xlsx([("Data", "visible", sheet)])))
+        self.assertEqual(cells[(0, "A1")]["formula"], {"source": None, "cachedValue": "3", "cachedValueState": "cached_unverified"})
+        self.assertIn("formula_source_unreadable", cells[(0, "A1")]["qualityFlags"])
+        self.assertEqual(cells[(0, "B1")]["formula"]["source"], "=1+1")
+
+    def test_s11_the_cells_an_array_or_data_table_range_spills_into_are_cached_results(self) -> None:
+        # The class: a multi-cell `<f t="array|dataTable" ref>` range. Only its top-left cell carries
+        # the formula; every other cell in the range is a value the file cached for it, which the
+        # parser reads as a plain value. Those are flagged, on any sheet, and only those.
+        array = (
+            row(1, value("A1", "1"), '<c r="B1" cm="1"><f t="array" ref="B1:C2">_xlfn.SEQUENCE(2,2)</f><v>1</v></c>', value("C1", "2"))
+            + row(2, value("A2", "5"), value("B2", "3"), value("C2", "4"), value("D2", "8"))
+        )
+        table = row(1, '<c r="A1"><f t="dataTable" ref="A1:A2" dt2D="0" dtr="0" r1="B1"/><v>7</v></c>') + row(2, value("A2", "9"))
+        single = row(1, '<c r="A1"><f t="array" ref="A1">SUM(1,1)</f><v>2</v></c>', value("B1", "4"))
+        cells = cells_by_address(read_bytes(nf.xlsx([
+            ("Arrays", "visible", nf.sheet_xml(array)), ("Table", "hidden", nf.sheet_xml(table)), ("Single", "visible", nf.sheet_xml(single)),
+        ])))
+        flagged = {key for key, cell in cells.items() if "array_formula_cached_result" in cell["qualityFlags"]}
+        self.assertEqual(flagged, {(0, "C1"), (0, "B2"), (0, "C2"), (1, "A2")})
+        for key in flagged:
+            self.assertEqual(cells[key]["kind"], "value")
+        self.assertEqual(cells[(0, "B1")]["kind"], "formula")  # the anchor keeps its formula record
+
+    def test_s11_an_array_range_it_cannot_read_is_refused_not_ignored(self) -> None:
+        sheet = nf.sheet_xml(row(1, '<c r="A1"><f t="array" ref="A1:B-2">1</f><v>1</v></c>', value("B1", "2")))
+        result = read_bytes(nf.xlsx([("Data", "visible", sheet)]))
+        self.assertEqual(result["native_read"], "unavailable", result)
+
+    def test_s11_the_same_package_reads_to_the_same_document_in_every_process(self) -> None:
+        # Pinned to a file, not to a second read in this process: the input digest covers the zip
+        # bytes (fixed member timestamps) and the cell ids derive from it.
+        sheet = nf.sheet_xml(row(1, label("A1", "Item"), label("B1", "Total")) + row(2, value("A2", "1"), formula("B2", "A2+A2", "2")))
+        payload = nf.xlsx([("Data", "visible", sheet)])
+        expected = json.loads((Path(__file__).resolve().parent / "native_read_golden.json").read_text(encoding="utf-8"))
+        self.assertEqual(read_bytes(payload), expected)
+        self.assertEqual(nf.digest(payload), expected["inputSha256"])
+
     def test_s11_a_workbook_that_declares_its_cache_stale_is_reported_so(self) -> None:
         for attribute in ('fullCalcOnLoad="1"', 'fullCalcOnLoad="true"'):
             with self.subTest(attribute=attribute):

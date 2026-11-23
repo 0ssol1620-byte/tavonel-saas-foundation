@@ -20,8 +20,25 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 
+FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
+
+
 def digest(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def fixed_member(name: str) -> zipfile.ZipInfo:
+    """A member header with a fixed timestamp: `writestr(name, ...)` stamps the wall clock."""
+    return zipfile.ZipInfo(name, date_time=FIXED_ZIP_TIME)
+
+
+def fixed_package(package: bytes) -> bytes:
+    """The same members, in order, with fixed headers (for packages a library wrote)."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(package)) as source, zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as target:
+        for info in source.infolist():
+            target.writestr(fixed_member(info.filename), source.read(info), compress_type=zipfile.ZIP_DEFLATED)
+    return buffer.getvalue()
 
 
 def sheet_xml(cells: str, merges: str = "") -> str:
@@ -82,7 +99,7 @@ def xlsx(
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", compression) as archive:
         for name, payload in members.items():
-            archive.writestr(name, payload)
+            archive.writestr(fixed_member(name), payload, compress_type=compression)
     return buffer.getvalue()
 
 
@@ -92,7 +109,7 @@ def with_member(package: bytes, name: str, payload: bytes, compression: int = zi
     with zipfile.ZipFile(io.BytesIO(package)) as source, zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as target:
         for info in source.infolist():
             target.writestr(info, source.read(info))
-        target.writestr(zipfile.ZipInfo(name), payload, compress_type=compression)
+        target.writestr(fixed_member(name), payload, compress_type=compression)
     return buffer.getvalue()
 
 
@@ -108,7 +125,7 @@ def docx_with_table() -> bytes:
     table.cell(2, 0).merge(table.cell(2, 1)).text = "Plus merged"
     buffer = io.BytesIO()
     document.save(buffer)
-    return buffer.getvalue()
+    return fixed_package(buffer.getvalue())
 
 
 def pptx_with_table() -> bytes:
@@ -124,4 +141,4 @@ def pptx_with_table() -> bytes:
             shape.table.cell(row, column).text = value
     buffer = io.BytesIO()
     presentation.save(buffer)
-    return buffer.getvalue()
+    return fixed_package(buffer.getvalue())

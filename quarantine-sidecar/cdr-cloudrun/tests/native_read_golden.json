@@ -1,0 +1,135 @@
+{
+ "containerKind": "sheet",
+ "containers": [
+  {
+   "hiddenColumns": [],
+   "hiddenRows": [],
+   "index0": 0,
+   "name": "Data",
+   "state": "visible"
+  }
+ ],
+ "coverage": {
+  "boundingBoxes": "not_emitted",
+  "cachedValues": "reported_unverified",
+  "cells": "tables_only",
+  "externalReferences": "refused",
+  "formats": [
+   "docx",
+   "pptx",
+   "xlsx"
+  ],
+  "formulasExecuted": false,
+  "macros": "refused"
+ },
+ "documentType": "xlsx",
+ "inputSha256": "sha256:c77c3d3c391fa845668dec73a343e1927cc38d9944612d73629669a500646c0d",
+ "native_read": "available",
+ "parserCode": null,
+ "reader": {
+  "coreSha": "783d8d0703878fcd805afb7fd136b6aae694aeb3",
+  "parser": "akc_native_parsers",
+  "parserVersion": "1.1.0",
+  "vendorManifestSha256": "sha256:21ea7653d6b577333e454573a2e91c91a3b5a6cc2c96337dd462ac16b11f1dfd"
+ },
+ "reason": null,
+ "reasonClass": null,
+ "schema": "tavonel.native_read.v1",
+ "tables": [
+  {
+   "cells": [
+    {
+     "cellId": "cell_9f2a2dd989051c650ba1397a00dae22e",
+     "columnIndex0": 0,
+     "columnSpan": 1,
+     "formula": null,
+     "kind": "value",
+     "location": {
+      "cellAddress": "A1",
+      "containerIndex0": 0,
+      "nativeObjectId": "xlsx/sheet/0000/cell/A1",
+      "tableIndex0": 0
+     },
+     "qualityFlags": [],
+     "rowIndex0": 0,
+     "rowSpan": 1,
+     "text": "Item"
+    },
+    {
+     "cellId": "cell_6fc9d0af9c35b4789a44efeb34701b04",
+     "columnIndex0": 1,
+     "columnSpan": 1,
+     "formula": null,
+     "kind": "value",
+     "location": {
+      "cellAddress": "B1",
+      "containerIndex0": 0,
+      "nativeObjectId": "xlsx/sheet/0000/cell/B1",
+      "tableIndex0": 0
+     },
+     "qualityFlags": [],
+     "rowIndex0": 0,
+     "rowSpan": 1,
+     "text": "Total"
+    },
+    {
+     "cellId": "cell_e14b554210c444a3fc26d0494ff7cb20",
+     "columnIndex0": 0,
+     "columnSpan": 1,
+     "formula": null,
+     "kind": "value",
+     "location": {
+      "cellAddress": "A2",
+      "containerIndex0": 0,
+      "nativeObjectId": "xlsx/sheet/0000/cell/A2",
+      "tableIndex0": 0
+     },
+     "qualityFlags": [],
+     "rowIndex0": 1,
+     "rowSpan": 1,
+     "text": "1"
+    },
+    {
+     "cellId": "cell_3c0b366eba6a30b1806540243ab933dd",
+     "columnIndex0": 1,
+     "columnSpan": 1,
+     "formula": {
+      "cachedValue": "2",
+      "cachedValueState": "cached_unverified",
+      "source": "=A2+A2"
+     },
+     "kind": "formula",
+     "location": {
+      "cellAddress": "B2",
+      "containerIndex0": 0,
+      "nativeObjectId": "xlsx/sheet/0000/cell/B2",
+      "tableIndex0": 0
+     },
+     "qualityFlags": [
+      "formula_preserved_not_executed"
+     ],
+     "rowIndex0": 1,
+     "rowSpan": 1,
+     "text": null
+    }
+   ],
+   "columnCount": 2,
+   "containerIndex0": 0,
+   "headerRowCount": 1,
+   "nativeObjectId": "xlsx/sheet/0000/range/A1:B2",
+   "qualityFlags": [
+    "header_row_inferred"
+   ],
+   "range": "A1:B2",
+   "rowCount": 2,
+   "tableId": "tbl_b5ca3499541b14c46d1b3e86e8a71f8d",
+   "tableIndex0": 0
+  }
+ ],
+ "warnings": [
+  "xlsx_formulas_not_executed"
+ ],
+ "workbookCalculation": {
+  "fullCalcOnLoad": false
+ }
+}

@@ -42,6 +42,7 @@ import os
 import re
 import sys
 import types
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -104,6 +105,9 @@ DIGEST: Final = re.compile(r"sha256:[a-f0-9]{64}")
 PARSER_CODE: Final = re.compile(r"[A-Z0-9_]{1,64}")
 VENDORED_PATH: Final = re.compile(r"akc_(?:cir|security|native_parsers)/[a-z_]+\.py")
 XLSX_CELL_ID: Final = re.compile(r"xlsx/sheet/([0-9]{4})/cell/([A-Z]{1,3}[1-9][0-9]{0,6})")
+RELATIONSHIP_NS: Final = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+ARRAY_REF: Final = re.compile(r"([A-Z]{1,3})([1-9][0-9]{0,6})(?::([A-Z]{1,3})([1-9][0-9]{0,6}))?")
+CELL_ADDRESS: Final = re.compile(r"([A-Z]{1,3})([1-9][0-9]{0,6})")
 XLSX_RANGE_ID: Final = re.compile(r"xlsx/sheet/([0-9]{4})/range/([A-Z]{1,3}[1-9][0-9]{0,6}:[A-Z]{1,3}[1-9][0-9]{0,6})")
 # The CIR ids derive from the source digest and native object ids, never from these. ParseContext
 # requires them; none of them is emitted, so nothing here is stored as a fact about the document.
@@ -296,22 +300,25 @@ def apply_rlimits(input_bytes: int) -> None:
     os.umask(0o077)
 
 
+def _workbook_part(archive: Any, safe_element_tree: Any) -> tuple[str, Any]:
+    """The workbook part is wherever the package relationship says, not always xl/workbook.xml."""
+    relationships = safe_element_tree.fromstring(archive.read("_rels/.rels"))
+    targets = [
+        str(element.attrib["Target"]).lstrip("/")
+        for element in relationships.iter()
+        if element.tag.rsplit("}", 1)[-1] == "Relationship"
+        and str(element.attrib.get("Type", "")).endswith("/officeDocument")
+    ]
+    _require(len(targets) == 1, "workbook part")
+    return targets[0], safe_element_tree.fromstring(archive.read(targets[0]))
+
+
 def _workbook_declares_stale_cache(data: bytes, safe_element_tree: Any) -> bool:
     """`<calcPr fullCalcOnLoad="1">`: the workbook itself says its cached values must be recalculated."""
     import io
-    import zipfile
 
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        # The workbook part is wherever the package relationship says, not always xl/workbook.xml.
-        relationships = safe_element_tree.fromstring(archive.read("_rels/.rels"))
-        targets = [
-            str(element.attrib["Target"]).lstrip("/")
-            for element in relationships.iter()
-            if element.tag.rsplit("}", 1)[-1] == "Relationship"
-            and str(element.attrib.get("Type", "")).endswith("/officeDocument")
-        ]
-        _require(len(targets) == 1, "workbook part")
-        root = safe_element_tree.fromstring(archive.read(targets[0]))
+        _part, root = _workbook_part(archive, safe_element_tree)
     flags = [element.attrib.get("fullCalcOnLoad") for element in root.iter() if element.tag.rsplit("}", 1)[-1] == "calcPr"]
     _require(len(flags) <= 1, "calcPr")
     # xsd:boolean; absent is the schema's default, false. Anything else is not guessed at.
@@ -322,12 +329,84 @@ def _workbook_declares_stale_cache(data: bytes, safe_element_tree: Any) -> bool:
     return True
 
 
+def _column_number(letters: str) -> int:
+    number = 0
+    for letter in letters:
+        number = number * 26 + ord(letter) - 64
+    return number
+
+
+def _is_array_result(address: str, ranges: list[tuple[int, int, int, int]]) -> bool:
+    """True for a cell inside a multi-cell array range that is not the range's anchor."""
+    match = CELL_ADDRESS.fullmatch(address)
+    _require(match is not None, "cell address")
+    assert match is not None
+    column, row = _column_number(match.group(1)), int(match.group(2))
+    return any(
+        low_row <= row <= high_row and low_column <= column <= high_column and (row, column) != (low_row, low_column)
+        for low_row, low_column, high_row, high_column in ranges
+    )
+
+
+def _array_result_ranges(data: bytes, safe_element_tree: Any) -> list[list[tuple[int, int, int, int]]]:
+    """Per worksheet, in workbook order: the multi-cell ranges of `<f t="array" ref>` / `<f t="dataTable" ref>`.
+
+    Only the anchor (top-left) cell of such a range carries the formula; the other cells hold the
+    values the file cached for it, and the parser reads them as plain values. The parser does not
+    expose the range, so it is read from the sheet part itself. A range that cannot be read is a
+    refusal, not an empty list.
+    """
+    import io
+    import posixpath
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        part, workbook = _workbook_part(archive, safe_element_tree)
+        rels_name = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
+        rels = {
+            element.attrib["Id"]: (str(element.attrib["Target"]), str(element.attrib.get("Type", "")))
+            for element in safe_element_tree.fromstring(archive.read(rels_name)).iter()
+            if element.tag.rsplit("}", 1)[-1] == "Relationship"
+        }
+        sheets: list[list[tuple[int, int, int, int]]] = []
+        for element in workbook.iter():
+            if element.tag.rsplit("}", 1)[-1] != "sheet":
+                continue
+            target, kind = rels[element.attrib[f"{{{RELATIONSHIP_NS}}}id"]]
+            if not kind.endswith("/worksheet"):
+                continue  # a chartsheet is not one of the parser's worksheets
+            name = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), target))
+            ranges: list[tuple[int, int, int, int]] = []
+            with archive.open(name) as stream:
+                for _event, node in safe_element_tree.iterparse(stream, events=("end",)):
+                    if node.tag.rsplit("}", 1)[-1] == "f" and node.attrib.get("t") in ("array", "dataTable"):
+                        ref = node.attrib.get("ref")
+                        match = ARRAY_REF.fullmatch(ref) if isinstance(ref, str) else None
+                        _require(match is not None, "array ref")
+                        assert match is not None
+                        low_column, low_row = _column_number(match.group(1)), int(match.group(2))
+                        high_column = _column_number(match.group(3) or match.group(1))
+                        high_row = int(match.group(4) or match.group(2))
+                        _require(low_column <= high_column and low_row <= high_row, "array ref")
+                        if (low_column, low_row) != (high_column, high_row):
+                            ranges.append((low_row, low_column, high_row, high_column))
+                    node.clear()
+            sheets.append(ranges)
+    return sheets
+
+
 def _require(condition: bool, what: str) -> None:
     if not condition:
         raise OutputInvalid(what)
 
 
-def to_native_read(document: Any, *, input_sha256: str, reader: dict[str, Any], stale_cache: bool | None) -> dict[str, Any]:
+def to_native_read(
+    document: Any,
+    *,
+    input_sha256: str,
+    reader: dict[str, Any],
+    stale_cache: bool | None,
+    array_ranges: list[list[tuple[int, int, int, int]]] | None = None,
+) -> dict[str, Any]:
     """CIR tables -> `tavonel.native_read.v1`. Every field read is required; nothing is defaulted."""
     metadata = document.metadata
     document_type = metadata["documentType"]
@@ -339,8 +418,12 @@ def to_native_read(document: Any, *, input_sha256: str, reader: dict[str, Any], 
     containers: list[dict[str, Any]] = []
     formulas: dict[tuple[int, str], dict[str, Any]] = {}
     sheet_state: dict[int, str] = {}
+    sheet_array_ranges: list[list[tuple[int, int, int, int]]] = []
     if document_type == "xlsx":
-        _require(stale_cache is not None, "workbook calculation")
+        _require(stale_cache is not None and array_ranges is not None, "workbook calculation")
+        assert array_ranges is not None
+        _require(len(array_ranges) == len(metadata["sheets"]), "sheet ranges")
+        sheet_array_ranges = array_ranges
         for sheet in metadata["sheets"]:
             index0, state = sheet["pageIndex0"], sheet["state"]
             _require(isinstance(index0, int) and state in {"visible", "hidden", "veryHidden"}, "sheet")
@@ -388,14 +471,17 @@ def to_native_read(document: Any, *, input_sha256: str, reader: dict[str, Any], 
                 address = match.group(2)
                 if sheet_state[container_index0] != "visible":
                     flags.add("hidden_sheet")
+                if _is_array_result(address, sheet_array_ranges[container_index0]):
+                    # Inside an array / data-table range but not its anchor: the file's cached result.
+                    flags.add("array_formula_cached_result")
                 if "formula_preserved_not_executed" in flags:
                     formula = formulas[(container_index0, address)]
                     source = formula["formula"]
                     _require(isinstance(source, str) and source == cell.raw_text, "formula source")
-                    if not source.startswith("="):
+                    if not source.startswith("=") or not source[1:].strip():
                         # openpyxl returns an array (`<f t="array">`, dynamic or CSE) or data-table
                         # formula as an object, and Core's `_cell_text` keeps str() of it: a repr
-                        # with a memory address, not the source. Not emitted, not reconstructed.
+                        # with a memory address, not the source (a bare "=" is no source either). Not emitted, not reconstructed.
                         source = None
                         flags.add("formula_source_unreadable")
                     if not formula["cachedValuePresent"]:
@@ -505,8 +591,9 @@ def read_native(source: Path, mime: str, input_sha256: str, input_bytes: int, *,
             raise ReaderUnavailable("parser_refused", code) from exc
         try:
             stale = _workbook_declares_stale_cache(data, reader["safe_element_tree"]) if extension == ".xlsx" else None
-            return to_native_read(document, input_sha256=input_sha256, reader=reader, stale_cache=stale)
-        except (KeyError, TypeError, AttributeError, IndexError) as exc:
+            ranges = _array_result_ranges(data, reader["safe_element_tree"]) if extension == ".xlsx" else None
+            return to_native_read(document, input_sha256=input_sha256, reader=reader, stale_cache=stale, array_ranges=ranges)
+        except (KeyError, TypeError, AttributeError, IndexError, ValueError, SyntaxError, zipfile.BadZipFile) as exc:
             # A field the mapping needs is absent or of the wrong type: nothing is defaulted.
             raise OutputInvalid(type(exc).__name__) from exc
     except ReaderUnavailable as exc:
