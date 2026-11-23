@@ -4703,6 +4703,8 @@ test('affected source agent admission: lookalikes, the shared distribution suite
     'nextjs/lib/source-agent-runtime.spec.ts','nextjs/lib/source-agent-runtimeXtest.ts','nextjs/lib/source-agent/runtime.test.ts','nextjs/lib/source-agent-runtime.test.ts.bak',
     'lib/source-agent-runtime.test.ts','nextjs/scripts/source-agent-runtime.test.ts']) {
     if (assertFixRound3Endpoint(path) || assertW1RemoteMcpEndpoint(path)) continue;
+    // Train 2026-11-24 (WO-TRAIN-1): the CLI has an owner now, developer-channel alone; source-agent still does not admit it.
+    if (path === 'nextjs/public/developer/tavonel-cli.mjs') { assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['developer-channel'],path); continue; }
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -7553,7 +7555,9 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
   const plan = affectedAskPlan(affectedMap(G1_COPY_TRUTH_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [affectedUnion(suites, CONSENT_POSTER_AFFECTED_UNIT_FILES), affectedUnion(browsers, CONSENT_POSTER_AFFECTED_BROWSER_FILES), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
-  for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs', 'lib/operations.ts.bak']) {
+  // Train 2026-11-24 (WO-TRAIN-1): the CLI beside the MCP client has its own owner now; g1-copy-truth still does not admit it.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/public/developer/tavonel-cli.mjs')).map(o => o.group), ['developer-channel']);
+  for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'lib/operations.ts.bak']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
@@ -8578,6 +8582,13 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-shell-client-weight', 2, '601b907f0fb5b3b8', 2, 'c5dc2177d17f842a', [], {}],
   ['source-availability', 5, 'f4a2bee82d192af7', 4, 'a51c2808fd4904e3', [], {}],
   ['root-stylesheet-scope', 2, '62941b95a605b38f', 2, 'e6fc291b724a57a1', [], {}],
+  // Train 2026-11-24 (WO-TRAIN-1): the train lanes' 53 owned paths, in six owners; acting-workspace.spec.ts is Product QA's claim at 390.
+  ['acting-workspace', 13, '86d90f197fc018c4', 9, 'f717502531e6e8a0', [], { 'e2e/acting-workspace.spec.ts': v34ProductQa('390') }],
+  ['member-source-scope', 17, '231acc58cc5bbb9c', 10, '131992facbcf95a1', [], {}],
+  ['connector-provider-qualification', 17, '6703f379e43e1fc9', 1, '368f502c594389f5', [], {}],
+  ['format-census', 2, '069edb130111c258', 1, '68cac7ee81a96597', [], {}],
+  ['developer-channel', 3, '5c0ddf8b1ccd1df1', 2, 'd54f49f16845e0de', [], {}],
+  ['developer-keys-inventory', 1, 'ff744f408484c885', 1, 'ff744f408484c885', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8912,13 +8923,20 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
   // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too. Round 8: WO-CI-16 is in
   // flight (codex/v34-ci-16 at 2c52aa89) and adds the shell's current() and its client-weight suite.
-  // WO-CI-16 merged and moved to the program owners: nothing is pending at this head.
-  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
+  // WO-CI-16 merged and moved to the program owners. Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8 (7a2df0e8) adds two routes; its own
+  // rebase round must not reopen this file, so the owner holds in both states: before the merge its paths are absent and nothing at
+  // head selects it; after, each path is present and maps to it alone with an executed check.
+  assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), ['agent-audit-routes']);
+  assert.deepEqual(V34_PROGRAM_PENDING_OWNERS['agent-audit-routes'], { paths: ['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts'],
+    unitFiles: ['lib/change-proposals-routes.test.ts', 'lib/route-classification.test.ts'], browserFiles: [], externalChecks: {} });
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
     for (const path of owner.paths) {
-      assert.equal(existsSync(v34RepoPath(`nextjs/${path}`)), false, `${path} is not in this tree yet`);
       assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(`nextjs/${path}`)).map(o => o.group), [group], path);
+      if (!existsSync(v34RepoPath(`nextjs/${path}`))) continue;
+      // The lane has merged: the path, changed alone at head, selects the owner's suites and nothing fails.
+      const merged = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+      assert.deepEqual([merged.failures, merged.groups, merged.unitFiles], [[], [group], [...owner.unitFiles]], path);
     }
     // Every suite it names exists now or is one of its own paths, so nothing else can select an absent suite through it.
     for (const suite of [...owner.unitFiles, ...owner.browserFiles]) assert.ok(existsSync(v34RepoPath(`nextjs/${suite}`)) || owner.paths.includes(suite), `${group}: ${suite}`);
@@ -8932,6 +8950,15 @@ test('affected v34 pending owners: a lane path absent at head is owned, selected
     }
     assert.deepEqual([lane.failures, lane.groups], [[], [group]], group);
     const ownSuite = owner.unitFiles.find(suite => owner.paths.includes(suite));
+    // An owner that brings no suite of its own selects suites present at head; the lane's change with any one of them gone fails closed on it.
+    if (!ownSuite) {
+      for (const suite of owner.unitFiles) {
+        assert.ok(existsSync(v34RepoPath(`nextjs/${suite}`)), `${group}: ${suite}`);
+        const gone = v34Map(owner.paths.map(p => affectedRecord('A', [`nextjs/${p}`], '000000')), { headHasFile: path => path !== `nextjs/${suite}` && arrived(path) });
+        assert.deepEqual(gone.failures, [`selected owner check is absent at head: ${suite}`], `${group}: ${suite}`);
+      }
+      continue;
+    }
     // An owner whose only path is its own suite has no partial change to test: absent, nothing selects it.
     if (owner.paths.length === 1) { assert.deepEqual(owner.paths, [ownSuite], group); continue; }
     const partial = v34Map(owner.paths.filter(p => p !== ownSuite).map(p => affectedRecord('A', [`nextjs/${p}`], '000000')), { headHasFile: path => path !== `nextjs/${ownSuite}` && arrived(path) });
