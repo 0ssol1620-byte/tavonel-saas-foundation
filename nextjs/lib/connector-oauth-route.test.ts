@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { gate } = vi.hoisted(() => ({ gate: vi.fn() }));
 vi.mock("@/lib/customer-data-admission", () => ({ canAdmitCustomerSource: gate }));
 
-vi.mock("@/lib/developer-auth", () => ({
+// WO-C-T1: the real role gate (requireConnectionManager) runs; a real principal always carries its
+// role, and the owner's is what this route saw before.
+vi.mock("@/lib/developer-auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./developer-auth")>()),
   requireFoundationSession: vi.fn(async () => ({
     ok: true,
     principal: {
@@ -11,6 +14,7 @@ vi.mock("@/lib/developer-auth", () => ({
       userId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
       scopes: [],
       authorizationRevision: 17,
+      workspaceRole: "owner",
     },
   })),
 }));

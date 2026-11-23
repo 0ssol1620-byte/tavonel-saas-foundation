@@ -25,6 +25,9 @@ const store = vi.hoisted(() => ({
   down: false,
   paths: [] as string[],
   user: null as { id: string } | null,
+  /** Supabase Auth's user_metadata per user id, as GET /auth/v1/admin/users/{id} answers it; absent = 404. */
+  authUsers: {} as Record<string, unknown>,
+  authDown: false,
 }));
 
 vi.mock("./supabase-admin", () => ({
@@ -35,8 +38,11 @@ vi.mock("./supabase-admin", () => ({
     const url = new URL(path, "https://store.test");
     const eq = (name: string) => url.searchParams.get(name)?.replace(/^eq\./, "");
     if (url.pathname === "/rest/v1/foundation_workspace_members") {
-      let rows = store.members.filter((row) => row.user_id === eq("user_id"));
-      if (url.searchParams.has("workspace_key")) rows = rows.filter((row) => row.workspace_key === eq("workspace_key"));
+      let rows = url.searchParams.has("user_id") ? store.members.filter((row) => row.user_id === eq("user_id")) : store.members;
+      const workspace = url.searchParams.get("workspace_key");
+      if (workspace?.startsWith("in.(")) rows = rows.filter((row) => workspace.slice(4, -1).split(",").includes(row.workspace_key));
+      else if (workspace !== null) rows = rows.filter((row) => row.workspace_key === eq("workspace_key"));
+      if (url.searchParams.has("role")) rows = rows.filter((row) => row.role === eq("role"));
       if (url.searchParams.has("state")) rows = rows.filter((row) => row.state === eq("state"));
       rows = [...rows].sort((a, b) => a.workspace_key.localeCompare(b.workspace_key));
       const embedded = (url.searchParams.get("select") ?? "").includes("foundation_workspaces(");
@@ -46,6 +52,12 @@ vi.mock("./supabase-admin", () => ({
     if (url.pathname === "/rest/v1/foundation_billing_accounts") {
       const keys = (url.searchParams.get("workspace_key") ?? "").replace(/^in\.\(|\)$/g, "").split(",");
       return new Response(JSON.stringify(store.billing.filter((row) => keys.includes(String(row.workspace_key)))));
+    }
+    if (url.pathname.startsWith("/auth/v1/admin/users/")) {
+      if (store.authDown) throw new Error("auth unreachable");
+      const id = decodeURIComponent(url.pathname.slice("/auth/v1/admin/users/".length));
+      if (!Object.hasOwn(store.authUsers, id)) return new Response(JSON.stringify({ code: 404, msg: "User not found" }), { status: 404 });
+      return new Response(JSON.stringify({ id, email: `${id}@mail.test`, user_metadata: store.authUsers[id] }));
     }
     throw new Error(`unexpected store path ${path}`);
   },
@@ -106,6 +118,12 @@ beforeEach(() => {
   store.down = false;
   store.paths = [];
   store.user = { id: MEMBER };
+  store.authUsers = {
+    [OWNER]: { full_name: "  Olivia Owner " },
+    [MEMBER]: { full_name: "Mina Member" },
+    [STRANGER]: {},
+  };
+  store.authDown = false;
   product.session.mockReset().mockResolvedValue({ ok: true, access: { source: "paid", accessPlan: "studio_access", billingExempt: false, expiresAt: null } });
   product.key.mockReset().mockResolvedValue({ ok: true, source: "paid", billingExempt: false });
   product.authenticate.mockReset();
@@ -370,12 +388,16 @@ describe("GET /api/workspaces/mine", () => {
       actingWorkspaceKey: SHARED,
       truncated: false,
       workspaces: [
-        { workspaceKey: MEMBER_OWN, role: "owner", workspaceName: `${MEMBER_OWN} name`, planLabel: null, acting: false },
-        { workspaceKey: SHARED, role: "member", workspaceName: `${SHARED} name`, planLabel: "Team", acting: true },
+        { workspaceKey: MEMBER_OWN, role: "owner", workspaceName: `${MEMBER_OWN} name`, ownerDisplayName: "Mina Member", planLabel: null, acting: false },
+        { workspaceKey: SHARED, role: "member", workspaceName: `${SHARED} name`, ownerDisplayName: "Olivia Owner", planLabel: "Team", acting: true },
       ].sort((a, b) => a.workspaceKey.localeCompare(b.workspaceKey)),
     });
+    // The owner's name and nothing else of the owner: no user id, no email, no other metadata.
     expect(JSON.stringify(body)).not.toContain("ctm_secret");
     expect(JSON.stringify(body)).not.toContain(OWNER);
+    expect(JSON.stringify(body)).not.toContain("mail.test");
+    expect(store.paths.filter((path) => path.startsWith("/auth/v1/admin/users/")).sort())
+      .toEqual([`/auth/v1/admin/users/${OWNER}`, `/auth/v1/admin/users/${MEMBER}`].sort());
   });
 
   it("omits a revoked membership and labels no plan for a lapsed subscription", async () => {
@@ -383,7 +405,47 @@ describe("GET /api/workspaces/mine", () => {
     store.billing = [{ workspace_key: MEMBER_OWN, access_plan: "observer_access", plan_code: "personal", subscription_status: "canceled" }];
     const body = await (await get(`tavonel_ws=${SHARED}`)).json();
     expect(body.actingWorkspaceKey).toBe(MEMBER_OWN);
-    expect(body.workspaces).toEqual([{ workspaceKey: MEMBER_OWN, role: "owner", workspaceName: `${MEMBER_OWN} name`, planLabel: null, acting: true }]);
+    expect(body.workspaces).toEqual([{ workspaceKey: MEMBER_OWN, role: "owner", workspaceName: `${MEMBER_OWN} name`, ownerDisplayName: "Mina Member", planLabel: null, acting: true }]);
+  });
+
+  // The owner's name is what they typed at sign-up: hostile input, never echoed unbounded.
+  it.each([
+    ["no metadata at all", undefined],
+    ["metadata that is not an object", "Olivia"],
+    ["metadata that is an array", ["Olivia"]],
+    ["no full_name", {}],
+    ["an empty name", { full_name: "" }],
+    ["a blank name", { full_name: " \t " }],
+    ["a number", { full_name: 42 }],
+    ["null", { full_name: null }],
+    ["an object", { full_name: { first: "Olivia" } }],
+    ["a name over 120 characters", { full_name: "O".repeat(121) }],
+    ["a control character", { full_name: "Olivia\u0000Owner" }],
+    ["a line break", { full_name: "Olivia\nOwner" }],
+  ])("answers no owner name, not a guess, for %s", async (_label, metadata) => {
+    store.authUsers[OWNER] = metadata;
+    const body = await (await get(`tavonel_ws=${SHARED}`)).json();
+    expect(body.code).toBe("OK");
+    expect(body.workspaces.find((item: { workspaceKey: string }) => item.workspaceKey === SHARED).ownerDisplayName).toBeNull();
+  });
+
+  it("keeps a name of exactly 120 characters, trimmed", async () => {
+    store.authUsers[OWNER] = { full_name: ` ${"O".repeat(120)} ` };
+    const body = await (await get(`tavonel_ws=${SHARED}`)).json();
+    expect(body.workspaces.find((item: { workspaceKey: string }) => item.workspaceKey === SHARED).ownerDisplayName).toBe("O".repeat(120));
+  });
+
+  it.each([
+    ["the owner's auth user is missing (404)", () => { delete store.authUsers[OWNER]; }, "WORKSPACE_MEMBERSHIP_READ_FAILED"],
+    ["Supabase Auth is unreachable", () => { store.authDown = true; }, "WORKSPACE_MEMBERSHIP_READ_FAILED"],
+    ["a listed workspace has no active owner row", () => { store.members[0] = row(SHARED, OWNER, "owner", "revoked", 2); }, "WORKSPACE_MEMBERSHIP_STORE_INVALID"],
+    ["a workspace answers two owner rows", () => { store.members.push(row(SHARED, STRANGER, "owner")); }, "WORKSPACE_MEMBERSHIP_STORE_INVALID"],
+    ["an owner row carries a malformed user id", () => { store.members[0] = { ...row(SHARED, OWNER, "owner"), user_id: "../admin" }; }, "WORKSPACE_MEMBERSHIP_STORE_INVALID"],
+  ])("fails closed when %s: a 503, never a list with the name quietly missing", async (_label, arrange, code) => {
+    arrange();
+    const response = await get(`tavonel_ws=${SHARED}`);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code });
   });
 
   it("fails closed on two paying accounts for one workspace and on a malformed store row", async () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireFoundationSession } from "@/lib/developer-auth";
+import { requireConnectionManager, requireFoundationSession } from "@/lib/developer-auth";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { buildOAuthAuthorizationUrl, createOAuthPkce, googleDriveViewerLinkEnabled, googleDriveViewerLinkRuntime, parseOAuthConnectorProvider, readOAuthProviderRuntime, sha256Hex } from "@/lib/connector-oauth";
 import { deleteOAuthSecret, putOAuthSecret, readOAuthSecretBrokerConfig } from "@/lib/connector-oauth-secrets";
@@ -26,6 +26,12 @@ export async function POST(request: Request) {
   const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
   if (!provider || !authorizationPurpose || !displayName || displayName.length > 100 ||
       (authorizationPurpose === "viewer_acl_link" && provider !== "google_drive")) return NextResponse.json({ code: "OAUTH_CONNECTOR_INPUT_INVALID" }, { status: 400, headers: HEADERS });
+  // TC-D7: a new workspace connection is the owner's or an admin's act. Linking the caller's own
+  // viewer identity is not a workspace connection, and stays open to a member.
+  if (authorizationPurpose === "connector_connection") {
+    const role = requireConnectionManager(auth.principal);
+    if (role) return NextResponse.json({ code: role.code }, { status: role.status, headers: HEADERS });
+  }
   if (authorizationPurpose === "viewer_acl_link" && !googleDriveViewerLinkEnabled()) {
     return NextResponse.json({ code: "GOOGLE_VIEWER_LINK_NOT_ENABLED" }, { status: 503, headers: HEADERS });
   }

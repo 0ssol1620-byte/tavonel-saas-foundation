@@ -42,6 +42,47 @@ function bearerAudience(bearer: string): ApiKeyAudience | null {
   }
 }
 
+/*
+  WO-C-T1, the role gate every resolution in this file passes (key or session), after the
+  workspace and its role are known and before a rate unit or a product read is spent.
+
+  1. The remote MCP surface serves owners and admins only (TC-D3): it lists Worlds without the
+     viewer's source scope. "On the surface" is any of: a `tvnl_mcp_` token, a call dispatched
+     in-process by /api/mcp (async context -- a `tvnl_live_` key arrives there too), or a request
+     to /api/mcp itself (its OAuth consent, which would otherwise mint a token for the member).
+     Whatever the credential's form, a member never resolves to a workspace there.
+  2. Changing a workspace's connections is an owner's or admin's act (TC-D7): a revoke deletes the
+     owner's refresh token at the broker, and that cannot be undone.
+
+  Anything that is not exactly "owner" or "admin" is refused; an unknown role is never passed through.
+*/
+const CONNECTION_MANAGER_SCOPES: ReadonlySet<DeveloperScope> = new Set(["connections:write", "connections:sync"]);
+const isWorkspaceManager = (role: unknown) => role === "owner" || role === "admin";
+const connectionRoleRefusal = () => ({ ok: false as const, code: "CONNECTION_ROLE_REQUIRED", status: 403 });
+
+function onRemoteMcpSurface(request: Request) {
+  if (insideRemoteMcpDispatch()) return true;
+  const { pathname } = new URL(request.url);
+  return pathname === "/api/mcp" || pathname.startsWith("/api/mcp/");
+}
+
+function workspaceRoleRefusal(request: Request, audience: ApiKeyAudience | null, role: WorkspaceRole, scope: DeveloperScope | null) {
+  if (isWorkspaceManager(role)) return null;
+  if (audience === "mcp" || onRemoteMcpSurface(request)) {
+    return { ok: false as const, code: "REMOTE_MCP_MEMBER_UNAVAILABLE", status: 403 };
+  }
+  if (scope !== null && CONNECTION_MANAGER_SCOPES.has(scope)) return connectionRoleRefusal();
+  return null;
+}
+
+/**
+ * For the session-only connection routes, which authorize without a DeveloperScope (OAuth
+ * connectors): null for an owner or admin, the refusal for anyone else.
+ */
+export function requireConnectionManager(principal: { workspaceRole: WorkspaceRole }) {
+  return isWorkspaceManager(principal.workspaceRole) ? null : connectionRoleRefusal();
+}
+
 async function resolveWorkspaceAuthority(workspaceKey: string, userId: string) {
   const found = await getWorkspaceMembership(workspaceKey, userId);
   if (!found.ok) return found;
@@ -161,11 +202,8 @@ async function resolveFoundationAuthorization(
     if (authenticated.principal.authorizationRevision !== authority.authorizationRevision) {
       return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
     }
-    // TC-D3, fail closed: the remote MCP lists Worlds without the viewer's source scope, so it
-    // serves owners and admins only until it can honour a member's scope (WO-C-T3).
-    if (audience === "mcp" && authority.workspaceRole === "member") {
-      return { ok: false as const, code: "REMOTE_MCP_MEMBER_UNAVAILABLE", status: 403 };
-    }
+    const roleRefused = workspaceRoleRefusal(request, audience, authority.workspaceRole, scope);
+    if (roleRefused) return roleRefused;
     const { audience: _audience, agent: _agent, ...identity } = authenticated.principal;
     const principal: FoundationPrincipal = {
       ...identity,
@@ -207,6 +245,8 @@ async function resolveFoundationAuthorization(
   if (!access.ok) return access;
   const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
   if (!authority.ok) return authority;
+  const roleRefused = workspaceRoleRefusal(request, null, authority.workspaceRole, scope);
+  if (roleRefused) return roleRefused;
   if (minimumPlan === null) {
     const principal: FoundationPrincipal = {
       kind: "session",
@@ -342,6 +382,8 @@ async function resolveFoundationSession(request: Request, minimumPlan: MinimumPl
   if (!access.ok) return access;
   const authority = await resolveWorkspaceAuthority(access.membership.workspaceId, user.id);
   if (!authority.ok) return authority;
+  const roleRefused = workspaceRoleRefusal(request, null, authority.workspaceRole, null);
+  if (roleRefused) return roleRefused;
   const productAccess = minimumPlan === null ? null
     : await authorizeFoundationSessionProduct(access.membership.workspaceId, user.id, minimumPlan);
   if (productAccess && !productAccess.ok) {

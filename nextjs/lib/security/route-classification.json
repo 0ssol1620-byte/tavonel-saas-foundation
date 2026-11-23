@@ -702,7 +702,7 @@
         "GET"
       ],
       "credential": "bearer:supabase-jwt",
-      "note": "Lists the caller's own active workspace memberships and which one the request acts in. The cookie selects among the caller's own memberships; privilege still comes only from the Bearer header."
+      "note": "Lists the caller's own active workspace memberships and which one the request acts in, with each workspace's owner display name (the name only: never the owner's user id, email or other metadata; read server-side from Supabase Auth with the service role). The cookie selects among the caller's own memberships; privilege still comes only from the Bearer header."
     },
     "app/api/access/processing-terms/route.ts": {
       "type": "A-bearer",
