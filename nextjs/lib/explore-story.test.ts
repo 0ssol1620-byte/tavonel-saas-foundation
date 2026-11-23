@@ -232,13 +232,13 @@ describe("every citation the Ask offers can be opened", () => {
       expect(view.reason, view.question).toBe(source.reason);
       expect(view.regions.map((region) => region.excerpt)).toEqual(source.citations.map((citation) => citation.excerpt));
     }
-    // The prepared Company Background question is the overflow regression: no text, its reason, its regions.
+    // The Company Background question used to abstain on length; since WO-ASK-0 it answers with windows.
     const company = views.find((view) => view.question.includes("Company Background"));
-    expect(company?.status).toBe("abstained");
-    expect(company?.answer).toBe("");
-    expect(company?.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(company?.status).toBe("grounded");
+    expect(company?.answer).not.toBe("");
+    expect(company?.reason).not.toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
     expect(company!.regions.length).toBeGreaterThan(0);
-    expect(views.filter((view) => view.status === "grounded").length).toBe(views.length - 1);
+    expect(views.filter((view) => view.status === "grounded").length).toBe(views.length);
   });
 
   it("has words for every abstention reason it accepts, keyed by the retriever's own code", () => {
@@ -284,6 +284,8 @@ describe("the answer adapter carries the retriever's state and refuses a malform
     authorityTier: "official",
     relevanceBreakdown: { lexical: 1, graph: 0, temporal: 0, authority: 1 },
     excerpt: PREVIEW,
+    // The citation shape since WO-ASK-0; the view builder under test does not read it.
+    window: { start: 0, end: 417, regionLength: FULL.length },
     ...overrides,
   });
   const fixture = (overrides: Partial<ExploreSampleAnswer>): ExploreSampleAnswer => ({
@@ -358,6 +360,15 @@ describe("the answer adapter carries the retriever's state and refuses a malform
 });
 
 describe("public copy on this lane's surfaces", () => {
+  it("describes the answers the page actually shows: verbatim windows marked with …, not whole regions or nothing", () => {
+    // WO-ASK-0: at least one prepared answer is a window of a longer region, so the note may not
+    // claim complete text or that a long answer is withheld; it has to name the marker it shows.
+    expect(exploreSampleAnswers.some((answer) => answer.status === "grounded" && answer.answer.includes("…"))).toBe(true);
+    expect(EXPLORE_COPY.askNote).toContain("…");
+    expect(EXPLORE_COPY.askNote).toMatch(/word for word/);
+    expect(EXPLORE_COPY.askNote).not.toMatch(/complete text|no answer is shown|too long to show/i);
+  });
+
   it.each(SURFACES)("keeps every barred phrase out of %s", (surface) => {
     const source = read(surface).toLowerCase();
     for (const phrase of BARRED) expect(source, `SPEC 13.3 bars "${phrase}"`).not.toContain(phrase);

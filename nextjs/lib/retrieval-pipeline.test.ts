@@ -5,6 +5,8 @@ import type { EmbedderAdapter } from "./embedder-adapter";
 import type { RerankerAdapter } from "./reranker-adapter";
 import { ADAPTIVE_ROUTER_SCHEMA, candidateIdentityKey, type AdaptiveRouterDecision } from "./adaptive-router";
 import { contentAddressedRetrievalProfileIdentity } from "./retrieval-profile-identity";
+import { answerFromContextPacket } from "./grounded-ask";
+import { ASKED_LINE, SYNTHETIC_QUESTION, syntheticRegions } from "./__fixtures__/ask-synthetic/statement-world";
 
 // Drives the REAL orchestrator (retrieval-pipeline.ts) end to end. Every stage below is
 // production code -- expandedTokens, reciprocalRankFusion, rankByStructuralOverlap,
@@ -581,5 +583,47 @@ describe("retrieval pipeline orchestration", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.packet.items.length).toBeLessThanOrEqual(1);
+  });
+});
+
+// WO-ASK-0: the synthetic statement World through the real orchestrator and the real answer builder.
+describe("entity terms first on the compiled path", () => {
+  // One document (and one document version) per invented company, as a compile records them.
+  const statementUnits = () => syntheticRegions().map((region) => unit({
+    unit_id: `retrieval-${region.chunkId}`,
+    document_id: region.sourceId,
+    document_version_key: `version-${region.sourceId}`,
+    text: region.text,
+  }));
+
+  it("puts the named company's region first although lexical ranked another company's first", async () => {
+    scenario.units = statementUnits();
+    // The stubbed lexical order is the observed one: another company's short region first.
+    scenario.lexicalIds = [
+      "retrieval-chunk-brakewell-d-highlights",
+      "retrieval-chunk-quillmore-b-statement",
+      "retrieval-chunk-corvanta-b-statement",
+    ];
+    scenario.denseIds = [];
+    const result = await runRetrievalPipeline({ ...baseInput(), question: SYNTHETIC_QUESTION, embedder: null, reranker: null });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.packet.items.map((item) => item.unitId).slice(0, 2)).toEqual([
+      "retrieval-chunk-quillmore-b-statement",
+      "retrieval-chunk-brakewell-d-highlights",
+    ]);
+    const answer = answerFromContextPacket(result.packet, { collectionId: COLLECTION, manifestDigest: MANIFEST });
+    expect(answer.status).toBe("grounded");
+    expect(answer.citations[0]?.excerpt).toContain(ASKED_LINE);
+  });
+
+  it("keeps the retrieved order when the question names no entity", async () => {
+    scenario.units = statementUnits();
+    scenario.lexicalIds = ["retrieval-chunk-brakewell-d-highlights", "retrieval-chunk-quillmore-b-statement"];
+    scenario.denseIds = [];
+    const result = await runRetrievalPipeline({ ...baseInput(), question: "revenue in 2023", embedder: null, reranker: null });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.packet.items.map((item) => item.unitId)).toEqual(scenario.lexicalIds);
   });
 });

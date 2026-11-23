@@ -316,12 +316,13 @@ describe("idempotency", () => {
 
 /*
   The compiled answer envelope through the real route: the pipeline is the only stub, and the
-  answer is the real answerFromContextPacket. Evidence over COMPILED_ANSWER_CHARACTER_LIMIT is an
-  abstention with no partial answer and its verified citations kept -- and a replay serves that
-  same receipt and those same citations without running retrieval again.
+  answer is the real answerFromContextPacket. Evidence over COMPILED_ANSWER_CHARACTER_LIMIT used
+  to abstain with no answer (EVIDENCE_EXCEEDS_ANSWER_LIMIT); since WO-ASK-0 it answers with one
+  verbatim window per verified citation, cut edges marked -- and a replay serves that same
+  answer, receipt and citations without running retrieval again.
 */
 describe("a compiled answer over its envelope", () => {
-  it("abstains with its verified citations and receipt, and replays both without re-running retrieval", async () => {
+  it("answers with windows of its verified citations, and replays them without re-running retrieval", async () => {
     const packet = buildContextPacket([
       {
         unitId: "unit-overflow",
@@ -361,13 +362,17 @@ describe("a compiled answer over its envelope", () => {
     expect(first.headers.get("x-tavonel-idempotent-replay")).toBeNull();
     const body = await first.json();
     expect(body).toMatchObject({
-      code: "ANSWER_ABSTAINED",
+      code: "GROUNDED_ANSWER",
       retrievalPath: "compiled-retrieval-v1",
       answerMode: "evidence_excerpts",
-      status: "abstained",
-      answer: "",
-      reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT,
+      status: "grounded",
+      answer: expected.answer,
+      reason: null,
     });
+    expect(body.reason).not.toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(body.answer.length).toBeLessThanOrEqual(COMPILED_ANSWER_CHARACTER_LIMIT);
+    expect(body.answer).toContain("Renewal clause");
+    expect(body.answer).toContain(" …");
     // Exactly the builder's verified citations, in packet order, with nothing invented for them.
     expect(body.citations).toEqual(expected.citations);
     expect(body.citations.map((citation: { evidenceId: string }) => citation.evidenceId)).toEqual(["evidence-a", "evidence-c"]);
@@ -376,6 +381,8 @@ describe("a compiled answer over its envelope", () => {
     for (const citation of body.citations) {
       expect(citation).not.toHaveProperty("sourceId");
       expect(citation).not.toHaveProperty("relevance");
+      // The window adds positions in the region, nothing scored.
+      expect(Object.keys(citation.window).sort()).toEqual(["end", "regionLength", "start"]);
     }
     // The receipt is the one the builder signed for this World, not a fixture.
     expect(body.receipt).toEqual(expected.receipt);

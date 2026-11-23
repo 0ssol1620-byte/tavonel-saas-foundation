@@ -42,7 +42,13 @@ const escaped = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 const SOURCE_VIEWER = 'aria-label="Original source viewer"';
 const OVERFLOW = EXPLORE_COPY.askAbstentions.EVIDENCE_EXCEEDS_ANSWER_LIMIT;
-const company = answers.find(view => view.question.includes("Company Background"))!;
+const actualCompany = answers.find(view => view.question.includes("Company Background"))!;
+/*
+  WO-ASK-0: the retriever no longer abstains on long evidence, so no sample view reaches the
+  overflow branch any more. The branch still renders whatever an abstention carries; it is held
+  here on the Company Background view, its regions unchanged, in the abstained state.
+*/
+const company: ExploreAnswerView = { ...actualCompany, status: "abstained", answer: "", reason: "EVIDENCE_EXCEEDS_ANSWER_LIMIT" };
 const grounded = answers.filter(view => view.status === "grounded");
 function workbench(list: ExploreAnswerView[]) {
   return renderToStaticMarkup(<EvidenceWorkbench model={model} answers={list} technical={technical} capturedOn="2026-09-01" onOpenRegion={() => {}} onRelations={() => {}} onChanges={() => {}} />);
@@ -52,11 +58,11 @@ function ask(list: ExploreAnswerView[], index: number) {
 }
 
 describe("both Ask consumers render the retriever's state", () => {
-  it("starts from the actual views: grounded answers and the Company Background overflow", () => {
-    expect(company.status).toBe("abstained");
-    expect(company.answer).toBe("");
+  it("starts from the actual views: every prepared question grounded, Company Background included", () => {
+    expect(actualCompany.status).toBe("grounded");
+    expect(actualCompany.answer).not.toBe("");
     expect(company.regions.length).toBeGreaterThan(0);
-    expect(grounded.length).toBe(answers.length - 1);
+    expect(grounded.length).toBe(answers.length);
   });
 
   it("quotes the complete grounded answer in the workbench, apart from the source passage", () => {
@@ -97,7 +103,8 @@ describe("both Ask consumers render the retriever's state", () => {
   });
 
   it("states the overflow in the Ask panel without an answer quotation, and keeps every source link", () => {
-    const html = ask(answers, answers.indexOf(company));
+    const list = answers.map(view => view === actualCompany ? company : view);
+    const html = ask(list, list.indexOf(company));
     expect(html).not.toContain("<blockquote");
     expect(html).toContain(`role="status">${escaped(OVERFLOW)}</p>`);
     expect(html).not.toContain("EVIDENCE_EXCEEDS_ANSWER_LIMIT");

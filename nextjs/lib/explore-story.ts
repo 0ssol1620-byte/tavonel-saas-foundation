@@ -146,7 +146,7 @@ export const EXPLORE_COPY = {
     "Each step is a full compile of the corpus as it stood, compared with the one before it. Steps run in reporting-period order.",
   askPlaceholder: "Ask this World…",
   askNote:
-    "Choose from the prepared questions above. An answer is the complete text of the source regions the retriever selected, not a rewrite of it. When that text is too long to show whole, no answer is shown and the regions stay open to read.",
+    "Choose from the prepared questions above. An answer is source text the retriever selected, not a rewrite of it: from each cited region, the part that matches the question, word for word. “…” marks where a region goes on; open the region to read it whole.",
   /*
     What the stage says when the retriever abstained, keyed by the retriever's own reason code.
     An abstention keeps its citations and shows no partial text, so the sentence says that and
@@ -342,7 +342,7 @@ export type ExploreAnswerRegion = {
 export type ExploreAbstentionReason = keyof typeof EXPLORE_COPY.askAbstentions;
 
 type ExploreAnswerState =
-  /** The complete selected evidence the retriever returned. Never a clipped citation preview. */
+  /** The retriever's answer: a verbatim window of each cited region, "…" where a region goes on. */
   | { status: "grounded"; answer: string; reason: null }
   /** No answer text at all; the regions are still there to open. */
   | { status: "abstained"; answer: ""; reason: ExploreAbstentionReason };
