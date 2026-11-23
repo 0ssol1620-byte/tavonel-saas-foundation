@@ -1,9 +1,11 @@
 # ADR-0010 — Governed automation: one proposal spine for approval policy, the steward, standing approvals, Skills and the Knowledge Steward
 
 - **Status:** design adopted for build by the implementer of WO-B-00 (merged with WO-KS-0, lead ruling 1 of
-  2026-11-18), **pending the lead's decision on the amendments in §0.2 and the independent attack in §15**.
-  Nothing here is built or proven. Every number is a start value, uncalibrated. No gate is marked passed:
-  U17, U31, U37, M9-03, M9-04, M9-05 stay **OPEN**.
+  2026-11-18). The independent review (r20, reviewer acting as attacker and verifier) found four blockers; the
+  lead ruled on each (2026-11-18) and the rulings are written in here as M15–M17 and §15.2 (closing round,
+  2026-11-23). Every option this ADR considered has a disposition row in §15.2. Nothing here is built or proven.
+  Every number is a start value, uncalibrated. No gate is marked passed: U17, U31, U37, M9-03, M9-04, M9-05
+  stay **OPEN**.
 - **Base read:** Foundation `codex/v34-fnd-int` at `e9364899`. Every `file:line` below is at that head.
 - **Sources:** `workorders/all-features/B-autopilot-steward-governance-skills.md` (cluster B, cited `[B §n]`),
   `workorders/all-features/A-agent-write-ontology.md` (cluster A, `[A §n]`), `LEAD-RULINGS-WAVE0.md`
@@ -44,7 +46,10 @@ Product-side placement (`[A §3.1]`, `[LR 16]`).
 | M3 | `[B WO-B-01]` separate `consume_foundation_standing_approval` RPC, called before execution | No separately callable consume RPC: the standing-rule check and debit happen **inside** `decide_world_change_proposal`, in the same transaction as the confirmation | Two transactions give confirm-without-debit or debit-without-confirm (S-1) |
 | M4 | `[B WO-B-01]` new binding kind `active_pointer`; `[A WO-AN-21]` binding `active_manifest` | `world_activation` pairs with the **existing** `active_manifest`; "no Active World" is `NO_BINDING_DIGEST` (`sha256:` + 64 zeros) | One meaning ("the collection's Active digest"), no new enum value; every binding column is `^sha256:` (S-21, S-22) |
 | M5 | `[B §1.1]` default policy `member` for every type | `world_activation` default and floor = `admin` | `transition_foundation_world_atomic` refuses actors below admin (`20260920120000:256-268`); a `member` default lets a member "confirm" a proposal that can only fail (S-4) |
-| M6 | `[B WO-B-GOV-2]` executor `run` calls `promoteFoundationCandidate` directly; `undo` calls `rollbackFoundationWorld` | `run` goes through the **same gate chain as the promote route** (plan gate `authorizeWorldActivation`, `checkActivationRateLimit(…, "world_activation")`, source currency via `transition_foundation_world_atomic_current`), extracted from the route into one function both use. **No undo**: going back is a new `world_activation` proposal to the previous digest (or the direct rollback route when no policy requires approval) | A direct store call skips three gates the route enforces (S-5); an undo is a one-person Active change that would bypass four-eyes and, later, step-up (S-6) |
+| M6 | `[B WO-B-GOV-2]` executor `run` calls `promoteFoundationCandidate` directly; `undo` calls `rollbackFoundationWorld` | `run` goes through the **same gate chain as the promote route** (plan gate `authorizeWorldActivation`, `checkActivationRateLimit(…, "world_activation")`, source currency via `transition_foundation_world_atomic_current`), extracted from the route into one function both use. **No undo**: going back is a **`world_rollback` proposal** (M17), or the direct rollback route when no policy requires approval | A direct store call skips three gates the route enforces (S-5); an undo is a one-person Active change that would bypass four-eyes and, later, step-up (S-6) |
+| M15 | (r20 B2) the activation proposal stored only the target digest; `run` re-read the Active pointer | A `world_activation` / `world_rollback` proposal **binds at creation** the Active state the approver saw — `expectedCurrentState`, `expectedCurrentRevision`, `expectedCurrentManifestDigest` — next to the target and the reason (§10.1). The executor passes **exactly those stored values** to `transition_foundation_world_atomic`; it never re-reads the pointer. A mismatch is the RPC's CAS refusal, recorded as the named outcome `failed` / `ACTIVE_WORLD_CONFLICT` (fail closed). Parser: `parseWorldTransitionInput` (constants module) | With a re-read, two approved proposals A→B and A→C both apply (C lands on B, which nobody approved), and a resume after a failed record sends a different request hash under the same operation id → `world_transition_idempotency_conflict` (r20 B2) |
+| M16 | (r20 B3) §4 runtime: a standing rule confirms through "the same `decideProposal` path as the rule's creator" | Rule execution is an **internal server path** (worker secret, `isInternalWorkerAuthorized`), never a session: the creator's user id is the actor, the creator's membership is checked **in SQL** at execution time, and every check the session path makes is mapped to its SQL counterpart in the §4.1 table; a check with no counterpart is listed **OPEN**, never dropped | `decideProposal` needs the creator's live session (`requireProposalSession`, `revalidateFoundationSession`, the bearer `runCompile` forwards); the only way to call it from a sweep is to forge one (r20 B3) |
+| M17 | (r20 B4) "going back is a new `world_activation` proposal to the previous digest" | Going back under a policy that requires approval is its **own proposal kind `world_rollback`** (R2, session-only, binding `active_manifest`, B-01) that calls the **existing rollback transition** (`p_action = 'rollback'`) through the rollback route's gate chain. It is decided by the **`world_activation` policy row** (`APPROVAL_POLICY_KEY`): one policy governs every Active change. No undo | The promote chain is forward-only: `transition_foundation_world_atomic_current` refuses a candidate whose sources were superseded (`assert_world_sources_current`), which is exactly the previous World in the common case; the rollback branch exists for that and requires a `superseded` target and an existing pointer (`20260920120000:357-366`) (r20 B4) |
 | M7 | `[A WO-AN-21]` adds action type `world_activation` and its own executor/migration | One executor, owned by WO-B-GOV-2 (`[LR 1]`). WO-AN-21 adds only: the passkey step-up at confirmation, the scope `agent:activation`, the tool `propose_activation`, and a migration that widens the `world_activation` proposer CHECK from `session` to `session, agent`. From the day WO-AN-20's step-up guards the promote route, **every** `world_activation` confirmation requires it (session- and agent-origin) | Otherwise the proposal path becomes a step-up bypass of promote (S-7) |
 | M8 | `[B WO-B-02]` steward cap via the existing `p_open_limit` | `create_world_change_proposal` keeps its signature; WO-B-02 replaces its **body** so `p_open_limit` is accepted for `steward` (counted per workspace under its own advisory key), a steward principal must be an active member, and a session key in a reserved namespace (`agt_`, `stw_`, `skl_`) is refused | The base RPC refuses `p_open_limit` for non-agents (`20261117130000:354`), so the cap as written cannot exist; a TS-side cap races; a session key `stw_…` would pre-empt a steward key (S-8, S-9) |
 | M9 | `[B WO-B-APL-2]` rule scope and credits checked in TS | The RPC checks the proposal's `input.documentIds` ⊆ the rule scope, and refuses a debit below the stored quote `input.quote.rechargeCredits` | A TS defect would confirm out-of-scope compiles or debit 0 (S-10, S-11) |
@@ -77,6 +82,7 @@ Product-side placement (`[A §3.1]`, `[LR 16]`).
 | `compile_plan` | R1 | `source_inventory` | session, steward, agent | existing | **yes, steward-origin only** | `agent:propose` |
 | `ontology_label_patch` | R1 | `correction_leaf` | session, agent | existing | no | `agent:propose` |
 | `world_activation` | **R2** | `active_manifest` (`NO_BINDING_DIGEST` when empty) | **session** (agent only after WO-AN-21, M7) | B-01 | **never** | `agent:activation` (reserved, WO-AN-21) |
+| `world_rollback` | **R2** | `active_manifest` (never empty: a rollback needs an Active World) | **session** only (no agent scope; widening it needs its own ADR) | B-01 | **never** | — |
 | `competency_questions_set` | R1 | `question_set` (`NO_BINDING_DIGEST` when no live set) | session, agent | KS-1 | no | `agent:steward` |
 | `ontology_patch` | R1 | `correction_leaf` | session, agent | KS-1 | no | `agent:steward` |
 
@@ -90,7 +96,8 @@ test `governed-automation-constants.test.ts`, "activation is never automatic"). 
 ### 2.2 State machines
 
 - **Proposal** (unchanged, ADR-0009): `proposed → confirmed | rejected | expired | stale | withdrawn`;
-  `confirmed → executed | failed`; `executed → undone` (types with an undo only; `world_activation` has none).
+  `confirmed → executed | failed`; `executed → undone` (types with an undo only; `world_activation` and
+  `world_rollback` have none).
   Policy and standing-rule refusals are **exceptions**: the row stays `proposed`.
 - **Steward item:** person transitions `STEWARD_PERSON_TRANSITIONS` — `new|reopened → acknowledged|snoozed|held|resolved`,
   `acknowledged → snoozed|held|resolved`, `snoozed → acknowledged|held|resolved`, `held → acknowledged|resolved`,
@@ -126,8 +133,9 @@ Use lever 2 when a credential or rule may be in the wrong hands, lever 1 when th
 
 `foundation_approval_policies (workspace_key, action_type, approver_min_role, require_distinct_approver,
 revision ≥ 1, updated_by, updated_at; pk (workspace_key, action_type))` — CHECKs: `action_type` ∈
-`actionTypesThrough(slot)`; `approver_min_role` ∈ (`member`,`admin`,`owner`); `action_type <>
-'world_activation' or approver_min_role in ('admin','owner')` (floor, `APPROVAL_POLICY_FLOOR`). Absent row =
+`policyActionTypesThrough(slot)` (the policy **keys**: every type except `world_rollback`, which is decided by
+the `world_activation` row, `APPROVAL_POLICY_KEY`, M17); `approver_min_role` ∈ (`member`,`admin`,`owner`);
+`action_type <> 'world_activation' or approver_min_role in ('admin','owner')` (floor, `APPROVAL_POLICY_FLOOR`). Absent row =
 `DEFAULT_APPROVAL_POLICY` at revision `ABSENT_POLICY_REVISION` (0) = today. `foundation_approval_policy_events`
 append-only. Writer: `set_foundation_approval_policy(p_workspace_key, p_actor_user_id,
 p_authorization_revision, p_action_type, p_min_role, p_distinct, p_expected_revision)` — actor active at that
@@ -146,7 +154,9 @@ arguments still resolves. Body, in order:
 3. Decider's membership row `for share` (`workspace_key = p_workspace_key and user_id = p_decided_by`).
 4. Proposal row `for update` (base); `proposal_not_found` / `proposal_not_decidable` (base).
 5. `expired`, then `withdrawn` (base verdicts, written as today).
-6. **Confirm only** — policy row `for share` (or the default):
+6. **Confirm only** — policy row of `APPROVAL_POLICY_KEY[v_row.action_type]` `for share` (or the default; a
+   `world_rollback` row reads the `world_activation` row — in SQL a `case` over the stored type, pgTAP asserts
+   it):
    - `coalesce(p_policy_revision, 0) <> coalesce(row.revision, 0)` → raise `approval_policy_changed`.
    - decider not `active`, or role rank < `approver_min_role` (or the floor when no row) → raise
      `approval_role_insufficient`.
@@ -162,8 +172,9 @@ preview (`approval.viewerMayConfirm`) and passes the revision it read; the RPC i
 
 **Direct activation routes** (`app/api/collections/[id]/promote/route.ts`, `…/world/rollback/route.ts`):
 when a `world_activation` policy row exists with `require_distinct_approver` or a min role above the
-caller's, they answer 409 `ACTIVATION_REQUIRES_APPROVAL` with the proposal path; with no row they behave
-exactly as today (test).
+caller's, they answer 409 `ACTIVATION_REQUIRES_APPROVAL` with the proposal path — a `world_activation`
+proposal from promote, a `world_rollback` proposal from rollback (M17); with no row they behave exactly as
+today (test).
 
 ## 4. Standing approvals (S2)
 
@@ -189,6 +200,10 @@ Inside `decide_world_change_proposal` step 6, when `p_standing_rule_id` is set (
 6. Scope: every id of `v_row.input->'documentIds'` is in `scope.documentIds`, or (collection scope) occurs in
    `foundation_collection_artifact_provenance.document_ids` of a scope collection of this workspace → else
    `standing_rule_out_of_scope` (M9).
+   Then source access as the creator (M16, §4.1 T7): `public.connector_documents_blocked(p_workspace_key,
+   documentIds)` (`20260927102000`) true → `standing_rule_source_access_denied`; and, until a per-viewer SQL
+   check is registered, any id with a row in `public.connector_document_bindings` → the same refusal (a rule
+   never confirms a connector-sourced document it cannot check per person).
 7. `p_rule_credits < (v_row.input->'quote'->>'rechargeCredits')::integer` → `proposal_request_invalid` (M9).
 8. Roll `period_start` forward by whole months while `period_start + 1 month <= clock_timestamp()`,
    resetting `credits_used`; `credits_used + p_rule_credits > credit_cap` → `standing_rule_budget_exhausted`.
@@ -200,14 +215,45 @@ p_credit_cap, p_expires_at)`: actor active at the revision and allowed to confir
 current policy; four-eyes policy → refused (`standing_rule_policy_insufficient`). `revoke_…(p_workspace_key,
 p_rule_id, p_actor_user_id)`: creator, or owner/admin. `revoke_all_…(p_workspace_key text default null)`.
 
-Runtime (WO-B-APL-2): when a steward `compile_plan` proposal is created and the flag is on, the server runs
-the **same `decideProposal` path** as the rule's creator (access re-check for every document, preview, quote,
-binding) passing `p_standing_rule_id` and the confirm-time quote as `p_rule_credits`; a row it confirmed but
-could not record is resumed by the next sweep after `PROPOSAL_RESUME_AFTER_MS` (no second debit: the row is
-no longer `proposed`). The receipt gains `approvedBy: {kind:'standing_rule', ruleId, createdBy, createdAt}`
-(`tavonel.action_receipt.v2`; the verifier accepts v1 and v2). Accepted residual: the actual re-charge can
-exceed the confirm-time quote (`[AN §9.2 #19]`, WO-AN-24); the rule bounds what it confirms, not what the
-meter later charges.
+### 4.1 Rule execution: an internal server path, never a session (M16, r20 B3)
+
+Runtime (WO-B-APL-2): `POST /api/internal/standing-approvals/run` (worker secret, `isInternalWorkerAuthorized`,
+`lib/internal-worker-auth.ts`), called by the steward sweep with `{workspaceKey, proposalId}` only. It does
+**not** call `requireProposalSession`, `revalidateFoundationSession`, `decideProposal` or any route handler, and
+it never builds a `Request` carrying a person's credential. The actor is `rule.created_by` (a user id read
+from the rule row, never from the request); `decide_world_change_proposal` is called with
+`p_decided_by = rule.created_by`, `p_standing_rule_id`, the binding the server computes, and the confirm-time
+quote as `p_rule_credits`, and the membership, scope, budget and policy checks happen **in SQL** inside that
+call (§3, §4 steps 1–9). Execution then runs the compile **as the creator's user id** through an internal
+compile entry (T14) that re-checks the creator's membership in SQL immediately before it enqueues.
+
+Each check the session path makes (`decideProposal` → `compilePlanExecutor` → `runCompile` →
+`POST /api/compile-jobs`, at `e9364899`), and what replaces it on the rule path:
+
+| # | Session-path check (TS, `file`) | Rule path: the SQL check that replaces it | Status |
+|---|---|---|---|
+| T1 | `requireProposalSession` → `getRequestUser`: a signed-in person (`change-proposals.ts:212`, `developer-auth.ts:331`) | identity is the rule row's `created_by`; `created_by = p_decided_by` (§4 step 3); the caller is the worker secret, not a person | replaced |
+| T2 | `foundationPilotAccess(user.id)`: the env access mode / pilot allow-list (`foundation-pilot.ts:65`) | none in SQL (it reads env). The internal path calls the same id-based function with `created_by` before the RPC; a refusal leaves the row `proposed` | **OPEN** (no SQL counterpart; env-based) |
+| T3 | `resolveWorkspaceAuthority`: membership row active (`developer-auth.ts:44`) | decider's membership `for share`, `state = 'active'` (§3 step 3) | replaced |
+| T4 | `authorizeFoundationSessionProduct(…, "observer")`: account grant / billing plan / trial (`self-service-trial.ts:87`) | none in SQL. The internal path calls the same id-based function with `created_by`; between that read and the RPC a plan change is not seen | **OPEN** (needs a SQL plan read; until then a read-then-decide window) |
+| T5 | `revalidateFoundationSession`: identity incl. `authorizationRevision` and role unchanged (`developer-auth.ts:358`) | creator's membership `authorization_revision = rule.authorization_revision` under the share lock (§4 step 5) — any role change, revoke or re-invite bumps it | replaced (stricter: pinned to rule creation, not to a session) |
+| T6 | `resolveRow`: executor, stored input parses, documents non-empty (`change-proposals.ts:342`) | §4 step 4 (`action_type = 'compile_plan'`, `principal_kind = 'steward'`); step 6 reads `input->'documentIds'` (an empty or non-array value is out of scope); step 7 reads the stored quote. The TS parse also stays (no session needed) | replaced + kept |
+| T7 | `checkDocuments` → `checkConnectorSourceAccessForViewer(ws, ids, user)` (`connector-source-access.ts:106`) | §4 step 6: `connector_documents_blocked(ws, ids)` and "no connector-bound document" → `standing_rule_source_access_denied`. The per-viewer ACL (`connector_documents_blocked_for_viewer`) is **not registered** in any migration at `e9364899`, so connector documents are refused outright on this path | **OPEN** for connector documents (refused until the per-viewer function is registered); uploads replaced |
+| T8 | preview digest the client rendered (`change-proposals.ts:636-637`) | no client exists; the rule's scope (step 6) and quote floor (step 7) are the approval, and the use row records the proposal id whose `input_sha256` is immutable | replaced |
+| T9 | `isResumable`: confirmed by this person ≥ `PROPOSAL_RESUME_AFTER_MS` ago (`change-proposals.ts:356`) | resume selects `state = 'confirmed' and decided_via_rule_id is not null and decided_at <= now() - interval` in SQL; such a row has `decided_by = rule.created_by` (§4 step 3 refused anything else) | replaced |
+| T10 | agent-origin flag and receipt signer (`change-proposals.ts:630-642`) | §4 step 4 refuses every non-steward row (`standing_rule_out_of_scope`); the v2 receipt signer is server config, read by the internal path, and an unsigned outcome is never recorded | replaced (N/A for steward rows) |
+| T11 | `preconditions`: re-quote, refuse over balance (`proposal-compile-plan.ts:273`) | the quote is the SQL `quote_foundation_compile_recharge`, called server-side; §4 step 7 floors the debit at the stored quote | kept (server read, no session) + floor in SQL |
+| T12 | `currentBinding` → binding compared by the RPC (`proposal-compile-plan.ts:263`) | unchanged: the server computes it, the RPC compares (`stale`) | kept |
+| T13 | base RPC checks (expired, withdrawn, stale, decidable) | unchanged (§3 steps 4–7) | kept |
+| T14 | `runCompile` forwards the **confirming person's bearer** to `POST /api/compile-jobs`, whose `authorizeFoundationRequest(request, "collections:compile", "observer")` resolves a person (`proposal-compile-plan.ts:164`, `app/api/compile-jobs/route.ts:42`) | an internal compile entry (WO-B-APL-2) taking `{workspaceKey, userId: created_by, documentIds}`: membership re-checked in SQL (`state = 'active' and authorization_revision = rule.authorization_revision`, else `failed` / `standing_rule_creator_inactive`), then the route's id-based gates (intake lineage, customer-source admission, source access as in T7, trial capacity) and the enqueue | **OPEN** (does not exist at `e9364899`; WO-B-APL-2 builds it; until then no rule executes) |
+
+Fail closed: while any row above is OPEN in a way that blocks execution (T14), the flag
+`TAVONEL_STANDING_APPROVALS_ENABLED` cannot be turned on (the autopilot capability receipt of WO-B-APL-FLIP names each row). A rule-confirmed row that
+was confirmed but could not record is resumed by the next sweep after `PROPOSAL_RESUME_AFTER_MS` (T9; no second
+debit: the row is no longer `proposed`, and the use row is unique per proposal). The receipt gains
+`approvedBy: {kind:'standing_rule', ruleId, createdBy, createdAt}` (`tavonel.action_receipt.v2`; the verifier
+accepts v1 and v2). Accepted residual: the actual re-charge can exceed the confirm-time quote
+(`[AN §9.2 #19]`, WO-AN-24); the rule bounds what it confirms, not what the meter later charges.
 
 ## 5. Steward (S3) and notifications
 
@@ -266,7 +312,7 @@ test compares its lists with `actionTypesThrough(slot)` / `agentScopesThrough(sl
 
 | Shared object | B-01 | B-02 | KS-1 | B-03 |
 |---|---|---|---|---|
-| `world_change_proposals_action_type_check`, `…_binding_kind_check`, `…_binding_pairing_check`, proposer CHECK per type | + `world_activation` (session only), pairing with `active_manifest` | — | + `competency_questions_set`, `ontology_patch`, binding `question_set`; both require `collection_id`; input bound 8,192 → 16,384 | — |
+| `world_change_proposals_action_type_check`, `…_binding_kind_check`, `…_binding_pairing_check`, proposer CHECK per type | + `world_activation`, `world_rollback` (session only), each paired with `active_manifest` | — | + `competency_questions_set`, `ontology_patch`, binding `question_set`; both require `collection_id`; input bound 8,192 → 16,384 | — |
 | `create_world_change_proposal` body (signature unchanged) | pairing list | steward cap, principal check, reserved key namespaces | pairing list, input bound | — |
 | `decide_world_change_proposal` | **drop + recreate** (§3, §4) | — | — | — |
 | `foundation_approval_policies.action_type` CHECK | 4 types | — | + 2 KS types | — |
@@ -399,13 +445,61 @@ approved; only the customer's confirmation in TAVONEL does." where it names a co
 
 | Thing | Single owner | Others |
 |---|---|---|
-| `world_activation` executor (`lib/proposal-world-activation.ts`) | WO-B-GOV-2: `parse` `{collectionId, toManifestDigest, reason 8..500}`; `documentsOf` = the candidate's provenance set (`list_collection_candidates`); binding `active_manifest` (`NO_BINDING_DIGEST` when empty); `prepare` refuses unless the digest is a readable candidate; `run` = the route's gate chain with the proposal id as operation id (the atomic guard is the pointer CAS in `transition_foundation_world_atomic`); **no `undo`** (M6) | WO-AN-21 adds the step-up requirement and nothing else (M7) |
+| `world_activation` executor (`lib/proposal-world-activation.ts`) | WO-B-GOV-2: `parse` = `parseWorldTransitionInput("world_activation", …)` (§10.1); `documentsOf` = the candidate's provenance set (`list_collection_candidates`); binding `active_manifest` = `worldTransitionBindingDigest(input)`; `prepare` refuses unless the digest is a readable candidate and reads the expected Active state **once, here**; `run` = the promote route's gate chain with the proposal id as operation id and the **stored** expectations (§10.1); **no `undo`** (M6) | WO-AN-21 adds the step-up requirement and nothing else (M7) |
+| `world_rollback` executor (same file, M17) | WO-B-GOV-2: `parse` = `parseWorldTransitionInput("world_rollback", …)` (state `active` only); `documentsOf` = the target version's provenance set (what `checkRollbackSourceAccess` reads); `prepare` refuses unless the target is a `superseded` version of the collection, readable by the proposer; `run` = the **rollback route's** gate chain (`authorizeFoundationProduct(…, "activation")`, owner/admin, `checkActivationRateLimit(…, "world_activation")`, `checkRollbackSourceAccess`) then `rollbackFoundationWorld` — the existing `p_action = 'rollback'` branch, no source-currency gate (going back to superseded sources is its purpose); **no `undo`** | session-only; no agent scope |
 | `/governance` flip | WO-B-GOV-FLIP | WO-AN-16 supplies the agent-proposal evidence (receipts, activity export, enterprise audit export) to the GOV-FLIP capability receipt; flips nothing (M13) |
 | `/steward` flip | WO-KS-9 (on WO-KS-8's receipt) | WO-B-STW-FLIP afterwards only reconciles copy for cluster B's additions (M14) |
 | `/autopilot` flip | WO-B-APL-FLIP | — |
 | `/skills` flip | WO-B-SKL-FLIP | — |
 
 Every flip states capability only, never an outcome, a gain or a customer result (`[LR 2]`).
+
+### 10.1 World transition proposals bind the state the approver saw (M15, M17; r20 B2, B4)
+
+**Stored input** (exactly these keys, `WORLD_TRANSITION_INPUT_KEYS`; parser `parseWorldTransitionInput`, which
+refuses and never defaults): `collectionId`, `toManifestDigest`, `expectedCurrentState` (`empty` | `active`),
+`expectedCurrentRevision`, `expectedCurrentManifestDigest`, `reason`. The pairings are the transition RPC's own
+(`20260920120000:209-227`): `empty` ⇔ revision `0` and digest `null`; `active` ⇔ a safe integer revision ≥ 1
+and a `sha256:` digest. Refused as well: a `world_rollback` from `empty` (the RPC raises
+`world_active_pointer_missing`), a target equal to the expected digest (a proposal that changes nothing),
+`NO_BINDING_DIGEST` standing for a real World, a reason the RPC would refuse (code points 8..500) or one with
+surrounding whitespace (the stored reason is the RPC's `p_reason` byte for byte, and it is hashed into the
+request). `prepare` reads the Active pointer once, at creation, and stores what it read; the preview shows it,
+so the person confirming confirms *from that state*. The binding digest is the stored expected digest
+(`NO_BINDING_DIGEST` when `empty`), so the decide RPC already turns a moved pointer into `stale` before
+execution.
+
+**Execution.** `run` calls the transition with `p_operation_id = proposal_id`, `p_action =
+WORLD_TRANSITION_SQL_ACTION[type]`, `p_expected_current_state/revision/manifest_digest` = **the stored values**,
+`p_actor_user_id = row.decided_by`, `p_reason` = the stored reason. It never reads the pointer at run time.
+Outcomes:
+
+| What the RPC finds | Recorded as |
+|---|---|
+| pointer equals the stored triple | `executed`, the transition receipt's `receiptSha256` in the action receipt |
+| pointer moved (`world_transition_compare_and_swap_conflict`; also the A→B, A→C race and an A→B→A revision change, which a digest alone would miss) | `failed`, code `ACTIVE_WORLD_CONFLICT` — fail closed, nothing applied; a new proposal from the new state is the way forward |
+| target is not a `superseded` version / pointer missing (rollback) | `failed`, `ROLLBACK_TARGET_CONFLICT` / `ROLLBACK_TARGET_NOT_FOUND` |
+| any other refusal of a gate in the chain | `failed` with that gate's code |
+
+**Resume after a failed record is idempotent under that binding.** The first invocation and every resume send
+the same `(operation_id, action, workspace, collection, target, candidate binding, expected state, expected
+revision, expected digest, actor, reason)`: all of it is stored on the proposal or derived from the target's
+immutable candidate key, so `foundation_world_transition_request_sha256` is identical and the RPC answers
+`replayed` with the first receipt instead of `world_transition_idempotency_conflict`
+(`20260920120000:272-300`). The resume first **reads the transition receipt by `operation_id = proposal_id`**
+(a read; WO-B-GOV-2 adds it to `lib/world-store.ts`): when it exists **and its `request_sha256`,
+`workspace_key`, `collection_id` and `actor_user_id` equal those of the stored call** the outcome is `executed`
+with that receipt, whatever happened to the actor's role since (the replay branch re-checks the actor's
+`authorization_revision` and would otherwise turn an effect that did happen into a failure); a receipt under
+that operation id that does not match (the direct routes accept a client-chosen operation id, and a proposal
+id is visible once created) is `failed` / `WORLD_TRANSITION_IDEMPOTENCY_CONFLICT`, never `executed`; when no
+receipt exists the call above runs once more with the stored values. After any refusal from the RPC the executor reads
+the receipt again before recording, so an effect that committed is never recorded as `failed`. Only the
+confirmer resumes (`isResumable`), so `p_actor_user_id` cannot differ between attempts.
+
+**Policy.** Both kinds are decided by the `world_activation` policy row (`APPROVAL_POLICY_KEY`): an owner who
+sets four-eyes on activation has set it on rollback too. Default and floor `admin`, setter `owner`, as the
+transition RPC requires (`20260920120000:262-270`).
 
 ## 11. DTO pairs (internal row type ≠ public type; never one type with a filter)
 
@@ -435,7 +529,8 @@ Every flip states capability only, never an outcome, a gain or a customer result
 | `APPROVAL_POLICY_REVISION_CONFLICT` | 409 | `approval_policy_revision_conflict` |
 | `ACTIVATION_REQUIRES_APPROVAL` | 409 | — |
 | `PROPOSAL_PRINCIPAL_INACTIVE` | 409 | `proposal_principal_inactive` |
-| `STANDING_RULE_REVOKED`, `…_EXPIRED`, `…_BUDGET_EXHAUSTED`, `…_CREATOR_INACTIVE`, `…_POLICY_INSUFFICIENT`, `…_OUT_OF_SCOPE` | 409 (rule APIs; on matching they only leave the row `proposed`) | `standing_rule_*` |
+| `STANDING_RULE_REVOKED`, `…_EXPIRED`, `…_BUDGET_EXHAUSTED`, `…_CREATOR_INACTIVE`, `…_POLICY_INSUFFICIENT`, `…_OUT_OF_SCOPE`, `…_SOURCE_ACCESS_DENIED` | 409 (rule APIs; on matching they only leave the row `proposed`) | `standing_rule_*` |
+| `ACTIVE_WORLD_CONFLICT`, `ROLLBACK_TARGET_CONFLICT`, `ROLLBACK_TARGET_NOT_FOUND` (existing, `lib/world-store.ts`) | recorded in a `failed` world-transition outcome (§10.1) | `world_transition_compare_and_swap_conflict`, `world_rollback_target_*` |
 | `STEWARD_ITEM_STATE_CHANGED`, `STEWARD_ITEM_TRANSITION_ILLEGAL`, `STEWARD_ITEM_PROPOSAL_CONFLICT` | 409 | `steward_item_*` |
 | `NOTIFY_ENDPOINT_LIMIT` / `NOTIFY_ENDPOINT_URL_UNSAFE` | 429 / 400 | `notify_endpoint_limit` |
 | `SKILL_UPGRADE_REQUIRES_REAPPROVAL` | 409 | `skill_upgrade_requires_reapproval` |
@@ -464,15 +559,21 @@ WO-AN-* did).
 ## 14. OPEN (not provable by this ADR)
 
 U17, U31, U37, M9-03/04/05 stay OPEN. Production apply of B-01/B-02/KS-1/B-03; real hosts on the agent path;
-the action-receipt signer in production; the spend ceiling (WO-AN-24); every start value.
+the action-receipt signer in production; the spend ceiling (WO-AN-24); every start value. On the standing-rule
+path (§4.1): T2 (env access mode, no SQL counterpart), T4 (plan level, no SQL read), T7 for connector
+documents (per-viewer SQL not registered; refused meanwhile), T14 (internal compile entry, not built; no rule
+executes until it exists).
 
 ## 15. Attack and dispositions
 
 **Independence.** The work order asks for a separate attacker and verifier agent. The implementing session
 could not start agents, so the brief is at `D:/CodexProjects/v34-lanes/receipts/WO-B-00/ATTACK-BRIEF.md`; the
-lane's independent reviewer acts as attacker and verifier against the code at `e9364899` and appends its
-findings in §15.2, each with a disposition, before WO-B-01, WO-B-02 or WO-KS-1 is dispatched. §15.1 is the
-implementer's own pass: **not independent**, recorded so the reviewer can check it, not as evidence.
+lane's independent reviewer acted as attacker and verifier against the code at `e9364899` (review round r20,
+`receipts/review-WO-B-00/r20/`; its findings and the lead's rulings are in `receipts/blockers/WO-B-00.md`).
+§15.1 is the implementer's own pass: **not independent**, recorded so the reviewer can check it, not as
+evidence. §15.2 holds the r20 findings with their rulings and one disposition row for every option this ADR
+considered. Whether WO-B-01, WO-B-02 and WO-KS-1 are dispatchable is the reviewer's verdict on this closing
+round, not this document's.
 
 ### 15.1 Implementer's self-attack (checked against the code at `e9364899`)
 
@@ -504,8 +605,77 @@ implementer's own pass: **not independent**, recorded so the reviewer can check 
 | S-24 | Cross-tenant rule use (rule id from another workspace) | §4 step 1 | **Adopted**: workspace equality, same refusal as revoked |
 | S-25 | Hostile text in a steward fact, CQ, Skill input or label reaches a template slot | `[B §3]` last rule | **Adopted** as invariant: facts are ids/digests/counts (≤ 4 KB, CHECK), subject keys are id-pattern, CQ text and labels are data rendered in `<q><bdi>`, Skill inputs are ids/enums; WO-B-06 runs ≥ 100 generated cases |
 
-### 15.2 Independent attacker and verifier findings
+### 15.2 Dispositions
 
-*(Appended by the lane's independent reviewer per the brief. Until this section holds the attacker's
-findings, the verifier's check of each against `e9364899`, and a disposition per finding, WO-B-01, WO-B-02
-and WO-KS-1 are not dispatchable.)*
+**(a) Independent review r20 — findings, the check against `e9364899`, the lead's ruling (2026-11-18).**
+
+| # | Finding | Checked against the code | Ruling and where it is written |
+|---|---|---|---|
+| R-1 | The dispositions section is empty | §15.2 held only a placeholder at `acff6a77` | **Adopted**: this section — the r20 rows here, every considered option in (b) |
+| R-2 | The activation proposal stores the digest, not the revision the approver saw: two approved proposals A→B and A→C both apply (C on top of B); a resume after a failed record hits an idempotency conflict | The transition's request hash covers expected state, revision and digest (`20260920120000:70-83`, `:247-252`); a replay with a re-read expectation differs → `world_transition_idempotency_conflict` (`:272-284`); the CAS compares revision and digest (`:323-328`) | **Adopted** M15: state, revision and digest bound at creation, the executor passes the stored values and never a re-read, a mismatch is `failed` / `ACTIVE_WORLD_CONFLICT`; resume reads the receipt by operation id (§10.1). Parser and its property tests: `parseWorldTransitionInput` |
+| R-3 | The standing-rule runtime "runs the same `decideProposal` path as the rule's creator", which needs the creator's live session | `requireProposalSession` (`change-proposals.ts:212`), `revalidateFoundationSession` (`:639`), `isResumable` keyed to the viewer (`:356`), `runCompile` forwards the request's bearer (`proposal-compile-plan.ts:167`) | **Adopted** M16: internal worker-secret path, creator's membership checked in SQL, creator's user id as actor, no session forged; TS-check → SQL-check table §4.1 with T2, T4, T7 (connector), T14 OPEN |
+| R-4 | "Going back is a new activation proposal" fails for the common case: the promote chain is forward-only and refuses superseded sources | `transition_foundation_world_atomic_current` runs `assert_world_sources_current` (`20261001170000:159-173`, `world_source_revision_superseded` `:152`); the rollback branch exists for a `superseded` target (`20260920120000:357-366`) | **Adopted** M17: `world_rollback` is its own proposal kind over the existing rollback transition, decided by the `world_activation` policy row (§2.1, §3, §10, §10.1) |
+
+**(b) Every option this ADR considered — one row each.**
+
+| # | Question | Option | Decision | Reason |
+|---|---|---|---|---|
+| O-1 | Who supplies the decider's role | caller passes `p_approver_role` | Rejected | any TS defect or the flag-off path becomes "owner approved" (S-2) |
+| O-2 | | the RPC reads it from `foundation_workspace_members` under a share lock | **Adopted** (M1) | the database is the authority; nothing to forge |
+| O-3 | What the policy flag does | flag off = policy not evaluated | Rejected | a switch that lifts a stored restriction fails open (S-3) |
+| O-4 | | stored policy always enforced; the flag gates writing policies and the surface | **Adopted** (M2) | no row = today either way; a restriction is never lifted by an operator switch |
+| O-5 | Where the standing-rule debit happens | separate consume RPC before execution | Rejected | two transactions: confirm-without-debit or debit-without-confirm (S-1) |
+| O-6 | | inside `decide_world_change_proposal`, same transaction | **Adopted** (M3) | one commit decides both |
+| O-7 | Binding kind of an activation | new kind `active_pointer` | Rejected | a second name for "the collection's Active digest" (S-21, S-22) |
+| O-8 | | existing `active_manifest`, `NO_BINDING_DIGEST` when empty | **Adopted** (M4) | one meaning; every binding column stays `^sha256:` |
+| O-9 | | a null binding for "no Active World" | Rejected | every binding column and parameter is `^sha256:` (`20261116130100:35`) |
+| O-10 | Default role for `world_activation` | `member` | Rejected | the transition refuses non-admins; a member could confirm what can only fail (S-4) |
+| O-11 | | `admin` default and floor, `owner` sets the policy | **Adopted** (M5) | the transition RPC's own floor (`20260920120000:262-270`) |
+| O-12 | How the activation executor runs | direct `promoteFoundationCandidate` call | Rejected | skips plan gate, rate ceiling and source currency (S-5) |
+| O-13 | | the promote route's gate chain, extracted into one function both use | **Adopted** (M6) | the proposal path is never weaker than the route |
+| O-14 | How a World goes back | `undo` on the executed activation | Rejected | a one-person Active change past four-eyes and later step-up (S-6) |
+| O-15 | | a new `world_activation` proposal to the previous digest | Rejected | the forward chain refuses superseded sources — the common case (r20 B4) |
+| O-16 | | its own kind `world_rollback` over the existing rollback transition | **Adopted** (M17) | the transition already has a checked rollback branch; four-eyes applies |
+| O-17 | | the direct rollback route only | Kept **only with no approval policy** (§3) | under a policy it is a one-person Active change, so it answers `ACTIVATION_REQUIRES_APPROVAL` |
+| O-18 | Which policy decides a rollback | its own `world_rollback` policy row | Rejected | four-eyes on activation could be walked around by a one-person rollback |
+| O-19 | | the `world_activation` row (`APPROVAL_POLICY_KEY`) | **Adopted** (M17) | one policy for every Active change; source test pins equal defaults/floor/setter |
+| O-20 | What an activation proposal binds | the target digest; the executor re-reads the pointer | Rejected | A→B and A→C both apply; resume hits an idempotency conflict (r20 B2) |
+| O-21 | | digest bound, revision re-read at run time | Rejected | A→B→A passes a digest check; a re-read is still a re-read |
+| O-22 | | state, revision and digest stored at creation; the executor passes the stored values | **Adopted** (M15) | the CAS refuses any state the approver did not see; the replay hash is stable |
+| O-23 | | binding digest = a hash of (state, revision, digest) | Rejected | changes the meaning of `active_manifest` (O-8) and the decide RPC compares against the pointer's digest; the transition's CAS already checks the revision |
+| O-24 | How a resume after a failed record runs | re-run the transition with re-read expectations | Rejected | different request hash under the same operation id → `world_transition_idempotency_conflict` |
+| O-25 | | re-run with the stored values only | Rejected alone | the replay branch re-checks the actor's authorization and would record an applied effect as `failed` |
+| O-26 | | read the receipt by operation id first; else the stored-value call; re-read the receipt after any refusal | **Adopted** (§10.1) | the effect, not the error, decides the recorded outcome |
+| O-27 | Number of `world_activation` executors | one in cluster B and one in WO-AN-21 | Rejected | two paths to the same Active change (S-22) |
+| O-28 | | one (WO-B-GOV-2); WO-AN-21 adds step-up, scope, tool, proposer widening | **Adopted** (M7) | the step-up then binds every confirmation |
+| O-29 | Steward open-proposal cap | as written, via `p_open_limit` | Rejected | the base RPC refuses `p_open_limit` for non-agents (`20261117130000:354`) |
+| O-30 | | counted in TS | Rejected | races |
+| O-31 | | body of `create_world_change_proposal` replaced, signature unchanged | **Adopted** (M8) | counted under an advisory key in the same transaction |
+| O-32 | Rule scope and credit floor | checked in TS | Rejected | a TS defect confirms out of scope or debits 0 (S-10, S-11) |
+| O-33 | | checked in SQL inside decide | **Adopted** (M9) | |
+| O-34 | How a standing rule executes | the same `decideProposal` path as the creator | Rejected | needs the creator's live session (r20 B3) |
+| O-35 | | mint a session or token for the creator | Rejected | a forged identity; the constitution's self-approval and secret rules |
+| O-36 | | internal worker-secret path; creator's membership in SQL; creator's id as actor | **Adopted** (M16) | no session needed; every session check mapped in §4.1, unmapped ones OPEN |
+| O-37 | | ask the creator to click each time | Rejected | that is not a standing rule; it is today's path, which stays available |
+| O-38 | Source access on the rule path | the TS per-viewer check by user id | Rejected | not SQL (the ruling); its SQL function is not registered |
+| O-39 | | `connector_documents_blocked` in SQL, connector-bound documents refused until a per-viewer SQL check exists | **Adopted** (§4 step 6) | fail closed; uploads keep working |
+| O-40 | | no access check on the rule path | Rejected | a lost source would compile |
+| O-41 | Plan gate on the rule path | id-based TS read before the RPC, listed OPEN | **Adopted for now** (§4.1 T4) | no SQL plan read exists; the window is named, not hidden |
+| O-42 | Consent for new agent tools | consent-version column and `CONSENT_OUTDATED` | Rejected | a changed sentence covers old grants that never saw it (S-12) |
+| O-43 | | a new scope per new sentence (rule C1) | **Adopted** (M10) | opt-in is explicit; no new mechanism |
+| O-44 | Grant body | `{clientLabel, steward?: boolean}` | Rejected | one boolean per future scope |
+| O-45 | | `{clientLabel, optionalScopes?: string[]}` | **Adopted** (M11) | fixed shape as scopes arrive |
+| O-46 | `run_skill` through the agent | read and propose Skills | Rejected | a tool declared read would file proposals (S-16) |
+| O-47 | | read-mode Skills only | **Adopted** (M12) | one mode per tool |
+| O-48 | `/governance` flip owner | WO-AN-16 | Rejected | two flippers for one route |
+| O-49 | | WO-B-GOV-FLIP only | **Adopted** (M13) | `[LR 1]` |
+| O-50 | `/steward` flip owner | WO-B-STW-FLIP | Rejected | the A2 receipt comes from WO-KS-8 |
+| O-51 | | WO-KS-9 | **Adopted** (M14) | `[LR 1]` |
+| O-52 | Where the ontology patch runs | Core `evaluate_ontology_patch` now | Rejected | Protected Core ladder (contract → shadow → benchmark → canary) |
+| O-53 | | Product-side | **Adopted** (§8) | `[LR 16]` |
+| O-54 | Who writes steward and brief sentences | a TAVONEL-hosted model | Rejected | `[MP 229]`, `[LR 16]`; no model on customer data |
+| O-55 | | server templates over durable facts | **Adopted** (§0) | |
+| O-56 | Decide vs role-change lock order (S-17) | reorder the existing role-change locks | Rejected | edits a shipped function outside this cluster for a liveness-only gain |
+| O-57 | | accept: one side aborts with 40P01, nothing written | **Accepted residual** | both sides fail closed; B-01 race harness shows it |
+| O-58 | A sole owner lowers four-eyes, acts, restores it (S-19) | forbid policy changes by a sole owner | Rejected | would lock a one-person workspace out of its own settings |
+| O-59 | | accept; every change is a signed trail event | **Accepted residual** | visible, not prevented |

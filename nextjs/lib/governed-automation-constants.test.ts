@@ -10,6 +10,8 @@ import {
   RESERVED_IDEMPOTENCY_PREFIXES, SKILL_FILABLE_ACTION_TYPES, STANDING_RULE_ACTION_TYPES, STANDING_RULE_MATCHED_PRINCIPALS,
   STEWARD_DEDUPE_PREFIX, STEWARD_ITEM_KINDS, STEWARD_ITEM_PRIORITY, STEWARD_ITEM_STATES, STEWARD_PERSON_TRANSITIONS,
   STEWARD_PRIORITY_CLASSES, STEWARD_PROPOSING_KINDS, STEWARD_SWEEP_TRANSITIONS, actionTypesThrough, agentScopesThrough,
+  APPROVAL_POLICY_KEY, WORLD_TRANSITION_ACTION_TYPES, WORLD_TRANSITION_INPUT_KEYS, WORLD_TRANSITION_SQL_ACTION,
+  parseWorldTransitionInput, policyActionTypesThrough, worldTransitionBindingDigest,
 } from "./governed-automation-constants";
 import * as constants from "./governed-automation-constants";
 
@@ -111,8 +113,9 @@ describe("every action type has every row (no default anywhere)", () => {
 });
 
 describe("activation is never automatic", () => {
-  it("R2 is world_activation only, and no R3 type exists", () => {
-    expect(GOVERNED_ACTION_TYPES.filter((t) => ACTION_RISK_TIER[t] === "R2")).toEqual(["world_activation"]);
+  it("R2 is the two Active-changing transitions only, and no R3 type exists", () => {
+    expect(GOVERNED_ACTION_TYPES.filter((t) => ACTION_RISK_TIER[t] === "R2")).toEqual([...WORLD_TRANSITION_ACTION_TYPES]);
+    expect([...WORLD_TRANSITION_ACTION_TYPES]).toEqual(["world_activation", "world_rollback"]);
     expect(GOVERNED_ACTION_TYPES.filter((t) => ACTION_RISK_TIER[t] === "R3" || ACTION_RISK_TIER[t] === "R0")).toEqual([]);
   });
 
@@ -155,6 +158,135 @@ describe("approval policy", () => {
       expect(APPROVER_ROLE_RANK[POLICY_SETTER_MIN_ROLE[type]]).toBeGreaterThanOrEqual(APPROVER_ROLE_RANK.admin);
     }
     expect(POLICY_SETTER_MIN_ROLE.world_activation).toBe("owner");
+  });
+
+  it("one policy row governs every Active change: a rollback reads the activation row (B4)", () => {
+    expect(Object.keys(APPROVAL_POLICY_KEY).sort()).toEqual([...GOVERNED_ACTION_TYPES].sort());
+    expect(APPROVAL_POLICY_KEY.world_rollback).toBe("world_activation");
+    for (const type of GOVERNED_ACTION_TYPES) {
+      const key = APPROVAL_POLICY_KEY[type];
+      // A key is itself a row of the policy table, and a type read through another key decides exactly as that key.
+      expect(APPROVAL_POLICY_KEY[key], type).toBe(key);
+      expect(ACTION_RISK_TIER[key], type).toBe(ACTION_RISK_TIER[type]);
+      expect(DEFAULT_APPROVAL_POLICY[type], type).toEqual(DEFAULT_APPROVAL_POLICY[key]);
+      expect(APPROVAL_POLICY_FLOOR[type], type).toBe(APPROVAL_POLICY_FLOOR[key]);
+      expect(POLICY_SETTER_MIN_ROLE[type], type).toBe(POLICY_SETTER_MIN_ROLE[key]);
+    }
+    for (const type of GOVERNED_ACTION_TYPES.filter((t) => APPROVAL_POLICY_KEY[t] === t && t !== "world_activation")) {
+      expect(ACTION_RISK_TIER[type], `${type} is its own key and not Active-changing`).toBe("R1");
+    }
+  });
+
+  it("the policy table's CHECK holds the keys only, in migration order", () => {
+    expect(policyActionTypesThrough("existing")).toEqual(actionTypesThrough("existing"));
+    expect(policyActionTypesThrough("B-01")).toContain("world_activation");
+    expect(policyActionTypesThrough("B-03")).not.toContain("world_rollback");
+    for (const slot of GOVERNED_MIGRATION_ORDER) {
+      expect(policyActionTypesThrough(slot)).toEqual(actionTypesThrough(slot).filter((t) => APPROVAL_POLICY_KEY[t] === t));
+    }
+    expect(() => policyActionTypesThrough("B-04" as never)).toThrow(TypeError);
+  });
+});
+
+describe("world transition proposals bind the state the approver saw (B2, B4)", () => {
+  const A = `sha256:${"a".repeat(64)}`;
+  const B = `sha256:${"b".repeat(64)}`;
+  const collectionId = `collection-${"c".repeat(32)}`;
+  const active = { collectionId, toManifestDigest: B, expectedCurrentState: "active", expectedCurrentRevision: 3,
+    expectedCurrentManifestDigest: A, reason: "Back to the March World" };
+  const empty = { ...active, expectedCurrentState: "empty", expectedCurrentRevision: 0, expectedCurrentManifestDigest: null };
+
+  it("each kind calls the existing transition with its own SQL action", () => {
+    expect(WORLD_TRANSITION_SQL_ACTION).toEqual({ world_activation: "activate", world_rollback: "rollback" });
+    expect(activationMigration).toContain("p_action not in ('activate', 'rollback')");
+  });
+
+  it("the stored expectations come back exactly, and the binding is the stored digest (never a re-read)", () => {
+    for (const type of WORLD_TRANSITION_ACTION_TYPES) {
+      expect(parseWorldTransitionInput(type, active)).toEqual(active);
+      expect(worldTransitionBindingDigest(parseWorldTransitionInput(type, active)!)).toBe(A);
+    }
+    expect(parseWorldTransitionInput("world_activation", empty)).toEqual(empty);
+    expect(worldTransitionBindingDigest(parseWorldTransitionInput("world_activation", empty)!)).toBe(NO_BINDING_DIGEST);
+    expect([...WORLD_TRANSITION_INPUT_KEYS].sort()).toEqual(Object.keys(active).sort());
+  });
+
+  it("a rollback needs an Active World (the SQL raises world_active_pointer_missing), and no proposal moves to where it is", () => {
+    expect(activationMigration).toContain("raise exception 'world_active_pointer_missing'");
+    expect(parseWorldTransitionInput("world_rollback", empty)).toBeNull();
+    for (const type of WORLD_TRANSITION_ACTION_TYPES) expect(parseWorldTransitionInput(type, { ...active, toManifestDigest: A })).toBeNull();
+  });
+
+  it("the pairing it mirrors is the base migration's own (20260920120000)", () => {
+    expect(activationMigration).toContain("p_expected_current_state not in ('empty', 'active')");
+    expect(activationMigration).toContain("and (p_expected_current_revision <> 0 or p_expected_current_manifest_digest is not null))");
+    expect(activationMigration).toContain("and (p_expected_current_revision <= 0 or p_expected_current_manifest_digest is null))");
+    expect(activationMigration).toContain("char_length(p_reason) not between 8 and 500");
+  });
+
+  /*
+    The class: any stored value the transition RPC would refuse, or any value that leaves an expectation to be
+    filled at run time, is refused at parse -- never defaulted. A seeded generator walks every field through a
+    hostile pool and every (state, revision, digest) combination through an oracle written from the SQL text.
+  */
+  const HOSTILE: unknown[] = [
+    undefined, null, NaN, Infinity, -Infinity, -1, 1.5, 2 ** 53, Number.MAX_VALUE, "3", "", " ", true, false, {}, [], [3],
+    A.toUpperCase(), NO_BINDING_DIGEST, `sha256:${"g".repeat(64)}`, `sha256:${"a".repeat(63)}`, ` ${A}`, `collection-${"C".repeat(32)}`,
+    "x".repeat(100_000), "short", ` ${active.reason}`, BigInt(3), () => 3, new Date(0), Object.create(null),
+  ];
+
+  it("property: every hostile value in every field is refused, and nothing throws", () => {
+    let refused = 0;
+    for (const type of WORLD_TRANSITION_ACTION_TYPES) {
+      for (const key of WORLD_TRANSITION_INPUT_KEYS) {
+        for (const [index, value] of HOSTILE.entries()) {
+          expect(() => parseWorldTransitionInput(type, { ...active, [key]: value })).not.toThrow();
+          // A digest-shaped string is still a legal reason (the SQL bounds only its length); every other cell is refused.
+          const legalReason = key === "reason" && typeof value === "string" && value === value.trim()
+            && [...value].length >= 8 && [...value].length <= 500;
+          expect(parseWorldTransitionInput(type, { ...active, [key]: value }) !== null, `${type}.${key}=HOSTILE[${index}]`).toBe(legalReason);
+          if (!legalReason) refused += 1;
+        }
+        const missing = Object.fromEntries(Object.entries(active).filter(([name]) => name !== key));
+        expect(parseWorldTransitionInput(type, missing), `${type} without ${key}`).toBeNull();
+      }
+      for (const raw of [...HOSTILE, JSON.parse(`{"__proto__":{"x":1},${JSON.stringify(active).slice(1)}`), { ...active, extra: 1 },
+        new Proxy(active, { ownKeys() { throw new Error("hostile"); } })]) {
+        expect(() => parseWorldTransitionInput(type, raw)).not.toThrow();
+        expect(parseWorldTransitionInput(type, raw)).toBeNull();
+      }
+    }
+    for (const type of ["", "compile_plan", "world_activation ", null, 1]) {
+      expect(parseWorldTransitionInput(type as never, active), String(type)).toBeNull();
+    }
+    expect(refused).toBeGreaterThan(WORLD_TRANSITION_ACTION_TYPES.length * (WORLD_TRANSITION_INPUT_KEYS.length - 1) * HOSTILE.length);
+  });
+
+  it("property: a (state, revision, digest) combination is accepted exactly when the SQL pairing accepts it", () => {
+    let seed = 0x5eed;
+    const next = () => { // mulberry32: deterministic, so a failure names a reproducible case
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32;
+    };
+    const pick = <T,>(values: readonly T[]) => values[Math.floor(next() * values.length)]!;
+    const states: unknown[] = ["empty", "active", "Active", "none", null];
+    const revisions: unknown[] = [0, 1, 2, 7, 2 ** 53 - 1, -1, 0.5, NaN, "1", null];
+    const digests: unknown[] = [null, A, NO_BINDING_DIGEST, B, "", undefined];
+    let accepted = 0;
+    for (let i = 0; i < 10_000; i += 1) {
+      const type = pick(WORLD_TRANSITION_ACTION_TYPES);
+      const state = pick(states), revision = pick(revisions), digest = pick(digests);
+      const raw = { ...active, expectedCurrentState: state, expectedCurrentRevision: revision, expectedCurrentManifestDigest: digest };
+      const sqlEmpty = state === "empty" && revision === 0 && digest === null;
+      const sqlActive = state === "active" && Number.isSafeInteger(revision) && (revision as number) >= 1
+        && typeof digest === "string" && /^sha256:[a-f0-9]{64}$/.test(digest) && digest !== NO_BINDING_DIGEST;
+      const oracle = (type === "world_activation" ? sqlEmpty || sqlActive : sqlActive) && digest !== B;
+      expect(parseWorldTransitionInput(type, raw) !== null, JSON.stringify({ type, state, revision: String(revision), digest })).toBe(oracle);
+      if (oracle) accepted += 1;
+    }
+    expect(accepted).toBeGreaterThan(50);
   });
 });
 

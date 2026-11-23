@@ -2,10 +2,12 @@
   Governed automation: the shared vocabulary of ADR docs/adr/0010-governed-automation.md (WO-B-00, merged
   with WO-KS-0). Every later work order of the approval policy, the steward, standing approvals, Skills and
   the Knowledge Steward reads its names, lists and start values from here, and every migration's text test
-  compares its CHECK lists with the lists below.
+  compares its CHECK lists with the lists below. The pure check at the end (world transition input, ADR
+  §10.1) is the one parser every executor and route of an Active-changing proposal uses.
 
   This module depends on nothing at all (a source test pins it), so a client panel can read it without
-  pulling in a Node built-in. Lists and numbers only: no secret, no flag value, no copy shown to customers.
+  pulling in a Node built-in. Lists, numbers and pure checks only: no secret, no flag value, no copy shown to
+  customers, no I/O.
 
   Every number here is a start value, uncalibrated: chosen for v1, not measured.
 */
@@ -31,14 +33,14 @@ export function appliedThrough(slot: GovernedMigrationSlot, through: GovernedMig
 // ---------------------------------------------------------------------------------------------------------
 
 export const GOVERNED_ACTION_TYPES = [
-  "library_label", "compile_plan", "ontology_label_patch", "world_activation", "competency_questions_set", "ontology_patch",
+  "library_label", "compile_plan", "ontology_label_patch", "world_activation", "world_rollback", "competency_questions_set", "ontology_patch",
 ] as const;
 export type GovernedActionType = (typeof GOVERNED_ACTION_TYPES)[number];
 
 /** Which migration adds the type to world_change_proposals_action_type_check. */
 export const ACTION_TYPE_INTRODUCED_BY: Readonly<Record<GovernedActionType, GovernedMigrationSlot>> = {
   library_label: "existing", compile_plan: "existing", ontology_label_patch: "existing",
-  world_activation: "B-01", competency_questions_set: "KS-1", ontology_patch: "KS-1",
+  world_activation: "B-01", world_rollback: "B-01", competency_questions_set: "KS-1", ontology_patch: "KS-1",
 };
 
 /** The action types a CHECK holds once `through` is applied, in GOVERNED_ACTION_TYPES order. */
@@ -56,7 +58,7 @@ export type RiskTier = (typeof RISK_TIERS)[number];
 
 export const ACTION_RISK_TIER: Readonly<Record<GovernedActionType, RiskTier>> = {
   library_label: "R1", compile_plan: "R1", ontology_label_patch: "R1", competency_questions_set: "R1", ontology_patch: "R1",
-  world_activation: "R2",
+  world_activation: "R2", world_rollback: "R2",
 };
 
 export const BINDING_KINDS = ["active_manifest", "source_inventory", "correction_leaf", "question_set"] as const;
@@ -65,7 +67,8 @@ export type BindingKind = (typeof BINDING_KINDS)[number];
 /** world_change_proposals_binding_pairing_check, one pair per action type. */
 export const ACTION_BINDING_KIND: Readonly<Record<GovernedActionType, BindingKind>> = {
   library_label: "active_manifest", compile_plan: "source_inventory", ontology_label_patch: "correction_leaf",
-  world_activation: "active_manifest", competency_questions_set: "question_set", ontology_patch: "correction_leaf",
+  world_activation: "active_manifest", world_rollback: "active_manifest", competency_questions_set: "question_set",
+  ontology_patch: "correction_leaf",
 };
 
 /**
@@ -87,6 +90,7 @@ export const ACTION_PROPOSER_KINDS: Readonly<Record<GovernedActionType, readonly
   compile_plan: ["session", "steward", "agent"],
   ontology_label_patch: ["session", "agent"],
   world_activation: ["session"],
+  world_rollback: ["session"],
   competency_questions_set: ["session", "agent"],
   ontology_patch: ["session", "agent"],
 };
@@ -118,19 +122,37 @@ export const DEFAULT_APPROVAL_POLICY: Readonly<Record<GovernedActionType, Approv
   competency_questions_set: { minRole: "member", distinctApprover: false },
   ontology_patch: { minRole: "member", distinctApprover: false },
   world_activation: { minRole: "admin", distinctApprover: false },
+  world_rollback: { minRole: "admin", distinctApprover: false },
 };
 
 /** The lowest role a policy row may name for the type (a row may tighten, never loosen below today). */
 export const APPROVAL_POLICY_FLOOR: Readonly<Record<GovernedActionType, ApproverRole>> = {
   library_label: "member", compile_plan: "member", ontology_label_patch: "member",
-  competency_questions_set: "member", ontology_patch: "member", world_activation: "admin",
+  competency_questions_set: "member", ontology_patch: "member", world_activation: "admin", world_rollback: "admin",
 };
 
 /** Who may write the policy row of each type. */
 export const POLICY_SETTER_MIN_ROLE: Readonly<Record<GovernedActionType, ApproverRole>> = {
   library_label: "admin", compile_plan: "admin", ontology_label_patch: "admin",
-  competency_questions_set: "admin", ontology_patch: "admin", world_activation: "owner",
+  competency_questions_set: "admin", ontology_patch: "admin", world_activation: "owner", world_rollback: "owner",
 };
+
+/**
+ * The policy row that decides each type (ADR §3, B4). Every Active change -- forward or back -- is decided by
+ * the one `world_activation` row: a separate rollback row would let a four-eyes activation policy be walked
+ * around by a one-person rollback. A type read through another key has that key's default, floor and setter
+ * (source test), so it decides exactly as the key does.
+ */
+export const APPROVAL_POLICY_KEY: Readonly<Record<GovernedActionType, GovernedActionType>> = {
+  library_label: "library_label", compile_plan: "compile_plan", ontology_label_patch: "ontology_label_patch",
+  world_activation: "world_activation", world_rollback: "world_activation",
+  competency_questions_set: "competency_questions_set", ontology_patch: "ontology_patch",
+};
+
+/** The action types foundation_approval_policies.action_type's CHECK holds once `through` is applied: the keys only. */
+export function policyActionTypesThrough(through: GovernedMigrationSlot): GovernedActionType[] {
+  return actionTypesThrough(through).filter((type) => APPROVAL_POLICY_KEY[type] === type);
+}
 
 /** An absent policy row reads as this revision; every stored row is >= 1. */
 export const ABSENT_POLICY_REVISION = 0;
@@ -295,3 +317,78 @@ export const GOVERNED_FLAGS = {
   notifyEmail: "TAVONEL_NOTIFY_EMAIL_ENABLED",
 } as const;
 export const GOVERNED_COHORT_MAX = 20;
+
+// ---------------------------------------------------------------------------------------------------------
+// World transition proposals (ADR §10.1, blockers B2 and B4). The proposal binds, at creation, the Active
+// state the approver saw: state, revision and manifest digest. The executor passes exactly these to
+// transition_foundation_world_atomic (20260920120000) and never a value re-read at run time, so two approved
+// proposals from the same state cannot both apply (the second meets the pointer CAS), and a resume repeats
+// the first call byte for byte (same request hash, same operation id).
+// ---------------------------------------------------------------------------------------------------------
+
+export const WORLD_TRANSITION_ACTION_TYPES = ["world_activation", "world_rollback"] as const satisfies readonly GovernedActionType[];
+export type WorldTransitionActionType = (typeof WORLD_TRANSITION_ACTION_TYPES)[number];
+
+/** The p_action each kind passes to the existing transition. A rollback uses the existing rollback branch (B4). */
+export const WORLD_TRANSITION_SQL_ACTION: Readonly<Record<WorldTransitionActionType, "activate" | "rollback">> = {
+  world_activation: "activate", world_rollback: "rollback",
+};
+
+/** The stored input's keys, sorted. Nothing else is stored and nothing is filled in later. */
+export const WORLD_TRANSITION_INPUT_KEYS = [
+  "collectionId", "expectedCurrentManifestDigest", "expectedCurrentRevision", "expectedCurrentState", "reason", "toManifestDigest",
+] as const;
+
+export type WorldTransitionInput = Readonly<{ collectionId: string; toManifestDigest: string; reason: string } & (
+  | { expectedCurrentState: "empty"; expectedCurrentRevision: 0; expectedCurrentManifestDigest: null }
+  | { expectedCurrentState: "active"; expectedCurrentRevision: number; expectedCurrentManifestDigest: string }
+)>;
+
+const TRANSITION_DIGEST = /^sha256:[a-f0-9]{64}$/;
+const TRANSITION_COLLECTION_ID = /^collection-[a-f0-9]{32}$/;
+/** char_length(p_reason) between 8 and 500 in the SQL counts code points; a UTF-16 length above 1,000 cannot fit. */
+const REASON_CODE_POINTS = { min: 8, max: 500 } as const;
+
+const isTransitionDigest = (value: unknown): value is string =>
+  typeof value === "string" && TRANSITION_DIGEST.test(value) && value !== NO_BINDING_DIGEST;
+
+/**
+ * The stored input of a world transition proposal, or null. Refuses, never defaults: an unknown kind, a key
+ * missing or extra, a wrong type, NaN/Infinity/a fraction/an unsafe integer, the (state, revision, digest)
+ * pairings the transition RPC refuses (`world_transition_expected_state_invalid`), a rollback from an empty
+ * collection (`world_active_pointer_missing`), a target equal to the expected Active digest (a proposal that
+ * changes nothing), the no-binding digest standing for a real World, and a reason the RPC would refuse or that
+ * is not stored exactly as passed (surrounding whitespace). Total: a hostile value that throws on read is a refusal.
+ */
+export function parseWorldTransitionInput(actionType: WorldTransitionActionType, raw: unknown): WorldTransitionInput | null {
+  try {
+    if (!(WORLD_TRANSITION_ACTION_TYPES as readonly unknown[]).includes(actionType)) return null;
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+    const keys = Object.keys(raw).sort();
+    if (keys.length !== WORLD_TRANSITION_INPUT_KEYS.length || keys.some((key, i) => key !== WORLD_TRANSITION_INPUT_KEYS[i])) return null;
+    const value = raw as Record<string, unknown>;
+    const { collectionId, toManifestDigest, reason } = value;
+    const state = value.expectedCurrentState;
+    const revision = value.expectedCurrentRevision;
+    const current = value.expectedCurrentManifestDigest;
+    if (typeof collectionId !== "string" || !TRANSITION_COLLECTION_ID.test(collectionId)) return null;
+    if (!isTransitionDigest(toManifestDigest)) return null;
+    if (typeof reason !== "string" || reason.length > REASON_CODE_POINTS.max * 2 || reason.trim() !== reason) return null;
+    const points = [...reason].length;
+    if (points < REASON_CODE_POINTS.min || points > REASON_CODE_POINTS.max) return null;
+    if (state === "empty") {
+      if (actionType === "world_rollback" || revision !== 0 || current !== null) return null;
+      return { collectionId, toManifestDigest, reason, expectedCurrentState: "empty", expectedCurrentRevision: 0, expectedCurrentManifestDigest: null };
+    }
+    if (state !== "active" || typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 1) return null;
+    if (!isTransitionDigest(current) || current === toManifestDigest) return null;
+    return { collectionId, toManifestDigest, reason, expectedCurrentState: "active", expectedCurrentRevision: revision, expectedCurrentManifestDigest: current };
+  } catch {
+    return null;
+  }
+}
+
+/** The proposal's binding digest (kind active_manifest): the stored expected Active digest, NO_BINDING_DIGEST when empty. */
+export function worldTransitionBindingDigest(input: WorldTransitionInput): string {
+  return input.expectedCurrentState === "empty" ? NO_BINDING_DIGEST : input.expectedCurrentManifestDigest;
+}
