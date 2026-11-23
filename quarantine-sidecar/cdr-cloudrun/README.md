@@ -101,6 +101,24 @@ The container suite verifies structured no-store health and disarm failure with 
 
 글자 지도 위조는 어떤 기하 규칙으로도 잡을 수 없다. 렌더 차분은 글자 자리에 잉크가 있다는 것만 보여 주고, 그 잉크가 레이어의 글자라는 것은 보여 주지 못한다. OCR 증인만 잡는다. 그래서 **`textlayer`는 경로 우선순위일 뿐 OCR 생략 허가가 아니다.** 같은 문서의 shadow OCR 증인이 그 쪽에서 일치하고 그 일치율이 창업자가 정한 임계값 이상이 되기 전에는, 텍스트 레이어가 어떤 쪽의 OCR 출력도 대신하지 않는다(ADR §3.5, §5, §8). worker 쪽은 구현하지 않았으므로 지금 OCR 생략은 0쪽이다. 깨진 레이어는 문서 전체를 `refused`로 돌려주고 텍스트를 하나도 내보내지 않는다. 문서를 만들지 않으므로 래스터 PDF는 그대로 유일한 하류 문서다. 시험은 `tests/test_text_layer.py`.
 
+## Native office cell reader (`/v1/native-read`, 기본 꺼짐)
+
+WO-E-TBL-1, `ADR-2026-11-18-structured-table-routes` route A. `TAVONEL_CDR_NATIVE_READ`는 부팅 때 한 번 읽는다. 미설정이나 `"0"`이면 라우트를 등록하지 않고 인증 경로도 늘리지 않으므로 서비스 동작이 바뀌지 않는다(`/v1/native-read`는 다른 없는 경로와 같은 404). 그 밖의 값이면 부팅하지 않는다. `service.yaml`은 `"0"`으로 배포한다.
+
+켜면 `/v1/disarm`과 같은 서명 요청, digest 확인, 악성코드 검사, Office 패키지 거부 뒤에 Core native parser(`parse_non_pdf_to_cir`)를 별도 child 프로세스에서 돌려 `tavonel.native_read.v1`(`shared/nativeReadContract.ts`)을 돌려준다. 표의 셀만 담는다: 컨테이너(시트·슬라이드·본문 순번), 표 번호, 통합문서의 셀 주소, 병합 범위. bbox는 내보내지 않는다. 수식은 원문과 파일에 저장된 캐시 값을 따로 담고 계산하지 않는다. 캐시 값의 상태는 `cached_unverified`, `cached_declared_stale`(통합문서가 `fullCalcOnLoad`로 스스로 낡았다고 선언), `cached_missing` 중 하나이고 "검증됨"은 없다. 숨긴 시트도 읽되 `hidden_sheet`로 표시한다. 외부 링크 파트·외부 관계, 매크로, 경로 탈출 멤버 이름, 압축 폭탄 모양 패키지, 시트당 500,000셀 초과는 parser가 거부한다.
+
+- 대상: DOCX, XLSX, PPTX. **CSV는 읽지 않는다**(Core parser가 받지 않는다). HTML·SRT·VTT는 이 경로로 보내지 않는다. 문단 텍스트·이미지·차트는 이 문서에 없다.
+- 실패는 모두 200 응답의 `native_read: "unavailable"`과 닫힌 이유 코드다(`document`/`operational` 구분). 빈 표 목록으로 실패를 감추지 않는다. 요청 경계(인증, digest, 악성코드 검사)만 오류 상태 코드로 거부한다.
+- PDF 경로는 이 reader와 무관하다. `/v1/disarm` 출력은 플래그가 꺼졌을 때, reader가 실패할 때, reader가 없을 때 같다(PDFium의 저장 시각 스탬프와 검사 시간만 호출마다 다르고, 이는 플래그와 무관하다). 시험은 `tests/test_native_reader.py`.
+
+**Vendored code.** `vendor/`는 Core `codex/v34-core-int` `783d8d0703878fcd805afb7fd136b6aae694aeb3`에서 `git show`로 바이트 그대로 복사한 47개 파일이고 `vendor/MANIFEST.json`이 파일별 sha256을 고정한다(`vendor/.gitattributes`는 줄바꿈 변환을 막는다). 수정하지 않는다. child가 import 직전에 매번 다시 확인하고, 하나라도 다르거나 목록에 없는 파일이 있으면 `reader_integrity_failed`다. 더 좁은 import 경로: `akc_security/__init__.py`(redis, cryptography, PIL을 import)와 `akc_native_parsers/__init__.py`(pypdf를 import)는 복사하지 않고 실행하지도 않는다. 두 패키지를 `__path__`만 가진 빈 패키지로 등록하고, parser가 `akc_security`에서 가져가는 네 이름은 실제 `__init__`이 가져오는 곳인 `akc_security/files.py`에서 채운다.
+
+**Child bounds.** `python -I -B`, LibreOffice와 같은 최소 환경, 요청 임시 디렉터리, stdin/stdout/stderr 닫음(traceback에 문서 내용이 실릴 수 있다). Kernel 한도: `RLIMIT_AS` 2 GiB, `RLIMIT_CPU` 30 s, `RLIMIT_FSIZE` 입력 상한 + 16 MiB, `RLIMIT_NOFILE` 64, `RLIMIT_NPROC` 0(스레드·프로세스 생성 불가). 각 한도를 설정 뒤 다시 읽어 확인하고, 하나라도 안 되면 `sandbox_unavailable`로 거부한다(`resource`가 없는 Windows 개발 PC가 그렇다). 그다음 Python 수준에서 socket 생성·이름 해석·프로세스 생성을 막는다. 벽시계 한도 40 s는 부모가 건다. 모든 수치는 시작값이고 측정값이 아니다. 단 하나의 로컬 측정(Windows, 이미지 아님, `v34-lanes/receipts/WO-E-TBL-1/measure.out.json`): 셀 100,000개 통합문서의 결과 JSON이 31.7 MB라 결과 상한 16 MiB에 걸려 `output_limit`가 된다. 지금 상한으로는 셀이 대략 5만 개를 넘는 통합문서는 native로 읽히지 않고 PDF 경로만 남는다.
+
+Cloud Run이 이 child에 주지 못하는 것: seccomp 필터나 child 전용 network namespace가 없다. 그래서 C 확장이 OS를 직접 불러 여는 소켓은 Python 수준 차단으로 막히지 않고, 그 경로는 `service.yaml`의 no-NAT VPC egress에 기대는데 production에 그 annotation이 있는지는 확인되지 않았다. Cloud Run(gen1/gVisor)이 위 `setrlimit`을 모두 지키는지도 확인되지 않았다. 지키지 않으면 child가 `sandbox_unavailable`로 거부한다.
+
+**아직 이미지에 없는 것.** reader의 Python 배포본(openpyxl, et-xmlfile, defusedxml, python-docx, python-pptx, XlsxWriter, lxml, beautifulsoup4, soupsieve, pydantic, pydantic-core, annotated-types, typing-inspection, typing-extensions)은 `requirements.txt`에 없다. NOTICE의 라이선스 문자열은 설치된 메타데이터에서 읽어야 하고 intake register 행도 필요하기 때문이다. 그 전까지 이미지에서 플래그를 켜면 `reader_absent`로 답한다.
+
 ## 측정 한도와 쪽 범위 래스터 (D1 1단계, 기본 꺼짐)
 
 production 한도는 `app.py`의 리터럴 `MAX_INPUT_BYTES`(5 MiB), `MAX_PAGES`(80), `MAX_OUTPUT_BYTES`(18 MiB) 그대로다. `service.yaml`은 아래 변수를 하나도 설정하지 않으며 `tests/test_service_definition.py`와 `nextjs/lib/intake-ceiling-cross-tree.test.ts`가 그것을 지킨다. 측정용으로만 띄운 **별도 Cloud Run 서비스**에서만 쓴다. production 서비스에 이 변수를 가진 revision이나 tag를 만들지 않는다: 다음 `gcloud run deploy --image`가 env를 물려받고, `latestRevision: true` traffic이면 그 revision이 production이 된다. 측정 전후로 production `/health`에 `measurementLimits`가 없음을 기록하고, 측정이 끝나면 측정 서비스를 지운다.

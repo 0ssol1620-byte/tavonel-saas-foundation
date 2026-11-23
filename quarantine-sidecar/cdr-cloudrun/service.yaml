@@ -66,6 +66,11 @@ spec:
             # /v1/text-layer answers 503 and nothing changes. Turning it on is a founder decision.
             - name: TAVONEL_CDR_TEXT_LAYER_FIRST
               value: "0"
+            # Native office cell reader (WO-E-TBL-1, native_reader.py). Off: /v1/native-read is
+            # not registered and /v1/disarm is unchanged. On needs the reader's dependencies in the
+            # image first (README "Native office cell reader"); until then it answers reader_absent.
+            - name: TAVONEL_CDR_NATIVE_READ
+              value: "0"
             # D1 intake ceiling stage (app.py STAGE_LIMITS). "0" = 5 MiB / 80 pages. "1" = 25 MiB /
             # 200 pages, deployed only after the §4.D stage-1 gates pass and before intake flips
             # (docs/runbooks/RELEASE_ORDER.md, "W2-D").

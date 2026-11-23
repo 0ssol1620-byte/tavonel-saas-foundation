@@ -15,7 +15,9 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 AuthCheck = Callable[[str | None, str | None, str | None, str | None], str]
 # Every route that receives source bytes. /v1/text-layer reads the same hostile source as
-# /v1/disarm (ADR-2026-11-02-text-layer-first-cdr), so it sits behind the same gate.
+# /v1/disarm (ADR-2026-11-02-text-layer-first-cdr), so it sits behind the same gate. A route that
+# exists only behind a boot flag (/v1/native-read) is added by the app when, and only when, it is
+# registered, so a revision with the flag off authenticates exactly these paths.
 AUTHENTICATED_PATHS = frozenset({"/v1/disarm", "/v1/text-layer"})
 AUTH_HEADERS = (
     b"x-tavonel-input-sha256", b"x-tavonel-cdr-timestamp",
@@ -27,6 +29,7 @@ class CdrRequestBoundary:
     def __init__(
         self, app: ASGIApp, *, authenticate: AuthCheck,
         max_body_bytes: int, receive_timeout_seconds: float = 15.0,
+        authenticated_paths: frozenset[str] = AUTHENTICATED_PATHS,
     ) -> None:
         if max_body_bytes < 1 or receive_timeout_seconds <= 0:
             raise ValueError("CDR request budgets must be positive")
@@ -34,10 +37,11 @@ class CdrRequestBoundary:
         self.authenticate = authenticate
         self.max_body_bytes = max_body_bytes
         self.receive_timeout_seconds = receive_timeout_seconds
+        self.authenticated_paths = authenticated_paths
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (scope["type"] != "http" or scope.get("method") != "POST"
-                or scope.get("path", "").rstrip("/") not in AUTHENTICATED_PATHS):
+                or scope.get("path", "").rstrip("/") not in self.authenticated_paths):
             await self.app(scope, receive, send)
             return
         try:
