@@ -95,19 +95,6 @@
   outline-offset: 4px;
 }
 
-/*
-  The four bands under the hero (walkthrough, cases, connect, trust) are not painted on the first
-  frame. `content-visibility: auto` lets the browser skip their style, layout and paint until they
-  are near the viewport, which is the main-thread work between the last render-blocking sheet and
-  the first paint (WO-PERF-4, Render Delay). `auto` in the intrinsic size remembers the real height
-  once a band has rendered, so the page height settles after the first scroll past it. Anchor jumps,
-  find-in-page and focus render a skipped band on demand. The hero is not in this list.
-*/
-.deferred {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
-}
-
 /* ---- walkthrough ------------------------------------------------------------------------ */
 
 .demoStats {

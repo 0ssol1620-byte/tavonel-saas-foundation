@@ -209,21 +209,6 @@ describe("links and the primary action", () => {
     expect(high[0]).toContain('src="/v34/world-layers.svg"');
   });
 
-  /*
-    WO-PERF-4 (Render Delay): the four bands under the hero skip style, layout and paint until they
-    are near the viewport; the hero is never deferred, so the first frame, the drop zone and the
-    LCP image are exactly as before. A pin on the rule and on which bands carry it.
-  */
-  it("defers the four bands under the hero and never the hero", () => {
-    const css = stripComments(styles.find((f) => f.file.endsWith("home.module.css"))!.text);
-    expect(css).toMatch(/\.deferred\s*\{[^}]*content-visibility:\s*auto;[^}]*contain-intrinsic-size:\s*auto\s+\d+px;/);
-    const tsx = stripComments(code.find((f) => f.file.endsWith("home/home.tsx"))!.text);
-    const deferred = tsx.match(/<Section\b[^>]*className=\{s\.deferred\}/g) ?? [];
-    expect(deferred, "walkthrough, cases, connect and trust").toHaveLength(4);
-    expect(tsx).not.toMatch(/<Hero\b[^>]*s\.deferred/);
-    expect(tsx).not.toMatch(/<(?:Bridge|FinalCta)\b[^>]*s\.deferred/);
-  });
-
   it("scrolls the secondary action to a section that exists", () => {
     const html = renderToStaticMarkup(createElement(HomeBody));
     expect(html).toContain('href="#walkthrough"');

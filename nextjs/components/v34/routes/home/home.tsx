@@ -62,7 +62,7 @@ export function HomeBody() {
         }
       />
 
-      <Section id={WALKTHROUGH_ANCHOR} className={s.deferred} surface="paper" eyebrow={WALKTHROUGH.eyebrow} title={WALKTHROUGH.title} lead={WALKTHROUGH.lead}>
+      <Section id={WALKTHROUGH_ANCHOR} surface="paper" eyebrow={WALKTHROUGH.eyebrow} title={WALKTHROUGH.title} lead={WALKTHROUGH.lead}>
         <div className={s.demoStats}>
           <Tag kind="Public reference corpus" />
           <CorpusStats
@@ -84,7 +84,7 @@ export function HomeBody() {
         </div>
       </Section>
 
-      <Section className={s.deferred} surface="cases" eyebrow={CASES.eyebrow} title={CASES.title} lead={CASES.lead}>
+      <Section surface="cases" eyebrow={CASES.eyebrow} title={CASES.title} lead={CASES.lead}>
         <ol className={s.cases}>
           {CASES.items.map((c, i) => (
             <li key={c.href} className={s.caseItem}>
@@ -107,7 +107,6 @@ export function HomeBody() {
       </Section>
 
       <Section
-        className={s.deferred}
         surface="connect"
         eyebrow={CONNECT.eyebrow}
         title={CONNECT.title}
@@ -135,7 +134,7 @@ export function HomeBody() {
         </div>
       </Section>
 
-      <Section className={s.deferred} surface="paper" eyebrow={TRUST.eyebrow} title={TRUST.title} lead={TRUST.lead}>
+      <Section surface="paper" eyebrow={TRUST.eyebrow} title={TRUST.title} lead={TRUST.lead}>
         <ul className={s.trust}>
           {TRUST.items.map((t, i) => (
             <li key={t.href} className={s.trustItem}>
