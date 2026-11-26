@@ -30,6 +30,7 @@ from PIL import Image, UnidentifiedImageError
 from request_boundary import AUTHENTICATED_PATHS, CdrRequestBoundary
 
 import native_reader
+import table_geometry
 import text_layer
 
 from malware import (
@@ -1038,7 +1039,16 @@ def read_text_layer(request: Request, source: UploadFile = File(...)) -> Respons
         scale = qualified_text_layer_scale(pdf_source)
         # A layer PDFium cannot read is a refused receipt, not an error (text_layer.read_document);
         # anything else raised here is this service failing, and surfaces as one.
-        receipt = text_layer.read_document(pdf_source.read_bytes(), expected_digest, scale)
+        pdf_bytes = pdf_source.read_bytes()
+        receipt = text_layer.read_document(pdf_bytes, expected_digest, scale)
+        # Table reader shadow (WO-E-TBL-P2): off adds nothing, so the body is byte-identical.
+        # A reader failure is a recorded status; it never takes the text-layer receipt down with it.
+        if table_geometry.reader_mode() == "shadow":
+            try:
+                receipt["tableRead"] = table_geometry.read_document(pdf_bytes, receipt)
+            except Exception:
+                logger.exception("table reader failed")
+                receipt["tableRead"] = table_geometry.unavailable("reader_error")
     finally:
         source.file.close()
         remove_tree(work_dir)

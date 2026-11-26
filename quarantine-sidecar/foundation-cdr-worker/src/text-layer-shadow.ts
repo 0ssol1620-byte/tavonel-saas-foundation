@@ -7,6 +7,8 @@
  * records, per page, how far the layer's characters agree with what OCR read. Nothing reads either
  * object to build a World: OCR still reads every page, and no text from the layer is served
  * (`servedPages` is always 0). The receipt carries counts and digests only, never document text.
+ * When the CDR's table reader runs in shadow, its section of the layer body is qualified and kept as
+ * `table-read.json` (`qualifyCdrTableRead`, WO-E-TBL-P2); nothing reads that either.
  *
  * Every failure is a recorded status, never an exception: the shadow cannot fail, slow-retry or
  * change the OCR path it sits beside.
@@ -15,6 +17,7 @@
  *   unavailable  no answer to judge: the CDR's flag is off (503), transport, auth, server error,
  *                or this worker could not read its own ocr.json
  */
+import { qualifyTableRead } from "../../../shared/tableReadContract";
 import { cdrRequestSignature, sha256DigestHeader } from "./hmac";
 import { cdrAuthorization } from "./identity";
 
@@ -140,7 +143,7 @@ function ocrPages(payload: unknown): string[] | null {
   return pages.map((regions) => regions.sort((left, right) => left.order - right.order).map((region) => region.text).join("\n"));
 }
 
-export function textLayerSiblingKey(immutablePdfKey: string, name: "text-layer.json" | "text-layer-shadow.json"): string {
+export function textLayerSiblingKey(immutablePdfKey: string, name: "text-layer.json" | "text-layer-shadow.json" | "table-read.json"): string {
   if (!immutablePdfKey.endsWith("/sanitized.pdf")) throw new Error("immutable PDF key is not a sanitized.pdf object");
   return `${immutablePdfKey.slice(0, -"/sanitized.pdf".length)}/${name}`;
 }
@@ -301,5 +304,92 @@ async function compare(input: TextLayerShadowInput): Promise<TextLayerShadowRece
     customMetadata: { stage: "text-layer" },
     onlyIf: { etagDoesNotMatch: "*" },
   });
+  await storeTableRead(input, layer, layer.pages as Record<string, unknown>[], textLayerSha256);
   return base("compared", null, { ocrJsonSha256, textLayerSha256, pages, summary });
+}
+
+const CDR_TABLE_READ_SCHEMA = "tavonel.cdr_table_read.v1";
+
+/**
+ * The CDR's table-reader shadow (WO-E-TBL-P2, ADR-2026-11-23 §7 step 2): when the CDR runs with
+ * TAVONEL_TABLE_READER_MODE=shadow, the verified text-layer body carries a `tableRead` section. It is
+ * held to `tavonel.table_read.v1` page by page (`qualifyTableRead`, with this object's key as
+ * `sourceImmutableKey`), to the layer's own pages (a document only on a `textlayer` page), and stored
+ * create-once as `table-read.json` beside `text-layer.json`. Nothing reads it to build a World.
+ * A section that does not hold is not stored, and the log says why; it never changes the text-layer
+ * receipt. Absent section: the CDR's reader is off, and nothing is stored.
+ */
+export function qualifyCdrTableRead(
+  section: unknown, layerPages: Record<string, unknown>[], sourceImmutableKey: string, inputSha256: string,
+): { ok: true; stored: Record<string, unknown> } | { ok: false; reason: string } {
+  const fail = (reason: string) => ({ ok: false as const, reason });
+  if (!isRecord(section) || section.schemaVersion !== CDR_TABLE_READ_SCHEMA || section.mode !== "shadow"
+    || section.servedPages !== 0 || !isRecord(section.reader) || !Array.isArray(section.pages)) {
+    return fail("table_read_contract_invalid");
+  }
+  const { revision, bindingSha256 } = section.reader;
+  if (typeof revision !== "string" || typeof bindingSha256 !== "string") return fail("table_read_contract_invalid");
+  const binding = { sourceImmutableKey, inputSha256 };
+  if (section.status === "unavailable") {
+    return typeof section.reason === "string" && section.pages.length === 0
+      ? { ok: true, stored: { ...section, ...binding } }
+      : fail("table_read_contract_invalid");
+  }
+  if (section.status !== "read" || section.reason !== null || section.pages.length !== layerPages.length) {
+    return fail("table_read_contract_invalid");
+  }
+  const pages: Record<string, unknown>[] = [];
+  for (const [index, page] of (section.pages as unknown[]).entries()) {
+    const layerPage = layerPages[index];
+    const read = layerPage.path === "textlayer";
+    if (!isRecord(page) || page.pageNumber1 !== index + 1 || page.path !== layerPage.path || page.read !== read
+      || !Array.isArray(page.tables) || !page.tables.every(isRecord)) {
+      return fail(`table_read_page_${index + 1}_invalid`);
+    }
+    if (!read) {
+      if (page.document !== null || page.tables.length !== 0) return fail(`table_read_page_${index + 1}_not_textlayer`);
+      pages.push(page);
+      continue;
+    }
+    if (!isRecord(page.document)) return fail(`table_read_page_${index + 1}_invalid`);
+    const document: Record<string, unknown> = { ...page.document, sourceImmutableKey };
+    const qualified = qualifyTableRead(document, {
+      ...binding, readerRevision: revision, readerBindingSha256: bindingSha256, pageIndex0: index, ocrRegions: [],
+    });
+    if (!qualified.ok) return fail(`table_read_page_${index + 1}_${qualified.reasonCode}`);
+    const entries = page.tables as Record<string, unknown>[];
+    const placed = entries.filter((entry) => entry.state === "placed").length;
+    const declared = (document.tables as unknown[]).length;
+    // Every table the CDR emitted survived qualification, and each has its receipt entry; a refusal
+    // likewise. A table the validator had to turn into a refusal is a reader defect, not a page fact.
+    if (qualified.tables.length !== declared || placed !== declared
+      || entries.length - placed !== (document.refusals as unknown[]).length
+      || entries.some((entry) => entry.state !== "placed" && entry.state !== "not_placed")) {
+      return fail(`table_read_page_${index + 1}_receipt_mismatch`);
+    }
+    pages.push({ ...page, document });
+  }
+  return { ok: true, stored: { ...section, ...binding, pages } };
+}
+
+async function storeTableRead(
+  input: TextLayerShadowInput, layer: Record<string, unknown>, layerPages: Record<string, unknown>[], textLayerSha256: string,
+): Promise<void> {
+  if (!("tableRead" in layer)) return;
+  try {
+    const result = qualifyCdrTableRead(layer.tableRead, layerPages, input.immutablePdfKey, input.inputSha256);
+    if (!result.ok) {
+      console.log(JSON.stringify({ event: "table_read_shadow", status: "not_stored", reason: result.reason }));
+      return;
+    }
+    await input.env.FOUNDATION_QUARANTINE.put(textLayerSiblingKey(input.immutablePdfKey, "table-read.json"),
+      new TextEncoder().encode(JSON.stringify({ ...result.stored, textLayerSha256 })), {
+        httpMetadata: { contentType: "application/json" },
+        customMetadata: { stage: "table-read" },
+        onlyIf: { etagDoesNotMatch: "*" },
+      });
+    console.log(JSON.stringify({ event: "table_read_shadow", status: "stored", reason: null }));
+  } catch {
+    console.log(JSON.stringify({ event: "table_read_shadow", status: "not_stored", reason: "store_failed" }));
+  }
 }
