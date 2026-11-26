@@ -249,33 +249,27 @@ const RECENT_FAILURE_MS = 24 * 60 * 60 * 1000;
  * `jobs` is `GET /api/compile-jobs`: newest first. The newest job is shown when it is still running
  * or failed within the last 24 h, so a compile that just failed shows its failure rather than an
  * older, stuck one (D0 2026-11-09, cjob-749b behind cjob-130f). Otherwise the first unfinished job.
- *
- * WO-WS-6 (F3): `review_required` is unfinished (a person still decides) but it is not running. An
- * older review package that a newer compile has since followed -- a smoke test, a retry -- was being
- * pulled back on every load, beside the candidate the person is actually reviewing. It is offered
- * only while nothing newer exists in this workspace, or when every newer job is another part of the
- * same corpus. The package itself is not touched: its collection stays reachable by its own link.
  */
-export function pickResumableCompileJob<T extends { state: CompileState; settledAt?: string | null; corpusId?: string | null }>(
+export function pickResumableCompileJob<T extends { state: CompileState; settledAt?: string | null }>(
   jobs: readonly T[], now: number,
 ): T | undefined {
   const newest = jobs[0];
   const settled = Date.parse(newest?.settledAt ?? "");
   // No lower bound: a browser clock behind the server must not hide a failure that just happened.
   if (newest?.state === "failed" && now - settled <= RECENT_FAILURE_MS) return newest;
-  return jobs.find((job, index) => !isCompileJobTerminal(job.state)
-    && (job.state !== "review_required" || jobs.slice(0, index).every((newer) => Boolean(job.corpusId) && newer.corpusId === job.corpusId)));
+  return jobs.find((job) => !isCompileJobTerminal(job.state));
 }
 
-/** An earlier review package the start-up pick did not open, with the one link that reaches it. */
+/** A pending review package the start-up pick did not open, with the one link that reaches it. */
 export type EarlierReviewPackage = { jobId: string; collectionId: string | null; href: string };
 
 /**
- * The `review_required` jobs `pickResumableCompileJob` leaves unopened, from the same list (no request).
- * A package a person still has to decide on must not become invisible because a newer compile exists
- * (WO-WS-6, F3): Home says how many there are and links each. A job in the opened job's corpus is
- * reachable through that corpus and is not listed. The link is the collection (its candidate and
- * review) when the job produced one, else the job itself.
+ * Every pending `review_required` package except the one the start-up pick opened, newest first (the
+ * order of `GET /api/compile-jobs`), from the same list (no request). Nothing is suppressed because a
+ * newer compile exists (founder decision 2026-11-26, row 2): Home collapses these behind a count. A job in
+ * the opened job's corpus is reachable through that corpus and is not listed. The link is the collection
+ * (its candidate and review) when the job produced one, else the job itself. Only a future validated
+ * "Superseded" state may leave a package out; none exists yet.
  */
 export function earlierReviewPackages(
   jobs: readonly { jobId: string; state: CompileState; collectionId?: string | null; corpusId?: string | null }[],

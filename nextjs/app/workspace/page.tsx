@@ -3026,7 +3026,7 @@ export default function WorkspacePage() {
   const workspaceState = deriveWorkspaceState(workspaceStateInput);
   const onboardingSteps = deriveOnboardingSteps(workspaceStateInput);
   const attentionItems = deriveAttentionItems(workspaceStateInput);
-  // A package whose collection is the one open here is not "earlier": it is the one on screen.
+  // A package whose collection is the one open here is the one on screen, not an earlier one. Nothing else is left out (founder decision 2026-11-26, row 2).
   const pendingEarlierReviews = earlierReviews.filter((item) => item.collectionId === null || item.collectionId !== collectionResult?.collectionId);
   const runIntent = (intent: WorkspaceIntent | undefined) => {
     if (intent === "upload") {
@@ -3545,15 +3545,18 @@ export default function WorkspacePage() {
             still waiting on a person, so Home says so and links each, from the job list already read.
           */}
           {tab === "overview" && surface === "home" && pendingEarlierReviews.length > 0 ? (
-            <p className="fine" role="status" data-testid="earlier-review-packages">
-              {pendingEarlierReviews.length === 1 ? "1 earlier review package is still pending." : `${pendingEarlierReviews.length} earlier review packages are still pending.`}{" "}
-              {pendingEarlierReviews.slice(0, 5).map((item, index) => (
-                <button key={item.jobId} type="button" className="btn ghost" onClick={() => window.location.assign(item.href)}>
-                  Open review package {index + 1}
-                </button>
-              ))}
-              {pendingEarlierReviews.length > 5 ? ` ${pendingEarlierReviews.length - 5} more are not listed here.` : null}
-            </p>
+            <details className="fine" data-testid="earlier-review-packages">
+              <summary>{pendingEarlierReviews.length === 1 ? "1 earlier package still pending" : `${pendingEarlierReviews.length} earlier packages still pending`}</summary>
+              <ol>
+                {pendingEarlierReviews.map((item, index) => (
+                  <li key={item.jobId}>
+                    <button type="button" className="btn ghost" onClick={() => window.location.assign(item.href)}>
+                      Open review package {index + 1} of {pendingEarlierReviews.length}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </details>
           ) : null}
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <Screen title="Needs attention" titleAs="h2" titleId="workspace-attention-title" status={attentionScreenStatus(attentionItems)}

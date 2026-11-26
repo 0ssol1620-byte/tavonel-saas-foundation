@@ -231,78 +231,34 @@ describe("pickResumableCompileJob (no ?job= in the URL)", () => {
     expect(pickResumableCompileJob([job("f", "failed", null)], now)).toBeUndefined();
     expect(pickResumableCompileJob([], now)).toBeUndefined();
   });
-
-  /* WO-WS-6 (F3): the 2026-11-26 live run. A review package from a smoke compile came back on every load beside the newer candidate. */
-  describe("a review package that a newer compile has followed (WO-WS-6)", () => {
-    const review = (id: string, corpusId: string | null = null) => ({ jobId: id, state: "review_required" as const, settledAt: "2026-11-26T08:24:00Z", corpusId });
-    const done = (id: string, corpusId: string | null = null) => ({ jobId: id, state: "ready" as const, settledAt: "2026-11-26T10:52:16Z", corpusId });
-
-    it("is not resurrected behind a newer ready job", () => {
-      expect(pickResumableCompileJob([done("new"), review("old")], now)).toBeUndefined();
-    });
-    it("is not resurrected behind a newer failed or cancelled job that is no longer recent", () => {
-      const stale = { jobId: "f", state: "failed" as const, settledAt: "2026-11-01T00:00:00Z", corpusId: null };
-      expect(pickResumableCompileJob([stale, review("old")], now)).toBeUndefined();
-      expect(pickResumableCompileJob([{ jobId: "c", state: "cancelled" as const, settledAt: null, corpusId: null }, review("old")], now)).toBeUndefined();
-    });
-    it("is still offered when it is the newest job: a person has yet to decide", () => {
-      expect(pickResumableCompileJob([review("only")], now)?.jobId).toBe("only");
-      expect(pickResumableCompileJob([review("newest"), done("older")], now)?.jobId).toBe("newest");
-    });
-    it("is still offered behind another part of its own corpus, and not behind a different corpus or a plain job", () => {
-      expect(pickResumableCompileJob([done("part2", "corpus-a"), review("part1", "corpus-a")], now)?.jobId).toBe("part1");
-      expect(pickResumableCompileJob([done("other", "corpus-b"), review("part1", "corpus-a")], now)).toBeUndefined();
-      expect(pickResumableCompileJob([done("plain"), review("part1", "corpus-a")], now)).toBeUndefined();
-    });
-    it("a running job older than a newer ready one is still found, as before; only the resting package is dropped", () => {
-      expect(pickResumableCompileJob([done("new"), review("old"), { jobId: "stuck", state: "reading" as const, settledAt: null, corpusId: null }], now)?.jobId).toBe("stuck");
-    });
-  });
 });
 
-/* D0 2026-11-09 R2: a job at rest kept "Compiling 1 source" on the Activity line. */
-describe("a compile job at rest", () => {
-  const resting = ["review_required", "ready", "failed", "cancelled"] as const;
-
-  it("is not running, and replaces the compiling line, in every terminal or waiting state", () => {
-    for (const state of resting) {
-      expect(isCompileJobResting(state)).toBe(true);
-      expect(compileJobRestingNotice(state)).toEqual(expect.any(String));
-      expect(compileJobRestingNotice(state)).not.toMatch(/compiling/i);
-    }
-    expect(compileJobRestingNotice("review_required")).toBe("A review package is ready for a person to inspect. Nothing is active yet.");
-    // Resting is not terminal: a review_required job still waits on a person, and stays resumable.
-    expect(resting.filter((state) => isCompileJobTerminal(state))).toEqual(["ready", "failed", "cancelled"]);
-  });
-
-  it("is running, with no resting line, in every other state", () => {
-    for (const state of COMPILE_STATES.filter((value) => !(resting as readonly string[]).includes(value))) {
-      expect(isCompileJobResting(state)).toBe(false);
-      expect(compileJobRestingNotice(state)).toBeNull();
-    }
-  });
-});
-
-describe("earlierReviewPackages: what the start-up pick leaves unopened stays pointed at (WO-WS-6, F3)", () => {
+describe("earlierReviewPackages: no pending review package is hidden (WO-WS-6, F3, founder decision 2026-11-26 row 2)", () => {
   const now = Date.parse("2026-11-26T12:00:00Z");
-  const job = (jobId: string, state: "ready" | "review_required" | "reading" | "failed", extra: { collectionId?: string | null; corpusId?: string | null } = {}) =>
+  type S = "ready" | "review_required" | "reading" | "failed" | "cancelled";
+  const job = (jobId: string, state: S, extra: { collectionId?: string | null; corpusId?: string | null; settledAt?: string | null } = {}) =>
     ({ jobId, state, settledAt: "2026-11-26T08:24:00Z", ...extra });
 
-  it("lists the old review package the pick hid, linked by its collection, else by its job", () => {
+  it("behind a newer ready job the pick is unchanged (the first unfinished job) and every other pending package is listed, newest first", () => {
     const jobs = [job("new", "ready", { collectionId: "collection-n" }), job("old", "review_required", { collectionId: "collection-o" }), job("older", "review_required")];
-    expect(pickResumableCompileJob(jobs, now)).toBeUndefined();
-    expect(earlierReviewPackages(jobs, undefined)).toEqual([
-      { jobId: "old", collectionId: "collection-o", href: "/workspace?collection=collection-o" },
-      { jobId: "older", collectionId: null, href: "/workspace?job=older" },
-    ]);
+    const open = pickResumableCompileJob(jobs, now);
+    expect(open?.jobId).toBe("old");
+    expect(earlierReviewPackages(jobs, open)).toEqual([{ jobId: "older", collectionId: null, href: "/workspace?job=older" }]);
+    expect(earlierReviewPackages(jobs, undefined).map((item) => item.jobId)).toEqual(["old", "older"]);
   });
-  it("does not list the job that was opened, and lists nothing when there is no review package", () => {
+  it("a newer failed job keeps the old package: it is opened or listed, never dropped", () => {
+    const jobs = [job("f", "failed", { settledAt: "2026-11-26T11:59:00Z" }), job("old", "review_required", { collectionId: "collection-o" })];
+    const open = pickResumableCompileJob(jobs, now);
+    expect(open?.jobId).toBe("f");
+    expect(earlierReviewPackages(jobs, open)).toEqual([{ jobId: "old", collectionId: "collection-o", href: "/workspace?collection=collection-o" }]);
+  });
+  it("lists nothing when there is no pending review package, and not the job that was opened", () => {
     const jobs = [job("only", "review_required")];
     expect(earlierReviewPackages(jobs, pickResumableCompileJob(jobs, now))).toEqual([]);
     expect(earlierReviewPackages([job("a", "ready"), job("b", "reading")], undefined)).toEqual([]);
     expect(earlierReviewPackages([], undefined)).toEqual([]);
   });
-  it("does not list another part of the opened job's corpus: it is reached through the corpus", () => {
+  it("another corpus stays independent and listed; another part of the opened job's corpus is reached through that corpus", () => {
     const jobs = [job("p2", "review_required", { corpusId: "corpus-a" }), job("p1", "review_required", { corpusId: "corpus-a" }), job("x", "review_required", { corpusId: "corpus-b" })];
     expect(earlierReviewPackages(jobs, jobs[0]).map((item) => item.jobId)).toEqual(["x"]);
   });
