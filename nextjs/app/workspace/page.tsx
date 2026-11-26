@@ -104,6 +104,8 @@ import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import { Screen } from "@/components/v34/ui/screen";
+import WorldPicture from "@/components/workspace/world-picture";
+import { pictureScreenStatus } from "@/lib/workspace-world-picture";
 import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus } from "./screen-status";
 import {
   buildReviewQueue,
@@ -3562,6 +3564,21 @@ export default function WorkspacePage() {
             </Screen>
           ) : null}
 
+          {/*
+            WO-WS-5: the active World, drawn with the renderer the public pages use, from the read model this page already
+            holds. Only when that model is the active World's own (same manifest); with no active World the existing empty
+            states stand and nothing is drawn. A click opens the evidence reader on Review.
+          */}
+          {tab === "overview" && surface === "home" && activeWorld && worldReadModel && worldReadModel.world.manifestDigest === activeWorld.manifestDigest ? (
+            <Screen title="Your World, drawn" titleAs="h2" titleId="workspace-world-picture-title" status={pictureScreenStatus(worldReadModel)} aria-labelledby="workspace-world-picture-title">
+              <WorldPicture
+                model={worldReadModel}
+                openLabel="Open evidence"
+                onOpenEvidence={(evidenceId) => { selectReviewEvidence(evidenceId); navigateSurface("review"); }}
+              />
+            </Screen>
+          ) : null}
+
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
           <>
           {/*
@@ -3742,6 +3759,18 @@ export default function WorkspacePage() {
                   onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
               </Screen>
+              {worldReadModel ? (
+                <Screen title="World map" titleAs="h2" titleId="review-world-picture-title" status={pictureScreenStatus(worldReadModel)} aria-labelledby="review-world-picture-title">
+                  <WorldPicture
+                    model={worldReadModel}
+                    openLabel="Open in the evidence reader"
+                    onOpenEvidence={(evidenceId) => {
+                      selectReviewEvidence(evidenceId);
+                      document.getElementById("review-comparison-title")?.scrollIntoView({ block: "start" });
+                    }}
+                  />
+                </Screen>
+              ) : null}
               {/* The blueprint's /evidence frame names this the evidence reader; the tag counts what it can open. */}
               <Screen title="Evidence reader" status={evidenceScreenStatus(worldReadModel?.evidence.length ?? 0)}
                 bodyClassName="review-comparison" aria-labelledby="review-comparison-title">
