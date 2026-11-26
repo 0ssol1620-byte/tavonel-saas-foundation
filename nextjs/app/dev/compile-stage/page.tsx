@@ -15,6 +15,8 @@
 import "@/app/workspace-final-polish.css";
 import "@/app/workspace-no1.css";
 import CompileStage from "@/components/compile-stage";
+// workspace-no1.css reads --v34-* names now (WO-WS-2); the workspace <main> defines them with `.site`, so this harness wraps in it too.
+import v34 from "@/components/v34/tokens.module.css";
 import { buildPipeline, type LocalUpload } from "@/lib/pipeline";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import type { OcrProgress } from "@/lib/ocr-progress";
@@ -95,10 +97,12 @@ export default function CompileStageHarness() {
     "d-handbook": "Employee Handbook 2026.pdf",
   };
   return (
-    <main id="main" className="one-path-workspace" style={{ padding: 24, background: "#08090a", minHeight: "100vh" }}>
-      <div className="workspace-compile-block">
-        <CompileStage rows={rows} reading={reading} names={names} />
-      </div>
-    </main>
+    <div className={v34.site}>
+      <main id="main" className="one-path-workspace" style={{ padding: 24, background: "#08090a", minHeight: "100vh" }}>
+        <div className="workspace-compile-block">
+          <CompileStage rows={rows} reading={reading} names={names} />
+        </div>
+      </main>
+    </div>
   );
 }

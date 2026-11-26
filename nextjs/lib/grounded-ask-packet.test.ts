@@ -54,11 +54,10 @@ function expectedSha({ receipt: _receipt, ...unsigned }: PacketAnswer) {
   produced prose. That was survivable only while the compiled branch was unreachable (R4-01);
   wiring it without this would have shipped a "successful" answer with nothing in it.
 
-  What is asserted here is the answer's own rules, not the pipeline's: the text is the complete
-  cited evidence in the packet's rank order (the 420-character excerpt is only its preview), a
-  unit with no evidence binding cannot be cited, an answer with no citations abstains, evidence
-  too long for the answer envelope abstains with its citations kept, and the receipt binds to
-  the world version.
+  What is asserted here is the answer's own rules, not the pipeline's: the text is one verbatim
+  window per cited unit in the packet's rank order, cut edges marked (WO-ASK-0), a unit with no
+  evidence binding cannot be cited, an answer with no citations abstains, an unverified citation
+  abstains with nothing retained, and the receipt binds to the world version.
 */
 
 const COLLECTION = `collection-${"a".repeat(32)}`;
@@ -163,11 +162,12 @@ describe("an answer built from a ContextPacket", () => {
     expect(answer.answer).toBe("real");
   });
 
-  it("truncates a long excerpt the same way the fallback path does", () => {
+  it("windows a long excerpt the same way the fallback path does, never with an in-text ellipsis", () => {
     const long = "x".repeat(600);
     const answer = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: long })]), meta);
-    expect(answer.citations[0].excerpt).toHaveLength(420);
-    expect(answer.citations[0].excerpt.endsWith("...")).toBe(true);
+    expect(answer.citations[0].excerpt).toBe("x".repeat(416));
+    expect(answer.citations[0].window).toEqual({ start: 0, end: 416, regionLength: 600 });
+    expect(answer.answer).toBe(`${"x".repeat(416)} …`);
   });
 
   it("only ever cites evidence the packet actually contains", () => {
@@ -182,73 +182,54 @@ describe("an answer built from a ContextPacket", () => {
     expect(parseContextPacket(JSON.parse(JSON.stringify(packet)))).not.toBeNull();
   });
 
-  it("answers with the complete cited evidence while the citation preview stays bounded", () => {
+  // WO-ASK-0: these cases used to abstain with EVIDENCE_EXCEEDS_ANSWER_LIMIT. The lead ruling
+  // replaced that rule: each cited unit contributes a verbatim window, and the answer marks a cut.
+  it("answers a long unit with a verbatim window in the packet's order, cut edges marked", () => {
     expect(FULL.indexOf("except where the buyer")).toBeGreaterThan(417);
     const answer = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: RAW }), unit({ unitId: "u2", text: "Renewal is automatic." })]), meta);
-    // Explicit, so an abstention (empty answer) can never satisfy the preservation checks below.
     expect(answer.status).toBe("grounded");
     expect(answer.reason).toBeNull();
-    expect(answer.answer).toBe(`${FULL}\n\nRenewal is automatic.`);
-    for (const kept of [
-      "except where the buyer waives notice in writing.",
-      "The 30-day rule does not apply to renewals signed after 2027-01-01.",
-      "적용되지 않으며",
-      "2026년 3월 31일",
-      "120억원",
-    ])
-      expect(answer.answer).toContain(kept);
     expect(answer.citations.map((citation) => citation.unitId)).toEqual(["u1", "u2"]);
-    expect(answer.citations[0].excerpt).toBe(`${FULL.slice(0, 417)}...`);
-    expect(answer.citations[0].excerpt).toHaveLength(420);
+    const [first, second] = answer.citations;
+    expect(RAW.slice(first!.window.start, first!.window.end)).toBe(first!.excerpt);
+    expect(first!.window.regionLength).toBe(RAW.length);
+    expect(first!.excerpt.length).toBeLessThanOrEqual(416);
+    expect(second!.excerpt).toBe("Renewal is automatic.");
+    expect(answer.answer).toBe(`${first!.excerpt} …\n\nRenewal is automatic.`);
     expect(answer.receipt.outputSha256).toBe(expectedSha(answer));
   });
 
-  it("changes the answer and receipt when only text past character 417 changes", () => {
+  it("changes the answer and receipt when text inside the window changes, and keeps the citation when text outside it does", () => {
     const before = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: RAW })]), meta);
-    const after = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: RAW.replace("2027-01-01", "2028-01-01") })]), meta);
-    expect(before.status).toBe("grounded");
-    expect(after.status).toBe("grounded");
-    expect(after.citations[0].excerpt).toBe(before.citations[0].excerpt);
-    expect(after.answer).toContain("2028-01-01");
-    expect(after.answer).not.toBe(before.answer);
-    expect(after.receipt.outputSha256).not.toBe(before.receipt.outputSha256);
+    const inside = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: RAW.replace("every supplier", "every vendors") })]), meta);
+    const outside = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: RAW.replace("2027-01-01", "2028-01-01") })]), meta);
+    expect(inside.answer).not.toBe(before.answer);
+    expect(inside.receipt.outputSha256).not.toBe(before.receipt.outputSha256);
+    expect(outside.citations[0].excerpt).toBe(before.citations[0].excerpt);
+    expect(outside.answer.endsWith(" …")).toBe(true);
   });
 
-  it("accepts evidence of exactly the compiled limit and abstains one character over it", () => {
+  it("answers within the compiled envelope however long the evidence, keeping every verified citation and its metadata in order", () => {
     expect(COMPILED_ANSWER_CHARACTER_LIMIT).toBe(4218);
-    const exact = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: sized(4218) })]), meta);
-    expect(exact.status).toBe("grounded");
-    expect(exact.answer).toHaveLength(4218);
-
-    const over = answerFromContextPacket(packetOf([unit({ unitId: "u1", text: sized(4219) })]), meta);
-    expect(over).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
-    expect(over.citations.map((citation) => citation.unitId)).toEqual(["u1"]);
-    expect(over.citations[0].excerpt).toHaveLength(420);
-    expect(over.receipt.outputSha256).toBe(expectedSha(over));
-  });
-
-  it("counts the nine double-newline separators of a full default packet", () => {
-    const ten = Array.from({ length: 10 }, (_, index) => unit({ unitId: `u${index}`, text: sized(420) }));
-    const fits = answerFromContextPacket(packetOf(ten), meta);
-    expect(fits.status).toBe("grounded");
-    expect(fits.answer).toHaveLength(4218);
-
-    // 4,201 characters of evidence, 4,219 with separators: every item fits a preview, the whole does not.
-    ten[9] = unit({ unitId: "u9", text: sized(421) });
-    const over = answerFromContextPacket(packetOf(ten), meta);
-    expect(over).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
-    expect(over.citations.map((citation) => citation.unitId)).toEqual(ten.map((item) => item.unitId));
-  });
-
-  it("abstains rather than dropping a later oversized item, and keeps every verified citation in order", () => {
-    const answer = answerFromContextPacket(
-      packetOf([unit({ unitId: "u1", text: "The notice period is thirty days." }), unit({ unitId: "u2", text: sized(5000) })]),
-      meta,
-    );
-    expect(answer.status).toBe("abstained");
-    expect(answer.answer).toBe("");
-    expect(answer.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
-    expect(answer.citations.map((citation) => citation.unitId)).toEqual(["u1", "u2"]);
+    const cases = [
+      [unit({ unitId: "u1", text: sized(4218) })],
+      [unit({ unitId: "u1", text: sized(4219) })],
+      Array.from({ length: 10 }, (_, index) => unit({ unitId: `u${index}`, text: sized(index === 9 ? 421 : 420) })),
+      [unit({ unitId: "u1", text: "The notice period is thirty days." }), unit({ unitId: "u2", text: sized(5000) })],
+    ];
+    for (const units of cases) {
+      const answer = answerFromContextPacket(packetOf(units), meta);
+      expect(answer.status).toBe("grounded");
+      expect(answer.reason).toBeNull();
+      expect(answer.answer.length).toBeLessThanOrEqual(COMPILED_ANSWER_CHARACTER_LIMIT);
+      expect(answer.citations.map((citation) => citation.unitId)).toEqual(units.map((item) => item.unitId));
+      answer.citations.forEach((citation, index) => {
+        expect(units[index]!.text.slice(citation.window.start, citation.window.end)).toBe(citation.excerpt);
+        expect(citation.excerpt.length).toBeLessThanOrEqual(416);
+      });
+      expect(answer.receipt.outputSha256).toBe(expectedSha(answer));
+    }
+    const answer = answerFromContextPacket(packetOf(cases[3]!), meta);
     expect(answer.citations[1]).toMatchObject({
       evidenceId: "evidence-u2",
       evidenceIds: ["evidence-u2"],
@@ -259,7 +240,7 @@ describe("an answer built from a ContextPacket", () => {
       claimIds: ["claim-one"],
       entityIds: ["entity-one"],
     });
-    expect(answer.citations[1].excerpt).toHaveLength(420);
+    expect(answer.reason).not.toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
   });
 
   it("does not count an unbound or empty unit toward the limit", () => {

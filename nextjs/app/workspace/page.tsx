@@ -7,7 +7,7 @@ import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
 import { failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
-import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
+import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
@@ -61,6 +61,8 @@ import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
+import { activeWorldOpenOutcome, ActiveWorldPicker, askWorldPanel, ConfirmDialog, discoverActiveWorlds, discoveryFailureCopy, discoveryOutcome, requestConfirm, type ActiveWorldDiscovery, type AskWorldState, type ConfirmRequest } from "@/components/workspace/in-page-choices";
+import type { ActiveWorldSummary } from "@/lib/world-store";
 import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
@@ -101,6 +103,8 @@ import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store"
 import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
+import { Screen } from "@/components/v34/ui/screen";
+import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus } from "./screen-status";
 import {
   buildReviewQueue,
   currentReviewLedger,
@@ -775,6 +779,17 @@ export default function WorkspacePage() {
      absent model, or a candidate beside the answering active World opens nothing. */
   const askWorldModel = qualifyAskWorldModel(worldReadModel, collectionResult, askResult?.receipt);
 
+  /* WO-WS-1: Ask with no active World asks the server which Worlds are active. "idle" is a listing
+     that has not run yet (the panel says "checking"); "opening" is a World being loaded;
+     "open-failed" is recorded only by an open that loaded no active World. `discoveryRun` lets a
+     newer listing own the panel: an older answer that returns late is dropped. */
+  const [askWorlds, setAskWorlds] = useState<AskWorldState>("idle");
+  const discoveryRun = useRef(0);
+  const askPanel = askWorldPanel(activeWorld, askWorlds);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const pendingConfirm = useRef<ConfirmRequest | null>(null);
+  const confirmInPage = (message: string, confirmLabel: string) => requestConfirm(pendingConfirm, setConfirmRequest, message, confirmLabel);
+
   const getAuthToken = async () => {
     const client = getSupabaseBrowserClient();
     const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -804,6 +819,16 @@ export default function WorkspacePage() {
     setWorldVersions([]);
     setAskResult(null);
     setAskEvidenceId(undefined);
+  };
+
+  /* The page let go of its collection (a compile, an upload, Back to a URL without one): what Ask
+     knew about the workspace's active Worlds is checked again, never carried over. Not called from
+     loadWorldState, whose "no active World" belongs to the open that asked for it. */
+  const clearSelection = () => {
+    setCollectionResult(null);
+    clearWorldState();
+    ++discoveryRun.current;
+    setAskWorlds("idle");
   };
 
   const loadWorldState = async (collectionId: string, token?: string, selectionSequence?: number): Promise<ActiveWorld | null | undefined> => {
@@ -897,7 +922,7 @@ export default function WorkspacePage() {
     setBillingNotices(readBillingNotices(json.notices));
   };
 
-  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string) => {
+  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string, observeActiveWorld?: (loaded: ActiveWorld | null | undefined) => void) => {
     const sequence = ++candidateLoadSequence.current;
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId) || (manifestDigest && !/^sha256:[a-f0-9]{64}$/.test(manifestDigest))) return;
     const client = getSupabaseBrowserClient();
@@ -951,6 +976,7 @@ export default function WorkspacePage() {
     }
     const loadedActiveWorld = await loadWorldState(collectionId, token, sequence);
     if (sequence !== candidateLoadSequence.current) return;
+    observeActiveWorld?.(loadedActiveWorld);
     if (loadedActiveWorld === undefined) return artifact.lifecycle;
     const verifiedPackage = "Its required package entries and state were checked.";
     setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
@@ -975,13 +1001,63 @@ export default function WorkspacePage() {
       setCollectionResult(null); setWorldReadModel(null);
       if (collection) void loadCollectionCandidate(collection, params.get("manifest") ?? undefined)
         .catch(() => setNotice("The selected revision could not be read. Reload to recheck access; no revision was changed."));
-      else { ++candidateLoadSequence.current; setCollectionResult(null); setWorldReadModel(null); }
+      else { ++candidateLoadSequence.current; setWorldReadModel(null); clearSelection(); }
     };
     window.addEventListener("popstate", restoreRevision);
     return () => window.removeEventListener("popstate", restoreRevision);
     // Reads current URL; the loader only uses auth and state setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* The World Ask reads goes into the URL before it loads, so a reload keeps the same choice.
+     `history` is "push" for a choice the person made and "replace" when there was only one. */
+  const openActiveWorld = async (world: ActiveWorldSummary, history: "push" | "replace") => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("collection", world.collectionId);
+    url.searchParams.set("manifest", world.manifestDigest);
+    if (history === "push") window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
+    setAskWorlds("opening");
+    const run = discoveryRun.current;
+    // The open records what it observed; the panel never infers a failure from later page state.
+    const sequence = candidateLoadSequence.current + 1;
+    let loaded: ActiveWorld | null | undefined;
+    await loadCollectionCandidate(world.collectionId, world.manifestDigest, (observed) => { loaded = observed; })
+      .catch(() => setNotice("The selected revision could not be read. Reload to recheck access; no revision was changed."));
+    // The page let go of its selection meanwhile (clearSelection): a newer listing owns the panel.
+    if (run !== discoveryRun.current) return;
+    // Superseded by another load: nothing was observed about this one.
+    setAskWorlds(candidateLoadSequence.current === sequence ? activeWorldOpenOutcome(loaded) : "idle");
+  };
+
+  /* Whenever Ask has no active World and no listing has answered since the page last let go of its
+     collection, the listing runs -- with or without a collection selected, so "No active World yet"
+     is always the listing's answer about the workspace. */
+  useEffect(() => {
+    if (surface !== "ask" || session !== "signed-in" || !workspaceStartupReady || activeWorld || askWorlds !== "idle") return;
+    setAskWorlds("checking");
+    const run = ++discoveryRun.current;
+    const started = candidateLoadSequence.current;
+    void (async () => {
+      let found: ActiveWorldDiscovery;
+      try {
+        const token = await getAuthToken();
+        found = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED", status: 401 };
+      } catch {
+        found = { kind: "failed", code: null, status: null };
+      }
+      // A newer listing owns the panel now.
+      if (run !== discoveryRun.current) return;
+      // Another collection was loaded meanwhile: this answer is stale and must not replace it.
+      if (candidateLoadSequence.current !== started) { setAskWorlds("idle"); return; }
+      const selected = Boolean(collectionResult) || new URLSearchParams(window.location.search).has("collection");
+      const next = discoveryOutcome(found, selected);
+      if ("open" in next) await openActiveWorld(next.open, "replace");
+      else setAskWorlds(next.show);
+    })();
+    // The loaders only use auth and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surface, session, workspaceStartupReady, activeWorld, askWorlds]);
 
   useEffect(() => {
     if (!collectionResult?.manifestDigest) return;
@@ -1811,8 +1887,7 @@ export default function WorkspacePage() {
       return;
     }
     setBusy(true);
-    setCollectionResult(null);
-    clearWorldState();
+    clearSelection();
     try {
       // Same durable path as a fresh upload. Compiling a selection that has already been
       // compiled returns the run that produced it rather than paying for it twice; a
@@ -1880,8 +1955,7 @@ export default function WorkspacePage() {
     if (files.length === 0) return;
     if (!intakeOpen) { setNotice(intakeClosedCopy); return; }
     setBusy(true);
-    setCollectionResult(null);
-    clearWorldState();
+    clearSelection();
     try {
       setNotice(`Uploading ${files.length} file(s) securely, ${UPLOAD_CEILING} at a time.`);
       const refusals: string[] = [];
@@ -1922,8 +1996,7 @@ export default function WorkspacePage() {
     // No whole-set approval to create: upload file by file, exactly as main does.
     if (!approvalLineage && !triageApproval) { await uploadLegacyDocuments(files, measured); return; }
     setBusy(true);
-    setCollectionResult(null);
-    clearWorldState();
+    clearSelection();
     try {
       if (files.length > 128) { setNotice("This approval supports at most 128 files. Reduce the selected set and review its new maximum."); return; }
       const client = getSupabaseBrowserClient();
@@ -2453,7 +2526,7 @@ export default function WorkspacePage() {
       // main's proof path: one file, its own reservation, no compile.
       if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) { await uploadLegacyDocument(proofFile); return; }
       const quote = quoteIntakeManifest([{ bytes: proofFile.size, mimeType: proofFile.type, claimedPages: null, claimedBasis: null }]);
-      if (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`)) return;
+      if (!quote.ok || !(await confirmInPage(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for this public proof PDF?`, `Approve up to ${formatUsd(quote.quote.maximumUsd)}`))) return;
       await uploadDocuments([proofFile], null);
     } catch {
       setNotice("Public proof PDF could not be prepared. Nothing entered quarantine.");
@@ -2464,8 +2537,7 @@ export default function WorkspacePage() {
 
   const uploadPublicCollectionProof = async () => {
     setBusy(true);
-    setCollectionResult(null);
-    clearWorldState();
+    clearSelection();
     setNotice("Preparing three digest-pinned public DART report pages in this browser…");
     try {
       const files: File[] = [];
@@ -2487,7 +2559,7 @@ export default function WorkspacePage() {
         bytes: file.size, mimeType: file.type || "application/pdf", claimedPages: null, claimedBasis: null,
       })));
       // The cost-approval prompt belongs to the approval lineage; switch off is main's direct upload.
-      if (INTAKE_APPROVAL_ROLLOUT_ENABLED && (!quote.ok || !window.confirm(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`))) return;
+      if (INTAKE_APPROVAL_ROLLOUT_ENABLED && (!quote.ok || !(await confirmInPage(`Approve a maximum of ${formatUsd(quote.quote.maximumUsd)} for all ${files.length} public proof files?`, `Approve up to ${formatUsd(quote.quote.maximumUsd)}`)))) return;
       await uploadDocuments(files, null);
     } catch {
       setNotice("The public collection proof could not be prepared. Nothing was activated.");
@@ -2662,7 +2734,7 @@ export default function WorkspacePage() {
       setNotice("Only a completed Python Core v2 candidate with a bound world state can be activated.");
       return;
     }
-    if (!window.confirm("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.")) return;
+    if (!(await confirmInPage("Activate this exact immutable candidate as the collection's current world? This records your review reason and does not alter candidate bytes.", "Activate this candidate"))) return;
     setWorldBusy(true);
     try {
       const token = await getAuthToken();
@@ -2700,7 +2772,7 @@ export default function WorkspacePage() {
 
   const rollbackWorld = async (targetManifestDigest: string) => {
     if (!collectionResult || !activeWorld || rollbackReason.trim().length < 8) return;
-    if (!window.confirm(`Roll the active pointer back to ${targetManifestDigest}? No package bytes will be deleted or rewritten.`)) return;
+    if (!(await confirmInPage(`Roll the active pointer back to ${targetManifestDigest}? No package bytes will be deleted or rewritten.`, "Roll back the active pointer"))) return;
     setWorldBusy(true);
     try {
       const token = await getAuthToken();
@@ -2996,6 +3068,7 @@ export default function WorkspacePage() {
     <WorkspaceUltimateShell
       surface={surface}
       activeRevision={activeWorld?.revision ?? null}
+      stateMode={workspaceState.mode}
       candidateReady={candidateNeedsDecision}
       reviewCount={candidateReady ? reviewCount : null}
       activityCount={activityCount}
@@ -3019,6 +3092,7 @@ export default function WorkspacePage() {
         ) : null
       }
     >
+          {confirmRequest ? <ConfirmDialog key={confirmRequest.id} request={confirmRequest} /> : null}
           <input ref={fileRef} type="file" multiple hidden accept={uploadAcceptAttribute} onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           <input ref={(node) => { folderRef.current = node; node?.setAttribute("webkitdirectory", ""); }} type="file" multiple hidden onChange={(event) => { const files = [...(event.target.files ?? [])]; if (files.length > 0) void stageWorkspaceFiles(files); }} />
           {/*
@@ -3396,9 +3470,9 @@ export default function WorkspacePage() {
             second blocked state can no longer hide behind the first one's heading.
           */}
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
-            <section className="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
+            <Screen title="Needs attention" titleAs="h2" titleId="workspace-attention-title" status={attentionScreenStatus(attentionItems)}
+              bodyClassName="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
               <div>
-                <h2 id="workspace-attention-title">Needs attention</h2>
                 <ul className="workspace-attention-items">
                   {attentionItems.map((item) => (
                     <li key={item.id}>
@@ -3426,7 +3500,7 @@ export default function WorkspacePage() {
                   <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
                 </div>
               ) : null}
-            </section>
+            </Screen>
           ) : null}
 
           {/*
@@ -3446,12 +3520,10 @@ export default function WorkspacePage() {
               point of the candidate stage is that automated extraction is not yet organizational
               truth; a heading that skips it undoes the guarantee.
             */
-            <section className="workspace-complete" aria-labelledby="workspace-complete-title">
+            /* Round 3: the state hero above already says "Ready for your review."; this screen says what the candidate holds. */
+            <Screen title={activeWorld ? "Your Compiled World is ready." : "What the candidate holds."} titleAs="h2" titleId="workspace-complete-title"
+              status={worldScreenStatus(activeWorld?.revision ?? null)} bodyClassName="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
-                <h2 id="workspace-complete-title">
-                  {/* Round 3: the state hero above already says "Ready for your review."; this card says what the candidate holds. */}
-                  {activeWorld ? "Your Compiled World is ready." : "What the candidate holds."}
-                </h2>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
                 {activeWorld ? null : (
                   <p className="fine">
@@ -3487,7 +3559,7 @@ export default function WorkspacePage() {
                   trackFunnel("workspace_ai_connect_opened");
                 }}
               />
-            </section>
+            </Screen>
           ) : null}
 
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
@@ -3532,8 +3604,9 @@ export default function WorkspacePage() {
           {documents && documents.length > 0 ? <LibraryPanel documentIds={documents.map((d) => d.documentId)} names={names} onAvailability={setLibraryAvailable} /> : null}
           {(intakeOpen || Boolean(collectionResult && !collectionResult.coreExecution)) ? <div className="workspace-grid">
             {intakeOpen ? (
-            <section id="workspace-sources" className="card document-card">
-              <h2>{documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}</h2>
+            <Screen id="workspace-sources" title={documents && documents.length > 0 ? "Sources ready for your next World" : "Bring your first source"}
+              titleAs="h2" titleId="workspace-sources-title" aria-labelledby="workspace-sources-title"
+              status={readyScreenStatus(readyDocumentCount)} bodyClassName="document-card">
               {documents && documents.length > 0 ? (
                 <>
                 <p>Compile one or more ready sources into the next candidate. Tick them on the board above; nothing becomes active until you review it.</p>
@@ -3554,7 +3627,7 @@ export default function WorkspacePage() {
                   <p>Add files in the box above, or connect the system where your knowledge already lives.</p>
                 </div>
               )}
-            </section>
+            </Screen>
             ) : null}
             {/*
               A candidate that exists but was never run through Core is the one case Home cannot
@@ -3659,8 +3732,8 @@ export default function WorkspacePage() {
                 reasons that already exist; a synthesised number would be an uncalibrated
                 threshold dressed up as a measurement.
               */}
-              <section className="card" aria-labelledby="review-queue-title">
-                <p className="eyebrow">Review queue</p>
+              {/* WO-WS-4: the eyebrow is the screen's name now; the tag is the count the top bar prints. */}
+              <Screen title="Review queue" status={reviewScreenStatus(reviewCount, Boolean(collectionResult))} aria-labelledby="review-queue-title">
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
@@ -3668,8 +3741,10 @@ export default function WorkspacePage() {
                   selectedDocumentId={worldReadModel?.evidence.find((item) => item.id === reviewEvidenceId)?.sourceId ?? null}
                   onSelectDocument={(documentId) => selectReviewEvidence(worldReadModel?.evidence.find((item) => item.sourceId === documentId)?.id ?? null)}
                 />
-              </section>
-              <section className="card review-comparison" aria-labelledby="review-comparison-title">
+              </Screen>
+              {/* The blueprint's /evidence frame names this the evidence reader; the tag counts what it can open. */}
+              <Screen title="Evidence reader" status={evidenceScreenStatus(worldReadModel?.evidence.length ?? 0)}
+                bodyClassName="review-comparison" aria-labelledby="review-comparison-title">
                 <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
                 {worldReadModel?.evidence.length ? (
                   <>
@@ -3784,17 +3859,11 @@ export default function WorkspacePage() {
                     ) : null}
                   </>
                 ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
-              </section>
-              <section id="workspace-review" className="card world-studio" aria-labelledby="world-studio-title">
-                <div className="world-heading">
-                  <div>
-                    <p className="eyebrow">Activate</p>
-                    <h2 id="world-studio-title">Make this the version your AI reads.</h2>
-                  </div>
-                  <output className={activeWorld ? "world-status active" : "world-status"}>
-                    {activeWorld ? `ACTIVE · REVISION ${activeWorld.revision}` : "NO ACTIVE WORLD"}
-                  </output>
-                </div>
+              </Screen>
+              {/* WO-WS-4: the activation block's eyebrow names the screen and its status output is the screen's tag. */}
+              <Screen id="workspace-review" className="world-studio" title="Activate" status={activationScreenStatus(activeWorld?.revision ?? null)}
+                statusAs="output" aria-labelledby="world-studio-title">
+                <h2 id="world-studio-title">Make this the version your AI reads.</h2>
                 {!collectionResult ? (
                   <p className="world-empty">Compile or reload a verified collection candidate to begin review.</p>
                 ) : (
@@ -3863,7 +3932,7 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                 )}
-              </section>
+              </Screen>
               {/*
                 The raw material check, behind a disclosure. It verifies the immutable OCR result
                 against its receipt and activates nothing; a reviewer reaches for it when a
@@ -3884,16 +3953,40 @@ export default function WorkspacePage() {
               </details>
               </> : null}
               {surface === "ask" ? (
-              <section id="workspace-ask" className="card ask-studio" aria-labelledby="ask-title">
-                <div className="one-path-ai-options">
+              /*
+                WO-WS-4: two product screens on one surface, as the blueprint's /connect and /evidence frames
+                draw them -- the setup (its tag is what its own foot line says: nothing verified) and the Ask
+                panel (its tag is which World it reads). Same controls, same order.
+              */
+              <div id="workspace-ask" className="ask-studio workspace-screens">
+                <Screen title="Connect your AI" titleId="workspace-ai-setup-title" aria-labelledby="workspace-ai-setup-title"
+                  status={AI_SETUP_SCREEN_STATUS} bodyClassName="one-path-ai-options">
                   <WorkspaceUseWithAi open onDownload={collectionResult ? () => void downloadCollection() : undefined}
                     downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
-                </div>
+                </Screen>
+                <Screen title="Ask" status={askScreenStatus(activeWorld?.revision ?? null, askPanel)} aria-labelledby="ask-title">
                 <div>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
                 </div>
-                {activeWorld ? null : (
+                {askPanel === null ? null : askPanel === "checking" || askPanel === "opening" ? (
+                  <p className="notice static" role="status">
+                    {askPanel === "checking" ? "Checking this workspace for an active World…" : "Opening the active World…"}
+                  </p>
+                ) : askPanel !== "none" && askPanel.kind === "several" ? (
+                  <ActiveWorldPicker worlds={askPanel.worlds} onChoose={(world) => void openActiveWorld(world, "push")} />
+                ) : askPanel !== "none" ? (
+                  <p className="notice static" role="status">
+                    <strong>{askPanel.kind === "failed" ? discoveryFailureCopy(askPanel).title : "The active World could not be opened."}</strong>{" "}
+                    {askPanel.kind === "failed" ? discoveryFailureCopy(askPanel).sentence : "Ask stays closed until it can read it."}
+                    <button type="button" onClick={() => {
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete("collection"); url.searchParams.delete("manifest");
+                      window.history.replaceState(null, "", url);
+                      ++candidateLoadSequence.current; clearSelection();
+                    }}>Check again</button>
+                  </p>
+                ) : (
                   <p className="notice static" role="status">
                     <strong>No active World yet.</strong> Ask reads the active World only. Review a
                     candidate and activate it, and this becomes answerable.
@@ -3955,6 +4048,9 @@ export default function WorkspacePage() {
                           {askAbstentionCopy(askResult.reason, pageLocale()).action}
                         </button>
                       </div>
+                    ) : askResult.status === "abstained" && askResult.reason === CITED_EVIDENCE_NOT_IN_PACKET ? (
+                      /* An integrity abstention: a citation did not verify. No source is missing, so nothing is offered. */
+                      null
                     ) : askResult.status === "abstained" ? (
                       <div className="workspace-intake-actions">
                         <button type="button" onClick={() => navigateSurface("sources")}>Add the source that would answer this</button>
@@ -3973,7 +4069,8 @@ export default function WorkspacePage() {
                 {askWorldModel && askEvidenceId !== undefined ? (
                   <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
-              </section>
+                </Screen>
+              </div>
               ) : null}
             </>
           ) : null}
@@ -4110,7 +4207,7 @@ export default function WorkspacePage() {
                 ? closedGate.action
                 : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
-          ) : <ConnectionsPanel />) : null}
+          ) : <ConnectionsPanel confirm={confirmInPage} />) : null}
 
           {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
@@ -4130,7 +4227,7 @@ export default function WorkspacePage() {
                 ? closedGate.action
                 : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
-          ) : <DeveloperPanel />) : null}
+          ) : <DeveloperPanel confirm={confirmInPage} />) : null}
 
           {tab === "integrity" ? (
           <section className="card gates">

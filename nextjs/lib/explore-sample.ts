@@ -326,7 +326,7 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
 
   Not a scripted answer with a citation drawn on afterwards: `answerGroundedQuestion` reads
   `rag/chunks.jsonl` out of this artifact and returns the regions it scored, and the page shows
-  exactly what it returned -- its status, its complete answer and its reason -- beside the
+  exactly what it returned -- its status, its answer and its reason -- beside the
   regions it cited. Picking the questions is a demo choice; the answers are not a choice.
 
   These reach two different filings: a quarterly income statement and the annual filing's
@@ -343,11 +343,11 @@ export const exploreSampleSnapshots: readonly ExploreSampleSnapshot[] = [
   region that merely contains the words. Asking it here would put a confident citation under an
   answer nothing computed. It stays out until Ask can reach the diff.
 
-  An answer is the complete text of the selected evidence or it is nothing. The Company
-  Background question's selected evidence is longer than the fallback answer limit, so the
-  retriever abstains with EVIDENCE_EXCEEDS_ANSWER_LIMIT and keeps its citations; the sample
-  carries that abstention as it is rather than showing a clipped citation preview as the answer,
-  and the tests hold it there as the overflow regression.
+  An answer is, for each cited region, the verbatim window of it that matches the question, with
+  "…" where the region goes on (WO-ASK-0). The Company Background question's evidence is longer
+  than the excerpt bound, so its answer is windows of those regions rather than an abstention.
+  An EVIDENCE_EXCEEDS_ANSWER_LIMIT abstention with citations is still carried as it is if the
+  retriever returns one (a remembered replay); it is never replaced by a clipped preview.
 
   Fail-closed: a null result, an abstention with nothing to cite, or an abstention for any other
   reason stops the build. The accompanying tests also pin each top-ranked source region.
@@ -369,7 +369,7 @@ export const EXPLORE_SAMPLE_QUESTIONS = [
 export type ExploreSampleAnswer = {
   question: string;
   status: GroundedAnswer["status"];
-  /** The complete selected evidence when grounded; "" when the retriever abstained. */
+  /** The verbatim windows of the cited regions when grounded; "" when the retriever abstained. */
   answer: GroundedAnswer["answer"];
   /** Why the retriever abstained; null when grounded. */
   reason: GroundedAnswer["reason"];

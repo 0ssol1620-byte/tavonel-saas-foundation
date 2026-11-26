@@ -9,9 +9,9 @@
   corpus to the browser or quietly fail on the fourth question. A control that only looks like it
   accepts anything is worse than one that says what it does.
 
-  A grounded answer is the complete text of the regions the retriever selected, shown as a
-  quotation. When that text is too long for the answer limit the retriever abstains, and the
-  panel says so in words instead of quoting anything. Either way every region under it opens
+  A grounded answer is, from each region the retriever cited, the part that matches the question,
+  verbatim, shown as a quotation; "…" marks where a region goes on (WO-ASK-0). When the retriever
+  abstains, the panel says so in words instead of quoting anything. Either way every region under it opens
   Act 2 at that region -- Question → World → Knowledge → Evidence → Original source, walked
   rather than described.
 */

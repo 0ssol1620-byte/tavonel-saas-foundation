@@ -9,8 +9,8 @@ import { RemoteMcpAvailability } from "@/components/workspace/connect-ai-panel";
 import { configuredOAuthProviders } from "@/lib/connector-oauth-secrets";
 import { remoteMcpEnabled } from "@/lib/remote-mcp";
 
-// Direction C (2026-11-04): the workspace stands on the warm canvas, so the browser chrome does too.
-export const viewport: Viewport = { themeColor: "#F5F3EE", colorScheme: "light" };
+// WO-WS-2 (2026-11-23): the workspace stands on the V34 paper (--v34-paper), so the browser chrome does too.
+export const viewport: Viewport = { themeColor: "#f7f8f4", colorScheme: "light" };
 
 export const metadata: Metadata = {
   alternates: { canonical: "/workspace" },

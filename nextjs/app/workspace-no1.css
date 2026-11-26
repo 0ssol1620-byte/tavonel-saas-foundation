@@ -28,7 +28,8 @@
 
 /* ---- type floor and voices ---------------------------------------------------------- */
 .one-path-workspace .workspace-content { gap: var(--ws-gap); padding: clamp(20px, 2.6vw, 36px) clamp(16px, 3vw, 40px) 72px; }
-.one-path-workspace .workspace-content h2 { margin: 0; color: var(--text-hi); font: 600 18px/1.35 var(--f-sans); letter-spacing: -.01em; }
+/* WO-WS-4: a section title is the target's H3 step (--v34-h3, 650), under the page title (workspace-ultimate.module.css). */
+.one-path-workspace .workspace-content h2 { margin: 0; color: var(--text-hi); font: 650 var(--v34-h3)/1.2 var(--v34-font); letter-spacing: -.02em; }
 /* One eyebrow (sans, sentence case, no rule ornament) and one state label (mono caps, machine
    state only). The workspace used to run both voices through .eyebrow, which is why every
    section header read like a terminal banner. */
@@ -494,7 +495,8 @@
 }
 /* workspace-08: on Ask this block is the first thing in the card, so the seam above it separated
    it from nothing -- an orphan rule across the top of the card. A seam divides; it does not open. */
-.one-path-workspace .ask-studio .one-path-ai-options:first-child .workspace-ai-use-guide { border-top: 0; }
+/* WO-WS-4: the options are the body of their own screen now (never a first child), and still open nothing. */
+.one-path-workspace .ask-studio .one-path-ai-options .workspace-ai-use-guide { border-top: 0; }
 .workspace.one-path-workspace .one-path-ai-options { margin-bottom: 0; }
 
 /* BQ-133: the settings tables are prose-and-number, not machine identifiers. */
@@ -587,8 +589,13 @@
    above a bottom bar that is correct -- it is the desktop rail, where the same rule opened the
    panel off the top of the viewport, that BQ-095 is about. */
 .workspace.one-path-workspace :is(button, summary, a, input, select, textarea):focus-visible {
-  outline: 2px solid var(--verified); outline-offset: 2px;
+  outline: 2px solid var(--v34-focus); outline-offset: 2px;
 }
+/* WO-WS-3: inside the workspace the ring is V34's focus colour (#4880ba), from the token sheet's `.site` on
+   <main>, so its forced-colors block (--v34-focus: Highlight) reaches it. Every other focusable keeps the
+   global ring's shape (app/tavonel.css) and takes the same colour. 3:1 or more on every workspace ground
+   (lib/workspace-v34-tokens.test.ts). */
+.workspace.one-path-workspace :focus-visible { outline-color: var(--v34-focus); }
 @media (max-width: 1023px) {
   .workspace.one-path-workspace .one-path-more-panel {
     position: fixed; left: auto; right: 12px; top: auto; bottom: calc(76px + env(safe-area-inset-bottom));
@@ -611,7 +618,7 @@
   .one-path-workspace .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled),
   /* REVIEW-R1 B-1: the filled ink primary lightens one step on hover (#15191d to #292f35). It was #fff over a --ground label, and --ground is the
      white sheet in the light workspace, so the label vanished. */
-  .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: var(--text-max); border-color: var(--text-max); color: var(--tv-sheet); }
+  .one-path-workspace .workspace-preflight .workspace-intake-actions button:first-child:hover:not(:disabled) { background: var(--text-max); border-color: var(--text-max); color: var(--v34-white); }
   .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled) {
     background: var(--g2); border-color: var(--text-lo);
   }
@@ -694,32 +701,35 @@
    on the white working sheet, rounded at 24px -- the canvas for a plain card and the drop zone,
    sand for what waits on a person (needs attention, the activation card), tint for the compile in
    progress -- and the action buttons are pills. Nothing here adds a state colour; the fills are
-   surfaces, and the state words inside them keep their own tokens. */
-.one-path-workspace { --ws-radius: var(--tv-r-inner); --ws-radius-sm: var(--tv-r-small); }
-.one-path-workspace .card { border: 0; border-radius: var(--tv-r-card); background: var(--g1); }
-.one-path-workspace .card .card { border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
-.one-path-workspace .workspace-intake { border: 0; border-radius: var(--tv-r-card); background: var(--tv-canvas); box-shadow: inset 0 0 0 1.5px var(--tv-rule-strong); }
+   surfaces, and the state words inside them keep their own tokens.
+   WO-WS-2 (2026-11-23): the same blocks read the V34 token layer now (paper, white, pale green, the V34 link
+   and radii, from components/v34/tokens.module.css via the workspace <main>); the shapes are unchanged. */
+.one-path-workspace { --ws-radius: var(--v34-radius-panel); --ws-radius-sm: var(--v34-radius-panel); }
+.one-path-workspace .card { border: 0; border-radius: var(--v34-radius-screen); background: var(--g1); }
+.one-path-workspace .card .card { border-radius: var(--v34-radius-panel); background: var(--v34-white); }
+.one-path-workspace .workspace-intake { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-paper); box-shadow: inset 0 0 0 1.5px var(--v34-control-border); }
 .one-path-workspace .workspace-intake[data-active="true"] { background: var(--verified-deep); box-shadow: inset 0 0 0 1.5px var(--verified); }
 .one-path-workspace .workspace-source-choices { border-top-color: var(--hairline); }
-.one-path-workspace .workspace-source-choices button { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); }
-.one-path-workspace .workspace-attention { padding: clamp(20px, 2.4vw, 28px); border-radius: var(--tv-r-card); background: var(--tv-sand); }
-.one-path-workspace .workspace-complete { border: 0; border-radius: var(--tv-r-card); background: var(--tv-sand); }
-.one-path-workspace .workspace-compile-block { border: 0; border-radius: var(--tv-r-card); background: var(--tv-tint-2); }
-.one-path-workspace .workspace-compile-block .workspace-compile-job { background: var(--tv-tint); }
-.one-path-workspace .notice.static { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sand); }
-.one-path-workspace .workspace-preflight dl { border: 0; border-radius: var(--tv-r-inner); background: var(--hairline); }
-.one-path-workspace .workspace-content :is(.workspace-intake-actions, .workspace-intake-gated-actions, .workspace-complete-actions, .workspace-attention-actions, .workspace-attention-items, .workspace-getting-started-actions, .compile-selection-actions, .world-actions, .review-decision-actions, .board-filters, .notice.static) :is(button, .btn, a.btn) { border-radius: var(--tv-r-pill); }
+.one-path-workspace .workspace-source-choices button { border: 0; border-radius: var(--v34-radius-panel); background: var(--v34-white); box-shadow: none; }
+.one-path-workspace .workspace-attention { padding: clamp(20px, 2.4vw, 28px); border-radius: var(--v34-radius-screen); background: var(--v34-green); }
+.one-path-workspace .workspace-complete { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-green); }
+.one-path-workspace .workspace-compile-block { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-cases); }
+.one-path-workspace .workspace-compile-block .workspace-compile-job { background: var(--v34-paper); }
+.one-path-workspace .notice.static { border: 0; border-radius: var(--v34-radius-panel); background: var(--v34-green); }
+.one-path-workspace .workspace-preflight dl { border: 0; border-radius: var(--v34-radius-panel); background: var(--hairline); }
+.one-path-workspace .workspace-content :is(.workspace-intake-actions, .workspace-intake-gated-actions, .workspace-complete-actions, .workspace-attention-actions, .workspace-attention-items, .workspace-getting-started-actions, .compile-selection-actions, .world-actions, .review-decision-actions, .board-filters, .notice.static) :is(button, .btn, a.btn) { border-radius: var(--v34-radius-pill); }
 .one-path-workspace .workspace-body > header > div:last-child > button,
-.one-path-workspace .workspace-body > header > div:last-child .proof-actions button { border-radius: var(--tv-r-pill); }
+.one-path-workspace .workspace-body > header > div:last-child .proof-actions button { border-radius: var(--v34-radius-pill); }
 /* Rows and empty states inside a block are white sheets on it, not a second ruled box. */
-.one-path-workspace .document-meta li { border-color: transparent; border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
-.one-path-workspace :is(.empty, .world-empty) { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
+.one-path-workspace .document-meta li { border-color: transparent; border-radius: var(--v34-radius-panel); background: var(--v34-white); }
+.one-path-workspace :is(.empty, .world-empty) { border: 0; border-radius: var(--v34-radius-panel); background: var(--v34-white); }
 /* Getting started is one quiet canvas row; its toggle carries no frame of its own. */
-.one-path-workspace .workspace-getting-started { border: 0; border-radius: var(--tv-r-card); background: var(--tv-canvas); }
-.one-path-workspace .workspace-getting-started-toggle { border: 0; border-radius: var(--tv-r-card); background: transparent; }
+/* WO-WS-4: the working area is the paper now, so the row is a white sheet with one rule round it. */
+.one-path-workspace .workspace-getting-started { border: 0; border-radius: var(--v34-radius-screen); background: var(--v34-white); box-shadow: inset 0 0 0 1px var(--v34-line); }
+.one-path-workspace .workspace-getting-started-toggle { border: 0; border-radius: var(--v34-radius-screen); background: transparent; }
 /* The source board is one white sheet of rows divided by hairlines; a row is not a box in a box. */
-.one-path-workspace .board-list-wrap { border: 0; border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
-.one-path-workspace .board-list > li { background: var(--tv-sheet); }
+.one-path-workspace .board-list-wrap { border: 0; border-radius: var(--v34-radius-panel); background: var(--v34-white); }
+.one-path-workspace .board-list > li { background: var(--v34-white); }
 .one-path-workspace .board-list .board-row-summary { border: 0; border-radius: 0; background: transparent; }
 /* ---- round 2 (CRITIQUE-R1 #3): one drop zone, one filled action, connectors as chips, the selection bar ----
    The drop zone is one dashed inset area on the working sheet -- no block inside the sheet and no tiles inside
@@ -730,51 +740,51 @@
 .one-path-workspace .workspace-intake[data-existing-documents="1"] { background: transparent; }
 .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy { background: transparent; }
 .one-path-workspace .workspace-intake,
-.one-path-workspace .workspace-intake[data-existing-documents="1"] { border: 1.5px dashed var(--tv-rule-strong); box-shadow: none; }
+.one-path-workspace .workspace-intake[data-existing-documents="1"] { border: 1.5px dashed var(--v34-control-border); box-shadow: none; }
 .one-path-workspace .workspace-intake[data-active="true"] { border: 2px solid var(--verified); background: var(--verified-deep); }
 .one-path-workspace .workspace-source-choices,
 .one-path-workspace .workspace-intake[data-compact="1"] .workspace-source-choices,
 .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); }
 .one-path-workspace .workspace-source-choices button {
   display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; white-space: nowrap;
-  border: 0; border-radius: var(--tv-r-pill); background: var(--tv-canvas); box-shadow: none; font-size: 13px;
+  border: 0; border-radius: var(--v34-radius-pill); background: var(--v34-white); box-shadow: inset 0 0 0 1px var(--v34-line); font-size: 13px;
 }
 .one-path-workspace .workspace-source-choices button small::before { content: "· "; }
 @media (pointer: coarse), (max-width: 767px) {
   .one-path-workspace .workspace-source-choices button { min-height: 44px; }
 }
 .workspace.one-path-workspace[data-surface="sources"] .workspace-intake-copy .workspace-intake-actions button:first-child {
-  background: var(--text-hi); border-color: var(--text-hi); color: var(--tv-sheet);
+  background: var(--text-hi); border-color: var(--text-hi); color: var(--v34-white);
 }
 .workspace.one-path-workspace[data-surface="sources"] .workspace-intake-copy .workspace-intake-actions button:not(:first-child) {
-  min-height: 44px; padding-inline: 8px; border-color: transparent; background: transparent; color: var(--tv-action);
+  min-height: 44px; padding-inline: 8px; border-color: transparent; background: transparent; color: var(--v34-link);
   text-decoration: underline; text-underline-offset: 3px;
 }
 /* The selection bar (the mockup's): the count on the left, the ink pill on the right, on a white sheet in the block.
    At 0 selected the pill is visibly off -- a sunk fill, no shadow, muted label -- not a hairline outline. */
 .one-path-workspace .compile-selection-actions {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
-  margin-top: 8px; padding: 10px 10px 10px 20px; border: 0; border-radius: var(--tv-r-pill); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1);
+  margin-top: 8px; padding: 10px 10px 10px 20px; border: 0; border-radius: var(--v34-radius-pill); background: var(--v34-white); box-shadow: var(--v34-shadow-screen);
 }
 .one-path-workspace .compile-selection-actions small { flex: 1 1 260px; min-width: 0; color: var(--text-lo); }
 .one-path-workspace .compile-selection-actions small b { color: var(--text-hi); font-weight: 600; }
-.one-path-workspace .compile-selection-actions button { min-height: 44px; padding: 0 20px; border-radius: var(--tv-r-pill); }
+.one-path-workspace .compile-selection-actions button { min-height: 44px; padding: 0 20px; border-radius: var(--v34-radius-pill); }
 .one-path-workspace .workspace-content .compile-selection-actions button:disabled { background: var(--g2); border-color: transparent; color: var(--text-lo); }
 @media (hover: hover) and (pointer: fine) {
-  .workspace.one-path-workspace[data-surface="sources"] .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled) { background: var(--text-max); border-color: var(--text-max); color: var(--tv-sheet); }
-  .workspace.one-path-workspace[data-surface="sources"] .workspace-intake-copy .workspace-intake-actions button:not(:first-child):hover { background: transparent; color: var(--tv-action-hover); }
-  .one-path-workspace .workspace-source-choices button:hover { background: var(--tv-sand); }
+  .workspace.one-path-workspace[data-surface="sources"] .workspace-intake-copy .workspace-intake-actions button:first-child:hover:not(:disabled) { background: var(--text-max); border-color: var(--text-max); color: var(--v34-white); }
+  .workspace.one-path-workspace[data-surface="sources"] .workspace-intake-copy .workspace-intake-actions button:not(:first-child):hover { background: transparent; color: var(--v34-header-btn-hover); }
+  .one-path-workspace .workspace-source-choices button:hover { background: var(--v34-green); }
 }
 @media (max-width: 767px) {
-  .one-path-workspace .compile-selection-actions { border-radius: var(--tv-r-inner); padding: 12px; }
+  .one-path-workspace .compile-selection-actions { border-radius: var(--v34-radius-panel); padding: 12px; }
   .one-path-workspace .compile-selection-actions button { width: 100%; }
 }
 /* The drop zone's mark: the upload glyph the workspace already uses, in the accent, beside the zone's name. */
-.one-path-workspace .workspace-intake-copy :is(h1, h2) > svg { display: inline-block; margin-right: 10px; vertical-align: -3px; color: var(--tv-action); }
+.one-path-workspace .workspace-intake-copy :is(h1, h2) > svg { display: inline-block; margin-right: 10px; vertical-align: -3px; color: var(--v34-link); }
 /* Round 2 (CRITIQUE-R1 #4): the review queue's limits fold under one "Why?"; the unread-ledger line is said once. */
 .one-path-workspace .workspace-review-why { margin: 4px 0 8px; }
 .one-path-workspace .workspace-review-why > summary {
-  display: inline-flex; align-items: center; min-height: 44px; color: var(--tv-action); cursor: pointer;
+  display: inline-flex; align-items: center; min-height: 44px; color: var(--v34-link); cursor: pointer;
   font: 500 13px/1.4 var(--f-sans); text-decoration: underline; text-underline-offset: 3px;
 }
 .one-path-workspace .workspace-review-why > p { max-width: 72ch; }
@@ -787,9 +797,9 @@
    - Needs attention is a list of rows on the white sheet; each row's state word keeps its own token.
    - The candidate card is the canvas, the same surface as a plain card. */
 .one-path-workspace .notice.static { padding: 4px 0; border: 0; border-radius: 0; background: transparent; color: var(--text-mid); }
-.one-path-workspace [role="alert"] > .notice.static { padding: 12px 16px; border: 1px solid var(--hairline-hi); border-radius: var(--tv-r-inner); background: var(--tv-sheet); }
+.one-path-workspace [role="alert"] > .notice.static { padding: 12px 16px; border: 1px solid var(--hairline-hi); border-radius: var(--v34-radius-panel); background: var(--v34-white); }
 .one-path-workspace .workspace-attention { padding: 0; border-radius: 0; background: transparent; }
-.one-path-workspace .workspace-complete { background: var(--tv-canvas); }
+.one-path-workspace .workspace-complete { background: var(--v34-paper); }
 /* N2: no coloured left edge on a board row. The row's state is its own word ("Needs review"), in its own token. */
 .one-path-workspace .board-list > li[data-status] { box-shadow: none; }
 .one-path-workspace .board-rows > li,
@@ -811,19 +821,54 @@
 .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-source-choices { grid-column: 1 / -1; }
 .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:first-child { border-color: var(--text-hi); }
 .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:not(:first-child) {
-  padding-inline: 8px; border-color: transparent; background: transparent; color: var(--tv-action);
+  padding-inline: 8px; border-color: transparent; background: transparent; color: var(--v34-link);
   text-decoration: underline; text-underline-offset: 3px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:not(:first-child):hover:not(:disabled) { border-color: transparent; background: transparent; color: var(--tv-action-hover); }
+  .one-path-workspace .workspace-intake[data-existing-documents="1"] .workspace-intake-copy .workspace-intake-actions button:not(:first-child):hover:not(:disabled) { border-color: transparent; background: transparent; color: var(--v34-header-btn-hover); }
 }
 /* The review queue: a reason is a chip a person reads, with the recorded code beside it in mono. */
 .one-path-workspace .workspace-review-reason { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
-.one-path-workspace .workspace-review-reason > span { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: var(--tv-r-pill); background: var(--g2); color: var(--text-hi); font: 500 12px/1 var(--f-sans); }
+.one-path-workspace .workspace-review-reason > span { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: var(--v34-radius-pill); background: var(--g2); color: var(--text-hi); font: 500 12px/1 var(--f-sans); }
 .one-path-workspace .workspace-review-reason > code { color: var(--text-lo); font: 12px/1.4 var(--f-mono); overflow-wrap: anywhere; }
 /* D0 R2: a known reason's sentence takes its own line, then "Reference" and the recorded code, still selectable. */
 .one-path-workspace .workspace-review-reason > em { flex-basis: 100%; color: var(--text-hi); font-style: normal; }
 /* Round 3, placement series: the example run under an empty workspace's drop zone -- labelled, quiet, on the sheet. */
 .one-path-workspace .workspace-example-run { display: grid; gap: 10px; margin: 24px 0 0; }
 .one-path-workspace .workspace-example-run figcaption { color: var(--text-lo); font: 500 12px/1.4 var(--f-sans); }
+
+/* ---- WO-WS-4: the blueprint's product frame -------------------------------------------------------------------
+   The work surfaces draw product "screen" frames (components/v34/ui/screen.tsx, `[data-v34-screen]`) on the paper.
+   The frame owns its box; a section's own layout class sits on the screen's body (its second child). The rules
+   here are the rhythm inside a screen, the two-screen stack on Use with AI, and the control faces. */
+/* :where() keeps this at one class, so a body's own layout class (.workspace-complete, .workspace-attention) wins. */
+.one-path-workspace :where([data-v34-screen] > div:nth-child(2)) { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.one-path-workspace .workspace-screens { display: grid; gap: var(--ws-gap); min-width: 0; }
+/* Body copy and meta on a screen: the target's .96rem screen paragraph and .84rem note, never under the 12px floor. */
+.one-path-workspace [data-v34-screen] :where(p, li) { font-size: .96rem; line-height: 1.6; }
+.one-path-workspace [data-v34-screen] .fine { color: var(--text-lo); font-size: .84rem; line-height: 1.55; }
+/* The filter chips are the target's pressed control: a control face, and forest with a white label when pressed
+   (aria-pressed, read from the same state as data-active). */
+.workspace.one-path-workspace .workspace-content .board-filters button:is([aria-pressed]) {
+  border: 1px solid var(--v34-control-border); border-radius: var(--v34-radius-control, 7px); background: var(--v34-paper); color: var(--v34-ink); font-weight: 600;
+}
+.workspace.one-path-workspace .workspace-content .board-filters button[aria-pressed="true"] { border-color: var(--v34-step-bg); background: var(--v34-step-bg); color: var(--v34-white); }
+/* Secondary buttons: the target's outlined face. Their rule colour (#cbd3c8) was decoration-weight, 1.5:1 on the
+   white sheet; the control border holds 3:1 (lib/workspace-v34-tokens.test.ts). The filled primary in each row is
+   excluded by position (review decisions) or never in the list (world actions, the selection bar). */
+.workspace.one-path-workspace .workspace-content :is(.workspace-complete-actions, .workspace-attention-items, .workspace-attention-actions, .notice.static, .ask-result, .version-list) button:not(:disabled),
+.workspace.one-path-workspace .workspace-content .review-decision-actions button:not(:first-child):not(:disabled) { border-color: var(--v34-control-border); }
+/* A row list inside a screen is the target's ruled source list (.source-row: a top rule, no box): the white row
+   sheets stood on a paper card, and on the white screen they would not be seen. */
+.one-path-workspace [data-v34-screen] .document-meta li { border: 0; border-top: 1px solid var(--v34-line); border-radius: 0; background: transparent; }
+/* The queue's "Open its evidence" is a toggle (aria-pressed): the target's control, forest when pressed. */
+.workspace.one-path-workspace .workspace-content .document-meta button:is([aria-pressed]) {
+  border: 1px solid var(--v34-control-border); border-radius: var(--v34-radius-control, 7px); background: var(--v34-paper); color: var(--v34-ink); font-weight: 600;
+}
+.workspace.one-path-workspace .workspace-content .document-meta button[aria-pressed="true"] { border-color: var(--v34-step-bg); background: var(--v34-step-bg); color: var(--v34-white); }
+@media (hover: hover) and (pointer: fine) {
+  .workspace.one-path-workspace .workspace-content .document-meta button[aria-pressed="false"]:hover { background: var(--v34-secondary-hover); color: var(--v34-ink); }
+  .workspace.one-path-workspace .workspace-content .board-filters button[aria-pressed="false"]:hover { background: var(--v34-secondary-hover); color: var(--v34-ink); }
+  .workspace.one-path-workspace .workspace-content .board-filters button[aria-pressed="true"]:hover { background: var(--v34-step-bg); color: var(--v34-white); }
+}
 }

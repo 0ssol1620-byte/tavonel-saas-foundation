@@ -80,6 +80,10 @@
   --v34-radius-pill: 100px;
   --v34-radius-panel: 8px;
   --v34-radius-art: 6px;
+  /* the product "screen" frame and a field (the signed-in workspace, WO-WS-2); no public route reads these */
+  --v34-radius-screen: 14px;
+  --v34-radius-field: 6px;
+  --v34-shadow-screen: 0 18px 45px rgb(20 42 36 / 0.06);
 
   /* type: the self-hosted faces the site already ships, no new font bytes */
   --v34-font: var(--f-sans, "Wanted Sans Variable", system-ui, sans-serif);
