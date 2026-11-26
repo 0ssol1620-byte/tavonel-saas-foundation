@@ -71,6 +71,10 @@ async function mockWorkspace(page: Page, reviewRequired = false, artifactManifes
   await page.route("**/api/compile-jobs", route =>
     route.fulfill({ json: { code: "OK", jobs: [] } })
   );
+  // WO-WS-6: Home reads the active-World listing on mount; unanswered it 401s against the fake session.
+  await page.route("**/api/v1/collections?**", route =>
+    route.fulfill({ json: { code: "COLLECTIONS_LISTED", collections: [], page: { limit: 50, cursor: null, nextCursor: null } } })
+  );
   await page.route("**/api/documents/*/source?**", route => {
     expect(route.request().headers().authorization).toMatch(/^Bearer /);
     return route.fulfill({ contentType: "application/pdf", body: sourcePreviewPdfFixture() });
