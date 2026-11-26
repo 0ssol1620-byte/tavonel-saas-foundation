@@ -98,11 +98,16 @@ export type WorkspaceRouteOptions = {
   jobs?: unknown[];
   accessSource?: "owner" | "paid" | "trial" | "unentitled";
   customerDataEnabled?: boolean;
+  /**
+   * What `GET /api/v1/collections` (the workspace's active-World listing, which Home and Ask both read) answers.
+   * Default: no active World. "failed": a 503, so the page must say it could not check.
+   */
+  activeWorlds?: Array<{ collectionId: string; manifestDigest: string; revision: number; updatedAt: string }> | "failed";
 };
 
 /** The routes a workspace surface reads on mount. Anything a spec cares about it re-routes after. */
 export async function installWorkspaceRoutes(page: Page, options: WorkspaceRouteOptions = {}): Promise<void> {
-  const { documents = [], billing = INACTIVE_BILLING, jobs = [], accessSource = "owner", customerDataEnabled = true } = options;
+  const { documents = [], billing = INACTIVE_BILLING, jobs = [], accessSource = "owner", customerDataEnabled = true, activeWorlds = [] } = options;
   await page.route("**/api/access/bootstrap", route => route.fulfill({
     json: {
       code: accessSource === "unentitled" ? "ACCESS_READY_NO_ENTITLEMENT" : "ACCESS_READY",
@@ -119,6 +124,9 @@ export async function installWorkspaceRoutes(page: Page, options: WorkspaceRoute
   await page.route("**/api/documents", route => route.fulfill({ json: { documents } }));
   await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs } }));
   await page.route("**/api/connections", route => route.fulfill({ json: { connections: [] } }));
+  await page.route("**/api/v1/collections?**", route => route.fulfill(activeWorlds === "failed"
+    ? { status: 503, json: { code: "COLLECTIONS_UNAVAILABLE" } }
+    : { json: { code: "COLLECTIONS_LISTED", collections: activeWorlds, page: { limit: 50, cursor: null, nextCursor: null } } }));
   await page.route("**/api/billing/status", route => route.fulfill(
     billing ? { json: { code: "OK", account: billing } } : { status: 503, json: { code: "BILLING_READ_FAILED" } },
   ));

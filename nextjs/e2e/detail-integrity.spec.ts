@@ -29,6 +29,28 @@ test('a returned inventory does not mount a pretend live canvas', async ({ page 
   await expect(dialog).toBeHidden();
 });
 
+/* WO-WS-6 (F1): Home reads the workspace's own listing, not only the open collection's active World. */
+const ACTIVE = (n: number, updatedAt: string) => ({ collectionId: `collection-${String(n).repeat(32)}`, manifestDigest: `sha256:${String(n).repeat(64)}`, revision: n, updatedAt });
+test('several active Worlds: Home names the count and does not say there is none', async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, {
+    documents: [fixtureDocument('ready-source-0')],
+    activeWorlds: [ACTIVE(1, '2026-09-30T00:00:00.000Z'), ACTIVE(2, '2026-11-23T03:46:00.000Z'), ACTIVE(3, '2026-11-26T09:44:22.000Z')],
+  });
+  await page.goto('/workspace');
+  await expect(page.getByText('3 active Worlds · most recent collection-3333333', { exact: false })).toBeVisible();
+  await expect(page.getByText('Ask asks you to choose', { exact: false })).toBeVisible();
+  await expect(page.getByText('No active World')).toHaveCount(0);
+});
+
+test('a failed listing: Home says the Worlds were not checked, never that there is none', async ({ page }) => {
+  await installFixtureSession(page);
+  await installWorkspaceRoutes(page, { documents: [fixtureDocument('ready-source-0')], activeWorlds: 'failed' });
+  await page.goto('/workspace');
+  await expect(page.getByText('· Worlds not checked', { exact: false })).toBeVisible();
+  await expect(page.getByText('No active World')).toHaveCount(0);
+});
+
 for (const state of ['ready', 'review_required', 'failed', 'cancelled']) test(`a ${state} job without a result shows an explanation, not an empty frame`, async ({ page }) => {
   await installFixtureSession(page);
   const jobId = `cjob-${'b'.repeat(32)}`;

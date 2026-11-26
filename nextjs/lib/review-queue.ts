@@ -64,6 +64,11 @@ export type ReviewQueueRow = {
    * the first decision was recorded before the compile settled -- never a clamped zero.
    */
   timeToFirstReviewMs: number | null;
+  /**
+   * True when `status` was settled only by the absence of evidence regions and the evidence was not
+   * loaded, so neither "read" nor "not read" is known. `status` is kept for ordering only.
+   */
+  evidenceUnverified?: boolean;
 };
 
 export type ReviewQueueBreakdown = {
@@ -82,9 +87,16 @@ export type ReviewQueueBreakdown = {
    * means the decision ledger was not read at all (still loading, no session, or a failed read),
    * so no row is called decided, undecided or timed.
    */
-  missing: Array<"compile_job" | "compile_settled_at" | "review_decisions" | "review_ledger">;
+  missing: Array<"compile_job" | "compile_settled_at" | "review_decisions" | "review_ledger" | "world_evidence">;
   /** The state of the decision read this breakdown was built from. */
   decisionsRead: ReviewLedgerStatus;
+  /**
+   * Documents whose read-or-not-read state could not be established, because the World's evidence
+   * regions were not loaded. They are in `rows` and in `total`, and in none of `counts`: a document
+   * is "read and bound to evidence" or "not read into this World" only after the evidence was seen.
+   * Always 0 when the evidence read was `ready`.
+   */
+  unverified: number;
   /**
    * The candidate's review reasons that name no document here: World-level reasons. They are not
    * pinned to a row, and they are still reasons to review, so the queue lists them on their own.
@@ -118,8 +130,40 @@ export type ReviewQueueInput = {
    * read: `decisions` is ignored, and an empty list is not taken to mean "nobody decided".
    */
   decisionsRead?: ReviewLedgerStatus;
+  /**
+   * Whether `evidence` is the World's evidence as read. Absent means it is -- a caller handing over
+   * evidence it already holds. `loading` and `unavailable` mean the read model that carries the
+   * evidence regions is not in hand, so an empty `evidence` says nothing about any document.
+   */
+  evidenceRead?: WorldEvidenceRead;
   names?: Record<string, string>;
 };
+
+/*
+  The World read model (`GET /api/v1/world/<id>?manifest=`) is the page's only source of evidence
+  regions, and it is a separate request from the candidate artifact that carries the compile's
+  counts. When it has not answered, or was refused, the page used to hand the queue an empty
+  evidence list, and the queue printed that as "N not read into this World · 0 read" beside a
+  compile that reported claims and relations. These are the states that read can be in.
+*/
+export type WorldReadState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready" }
+  | { status: "unavailable"; code: string | null; httpStatus: number | null };
+
+export type WorldEvidenceRead = "ready" | "loading" | "unavailable";
+
+/** `idle` (no collection selected) has no evidence to be missing, so it reads as ready. */
+export function worldEvidenceRead(state: WorldReadState): WorldEvidenceRead {
+  return state.status === "loading" ? "loading" : state.status === "unavailable" ? "unavailable" : "ready";
+}
+
+/** The error reference a refused read carries, only when it looks like one; never free text from the response. */
+export function worldReadFailureCode(body: unknown): string | null {
+  const code = typeof body === "object" && body !== null ? (body as { code?: unknown }).code : undefined;
+  return typeof code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : null;
+}
 
 /*
   The decision-ledger read, as the states it can actually be in.
@@ -289,6 +333,8 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
   const decisionsRead = input.decisionsRead ?? "ready";
   if (decisionsRead !== "ready") missing.push("review_ledger");
   else if (input.decisionsTruncated === true) missing.push("review_decisions");
+  const evidenceKnown = (input.evidenceRead ?? "ready") === "ready";
+  if (!evidenceKnown) missing.push("world_evidence");
 
   const blockedById = new Map(input.blocked.map((entry) => [entry.documentId, entry]));
   const documentById = new Map((input.documents ?? []).map((entry) => [entry.documentId, entry]));
@@ -356,6 +402,11 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
             ? "read"
             : "unprocessed";
 
+    // Without the evidence regions, "no region for this document" is not an observation: the row is
+    // neither read nor unread. A blocker, an operator review and a recorded reason are still facts.
+    const evidenceUnverified = !evidenceKnown && !blocker && document?.processingState !== "operator_review"
+      && reasons.length === 0 && evidenceIds.length === 0;
+
     const decisionTimes = evidenceIds
       .map((id) => firstDecisionByEvidence.get(id))
       .filter((value): value is number => value !== undefined);
@@ -385,16 +436,18 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueBreakdown 
       observedReviewAt: earliestObserved === null ? null : new Date(earliestObserved).toISOString(),
       firstReviewAt: firstReview === null ? null : new Date(firstReview).toISOString(),
       timeToFirstReviewMs: elapsed,
+      ...(evidenceUnverified ? { evidenceUnverified: true } : {}),
     };
   }).sort(compareReviewQueueRows);
 
   const counts: Record<ReviewQueueStatus, number> = { excluded: 0, under_review: 0, unprocessed: 0, read: 0 };
-  for (const row of rows) counts[row.status] += 1;
+  for (const row of rows) if (!row.evidenceUnverified) counts[row.status] += 1;
+  const unverified = rows.filter((row) => row.evidenceUnverified).length;
 
   const attributed = new Set(rows.flatMap((row) => row.reasons));
   const worldReasons = [...new Set(input.reviewReasons)].filter((reason) => !attributed.has(reason));
 
-  return { rows, total: rows.length, counts, missing, decisionsRead, worldReasons };
+  return { rows, total: rows.length, counts, unverified, missing, decisionsRead, worldReasons };
 }
 
 /**
@@ -431,6 +484,9 @@ export function formatElapsed(ms: number | null): string | null {
   if (hours < 24) return `${hours} h ${minutes % 60} min`;
   return `${Math.floor(hours / 24)} d ${hours % 24} h`;
 }
+
+/** A source whose read state cannot be told because the evidence regions were not loaded. */
+export const REVIEW_QUEUE_UNVERIFIED_COPY = "not checked against evidence";
 
 export const REVIEW_QUEUE_STATUS_COPY: Record<ReviewQueueStatus, string> = {
   excluded: "excluded by a safety check",

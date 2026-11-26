@@ -89,7 +89,7 @@ import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
-import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
+import { compileJobRestingNotice, earlierReviewPackages, isCompileJobResting, isCompileJobTerminal, observeCompileJob, olderReviewOpened, pickResumableCompileJob, type EarlierReviewPackage } from "@/lib/compile-job-client";
 import { measureSelection, refusablePageCount, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
@@ -106,7 +106,7 @@ import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import { Screen } from "@/components/v34/ui/screen";
 import WorldPicture from "@/components/workspace/world-picture";
 import { pictureScreenStatus } from "@/lib/workspace-world-picture";
-import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus } from "./screen-status";
+import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, homeWorldFact, readyScreenStatus, reviewScreenStatus, worldScreenStatus, type WorkspaceWorlds } from "./screen-status";
 import {
   buildReviewQueue,
   currentReviewLedger,
@@ -114,8 +114,11 @@ import {
   reviewLedgerScope,
   reviewQueueDecisionInput,
   reviewReasonsShown,
+  worldEvidenceRead,
+  worldReadFailureCode,
   type ReviewQueueInput,
   type ScopedReviewLedger,
+  type WorldReadState,
 } from "@/lib/review-queue";
 
 /** What this panel prints when it has no value. Not "0", and not a spinner that never resolves. */
@@ -503,6 +506,14 @@ export default function WorkspacePage() {
   const candidateLoadSequence = useRef(0);
   const [worldReadModel, setWorldReadModel] = useState<WorldReadModel | null>(null);
   /*
+    WO-WS-6 (F2): `worldReadModel === null` used to mean four things at once -- no collection, still
+    loading, refused, and a model for some other revision -- and every counter read it as "no evidence".
+    This says which, so the review queue and the evidence reader can say "not loaded" instead of "0".
+  */
+  const [worldReadState, setWorldReadState] = useState<WorldReadState>({ status: "idle" });
+  const [worldReadEpoch, setWorldReadEpoch] = useState(0);
+  const evidenceRead = worldEvidenceRead(worldReadState);
+  /*
     FUNNEL-SIGNED-IN #4: "Review and activate" on a finished compile lands here with #activate. The
     form renders once the candidate has loaded, and the evidence view above it grows once the read
     model has, both after the browser's own hash scroll. So the scroll waits for both, and is made
@@ -523,30 +534,45 @@ export default function WorkspacePage() {
     const manifest = collectionResult?.manifestDigest;
     setWorldReadModel(null);
     if (!collectionId || !manifest) {
+      setWorldReadState({ status: "idle" });
       return;
     }
+    setWorldReadState({ status: "loading" });
     const controller = new AbortController();
-    void (async () => {
+    type Answer = { kind: "model"; model: WorldReadModel | undefined } | { kind: "refused"; code: string | null; httpStatus: number | null };
+    void (async (): Promise<Answer> => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) return null;
+      if (!token) return { kind: "refused", code: "AUTH_REQUIRED", httpStatus: null };
       const response = await fetch(`/api/v1/world/${encodeURIComponent(collectionId)}?manifest=${encodeURIComponent(manifest)}`, {
         cache: "no-store",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
-      return response.ok ? await response.json() as { model?: WorldReadModel } : null;
+      if (!response.ok) return { kind: "refused", code: worldReadFailureCode(await response.json().catch(() => null)), httpStatus: response.status };
+      return { kind: "model", model: (await response.json() as { model?: WorldReadModel }).model };
     })()
-      .then((body) => {
-        if (!controller.signal.aborted) setWorldReadModel(body?.model?.world.id === collectionId && body.model.world.manifestDigest === manifest ? body.model : null);
+      .then((answer) => {
+        if (controller.signal.aborted) return;
+        if (answer.kind === "refused") {
+          setWorldReadState({ status: "unavailable", code: answer.code, httpStatus: answer.httpStatus });
+          return;
+        }
+        // A model for another collection or revision is not this compile's evidence: unavailable, never an empty World.
+        const model = answer.model?.world.id === collectionId && answer.model.world.manifestDigest === manifest ? answer.model : null;
+        setWorldReadModel(model);
+        setWorldReadState(model ? { status: "ready" } : { status: "unavailable", code: "WORLD_READ_MODEL_MISMATCH", httpStatus: null });
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) setWorldReadModel(null);
+        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) {
+          setWorldReadModel(null);
+          setWorldReadState({ status: "unavailable", code: null, httpStatus: null });
+        }
       });
     return () => controller.abort();
-  }, [collectionResult?.collectionId, collectionResult?.manifestDigest]);
+  }, [collectionResult?.collectionId, collectionResult?.manifestDigest, worldReadEpoch]);
   /*
     The two server facts the review queue needs and the candidate artifact does not carry.
 
@@ -787,6 +813,52 @@ export default function WorkspacePage() {
      newer listing own the panel: an older answer that returns late is dropped. */
   const [askWorlds, setAskWorlds] = useState<AskWorldState>("idle");
   const discoveryRun = useRef(0);
+  /*
+    WO-WS-6 (F1): which Worlds the workspace has active, for Home. `activeWorld` above is the one
+    collection the page has open (the URL's `?collection=`, or none); the database keeps an active
+    World per collection and allows several, so Home used to say "No active World" for a workspace
+    whose Ask listed three. The same listing Ask uses, read once the page is ready and again whenever
+    the open collection's active World changes (an activation or a rollback). Nothing is opened or
+    chosen here: Ask's own rule for which World it reads is untouched.
+  */
+  const [workspaceWorlds, setWorkspaceWorlds] = useState<WorkspaceWorlds>("checking");
+  /* WO-WS-6 (F3): review packages older than a newer compile, which the start-up pick does not open. */
+  const [earlierReviews, setEarlierReviews] = useState<EarlierReviewPackage[]>([]);
+  /* The opened job when it is a review package older than the newest compile: its id and when it settled. */
+  const [olderReview, setOlderReview] = useState<{ jobId: string; settledAt: string | null } | null>(null);
+  /*
+    One listing request per moment, shared by Home's effect and Ask's. A call made while another for the
+    same open World (its manifest digest, "" for none) is in flight gets that call's answer; a call after
+    the open World changed starts its own, so an answer that began before an activation is never reused.
+  */
+  const listingInflight = useRef<{ key: string; promise: Promise<ActiveWorldDiscovery> } | null>(null);
+  const listActiveWorlds = (): Promise<ActiveWorldDiscovery> => {
+    const key = activeWorld?.manifestDigest ?? "";
+    if (listingInflight.current?.key === key) return listingInflight.current.promise;
+    const entry: { key: string; promise: Promise<ActiveWorldDiscovery> } = {
+      key,
+      promise: (async (): Promise<ActiveWorldDiscovery> => {
+        try {
+          const token = await getAuthToken();
+          return token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED", status: 401 };
+        } catch {
+          return { kind: "failed", code: null, status: null };
+        }
+      })().finally(() => { if (listingInflight.current === entry) listingInflight.current = null; }),
+    };
+    listingInflight.current = entry;
+    return entry.promise;
+  };
+  useEffect(() => {
+    if (session !== "signed-in" || !workspaceStartupReady) return;
+    let current = true;
+    // The open World changed (or this is the first read): the last answer is not shown as this one's.
+    setWorkspaceWorlds("checking");
+    void listActiveWorlds().then((found) => { if (current) setWorkspaceWorlds(found); });
+    return () => { current = false; };
+    // getAuthToken only reads the session; the open World's identity is what makes the listing stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, workspaceStartupReady, activeWorld?.manifestDigest, activeWorld?.revision]);
   const askPanel = askWorldPanel(activeWorld, askWorlds);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const pendingConfirm = useRef<ConfirmRequest | null>(null);
@@ -1041,13 +1113,8 @@ export default function WorkspacePage() {
     const run = ++discoveryRun.current;
     const started = candidateLoadSequence.current;
     void (async () => {
-      let found: ActiveWorldDiscovery;
-      try {
-        const token = await getAuthToken();
-        found = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED", status: 401 };
-      } catch {
-        found = { kind: "failed", code: null, status: null };
-      }
+      // Shared with Home's read of the same listing while one is in flight (WO-WS-6), so a load makes one request.
+      const found = await listActiveWorlds();
       // A newer listing owns the panel now.
       if (run !== discoveryRun.current) return;
       // Another collection was loaded meanwhile: this answer is stale and must not replace it.
@@ -1124,6 +1191,10 @@ export default function WorkspacePage() {
         if (!response.ok) return;
         const json = await response.json() as { jobs?: Array<CompileJobView & { settledAt?: string | null }> };
         const open = pickResumableCompileJob(json.jobs ?? [], Date.now());
+        // From the list already in hand: a review package this pick leaves unopened stays pointed at.
+        setEarlierReviews(earlierReviewPackages(json.jobs ?? [], open));
+        const older = olderReviewOpened(json.jobs ?? [], open);
+        setOlderReview(older && open ? { jobId: open.jobId, settledAt: older.settledAt } : null);
         if (!open) return;
         // A part found on its own is still part of a run, and showing it alone would say
         // "12 sources" about a compile the customer started with 128.
@@ -1610,7 +1681,7 @@ export default function WorkspacePage() {
       if (!result || result.collectionId !== compiled) return result;
       setNotice(result.lifecycle === "review_required"
         ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; nothing is active yet.`
-        : `Compiled World ready from ${result.validation.counts.documents} documents: ${result.validation.counts.topics} topics, ${result.validation.counts.entities} entities, ${result.validation.counts.claims} claims and ${result.validation.counts.relations} evidence-bound relations.`);
+        : `Compiled World ready from ${result.validation.counts.documents} documents: ${result.validation.counts.topics} topics, ${result.validation.counts.entities} entities, ${result.validation.counts.claims} claims and ${result.validation.counts.relations} relations.`);
       return result;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2922,6 +2993,7 @@ export default function WorkspacePage() {
     })),
     reviewReasons: collectionResult?.reviewReasons ?? [],
     evidence: (worldReadModel?.evidence ?? []).map((item) => ({ id: item.id, sourceId: item.sourceId })),
+    evidenceRead,
     ...reviewQueueDecisionInput(reviewLedger),
     names,
   };
@@ -2960,6 +3032,8 @@ export default function WorkspacePage() {
   const workspaceState = deriveWorkspaceState(workspaceStateInput);
   const onboardingSteps = deriveOnboardingSteps(workspaceStateInput);
   const attentionItems = deriveAttentionItems(workspaceStateInput);
+  // A package whose collection is the one open here is the one on screen, not an earlier one. Nothing else is left out (founder decision 2026-11-26, row 2).
+  const pendingEarlierReviews = earlierReviews.filter((item) => item.collectionId === null || item.collectionId !== collectionResult?.collectionId);
   const runIntent = (intent: WorkspaceIntent | undefined) => {
     if (intent === "upload") {
       if (activationPolicy.customerIntake.enabled && intakeOpen) fileRef.current?.click();
@@ -2987,7 +3061,7 @@ export default function WorkspacePage() {
       `${readyDocumentCount} ready`,
       `${readingCount} being read`,
       `${operatorReviewCount} need review`,
-      activeWorld ? `World v${activeWorld.revision} active` : "No active World",
+      homeWorldFact(activeWorld?.revision ?? null, workspaceWorlds),
     ].join(" · ")
     : undefined;
   /*
@@ -3077,6 +3151,7 @@ export default function WorkspacePage() {
       stateTitle={stateTitle}
       stateDescription={stateDescription}
       stateFacts={workspaceFacts}
+      activeWorlds={workspaceWorlds}
       stateHero={workspaceState.mode !== "new" && workspaceState.mode !== "source_pending" && workspaceState.mode !== "plan_required"}
       onAccess={applyAccess}
       accessEpoch={accessEpoch}
@@ -3471,6 +3546,24 @@ export default function WorkspacePage() {
             with its own written label -- the state is legible without reading a colour, and a
             second blocked state can no longer hide behind the first one's heading.
           */}
+          {/*
+            WO-WS-6 (F3): the start-up pick opens one compile job, and an older review package is not it. It is
+            still waiting on a person, so Home says so and links each, from the job list already read.
+          */}
+          {tab === "overview" && surface === "home" && pendingEarlierReviews.length > 0 ? (
+            <details className="fine" data-testid="earlier-review-packages">
+              <summary>{pendingEarlierReviews.length === 1 ? "1 earlier package still pending" : `${pendingEarlierReviews.length} earlier packages still pending`}</summary>
+              <ol>
+                {pendingEarlierReviews.map((item, index) => (
+                  <li key={item.jobId}>
+                    <button type="button" className="btn ghost" onClick={() => window.location.assign(item.href)}>
+                      Open review package {index + 1} of {pendingEarlierReviews.length}{item.settledAt ? ` · settled ${formatTimestamp(item.settledAt) ?? item.settledAt}` : ""}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : null}
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <Screen title="Needs attention" titleAs="h2" titleId="workspace-attention-title" status={attentionScreenStatus(attentionItems)}
               bodyClassName="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
@@ -3509,6 +3602,11 @@ export default function WorkspacePage() {
             Home, in flight: the compile follows the intake bar and the attention queue (founder
             2026-10-27). The result block follows the compile.
           */}
+          {tab === "overview" && surface === "home" && olderReview && compileJob?.jobId === olderReview.jobId ? (
+            <p className="fine" role="status" data-testid="older-review-opened">
+              This review package {olderReview.settledAt ? `settled ${formatTimestamp(olderReview.settledAt) ?? olderReview.settledAt}` : "has no recorded settle time"}; a newer compile exists.
+            </p>
+          ) : null}
           {tab === "overview" && surface === "home" && (compileJob || activePipelineCount > 0) ? compileBlock : null}
 
           {tab === "overview" && surface === "home" && collectionResult ? (
@@ -3526,7 +3624,7 @@ export default function WorkspacePage() {
             <Screen title={activeWorld ? "Your Compiled World is ready." : "What the candidate holds."} titleAs="h2" titleId="workspace-complete-title"
               status={worldScreenStatus(activeWorld?.revision ?? null)} bodyClassName="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
-                <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} evidence-bound relations.</p>
+                <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} relations.</p>
                 {activeWorld ? null : (
                   <p className="fine">
                     Nothing is active until you approve it. Review the evidence, then activate the
@@ -3750,7 +3848,7 @@ export default function WorkspacePage() {
                 threshold dressed up as a measurement.
               */}
               {/* WO-WS-4: the eyebrow is the screen's name now; the tag is the count the top bar prints. */}
-              <Screen title="Review queue" status={reviewScreenStatus(reviewCount, Boolean(collectionResult))} aria-labelledby="review-queue-title">
+              <Screen title="Review queue" status={reviewScreenStatus(reviewCount, Boolean(collectionResult), evidenceRead)} aria-labelledby="review-queue-title">
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
                 <ReviewQueue
                   input={reviewQueueInput}
@@ -3772,7 +3870,7 @@ export default function WorkspacePage() {
                 </Screen>
               ) : null}
               {/* The blueprint's /evidence frame names this the evidence reader; the tag counts what it can open. */}
-              <Screen title="Evidence reader" status={evidenceScreenStatus(worldReadModel?.evidence.length ?? 0)}
+              <Screen title="Evidence reader" status={evidenceScreenStatus(worldReadModel?.evidence.length ?? 0, evidenceRead)}
                 bodyClassName="review-comparison" aria-labelledby="review-comparison-title">
                 <h2 id="review-comparison-title">Compare the compiled result with its source.</h2>
                 {worldReadModel?.evidence.length ? (
@@ -3887,6 +3985,23 @@ export default function WorkspacePage() {
                       </form>
                     ) : null}
                   </>
+                ) : worldReadState.status === "loading" ? (
+                  <p className="world-empty" role="status">Loading the evidence regions for this compile…</p>
+                ) : worldReadState.status === "unavailable" ? (
+                  /* F2: a refused or unmatched read is said as that, not as an empty World beside a compile that counted claims. */
+                  <div className="world-empty" role="status">
+                    <p>
+                      The evidence regions for this compile could not be loaded
+                      {worldReadState.code ? <> (reference <code>{worldReadState.code}</code>)</> : null}.
+                      The compile itself reported {collectionResult?.validation.counts.claims ?? 0} claims and {collectionResult?.validation.counts.relations ?? 0} relations;
+                      none of them can be opened against a source page until this loads.
+                    </p>
+                    <button type="button" onClick={() => setWorldReadEpoch((epoch) => epoch + 1)}>Try loading the evidence again</button>
+                  </div>
+                ) : collectionResult ? (
+                  <p className="world-empty" role="status">
+                    This compile's package carries no page-and-region evidence to open: {collectionResult.validation.counts.claims} claims and {collectionResult.validation.counts.relations} relations were counted, and 0 evidence regions.
+                  </p>
                 ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
               </Screen>
               {/* WO-WS-4: the activation block's eyebrow names the screen and its status output is the screen's tag. */}

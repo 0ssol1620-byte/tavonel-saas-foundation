@@ -13,7 +13,7 @@ import styles from "@/app/workspace/workspace-ultimate.module.css";
 // WO-WS-2: <main> carries the V34 token layer's `.site`, so the workspace sheets can read every --v34-* name.
 import v34 from "@/components/v34/tokens.module.css";
 import { Screen } from "@/components/v34/ui/screen";
-import { homeWorldScreenStatus } from "@/app/workspace/screen-status";
+import { homeWorldScreenStatus, type WorkspaceWorlds } from "@/app/workspace/screen-status";
 import type { WorkspaceMode } from "@/lib/workspace-onboarding";
 
 export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
@@ -90,6 +90,8 @@ type Props = {
   stateDescription: string;
   /** One line of counted facts under the state sentence; omitted on a first run. */
   stateFacts?: string;
+  /** The workspace's own listing of active Worlds, so the Home tag does not mistake "this collection has none" for "the workspace has none". */
+  activeWorlds?: WorkspaceWorlds;
   /*
     D6/BQ-023: a workspace with no sources opens on the drop box, and nothing competes with it
     above the fold. The page turns the hero off for that one case and carries the h1 on the box
@@ -125,7 +127,7 @@ function PaletteFocus({ panel }: { panel: RefObject<HTMLElement | null> }) {
 
 export default function WorkspaceUltimateShell({
   surface, children, headerAction, activeRevision, stateMode, candidateReady, reviewCount, activityCount,
-  stateTitle, stateDescription, stateFacts, stateHero = true, nextAction, onAccess, accessEpoch = 0, onNavigate, onUpload, onRefresh, onSignOut,
+  stateTitle, stateDescription, stateFacts, activeWorlds, stateHero = true, nextAction, onAccess, accessEpoch = 0, onNavigate, onUpload, onRefresh, onSignOut,
 }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -364,7 +366,7 @@ export default function WorkspaceUltimateShell({
         <div className={`workspace-content ${styles.content}`}>
           {surface === "home" && stateHero ? (
             /* WO-WS-4: the state is the Home screen -- its tag is which World is active, its foot the counted facts. */
-            <Screen title="Overview" status={homeWorldScreenStatus(activeRevision, stateMode)} foot={stateFacts}
+            <Screen title="Overview" status={homeWorldScreenStatus(activeRevision, stateMode, activeWorlds)} foot={stateFacts}
               bodyClassName={styles.stateHero} aria-labelledby="workspace-state-title"
               data-activity={activityCount > 0 ? "running" : "quiet"} data-decision={candidateReady && activityCount === 0 ? "1" : undefined}>
               <div>
