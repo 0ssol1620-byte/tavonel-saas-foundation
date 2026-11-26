@@ -28,7 +28,10 @@ async function sessionToken() {
   return data.session?.access_token ?? null;
 }
 
-export default function DeveloperPanel() {
+/** The page's in-page confirmation (WO-WS-1), so a revoke never opens a native browser dialog. */
+type ConfirmInPage = (message: string, confirmLabel: string) => Promise<boolean>;
+
+export default function DeveloperPanel({ confirm }: { confirm: ConfirmInPage }) {
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
   const [name, setName] = useState("Local compiler agent");
   const [expiresInDays, setExpiresInDays] = useState("90");
@@ -87,7 +90,7 @@ export default function DeveloperPanel() {
   };
 
   const revoke = async (key: ApiKey) => {
-    if (!window.confirm(`Revoke ${key.name}? Clients using this key will stop immediately.`)) return;
+    if (!(await confirm(`Revoke ${key.name}? Clients using this key will stop immediately.`, "Revoke key"))) return;
     setBusy(true);
     try {
       const token = await sessionToken();

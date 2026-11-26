@@ -118,9 +118,9 @@ describe("WO-WS-2: the workspace reads the V34 token layer", () => {
     expect(main, "<main>'s className carries the token sheet's .site").toContain(`${name}.site`);
   });
 
-  it("reads no --v34-* name the token sheet does not declare (an undefined var() paints nothing)", () => {
+  it("reads no --v34-* name the token sheet or the workspace <main> does not declare (an undefined var() paints nothing)", () => {
     for (const path of SHEETS) {
-      const unknown = [...strip(read(path)).matchAll(/var\((--v34-[\w-]+)/g)].map((m) => m[1]).filter((name) => !site.has(name));
+      const unknown = [...strip(read(path)).matchAll(/var\((--v34-[\w-]+)/g)].map((m) => m[1]).filter((name) => !site.has(name) && !remap.has(name));
       expect(unknown, path).toEqual([]);
     }
   });
@@ -266,7 +266,9 @@ describe("WO-WS-3: state, focus and the details the review named", () => {
   });
 
   it("navigation controls take the target's control radius", () => {
-    expect(site.get("--v34-radius-control")).toBe("7px");
+    // Declared on the workspace <main> alone: the public token sheet carries no workspace-only name (round 2).
+    expect(site.has("--v34-radius-control")).toBe(false);
+    expect(remap.get("--v34-radius-control")).toBe("7px");
     const nav = rules(shell).filter((rule) => /\.nav button$/.test(rule.selector));
     expect(nav.map((rule) => declared(rule.body, "border-radius"))).toContain("var(--v34-radius-control)");
   });

@@ -104,7 +104,7 @@ import ReviewQueue from "@/components/review-queue";
 import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import { Screen } from "@/components/v34/ui/screen";
-import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus } from "./screen-status";
+import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus } from "./screen-status";
 import {
   buildReviewQueue,
   currentReviewLedger,
@@ -3068,6 +3068,7 @@ export default function WorkspacePage() {
     <WorkspaceUltimateShell
       surface={surface}
       activeRevision={activeWorld?.revision ?? null}
+      stateMode={workspaceState.mode}
       candidateReady={candidateNeedsDecision}
       reviewCount={candidateReady ? reviewCount : null}
       activityCount={activityCount}
@@ -3963,7 +3964,7 @@ export default function WorkspacePage() {
                   <WorkspaceUseWithAi open onDownload={collectionResult ? () => void downloadCollection() : undefined}
                     downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
                 </Screen>
-                <Screen title="Ask" status={worldScreenStatus(activeWorld?.revision ?? null)} aria-labelledby="ask-title">
+                <Screen title="Ask" status={askScreenStatus(activeWorld?.revision ?? null, askPanel)} aria-labelledby="ask-title">
                 <div>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
                   <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
@@ -4206,7 +4207,7 @@ export default function WorkspacePage() {
                 ? closedGate.action
                 : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
-          ) : <ConnectionsPanel />) : null}
+          ) : <ConnectionsPanel confirm={confirmInPage} />) : null}
 
           {tab === "developers" ? (accessSource !== "owner" && accessSource !== "paid" ? (
             <section className="card workspace-access-gate" role="status">
@@ -4226,7 +4227,7 @@ export default function WorkspacePage() {
                 ? closedGate.action
                 : <Link className="btn" href="/pricing">See plans</Link>}</div>
             </section>
-          ) : <DeveloperPanel />) : null}
+          ) : <DeveloperPanel confirm={confirmInPage} />) : null}
 
           {tab === "integrity" ? (
           <section className="card gates">

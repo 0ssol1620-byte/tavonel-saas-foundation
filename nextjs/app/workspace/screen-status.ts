@@ -1,6 +1,8 @@
 import type { ScreenStatus } from "@/components/v34/ui/screen";
 import type { AttentionItem } from "@/lib/workspace-onboarding";
 import { countNoun } from "@/lib/plural";
+import type { AskWorldState } from "@/components/workspace/in-page-choices";
+import type { WorkspaceMode } from "@/lib/workspace-onboarding";
 
 /*
   WO-WS-4: the state each workspace screen's tag carries, read from values the page already holds.
@@ -19,6 +21,33 @@ export function worldScreenStatus(activeRevision: number | null): ScreenStatus {
   if (activeRevision === null) return { tone: "waiting", label: "No active World" };
   if (!Number.isInteger(activeRevision) || activeRevision < 1) throw new Error("screen_status_revision_invalid");
   return { tone: "ok", label: `World v${activeRevision} active` };
+}
+
+/*
+  WO-WS-3/4 round 2: a tag is derived from what the page has observed, the same value its body switches on.
+  A read that has not answered, or failed, is not "no World": the tag says it is unknown and asserts nothing.
+*/
+
+/** Ask: `panel` is `askWorldPanel(activeWorld, state)`, the value the Ask body renders from. */
+export function askScreenStatus(activeRevision: number | null, panel: "checking" | "opening" | "none" | Exclude<AskWorldState, "idle" | "checking" | "opening"> | null): ScreenStatus {
+  if (panel === null) {
+    // The panel is null only while a World is loaded; a null revision beside it is a page bug, not a state.
+    if (activeRevision === null) throw new Error("screen_status_ask_inconsistent");
+    return worldScreenStatus(activeRevision);
+  }
+  if (panel === "checking") return { tone: "waiting", label: "Checking Worlds…" };
+  if (panel === "opening") return { tone: "waiting", label: "Opening World…" };
+  if (panel === "none") return { tone: "waiting", label: "No active World" };
+  if (panel.kind === "several") return { tone: "waiting", label: countNoun(panel.worlds.length, "active World") };
+  if (panel.kind === "failed") return { tone: "waiting", label: "Worlds not checked" };
+  return { tone: "waiting", label: "World not opened" };
+}
+
+/** Home: while the inventory is loading or unavailable the page does not know which World is active. */
+export function homeWorldScreenStatus(activeRevision: number | null, mode: WorkspaceMode): ScreenStatus {
+  if (mode === "loading") return { tone: "waiting", label: "Checking World…" };
+  if (mode === "unavailable") return { tone: "waiting", label: "World not checked" };
+  return worldScreenStatus(activeRevision);
 }
 
 /** The activation block's own status line, unchanged, now in the frame's tag. */

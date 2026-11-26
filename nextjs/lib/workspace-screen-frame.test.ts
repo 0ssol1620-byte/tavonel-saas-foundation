@@ -1,11 +1,13 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { assertScreenStatus, Screen, type ScreenStatus } from "@/components/v34/ui/screen";
 import WorkspaceUltimateShell from "@/components/workspace-ultimate-shell";
+import { ActiveWorldPicker, askWorldPanel, discoveryFailureCopy, type AskWorldState } from "@/components/workspace/in-page-choices";
+import type { WorkspaceMode } from "@/lib/workspace-onboarding";
 import {
-  activationScreenStatus, AI_SETUP_SCREEN_STATUS, attentionScreenStatus, evidenceScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus,
+  activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, homeWorldScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus,
 } from "@/app/workspace/screen-status";
 
 /*
@@ -19,6 +21,12 @@ import {
     3. the frame's colours read a token the V34 sheet does not declare, or miss contrast on the top bar.
 */
 
+const walk = (dir: string): string[] =>
+  readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return walk(path);
+    return /\.(tsx?|css)$/.test(entry.name) && !/\.test\./.test(entry.name) ? [path] : [];
+  });
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const render = (props: Parameters<typeof Screen>[0]) => renderToStaticMarkup(createElement(Screen, props));
 
@@ -119,7 +127,7 @@ describe("the state each workspace screen carries", () => {
 describe("the shell draws Home's state as a screen (the real component)", () => {
   const shell = (activeRevision: number | null, stateFacts?: string) => {
     const props: Parameters<typeof WorkspaceUltimateShell>[0] = {
-      surface: "home", headerAction: null, activeRevision, candidateReady: false, reviewCount: null, activityCount: 0,
+      surface: "home", headerAction: null, activeRevision, stateMode: "returning", candidateReady: false, reviewCount: null, activityCount: 0,
       stateTitle: "2 sources are ready to compile.", stateDescription: "Choose which ready sources to compile.", stateFacts,
       stateHero: true, nextAction: { label: "Choose sources to compile", surface: "sources" },
       onNavigate: () => undefined, onUpload: () => undefined, onRefresh: () => undefined, onSignOut: () => undefined,
@@ -141,6 +149,124 @@ describe("the shell draws Home's state as a screen (the real component)", () => 
 
   it("keeps exactly the two h1 the shell has always printed", () => {
     expect(read("components/workspace-ultimate-shell.tsx").match(/<h1[ >]/g) ?? []).toHaveLength(2);
+  });
+});
+
+/*
+  Round 2: a tag may not say more than the page knows. The Ask body switches on `askWorldPanel(activeWorld, state)`; the tag is
+  derived from that same value, so for every state the listing can be in the two are checked against each other here.
+*/
+describe("the Ask tag and the Ask body come from one observation and never disagree", () => {
+  const world = (n: number) => ({ collectionId: `collection-${String(n).padStart(32, "0")}`, manifestDigest: `sha256:${"a".repeat(64)}`, revision: n, updatedAt: "2026-11-20T00:00:00Z" });
+  const body = (state: AskWorldState) => {
+    const panel = askWorldPanel(null, state);
+    if (panel === "checking") return "Checking this workspace for an active World…";
+    if (panel === "opening") return "Opening the active World…";
+    if (panel === "none") return "No active World yet.";
+    if (panel !== null && panel.kind === "several") return renderToStaticMarkup(createElement(ActiveWorldPicker, { worlds: panel.worlds, onChoose: () => undefined }));
+    if (panel !== null && panel.kind === "failed") return discoveryFailureCopy(panel).title;
+    return "The active World could not be opened.";
+  };
+  const tag = (state: AskWorldState) => askScreenStatus(null, askWorldPanel(null, state));
+
+  it("the body strings used above are the ones the page prints", () => {
+    const page = read("app/workspace/page.tsx");
+    for (const text of ["Checking this workspace for an active World…", "Opening the active World…", "<strong>No active World yet.</strong>", "The active World could not be opened."]) {
+      expect(page, text).toContain(text);
+    }
+  });
+
+  it("loading: the listing has not answered, so the tag asserts no World state", () => {
+    for (const state of ["idle", "checking"] as const) {
+      expect(tag(state)).toEqual({ tone: "waiting", label: "Checking Worlds…" });
+      expect(body(state)).toContain("Checking this workspace");
+    }
+    expect(tag("opening")).toEqual({ tone: "waiting", label: "Opening World…" });
+    expect(body("opening")).toContain("Opening the active World");
+  });
+
+  it("error: a failed or refused listing, or an open that loaded nothing, is not 'no World'", () => {
+    for (const state of [{ kind: "failed", code: null, status: null }, { kind: "failed", code: "X", status: 503 }, { kind: "failed", code: "X", status: 403 }] as const) {
+      expect(tag(state)).toEqual({ tone: "waiting", label: "Worlds not checked" });
+      expect(body(state)).toMatch(/could not be checked|may not list/);
+    }
+    expect(tag({ kind: "open-failed" })).toEqual({ tone: "waiting", label: "World not opened" });
+    expect(body({ kind: "open-failed" })).toContain("could not be opened");
+  });
+
+  it("answered with none: the one state that says 'No active World', and the body says it too", () => {
+    expect(tag({ kind: "none" })).toEqual({ tone: "waiting", label: "No active World" });
+    expect(body({ kind: "none" })).toContain("No active World yet.");
+  });
+
+  it("answered with N: the tag carries the count the body prints", () => {
+    const one: AskWorldState = { kind: "several", worlds: [world(1)] };
+    const two: AskWorldState = { kind: "several", worlds: [world(1), world(2)] };
+    expect(tag(one).label).toBe("1 active World");
+    expect(body(one)).toContain("This workspace has 1 active World.");
+    expect(tag(two).label).toBe("2 active Worlds");
+    expect(body(two)).toContain("This workspace has 2 active Worlds.");
+  });
+
+  it("a loaded World is the only state that names a revision; 'No active World' is never drawn for any other state", () => {
+    expect(askScreenStatus(4, askWorldPanel({ revision: 4 }, "idle"))).toEqual({ tone: "ok", label: "World v4 active" });
+    expect(() => askScreenStatus(null, null)).toThrow("screen_status_ask_inconsistent");
+    const states: AskWorldState[] = ["idle", "checking", "opening", { kind: "failed", code: null, status: null }, { kind: "open-failed" }, { kind: "several", worlds: [world(1), world(2)] }];
+    for (const state of states) expect(tag(state).label, JSON.stringify(state)).not.toBe("No active World");
+  });
+
+  it("the page passes the tag the same panel it renders the body from", () => {
+    const page = read("app/workspace/page.tsx");
+    expect(page).toContain("const askPanel = askWorldPanel(activeWorld, askWorlds);");
+    expect(page).toContain("askScreenStatus(activeWorld?.revision ?? null, askPanel)");
+    expect(page).not.toContain('<Screen title="Ask" status={worldScreenStatus(');
+  });
+});
+
+describe("the Home tag follows the state sentence it sits beside", () => {
+  const shellHero = (stateMode: WorkspaceMode, stateTitle: string) => {
+    const props: Parameters<typeof WorkspaceUltimateShell>[0] = {
+      surface: "home", headerAction: null, activeRevision: null, stateMode, candidateReady: false, reviewCount: null, activityCount: 0,
+      stateTitle, stateDescription: "x", stateHero: true, nextAction: { label: "Loading" },
+      onNavigate: () => undefined, onUpload: () => undefined, onRefresh: () => undefined, onSignOut: () => undefined,
+      children: null,
+    };
+    return renderToStaticMarkup(createElement(WorkspaceUltimateShell, props));
+  };
+
+  it("loading and unavailable make no claim about a World; the other modes name the active revision or none", () => {
+    expect(homeWorldScreenStatus(null, "loading")).toEqual({ tone: "waiting", label: "Checking World…" });
+    expect(homeWorldScreenStatus(null, "unavailable")).toEqual({ tone: "waiting", label: "World not checked" });
+    expect(homeWorldScreenStatus(null, "returning")).toEqual({ tone: "waiting", label: "No active World" });
+    expect(homeWorldScreenStatus(3, "returning")).toEqual({ tone: "ok", label: "World v3 active" });
+  });
+
+  it("the real shell draws it: 'Loading your knowledge.' never carries 'No active World'", () => {
+    const loading = shellHero("loading", "Loading your knowledge.");
+    expect(loading).toContain("Loading your knowledge.");
+    expect(loading).toContain("Checking World…");
+    expect(loading).not.toContain("No active World");
+    const unavailable = shellHero("unavailable", "Your knowledge could not be loaded.");
+    expect(unavailable).toContain("World not checked");
+    expect(unavailable).not.toContain("No active World");
+    expect(shellHero("returning", "2 sources are ready to compile.")).toContain("No active World");
+  });
+
+  it("the page hands the shell the mode the state sentence was derived from", () => {
+    expect(read("app/workspace/page.tsx")).toContain("stateMode={workspaceState.mode}");
+  });
+});
+
+describe("workspace confirmations are in-page (WO-WS-1)", () => {
+  it("no native confirm in the workspace page or the panels it mounts", () => {
+    for (const file of ["app/workspace/page.tsx", "components/connections-panel.tsx", "components/developer-panel.tsx"]) {
+      expect(read(file), file).not.toMatch(/window\.confirm|(?<!await )(?<![.\w])confirm\(/);
+    }
+    expect(read("components/connections-panel.tsx").match(/await confirm\(/g)).toHaveLength(2);
+    expect(read("components/developer-panel.tsx").match(/await confirm\(/g)).toHaveLength(1);
+    const page = read("app/workspace/page.tsx");
+    expect(page).toContain("<ConnectionsPanel confirm={confirmInPage} />");
+    expect(page).toContain("<DeveloperPanel confirm={confirmInPage} />");
   });
 });
 
@@ -169,7 +295,7 @@ describe("the page puts its work blocks in the frame, keeping the hooks the e2e 
     const wrapper = page.indexOf('<div id="workspace-ask" className="ask-studio workspace-screens">');
     expect(wrapper).toBeGreaterThan(-1);
     const setup = page.indexOf("status={AI_SETUP_SCREEN_STATUS}", wrapper);
-    const ask = page.indexOf('<Screen title="Ask" status={worldScreenStatus(activeWorld?.revision ?? null)} aria-labelledby="ask-title">', wrapper);
+    const ask = page.indexOf('<Screen title="Ask" status={askScreenStatus(activeWorld?.revision ?? null, askPanel)} aria-labelledby="ask-title">', wrapper);
     expect(setup).toBeGreaterThan(wrapper);
     expect(ask).toBeGreaterThan(setup);
   });
@@ -185,10 +311,24 @@ describe("the page puts its work blocks in the frame, keeping the hooks the e2e 
   });
 });
 
+describe("the frame's sheet stays out of the public stylesheet", () => {
+  it("lives in the workspace module, which only the workspace shell and the frame import; the public token sheet gained nothing", () => {
+    expect(() => read("components/v34/ui/screen.module.css")).toThrow();
+    expect(read("components/v34/ui/screen.tsx")).toContain('import s from "@/app/workspace/workspace-ultimate.module.css";');
+    expect(read("components/v34/tokens.module.css")).not.toContain("--v34-radius-control");
+    const importers = ["app", "components", "lib"].flatMap((dir) => walk(dir)).filter((file) => /workspace-ultimate\.module\.css"/.test(read(file)));
+    expect(importers.sort()).toEqual(["components/v34/ui/screen.tsx", "components/workspace-ultimate-shell.tsx"]);
+  });
+});
+
 describe("the frame's sheet reads the V34 tokens it may, at contrast", () => {
   const tokens = read("components/v34/tokens.module.css");
   const site = new Map([...(/\.site \{([\s\S]*?)\n\}/.exec(tokens)?.[1] ?? "").matchAll(/(--v34-[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-  const sheet = read("components/v34/ui/screen.module.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  // The frame's rules are the end of the workspace module (round 2: a module of its own was merged into the public root stylesheet).
+  const shellSheet = read("app/workspace/workspace-ultimate.module.css");
+  const frameAt = shellSheet.indexOf('The product "screen" frame');
+  if (frameAt < 0) throw new Error("the frame section is not in the workspace module");
+  const sheet = shellSheet.slice(frameAt).replace(/\/\*[\s\S]*?\*\//g, "");
   const hex = (name: string) => {
     const value = site.get(name);
     if (!value || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`${name} is not a declared colour`);
@@ -220,19 +360,19 @@ describe("the frame's sheet reads the V34 tokens it may, at contrast", () => {
   });
 
   it("the top bar's title and tag read at 4.5:1 on its ground; the dots hold 3:1; the foot reads on the screen", () => {
-    const top = colourOf(rule(".top"), "background");
+    const top = colourOf(rule(".screenTop"), "background");
     const screen = colourOf(rule(".screen"), "background");
-    expect(contrast(colourOf(rule(".title"), "color"), top)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(colourOf(rule(".tag"), "color"), top)).toBeGreaterThanOrEqual(4.5);
-    for (const selector of [".dot", '.dot[data-tone="waiting"]']) expect(contrast(colourOf(rule(selector), "border"), top), selector).toBeGreaterThanOrEqual(3);
-    expect(contrast(colourOf(rule('.dot[data-tone="stopped"]'), "border-color"), top)).toBeGreaterThanOrEqual(3);
-    expect(contrast(colourOf(rule(".foot"), "color"), screen)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colourOf(rule(".screenTitle"), "color"), top)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colourOf(rule(".screenTag"), "color"), top)).toBeGreaterThanOrEqual(4.5);
+    for (const selector of [".screenDot", '.screenDot[data-tone="waiting"]']) expect(contrast(colourOf(rule(selector), "border"), top), selector).toBeGreaterThanOrEqual(3);
+    expect(contrast(colourOf(rule('.screenDot[data-tone="stopped"]'), "border-color"), top)).toBeGreaterThanOrEqual(3);
+    expect(contrast(colourOf(rule(".screenFoot"), "color"), screen)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("draws the three tones as three different shapes or colours, so a dot is never decoration", () => {
-    const ok = rule(".dot");
-    const waiting = rule('.dot[data-tone="waiting"]');
-    const stopped = rule('.dot[data-tone="stopped"]');
+    const ok = rule(".screenDot");
+    const waiting = rule('.screenDot[data-tone="waiting"]');
+    const stopped = rule('.screenDot[data-tone="stopped"]');
     expect(ok).toMatch(/border:\s*4px solid var\(--v34-ok\)/);
     expect(waiting).toMatch(/border:\s*2px solid/);
     expect(stopped).toMatch(/border-color:\s*var\(--v34-error\)/);

@@ -13,7 +13,8 @@ import styles from "@/app/workspace/workspace-ultimate.module.css";
 // WO-WS-2: <main> carries the V34 token layer's `.site`, so the workspace sheets can read every --v34-* name.
 import v34 from "@/components/v34/tokens.module.css";
 import { Screen } from "@/components/v34/ui/screen";
-import { worldScreenStatus } from "@/app/workspace/screen-status";
+import { homeWorldScreenStatus } from "@/app/workspace/screen-status";
+import type { WorkspaceMode } from "@/lib/workspace-onboarding";
 
 export type WorkspaceSurface = "home" | "sources" | "runs" | "review" | "changes" | "world" | "ask" | "connections" | "developer" | "activity" | "settings";
 
@@ -80,6 +81,8 @@ type Props = {
   children: ReactNode;
   headerAction: ReactNode;
   activeRevision: number | null;
+  /** What the state sentence was derived from, so the tag cannot say more than it. */
+  stateMode: WorkspaceMode;
   candidateReady: boolean;
   reviewCount: number | null;
   activityCount: number;
@@ -121,7 +124,7 @@ function PaletteFocus({ panel }: { panel: RefObject<HTMLElement | null> }) {
 }
 
 export default function WorkspaceUltimateShell({
-  surface, children, headerAction, activeRevision, candidateReady, reviewCount, activityCount,
+  surface, children, headerAction, activeRevision, stateMode, candidateReady, reviewCount, activityCount,
   stateTitle, stateDescription, stateFacts, stateHero = true, nextAction, onAccess, accessEpoch = 0, onNavigate, onUpload, onRefresh, onSignOut,
 }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -361,7 +364,7 @@ export default function WorkspaceUltimateShell({
         <div className={`workspace-content ${styles.content}`}>
           {surface === "home" && stateHero ? (
             /* WO-WS-4: the state is the Home screen -- its tag is which World is active, its foot the counted facts. */
-            <Screen title="Overview" status={worldScreenStatus(activeRevision)} foot={stateFacts}
+            <Screen title="Overview" status={homeWorldScreenStatus(activeRevision, stateMode)} foot={stateFacts}
               bodyClassName={styles.stateHero} aria-labelledby="workspace-state-title"
               data-activity={activityCount > 0 ? "running" : "quiet"} data-decision={candidateReady && activityCount === 0 ? "1" : undefined}>
               <div>

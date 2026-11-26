@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import s from "./screen.module.css";
+import s from "@/app/workspace/workspace-ultimate.module.css";
 
 /*
   The product "screen" frame (TARGET-DESIGN-SYSTEM §5): `.screen > .screen-top (title + tag with a
@@ -44,12 +44,12 @@ export function Screen({
   const Tag = statusAs;
   return (
     <section {...rest} className={className ? `${s.screen} ${className}` : s.screen} data-v34-screen="">
-      <div className={s.top}>
-        <Title id={titleId} className={s.title}>{title}</Title>
-        <Tag className={s.tag} data-tone={tone}><i className={s.dot} data-tone={tone} aria-hidden="true" />{label}</Tag>
+      <div className={s.screenTop}>
+        <Title id={titleId} className={s.screenTitle}>{title}</Title>
+        <Tag className={s.screenTag} data-tone={tone}><i className={s.screenDot} data-tone={tone} aria-hidden="true" />{label}</Tag>
       </div>
-      <div className={bodyClassName ? `${s.body} ${bodyClassName}` : s.body}>{children}</div>
-      {foot ? <div className={s.foot}>{foot}</div> : null}
+      <div className={bodyClassName ? `${s.screenBody} ${bodyClassName}` : s.screenBody}>{children}</div>
+      {foot ? <div className={s.screenFoot}>{foot}</div> : null}
     </section>
   );
 }

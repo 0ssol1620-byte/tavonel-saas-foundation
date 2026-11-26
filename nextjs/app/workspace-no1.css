@@ -850,7 +850,7 @@
 /* The filter chips are the target's pressed control: a control face, and forest with a white label when pressed
    (aria-pressed, read from the same state as data-active). */
 .workspace.one-path-workspace .workspace-content .board-filters button:is([aria-pressed]) {
-  border: 1px solid var(--v34-control-border); border-radius: var(--v34-radius-control); background: var(--v34-paper); color: var(--v34-ink); font-weight: 600;
+  border: 1px solid var(--v34-control-border); border-radius: var(--v34-radius-control, 7px); background: var(--v34-paper); color: var(--v34-ink); font-weight: 600;
 }
 .workspace.one-path-workspace .workspace-content .board-filters button[aria-pressed="true"] { border-color: var(--v34-step-bg); background: var(--v34-step-bg); color: var(--v34-white); }
 /* Secondary buttons: the target's outlined face. Their rule colour (#cbd3c8) was decoration-weight, 1.5:1 on the
@@ -863,7 +863,7 @@
 .one-path-workspace [data-v34-screen] .document-meta li { border: 0; border-top: 1px solid var(--v34-line); border-radius: 0; background: transparent; }
 /* The queue's "Open its evidence" is a toggle (aria-pressed): the target's control, forest when pressed. */
 .workspace.one-path-workspace .workspace-content .document-meta button:is([aria-pressed]) {
-  border: 1px solid var(--v34-control-border); border-radius: var(--v34-radius-control); background: var(--v34-paper); color: var(--v34-ink); font-weight: 600;
+  border: 1px solid var(--v34-control-border); border-radius: var(--v34-radius-control, 7px); background: var(--v34-paper); color: var(--v34-ink); font-weight: 600;
 }
 .workspace.one-path-workspace .workspace-content .document-meta button[aria-pressed="true"] { border-color: var(--v34-step-bg); background: var(--v34-step-bg); color: var(--v34-white); }
 @media (hover: hover) and (pointer: fine) {
