@@ -55,6 +55,9 @@ vi.mock("./supabase-admin", () => ({
     }
     if (name === "request_connector_source_deletion") return Response.json({ receiptId: `sha256:${"d".repeat(64)}`, status: "recorded" });
     if (name === "complete_foundation_job_batch") return Response.json({ state: body?.p_outcome === "succeeded" ? "succeeded" : "queued" });
+    // WO-C-T3: the member source scope is asked first on every read. This test's viewer is a whole-workspace
+    // reader, so no document is outside it; the suspension predicate below is what these tests move.
+    if (name === "documents_outside_member_scope") return Response.json(false);
     if (name === "connector_documents_blocked") {
       // Mirrors 20260927102000's predicate for the one column this test moves: a bound document
       // whose source has a suspension row is blocked. Connection status and tombstones are not modelled.
