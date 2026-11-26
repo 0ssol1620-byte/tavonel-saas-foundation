@@ -572,6 +572,9 @@ describe("qualifying the loaded World against the answer that cites it", () => {
     const ask = workspace.slice(workspace.indexOf("const askActiveWorld = async"), workspace.indexOf("const token = await getAuthToken();", workspace.indexOf("const askActiveWorld = async")));
     expect(ask).toContain("setAskResult(null);\n    setAskEvidenceId(undefined);");
     // The selected read-model load still accepts only the selected identities; no new request flow.
-    expect(workspace).toContain("body?.model?.world.id === collectionId && body.model.world.manifestDigest === manifest ? body.model : null");
+    // WO-WS-6 (d70c6bb6) split the load into refused|model answers, so the accepting line became the one below. The same identity check
+    // still gates the model (collection id AND manifest digest), and a mismatch is unavailable, never an empty World.
+    expect(workspace).toContain("answer.model?.world.id === collectionId && answer.model.world.manifestDigest === manifest ? answer.model : null");
+    expect(workspace).toContain('code: "WORLD_READ_MODEL_MISMATCH"');
   });
 });

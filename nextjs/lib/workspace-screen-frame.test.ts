@@ -283,7 +283,7 @@ describe("the page puts its work blocks in the frame, keeping the hooks the e2e 
   };
 
   it("Review: the queue, the evidence reader and the activation block", () => {
-    expect(screenOpening('aria-labelledby="review-queue-title"')).toContain("reviewScreenStatus(reviewCount, Boolean(collectionResult))");
+    expect(screenOpening('aria-labelledby="review-queue-title"')).toContain("reviewScreenStatus(reviewCount, Boolean(collectionResult), evidenceRead)"); // WO-WS-6 (d70c6bb6) added the evidence-read argument, so the two-argument call no longer exists; the pin at line ~471 and the unit tests at ~462-466 cover its behaviour.
     expect(screenOpening('aria-labelledby="review-comparison-title"')).toContain("evidenceScreenStatus(");
     const activation = screenOpening('aria-labelledby="world-studio-title"');
     expect(activation).toContain('id="workspace-review"');

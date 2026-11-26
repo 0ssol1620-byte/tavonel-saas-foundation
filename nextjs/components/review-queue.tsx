@@ -56,7 +56,7 @@ const UNREAD_LEDGER_COPY: Record<Exclude<ReviewLedgerStatus, "ready">, { notice:
 function evidenceUnknownCopy(read: ReviewQueueInput["evidenceRead"]): string {
   return read === "loading"
     ? "The evidence regions for this compile are still loading. Until they have, no source is shown as read or as not read."
-    : "The evidence regions for this compile could not be loaded, so whether each source was read and bound to evidence is not known here. This is not a count of zero.";
+    : "The evidence regions for this compile could not be loaded, so whether each source has evidence bound to it is not known here. This is not a count of zero.";
 }
 
 /*
