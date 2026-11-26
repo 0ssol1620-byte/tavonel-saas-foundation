@@ -3,6 +3,7 @@ import { evaluateHealth } from "./guards";
 import { extractObjectKey, isQuarantineSourceKey } from "./keys";
 import { ocrFailureKind } from "./ocr";
 import { SegmentContinuation, asSourceRefusal, sanitizeObject, writeCdrRejectReceipt, type SanitizeResult } from "./sanitize";
+import { prewarmServices } from "./prewarm";
 import { dispatchComputeSettlement } from "./settlement";
 import { COMPLETED_READ_SCHEMA, parseCompletedReadFacts } from "../../../shared/completedReadReceipt";
 import { RetryableError } from "./errors";
@@ -25,6 +26,8 @@ export interface Env {
   FOUNDATION_MANUAL_TRIGGER_TOKEN?: string;
   TAVONEL_INTAKE_CEILING_STAGE?: string;
   FOUNDATION_CDR_TEXT_LAYER_FIRST?: string;
+  /** "1" and nothing else: warm the CDR and OCR services when a workspace's first source is queued (prewarm.ts). Unset: off. */
+  TAVONEL_CDR_PREWARM?: string;
   /** Segmented sources (sanitize.ts sourceSegmentPages). Unset: off. */
   FOUNDATION_SOURCE_SEGMENT_PAGES?: string;
   /** Producer bound to this consumer's own queue (wrangler.jsonc); a segmented source continues on it. */
@@ -212,13 +215,21 @@ export function coldStartRetryDelay(attempts: unknown): number | undefined {
   return OCR_COLD_START_RETRY_DELAYS_S[attempt - 1];
 }
 
-export async function handleQueue(batch: MessageBatch<unknown>, env: Env, fetcher: typeof fetch = fetch): Promise<void> {
+export async function handleQueue(
+  batch: MessageBatch<unknown>, env: Env, fetcher: typeof fetch = fetch,
+  waitUntil?: (work: Promise<unknown>) => void,
+): Promise<void> {
   for (const message of batch.messages) {
     try {
       const objectKey = extractObjectKey(message.body);
       if (!objectKey || !isQuarantineSourceKey(objectKey)) {
         message.ack();
         continue;
+      }
+      // First delivery only, and never awaited: the warm-up runs beside this source's own CDR call.
+      if (message.attempts === 1 || message.attempts === undefined) {
+        const warm = prewarmServices(env, objectKey, fetcher);
+        if (waitUntil) waitUntil(warm);
       }
       const retryDelaySeconds = coldStartRetryDelay(message.attempts);
       const result = await sanitizeObject(env, objectKey, fetcher, undefined, undefined, {
@@ -273,7 +284,7 @@ export default {
   fetch(request: Request, env: Env): Promise<Response> {
     return handleRequest(request, env, fetch);
   },
-  queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
-    return handleQueue(batch, env, fetch);
+  queue(batch: MessageBatch<unknown>, env: Env, ctx?: { waitUntil(work: Promise<unknown>): void }): Promise<void> {
+    return handleQueue(batch, env, fetch, ctx ? work => ctx.waitUntil(work) : undefined);
   },
 };
