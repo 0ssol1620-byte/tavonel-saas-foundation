@@ -261,7 +261,7 @@ export function pickResumableCompileJob<T extends { state: CompileState; settled
 }
 
 /** A pending review package the start-up pick did not open, with the one link that reaches it. */
-export type EarlierReviewPackage = { jobId: string; collectionId: string | null; href: string };
+export type EarlierReviewPackage = { jobId: string; collectionId: string | null; href: string; settledAt: string | null };
 
 /**
  * Every pending `review_required` package except the one the start-up pick opened, newest first (the
@@ -272,7 +272,7 @@ export type EarlierReviewPackage = { jobId: string; collectionId: string | null;
  * "Superseded" state may leave a package out; none exists yet.
  */
 export function earlierReviewPackages(
-  jobs: readonly { jobId: string; state: CompileState; collectionId?: string | null; corpusId?: string | null }[],
+  jobs: readonly { jobId: string; state: CompileState; collectionId?: string | null; corpusId?: string | null; settledAt?: string | null }[],
   opened: { jobId: string; corpusId?: string | null } | undefined,
 ): EarlierReviewPackage[] {
   return jobs
@@ -281,6 +281,20 @@ export function earlierReviewPackages(
     .map((job) => ({
       jobId: job.jobId,
       collectionId: job.collectionId ?? null,
+      settledAt: job.settledAt ?? null,
       href: job.collectionId ? `/workspace?collection=${encodeURIComponent(job.collectionId)}` : `/workspace?job=${encodeURIComponent(job.jobId)}`,
     }));
+}
+
+/**
+ * When the opened job is a `review_required` package and a newer compile exists, the time that package
+ * settled (`null` if unrecorded), so Home can say how old it is; `undefined` when it is the newest
+ * job or not a review package. Read from the same list; nothing is fetched.
+ */
+export function olderReviewOpened(
+  jobs: readonly { jobId: string; settledAt?: string | null }[],
+  opened: { jobId: string; state: CompileState } | undefined,
+): { settledAt: string | null } | undefined {
+  if (!opened || opened.state !== "review_required" || jobs[0]?.jobId === opened.jobId) return undefined;
+  return { settledAt: jobs.find((job) => job.jobId === opened.jobId)?.settledAt ?? null };
 }

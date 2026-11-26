@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readSourceStages } from "./compile-source-stages";
-import { compileJobRestingNotice, drainSseFrames, earlierReviewPackages, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
+import { compileJobRestingNotice, drainSseFrames, earlierReviewPackages, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, olderReviewOpened, pickResumableCompileJob } from "./compile-job-client";
 import { COMPILE_STATES } from "./compile-job-store";
 
 /*
@@ -233,6 +233,29 @@ describe("pickResumableCompileJob (no ?job= in the URL)", () => {
   });
 });
 
+/* D0 2026-11-09 R2: a job at rest kept "Compiling 1 source" on the Activity line. */
+describe("a compile job at rest", () => {
+  const resting = ["review_required", "ready", "failed", "cancelled"] as const;
+
+  it("is not running, and replaces the compiling line, in every terminal or waiting state", () => {
+    for (const state of resting) {
+      expect(isCompileJobResting(state)).toBe(true);
+      expect(compileJobRestingNotice(state)).toEqual(expect.any(String));
+      expect(compileJobRestingNotice(state)).not.toMatch(/compiling/i);
+    }
+    expect(compileJobRestingNotice("review_required")).toBe("A review package is ready for a person to inspect. Nothing is active yet.");
+    // Resting is not terminal: a review_required job still waits on a person, and stays resumable.
+    expect(resting.filter((state) => isCompileJobTerminal(state))).toEqual(["ready", "failed", "cancelled"]);
+  });
+
+  it("is running, with no resting line, in every other state", () => {
+    for (const state of COMPILE_STATES.filter((value) => !(resting as readonly string[]).includes(value))) {
+      expect(isCompileJobResting(state)).toBe(false);
+      expect(compileJobRestingNotice(state)).toBeNull();
+    }
+  });
+});
+
 describe("earlierReviewPackages: no pending review package is hidden (WO-WS-6, F3, founder decision 2026-11-26 row 2)", () => {
   const now = Date.parse("2026-11-26T12:00:00Z");
   type S = "ready" | "review_required" | "reading" | "failed" | "cancelled";
@@ -243,14 +266,14 @@ describe("earlierReviewPackages: no pending review package is hidden (WO-WS-6, F
     const jobs = [job("new", "ready", { collectionId: "collection-n" }), job("old", "review_required", { collectionId: "collection-o" }), job("older", "review_required")];
     const open = pickResumableCompileJob(jobs, now);
     expect(open?.jobId).toBe("old");
-    expect(earlierReviewPackages(jobs, open)).toEqual([{ jobId: "older", collectionId: null, href: "/workspace?job=older" }]);
+    expect(earlierReviewPackages(jobs, open)).toEqual([{ jobId: "older", collectionId: null, href: "/workspace?job=older", settledAt: "2026-11-26T08:24:00Z" }]);
     expect(earlierReviewPackages(jobs, undefined).map((item) => item.jobId)).toEqual(["old", "older"]);
   });
   it("a newer failed job keeps the old package: it is opened or listed, never dropped", () => {
     const jobs = [job("f", "failed", { settledAt: "2026-11-26T11:59:00Z" }), job("old", "review_required", { collectionId: "collection-o" })];
     const open = pickResumableCompileJob(jobs, now);
     expect(open?.jobId).toBe("f");
-    expect(earlierReviewPackages(jobs, open)).toEqual([{ jobId: "old", collectionId: "collection-o", href: "/workspace?collection=collection-o" }]);
+    expect(earlierReviewPackages(jobs, open)).toEqual([{ jobId: "old", collectionId: "collection-o", href: "/workspace?collection=collection-o", settledAt: "2026-11-26T08:24:00Z" }]);
   });
   it("lists nothing when there is no pending review package, and not the job that was opened", () => {
     const jobs = [job("only", "review_required")];
@@ -264,5 +287,22 @@ describe("earlierReviewPackages: no pending review package is hidden (WO-WS-6, F
   });
   it("encodes what it links to", () => {
     expect(earlierReviewPackages([job("a", "review_required", { collectionId: "c&d=1" })], undefined)[0].href).toBe("/workspace?collection=c%26d%3D1");
+  });
+});
+
+describe("olderReviewOpened: an old review package says it is old (WO-WS-6 review r2)", () => {
+  const jobs = [
+    { jobId: "new", state: "ready" as const, settledAt: "2026-11-26T10:52:16Z" },
+    { jobId: "old", state: "review_required" as const, settledAt: "2026-11-26T08:24:00Z" },
+    { jobId: "unrecorded", state: "review_required" as const, settledAt: null },
+  ];
+  it("gives the settle time of a review package that is not the newest job", () => {
+    expect(olderReviewOpened(jobs, jobs[1])).toEqual({ settledAt: "2026-11-26T08:24:00Z" });
+    expect(olderReviewOpened(jobs, jobs[2])).toEqual({ settledAt: null });
+  });
+  it("is undefined for the newest job, a job that is not a review package, and no job", () => {
+    expect(olderReviewOpened([jobs[1], jobs[0]], jobs[1])).toBeUndefined();
+    expect(olderReviewOpened(jobs, { jobId: "x", state: "reading" })).toBeUndefined();
+    expect(olderReviewOpened(jobs, undefined)).toBeUndefined();
   });
 });

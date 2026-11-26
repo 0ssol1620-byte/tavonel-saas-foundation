@@ -89,7 +89,7 @@ import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
-import { compileJobRestingNotice, earlierReviewPackages, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob, type EarlierReviewPackage } from "@/lib/compile-job-client";
+import { compileJobRestingNotice, earlierReviewPackages, isCompileJobResting, isCompileJobTerminal, observeCompileJob, olderReviewOpened, pickResumableCompileJob, type EarlierReviewPackage } from "@/lib/compile-job-client";
 import { measureSelection, refusablePageCount, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
@@ -822,6 +822,8 @@ export default function WorkspacePage() {
   const [workspaceWorlds, setWorkspaceWorlds] = useState<WorkspaceWorlds>("checking");
   /* WO-WS-6 (F3): review packages older than a newer compile, which the start-up pick does not open. */
   const [earlierReviews, setEarlierReviews] = useState<EarlierReviewPackage[]>([]);
+  /* The opened job when it is a review package older than the newest compile: its id and when it settled. */
+  const [olderReview, setOlderReview] = useState<{ jobId: string; settledAt: string | null } | null>(null);
   /*
     One listing request per moment, shared by Home's effect and Ask's. A call made while another for the
     same open World (its manifest digest, "" for none) is in flight gets that call's answer; a call after
@@ -1189,6 +1191,8 @@ export default function WorkspacePage() {
         const open = pickResumableCompileJob(json.jobs ?? [], Date.now());
         // From the list already in hand: a review package this pick leaves unopened stays pointed at.
         setEarlierReviews(earlierReviewPackages(json.jobs ?? [], open));
+        const older = olderReviewOpened(json.jobs ?? [], open);
+        setOlderReview(older && open ? { jobId: open.jobId, settledAt: older.settledAt } : null);
         if (!open) return;
         // A part found on its own is still part of a run, and showing it alone would say
         // "12 sources" about a compile the customer started with 128.
@@ -3551,7 +3555,7 @@ export default function WorkspacePage() {
                 {pendingEarlierReviews.map((item, index) => (
                   <li key={item.jobId}>
                     <button type="button" className="btn ghost" onClick={() => window.location.assign(item.href)}>
-                      Open review package {index + 1} of {pendingEarlierReviews.length}
+                      Open review package {index + 1} of {pendingEarlierReviews.length}{item.settledAt ? ` · settled ${formatTimestamp(item.settledAt) ?? item.settledAt}` : ""}
                     </button>
                   </li>
                 ))}
@@ -3596,6 +3600,11 @@ export default function WorkspacePage() {
             Home, in flight: the compile follows the intake bar and the attention queue (founder
             2026-10-27). The result block follows the compile.
           */}
+          {tab === "overview" && surface === "home" && olderReview && compileJob?.jobId === olderReview.jobId ? (
+            <p className="fine" role="status" data-testid="older-review-opened">
+              This review package {olderReview.settledAt ? `settled ${formatTimestamp(olderReview.settledAt) ?? olderReview.settledAt}` : "has no recorded settle time"}; a newer compile exists.
+            </p>
+          ) : null}
           {tab === "overview" && surface === "home" && (compileJob || activePipelineCount > 0) ? compileBlock : null}
 
           {tab === "overview" && surface === "home" && collectionResult ? (
