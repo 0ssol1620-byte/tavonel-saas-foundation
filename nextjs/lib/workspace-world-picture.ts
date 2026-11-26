@@ -26,6 +26,8 @@ export const PICTURE_EDGE_CAP = 6000;
 export const PICTURE_LIVE_MIN_WIDTH = 900;
 export const PICTURE_LIVE_QUERY = `(min-width: ${PICTURE_LIVE_MIN_WIDTH}px)`;
 export const PICTURE_SUMMARY_ROWS = 8;
+/** The find box lists at most this many matches, and says how many matched. */
+export const PICTURE_FIND_ROWS = 20;
 
 const KIND_OF: Readonly<Record<WorldObjectType, WorldKind>> = {
   Document: "Source",
@@ -71,8 +73,6 @@ export type WorldPicture = {
   capped: boolean;
   legend: { kind: WorldKind; label: string; color: string; drawn: number; total: number }[];
   info: ReadonlyMap<string, PictureNodeInfo>;
-  /** The most connected drawn objects, in the order the list prints them. */
-  top: PictureNodeInfo[];
 };
 
 const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -139,7 +139,6 @@ export function adaptWorldForPicture(model: WorldReadModel, caps: { nodes?: numb
     capped: nodes.length < model.objects.length || edges.length < resolved.length,
     legend: WORLD_KINDS.map((kind) => ({ kind, label: PICTURE_TYPE_LABEL[kind], color: KIND_COLORS[kind], drawn: drawnKind.get(kind) ?? 0, total: total.get(kind) ?? 0 })),
     info,
-    top: kept.slice(0, PICTURE_SUMMARY_ROWS).map((object) => info.get(object.id)!),
   };
 }
 
@@ -171,15 +170,24 @@ export function fallbackGraphics(from: Graphics): Graphics {
   return from === "webgl" ? "canvas2d" : "summary";
 }
 
-/** The Screen tag: an active World says its revision, a candidate says it is not active. Never a state the model does not hold. */
-export function pictureScreenStatus(model: Pick<WorldReadModel, "world">): ScreenStatus {
-  if (model.world.status !== "active") return { tone: "waiting", label: "Candidate, not active" };
-  const revision = model.world.revision;
-  return revision.state === "read" && Number.isInteger(revision.value) && revision.value >= 1
-    ? worldScreenStatus(revision.value)
-    : { tone: "ok", label: "World active" };
+/**
+  The Screen tag, from the page's active-World state and never from the read model's own snapshot: the model is fetched once per
+  manifest and its status is fixed at read time, so after an activation or a rollback it would say what was true then.
+  Active iff this model's manifest is the active World's manifest; anything else is not the active World.
+*/
+export function pictureScreenStatus(model: Pick<WorldReadModel, "world">, active: { manifestDigest: string; revision: number } | null): ScreenStatus {
+  if (!active || model.world.manifestDigest !== active.manifestDigest) return { tone: "waiting", label: "Candidate, not active" };
+  return Number.isInteger(active.revision) && active.revision >= 1 ? worldScreenStatus(active.revision) : { tone: "ok", label: "World active" };
+}
+
+/** Drawn objects whose label, type or id contains the query (case-insensitive), most connected first; an empty query lists the most connected. */
+export function findObjects(picture: WorldPicture, query: string, limit: number = PICTURE_FIND_ROWS): { items: PictureNodeInfo[]; matched: number } {
+  const q = query.trim().toLowerCase();
+  const all = [...picture.info.values()]; // insertion order is the ranked order
+  const hits = q === "" ? all : all.filter((item) => `${item.label} ${item.typeLabel} ${item.id}`.toLowerCase().includes(q));
+  return { items: hits.slice(0, q === "" ? PICTURE_SUMMARY_ROWS : limit), matched: hits.length };
 }
 
 export function pictureAriaLabel(picture: WorldPicture): string {
-  return `The World drawn as a graph: ${n(picture.drawn.objects)} objects and ${n(picture.drawn.relations)} relations. The list below it opens the same objects.`;
+  return `The World drawn as a graph: ${n(picture.drawn.objects)} objects and ${n(picture.drawn.relations)} relations. The canvas is pointer-only; the find box below it selects any drawn object.`;
 }

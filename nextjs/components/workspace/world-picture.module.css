@@ -30,12 +30,14 @@
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; font-size: var(--t-3, 14px); }
 .legend li { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .legend b { font: 600 13px var(--f-mono); font-variant-numeric: tabular-nums; }
-.swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+/* The kind colours are made for the dark ground (9:1 there), so each swatch carries that ground around it: the dot keeps its contrast on the light page. */
+.swatch { box-sizing: content-box; width: 10px; height: 10px; border: 5px solid #07100e; border-radius: 50%; flex: none; }
 
 .line, .showing { margin: 0; max-width: 74ch; color: var(--text-mid); font-size: var(--t-3, 14px); line-height: 1.55; }
 .showing { font-variant-numeric: tabular-nums; }
 
-.listTitle { margin: 4px 0 0; font-size: var(--t-4, 15px); }
+.find { display: grid; gap: 4px; max-width: 28rem; font-size: var(--t-3, 14px); }
+.find input { min-height: 44px; padding: 8px 12px; border: 1px solid var(--hairline-hi); border-radius: 7px; background: var(--g1); color: var(--text-hi); font: inherit; }
 .list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .list li, .list button { min-width: 0; }
 .list button, .detail button {

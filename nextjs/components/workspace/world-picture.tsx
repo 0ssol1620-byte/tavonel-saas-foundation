@@ -7,6 +7,8 @@ import type { WorldRenderer } from "@/components/v34/world/renderer-types";
 import {
   adaptWorldForPicture,
   fallbackGraphics,
+  findObjects,
+  PICTURE_FIND_ROWS,
   PICTURE_LINE_NOTE,
   PICTURE_LIVE_QUERY,
   pictureAriaLabel,
@@ -59,6 +61,7 @@ export default function WorldPicture({ model, onOpenEvidence, openLabel }: Props
   const [gfxState, setGfxState] = useState<Graphics>("webgl");
   const [renderer, setRenderer] = useState<WorldRenderer | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const stageRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<Camera>({ ...DEFAULT_CAMERA });
   const orbitRef = useRef(orbit);
@@ -69,15 +72,19 @@ export default function WorldPicture({ model, onOpenEvidence, openLabel }: Props
   const built = useMemo(() => {
     try {
       const picture = adaptWorldForPicture(model);
-      return { picture, layout: layoutWorld(picture.corpus, "world"), error: null };
+      // Below 900 px nothing is drawn, so nothing is laid out.
+      return { picture, layout: live ? layoutWorld(picture.corpus, "world") : null, error: null };
     } catch (error) {
       return { picture: null, layout: null, error: error instanceof Error ? error.message : "world_picture_failed" };
     }
-  }, [model]);
+  }, [model, live]);
   const { picture, layout } = built;
   const gfx: Graphics = live ? gfxState : "summary";
 
-  useEffect(() => setFocusId(null), [model]);
+  useEffect(() => {
+    setFocusId(null);
+    setQuery("");
+  }, [model]);
 
   /* One canvas, one renderer and their listeners per effect run, all released by its cleanup. A failure moves one step down the chain on a fresh canvas
      (a canvas that has held a GL context cannot give a 2D one); the last step is the list. */
@@ -192,6 +199,7 @@ export default function WorldPicture({ model, onOpenEvidence, openLabel }: Props
   }
 
   const selected = focusId ? picture.info.get(focusId) ?? null : null;
+  const found = findObjects(picture, query);
   return (
     <div className={styles.root} data-world-picture="" data-mode={gfx} data-orbit={orbit ? "true" : "false"} data-node-count={picture.drawn.objects} data-edge-count={picture.drawn.relations}>
       {gfx !== "summary" ? <div className={styles.stage} ref={stageRef} /> : null}
@@ -205,21 +213,30 @@ export default function WorldPicture({ model, onOpenEvidence, openLabel }: Props
       </ul>
       <p className={styles.line}>{PICTURE_LINE_NOTE}</p>
       <p className={styles.showing} role="status">{showingLine(picture)}</p>
-      <h3 className={styles.listTitle}>Most connected</h3>
-      <ol className={styles.list}>
-        {picture.top.map((item) => (
+      <label className={styles.find}>
+        <span>Find an object</span>
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or type" autoComplete="off" />
+      </label>
+      <p className={styles.showing} role="status">
+        {query.trim() === ""
+          ? "Listing the 8 most connected of the drawn objects. Type to find any other."
+          : `Showing ${found.items.length} of ${n(found.matched)} matching drawn objects${found.matched > PICTURE_FIND_ROWS ? ", the most connected first" : ""}.`}
+      </p>
+      <ol className={styles.list} aria-label="Drawn objects">
+        {found.items.map((item) => (
           <li key={item.id}>
             <button type="button" aria-pressed={focusId === item.id} onClick={() => setFocusId(focusId === item.id ? null : item.id)}>
               <span>{item.label}</span>
-              <small>{item.typeLabel} · {n(item.relationCount)} {item.relationCount === 1 ? "relation" : "relations"} · {n(item.evidenceCount)} evidence</small>
+              <small>{item.typeLabel} · {n(item.relationCount)} {item.relationCount === 1 ? "relation" : "relations"} · {n(item.evidenceCount)} evidence {item.evidenceCount === 1 ? "record" : "records"}</small>
             </button>
           </li>
         ))}
       </ol>
+      <div aria-live="polite">
       {selected ? (
         <div className={styles.detail} role="group" aria-label="Selected object">
           <strong>{selected.label}</strong>
-          <span>{selected.typeLabel} · {n(selected.relationCount)} {selected.relationCount === 1 ? "relation" : "relations"} · {n(selected.evidenceCount)} evidence</span>
+          <span>{selected.typeLabel} · {n(selected.relationCount)} {selected.relationCount === 1 ? "relation" : "relations"} · {n(selected.evidenceCount)} evidence {selected.evidenceCount === 1 ? "record" : "records"}</span>
           {selected.evidenceId ? (
             <button type="button" onClick={() => onOpenEvidence(selected.evidenceId as string)}>{openLabel}</button>
           ) : (
@@ -227,6 +244,7 @@ export default function WorldPicture({ model, onOpenEvidence, openLabel }: Props
           )}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

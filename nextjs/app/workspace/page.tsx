@@ -3570,7 +3570,7 @@ export default function WorkspacePage() {
             states stand and nothing is drawn. A click opens the evidence reader on Review.
           */}
           {tab === "overview" && surface === "home" && activeWorld && worldReadModel && worldReadModel.world.manifestDigest === activeWorld.manifestDigest ? (
-            <Screen title="Your World, drawn" titleAs="h2" titleId="workspace-world-picture-title" status={pictureScreenStatus(worldReadModel)} aria-labelledby="workspace-world-picture-title">
+            <Screen title="Your World, drawn" titleAs="h2" titleId="workspace-world-picture-title" status={pictureScreenStatus(worldReadModel, activeWorld)} aria-labelledby="workspace-world-picture-title">
               <WorldPicture
                 model={worldReadModel}
                 openLabel="Open evidence"
@@ -3760,7 +3760,7 @@ export default function WorkspacePage() {
                 />
               </Screen>
               {worldReadModel ? (
-                <Screen title="World map" titleAs="h2" titleId="review-world-picture-title" status={pictureScreenStatus(worldReadModel)} aria-labelledby="review-world-picture-title">
+                <Screen title="World map" titleAs="h2" titleId="review-world-picture-title" status={pictureScreenStatus(worldReadModel, activeWorld)} aria-labelledby="review-world-picture-title">
                   <WorldPicture
                     model={worldReadModel}
                     openLabel="Open in the evidence reader"

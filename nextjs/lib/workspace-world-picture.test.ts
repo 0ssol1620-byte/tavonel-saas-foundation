@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   adaptWorldForPicture,
   fallbackGraphics,
+  findObjects,
+  pictureAriaLabel,
   PICTURE_LIVE_MIN_WIDTH,
   PICTURE_LIVE_QUERY,
   pictureBranch,
@@ -143,11 +145,55 @@ describe("which picture a reader gets", () => {
   });
 });
 
-describe("the screen tag", () => {
-  it("says the revision of an active World and that a candidate is not active", () => {
-    expect(pictureScreenStatus(small)).toEqual({ tone: "ok", label: "World v3 active" });
-    expect(pictureScreenStatus(model({ objects: [], status: "candidate" }))).toEqual({ tone: "waiting", label: "Candidate, not active" });
-    expect(pictureScreenStatus(model({ objects: [], revision: { state: "not_yet", reason: "x" } }))).toEqual({ tone: "ok", label: "World active" });
+describe("the screen tag follows the page's active World, not the model's own snapshot", () => {
+  const snapshotActive = model({ objects: [], status: "active", revision: { state: "read", value: 3 } }); // manifest sha256:x, fetched while it was active
+  const snapshotCandidate = model({ objects: [], status: "candidate" });
+  it("is active iff the model's manifest is the active World's manifest, with the active revision", () => {
+    expect(pictureScreenStatus(snapshotActive, { manifestDigest: "sha256:x", revision: 5 })).toEqual({ tone: "ok", label: "World v5 active" });
+  });
+  it("activation: a model read as a candidate reads active once the page's active World is its manifest", () => {
+    expect(pictureScreenStatus(snapshotCandidate, { manifestDigest: "sha256:x", revision: 4 })).toEqual({ tone: "ok", label: "World v4 active" });
+  });
+  it("rollback: a model read as active is not active once the page's active World is another manifest", () => {
+    expect(pictureScreenStatus(snapshotActive, { manifestDigest: "sha256:other", revision: 2 })).toEqual({ tone: "waiting", label: "Candidate, not active" });
+  });
+  it("no active World: never active, whatever the snapshot says", () => {
+    expect(pictureScreenStatus(snapshotActive, null)).toEqual({ tone: "waiting", label: "Candidate, not active" });
+    expect(pictureScreenStatus(snapshotCandidate, null)).toEqual({ tone: "waiting", label: "Candidate, not active" });
+  });
+  it("an active World with no usable revision says active without a number", () => {
+    expect(pictureScreenStatus(snapshotActive, { manifestDigest: "sha256:x", revision: 0 })).toEqual({ tone: "ok", label: "World active" });
+  });
+  it("the page passes the active World to both screens", () => {
+    const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+    expect(page.split("pictureScreenStatus(worldReadModel, activeWorld)")).toHaveLength(3);
+    expect(page).not.toContain("pictureScreenStatus(worldReadModel)");
+  });
+});
+
+describe("every drawn object has a keyboard route", () => {
+  const ids = Array.from({ length: 30 }, (_, i) => `o${String(i).padStart(2, "0")}`);
+  const big = model({ objects: ids.map((id) => object({ id, type: "Entity" })), relations: [relation("1", "o05", "o06"), relation("2", "o05", "o07")] });
+  const picture = adaptWorldForPicture(big);
+
+  it("an empty query lists the 8 most connected, most connected first", () => {
+    const { items, matched } = findObjects(picture, "");
+    expect(items).toHaveLength(8);
+    expect(matched).toBe(30);
+    expect(items[0]!.id).toBe("o05");
+  });
+  it("a query reaches any drawn object, capped with the matched count", () => {
+    expect(findObjects(picture, "label o29")).toMatchObject({ matched: 1, items: [{ id: "o29" }] });
+    const all = findObjects(picture, "entity");
+    expect(all.matched).toBe(30);
+    expect(all.items).toHaveLength(20);
+    expect(findObjects(picture, "no such").items).toEqual([]);
+  });
+  it("the canvas name claims only what the control does", () => {
+    const label = pictureAriaLabel(picture);
+    expect(label).toContain("pointer-only");
+    expect(label).toContain("find box");
+    expect(label).not.toContain("same objects");
   });
 });
 
@@ -158,6 +204,10 @@ describe("the page and the component stay on real data", () => {
     expect(page).toContain("activeWorld && worldReadModel && worldReadModel.world.manifestDigest === activeWorld.manifestDigest");
     const component = read("components/workspace/world-picture.tsx");
     for (const forbidden of ["public-corpus", "explore-sample", "demo-world", "fetch("]) expect(component, forbidden).not.toContain(forbidden);
+  });
+
+  it("lays the World out only when a canvas will draw it", () => {
+    expect(read("components/workspace/world-picture.tsx")).toContain('live ? layoutWorld(picture.corpus, "world") : null');
   });
 
   it("the sheet animates nothing, paints no focus ring of its own, and hides the stage under 900 px", () => {
