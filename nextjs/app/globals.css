@@ -24,7 +24,12 @@
 
 @import "./tavonel.css";
 @import "./wanted-sans-korean.css";
-@import "./product-polish.css";
+/*
+  product-polish.css is not imported here either (WO-PERF-4). No rule of it matched an element on / (0 of 148
+  and 0 of 137 rules at 390 and 1440, WO-CI-16d), and it was a render-blocking sheet before the first paint of
+  every route. The routes whose classes it styles import it themselves, first (the route list is pinned in
+  lib/landing-v2-tokens.test.ts); it stays `@layer overrides`, after tavonel.css.
+*/
 /*
   workspace-final-polish.css and workspace-no1.css are not imported here (WO-CI-16d): every rule of
   theirs is scoped to classes only the workspace route and the /dev/compile-stage harness render, and

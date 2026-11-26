@@ -23,6 +23,8 @@
  * goes.
  */
 
+// WO-PERF-4: product-polish.css is route-scoped (it left globals.css); keep it the first import so it loads before this route's other sheets.
+import "@/app/product-polish.css";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PublicSitePage } from "@/components/public-site-chrome";

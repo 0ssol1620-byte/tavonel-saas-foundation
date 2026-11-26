@@ -277,11 +277,39 @@ describe("route-scoped global sheets", () => {
     // `.board-row-name`, `.document-meta` or under `.one-path-workspace`) left globals.css; their
     // renderers are the workspace route and the compile-stage harness. Layer order inside
     // `overrides` is unchanged: they still load after tavonel.css and product-polish.css.
-    ["app/workspace/layout.tsx", ["@/app/one-path.css", "@/app/workspace-final-polish.css", "@/app/workspace-no1.css"]],
+    // WO-PERF-4: product-polish.css joined them, ahead of the two workspace sheets (same layer, same order as in the root).
+    ["app/workspace/layout.tsx", ["@/app/one-path.css", "@/app/product-polish.css", "@/app/workspace-final-polish.css", "@/app/workspace-no1.css"]],
     ["app/dev/compile-stage/page.tsx", ["@/app/workspace-final-polish.css", "@/app/workspace-no1.css"]],
   ])("%s imports the sheets that style its classes, ahead of every other import", (path, sheets) => {
     const imports = [...code(path).matchAll(/^import\s+(?:[^"';]+\s+from\s+)?["']([^"']+)["'];?$/gm)].map((match) => match[1]);
     expect(imports.slice(0, sheets.length)).toEqual(sheets);
+  });
+  /*
+    WO-PERF-4: product-polish.css left globals.css. The routes below are every app entry whose module
+    closure could match a rule of the sheet (receipts/WO-PERF-4/polish-match.mjs: 33 entries, a superset
+    of the 43 routes where WO-CI-16d measured a rule match in the browser), plus the workspace layout
+    (all five workspace pages match). Each imports it as its FIRST import, so it still loads before the
+    route's other sheets and keeps its place in `@layer overrides`. A route that loses the import renders
+    unstyled; a route added to the list puts a render-blocking request back on it.
+  */
+  const POLISH_ENTRIES = [
+    "api/page.tsx", "benchmarks/gdp-pdf/page.tsx", "benchmarks/page.tsx", "changelog/page.tsx", "contact/page.tsx",
+    "cookbooks/[slug]/page.tsx", "cookbooks/page.tsx", "docs/[section]/page.tsx", "docs/page.tsx", "error.tsx",
+    "evaluation/page.tsx", "guide/page.tsx", "how-it-works/page.tsx", "integrations/page.tsx", "login/page.tsx",
+    "not-found.tsx", "oauth/authorize/page.tsx", "pricing/page.tsx", "privacy/page.tsx",
+    "product/compiled-world/page.tsx", "product/continuous-knowledge/page.tsx",
+    "product/document-understanding/page.tsx", "product/page.tsx", "refunds/page.tsx", "research/notes/page.tsx",
+    "resources/page.tsx", "solutions/[slug]/page.tsx", "solutions/page.tsx", "sources/page.tsx", "status/page.tsx",
+    "subprocessors/page.tsx", "terms/page.tsx", "trust/page.tsx",
+  ];
+  it("the root imports no product-polish.css, and Home does not reach it", () => {
+    expect(code("app/layout.tsx")).not.toContain("product-polish.css");
+    expect(code("app/globals.css")).not.toContain("product-polish.css");
+    expect(code("app/page.tsx")).not.toContain("product-polish.css");
+  });
+  it.each(POLISH_ENTRIES)("app/%s imports product-polish.css before anything else", (entry) => {
+    const imports = [...code(`app/${entry}`).matchAll(/^import\s+(?:[^"';]+\s+from\s+)?["']([^"']+)["'];?$/gm)].map((match) => match[1]);
+    expect(imports[0]).toBe("@/app/product-polish.css");
   });
 });
 

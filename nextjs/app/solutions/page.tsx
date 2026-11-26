@@ -1,3 +1,5 @@
+// WO-PERF-4: product-polish.css is route-scoped (it left globals.css); keep it the first import so it loads before this route's other sheets.
+import "@/app/product-polish.css";
 import RouteJsonLd from "@/components/v34/shell/route-json-ld";
 import V34Page from "@/components/v34/shell/v34-page";
 import { SolutionsBody } from "@/components/v34/routes/solutions/solutions";

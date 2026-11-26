@@ -1,5 +1,8 @@
 // `.one-path-ai-*` and `.one-path-more`: from the root layout to the routes that render them (WO-CI-16b).
 import "@/app/one-path.css";
+// WO-PERF-4: product-polish.css (`@layer overrides`) left globals.css for the routes that render its classes; it stays ahead of the two
+// workspace sheets below, the same relative order inside `overrides` that it had in the root.
+import "@/app/product-polish.css";
 // The workspace sheets (`@layer overrides`), from globals.css to the routes that render them (WO-CI-16d).
 import "@/app/workspace-final-polish.css";
 import "@/app/workspace-no1.css";

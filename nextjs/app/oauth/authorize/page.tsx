@@ -19,6 +19,8 @@
  * budget (§22). A signed-out person sees the request first and is asked to sign in when they allow.
  */
 
+// WO-PERF-4: product-polish.css is route-scoped (it left globals.css); keep it the first import so it loads before this route's other sheets.
+import "@/app/product-polish.css";
 import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
