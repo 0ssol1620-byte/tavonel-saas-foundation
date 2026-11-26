@@ -6,7 +6,7 @@ import { failureClasses } from "../../../shared/uskcEnums";
 import { PermanentReject, RetryableError } from "./errors";
 import { PRIVATE_CDR_ORIGIN, IDENTITY_BROKER } from "./identity";
 import { cdrRequestSignature, sha256DigestHeader } from "./hmac";
-import { handleQueue, handleRequest, type Env } from "./index";
+import { OCR_COLD_START_RETRY_DELAYS_S, coldStartRetryDelay, handleQueue, handleRequest, type Env } from "./index";
 import { cdrReceiptSiblingKey, immutableObjectKey, ocrReviewSiblingKey, ocrSiblingKey } from "./keys";
 import { OcrEvidenceRetryableError } from "./ocr";
 import {
@@ -748,18 +748,49 @@ describe("Worker HTTP and queue surface", () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
     const run = await runQueueAttempt(r2, 1, ocrTimeout);
     const reviewKey = ocrReviewSiblingKey(immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
-    assert.deepEqual(run.retries, [60]);
+    assert.deepEqual(run.retries, [15]);
     assert.equal(run.acks, 0);
     assert.deepEqual(run.settlements, []);
     assert.equal(r2.objects.has(reviewKey), false);
 
     const second = await runQueueAttempt(r2, 2, ocrTimeout);
-    assert.deepEqual(second.retries, [120]);
+    assert.deepEqual(second.retries, [30]);
     assert.equal(r2.objects.has(reviewKey), false);
   });
 
+  it("walks the cold-start ladder 15, 30, 60, 60 s and then records the failure on attempt 5", async () => {
+    assert.deepEqual([...OCR_COLD_START_RETRY_DELAYS_S], [15, 30, 60, 60]);
+    // An unknown or malformed attempt counter starts at the first rung; past the ladder is terminal.
+    assert.equal(coldStartRetryDelay(undefined), 15);
+    assert.equal(coldStartRetryDelay(0), 15);
+    assert.equal(coldStartRetryDelay(5), undefined);
+    assert.equal(coldStartRetryDelay(10), undefined);
+    const delays: Array<number | undefined> = [];
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
+      const run = await runQueueAttempt(r2, attempt, ocrTimeout);
+      assert.equal(run.acks, 0, `attempt ${attempt} waits instead of acknowledging`);
+      assert.deepEqual(run.settlements, [], `attempt ${attempt} settles nothing`);
+      delays.push(run.retries[0]);
+    }
+    assert.deepEqual(delays, [15, 30, 60, 60]);
+    const terminal = await runQueueAttempt(new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES }), 5, ocrTimeout);
+    assert.deepEqual(terminal.retries, []);
+    assert.equal(terminal.acks, 1);
+    assert.equal(terminal.settlements[0]?.outcome, "released");
+    assert.equal(terminal.settlements[0]?.actualCredits, 0);
+  });
+
+  it("does not shorten the wait for a failure that is not a cold or unavailable endpoint", async () => {
+    // A reader's rejection is semantic: it is never re-queued on the cold-start ladder.
+    const run = await runQueueAttempt(new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES }), 1,
+      async () => new Response("this document was refused", { status: 422 }));
+    assert.deepEqual(run.retries, []);
+    assert.equal(run.acks, 1);
+  });
+
   for (const stage of ["review-get", "existence-get", "source-get", "source-body", "persisted-get", "persisted-body"] as const) {
-    it(`attempt 3 retries ${stage} storage evidence failure without review receipt or settlement`, async () => {
+    it(`attempt 5 retries ${stage} storage evidence failure without review receipt or settlement`, async () => {
       const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
       const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
       const ocrKey = ocrSiblingKey(immutableKey);
@@ -783,7 +814,7 @@ describe("Worker HTTP and queue surface", () => {
         return object;
       };
       let acknowledgements = 0; let retries = 0; const settlements: unknown[] = []; let providerCalls = 0;
-      await handleQueue({ messages: [{ body: { object: { key: SOURCE_KEY } }, attempts: 3,
+      await handleQueue({ messages: [{ body: { object: { key: SOURCE_KEY } }, attempts: 5,
         ack: () => { acknowledgements++; }, retry: () => { retries++; } }] },
       envFor(r2, { FOUNDATION_OCR_URL: FOUNDATION_OCR }), async (url, init) => {
         if (String(url) === SETTLEMENT_URL) { settlements.push(init?.body); return Response.json({ code: "SETTLEMENT_APPLIED" }); }
@@ -803,7 +834,7 @@ describe("Worker HTTP and queue surface", () => {
   }
 
   for (const invalid of ["malformed", "wrong-source"] as const) {
-    it(`attempt 3 preserves terminal operator review for ${invalid} persisted evidence`, async () => {
+    it(`attempt 5 preserves terminal operator review for ${invalid} persisted evidence`, async () => {
       const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
       const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
       const payload = invalid === "malformed" ? {} : {
@@ -813,7 +844,7 @@ describe("Worker HTTP and queue surface", () => {
           text: "synthetic", bbox1000: [0, 0, 100, 100], confidence: 1, authority: "unknown" }],
       };
       r2.objects.set(ocrSiblingKey(immutableKey), { bytes: new TextEncoder().encode(JSON.stringify(payload)), contentType: "application/json" });
-      const run = await runQueueAttempt(r2, 3, async () => { throw new Error("provider must not run"); });
+      const run = await runQueueAttempt(r2, 5, async () => { throw new Error("provider must not run"); });
       assert.equal(run.acks, 1); assert.deepEqual(run.retries, []); assert.equal(run.ocrCalls, 0);
       assert.equal(run.settlements.length, 1); assert.equal(run.settlements[0]?.outcome, "operator_review");
       assert.equal(run.settlements[0]?.actualCredits, 2);
@@ -824,7 +855,7 @@ describe("Worker HTTP and queue surface", () => {
 
   it("records the failure when the OCR timeout outlives the retry bound, still charging nothing", async () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
-    const run = await runQueueAttempt(r2, 3, ocrTimeout);
+    const run = await runQueueAttempt(r2, 5, ocrTimeout);
     const reviewKey = ocrReviewSiblingKey(immutableObjectKey("ws_pilot", "doc_1", outputSha256()));
     assert.deepEqual(run.retries, []);
     assert.equal(run.acks, 1);
@@ -846,7 +877,7 @@ describe("Worker HTTP and queue surface", () => {
   it("retries an unavailable endpoint but sends a reader's rejection straight to review", async () => {
     const unavailable = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
     const held = await runQueueAttempt(unavailable, 1, async () => new Response("capacity unavailable", { status: 503 }));
-    assert.deepEqual(held.retries, [60], "a 503 is the endpoint being unavailable, not a verdict");
+    assert.deepEqual(held.retries, [15], "a 503 is the endpoint being unavailable, not a verdict");
     assert.deepEqual(held.settlements, []);
 
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
@@ -866,7 +897,7 @@ describe("Worker HTTP and queue surface", () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
     const immutableKey = immutableObjectKey("ws_pilot", "doc_1", outputSha256());
     const first = await runQueueAttempt(r2, 1, ocrTimeout);
-    assert.deepEqual(first.retries, [60]);
+    assert.deepEqual(first.retries, [15]);
 
     const second = await runQueueAttempt(r2, 2, cleanCdrFetch);
     assert.equal(second.acks, 1);
@@ -966,7 +997,7 @@ describe("recorded OCR review replay", () => {
 
   it("replays a zero-charge timeout receipt after a settlement 503 that never committed", async () => {
     const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
-    const first = await runQueueAttempt(r2, 3, ocrTimeout, settlementDown);
+    const first = await runQueueAttempt(r2, 5, ocrTimeout, settlementDown);
     assert.equal(first.acks, 0);
     assert.deepEqual(first.retries, [undefined]);
     assert.equal(first.ocrCalls, 1);
@@ -974,7 +1005,7 @@ describe("recorded OCR review replay", () => {
     assert.equal(review.billingDisposition, "released");
     assert.equal(review.computeCredits, 0);
 
-    const replay = await runQueueAttempt(r2, 4, providerMustNotRun);
+    const replay = await runQueueAttempt(r2, 6, providerMustNotRun);
     assert.equal(replay.ocrCalls, 0);
     assert.equal(replay.cdrCalls, 0);
     assert.equal(replay.acks, 1);
@@ -999,7 +1030,7 @@ describe("recorded OCR review replay", () => {
       return Response.json({ code: committed === undefined ? "SETTLEMENT_APPLIED" : "SETTLEMENT_DUPLICATE" });
     };
 
-    const first = await runQueueAttempt(r2, 3, ocrTimeout, (body) => {
+    const first = await runQueueAttempt(r2, 5, ocrTimeout, (body) => {
       commit(body);
       throw new Error("connection reset after the release committed");
     });
@@ -1007,7 +1038,7 @@ describe("recorded OCR review replay", () => {
     assert.deepEqual(first.retries, [undefined]);
     assert.equal(ledger.size, 1);
 
-    const duplicate = await runQueueAttempt(r2, 4, providerMustNotRun, commit);
+    const duplicate = await runQueueAttempt(r2, 6, providerMustNotRun, commit);
     assert.equal(duplicate.ocrCalls, 0);
     assert.equal(duplicate.acks, 1);
     assert.deepEqual(duplicate.retries, []);
@@ -1061,7 +1092,7 @@ describe("recorded OCR review replay", () => {
     it(`derives ${outcome}/${credits} for a legacy v1 ${reasonCode} receipt from the taxonomy alone`, async () => {
       const r2 = await disarmed();
       writeReview(r2, encode(legacyReview(reasonCode)));
-      const run = await runQueueAttempt(r2, 4, providerMustNotRun);
+      const run = await runQueueAttempt(r2, 6, providerMustNotRun);
       assert.equal(run.ocrCalls, 0);
       assert.equal(run.acks, 1);
       assert.equal(run.settlements[0]?.outcome, outcome);
@@ -1080,7 +1111,7 @@ describe("recorded OCR review replay", () => {
       }
       return put(key, value, options);
     };
-    const run = await runQueueAttempt(r2, 4, refused);
+    const run = await runQueueAttempt(r2, 6, refused);
     assert.equal(run.ocrCalls, 1);
     assert.equal(run.acks, 1);
     assert.equal(run.settlements[0]?.outcome, "released");
@@ -1124,12 +1155,12 @@ describe("recorded OCR review replay", () => {
     for (const [name, mutate] of Object.entries(mutations)) {
       it(`retries a ${seed} receipt with ${name} before OCR and before settlement`, async () => {
         const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
-        const seeded = await runQueueAttempt(r2, seed === "timeout" ? 3 : 1, seed === "timeout" ? ocrTimeout : refused);
+        const seeded = await runQueueAttempt(r2, seed === "timeout" ? 5 : 1, seed === "timeout" ? ocrTimeout : refused);
         assert.equal(seeded.acks, 1);
         const planted = mutate(readReview(r2));
         writeReview(r2, planted);
 
-        const run = await runQueueAttempt(r2, 4, providerMustNotRun);
+        const run = await runQueueAttempt(r2, 6, providerMustNotRun);
         assert.equal(run.ocrCalls, 0);
         assert.equal(run.acks, 0);
         assert.deepEqual(run.retries, [undefined]);
@@ -1142,7 +1173,7 @@ describe("recorded OCR review replay", () => {
   for (const failure of ["get", "body", "size-lie"] as const) {
     it(`retries an unreadable receipt (${failure}) before OCR and before settlement`, async () => {
       const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
-      await runQueueAttempt(r2, 3, ocrTimeout);
+      await runQueueAttempt(r2, 5, ocrTimeout);
       const get = r2.get.bind(r2);
       r2.get = async (key) => {
         if (key !== reviewKey) return get(key);
@@ -1152,7 +1183,7 @@ describe("recorded OCR review replay", () => {
           ? { ...object, arrayBuffer: async () => { throw new Error("synthetic review body failure"); } }
           : { ...object, size: object.size - 1 };
       };
-      const run = await runQueueAttempt(r2, 4, providerMustNotRun);
+      const run = await runQueueAttempt(r2, 6, providerMustNotRun);
       assert.equal(run.ocrCalls, 0);
       assert.equal(run.acks, 0);
       assert.deepEqual(run.retries, [undefined]);
@@ -1214,7 +1245,7 @@ describe("OCR review receipt persistence", () => {
 
   for (const [seed, attempts, ocrFetch, outcome, credits, reasonCode] of [
     ["semantic 422", 1, refused, "operator_review", 2, "OCR_HTTP_REJECTED"],
-    ["last-attempt timeout", 3, ocrTimeout, "released", 0, "OCR_TIMEOUT_OR_NETWORK"],
+    ["last-attempt timeout", 5, ocrTimeout, "released", 0, "OCR_TIMEOUT_OR_NETWORK"],
   ] as const) {
     it(`recovers a ${seed} receipt whose PUT committed and then threw`, async () => {
       const r2 = new FakeR2({ [SOURCE_KEY]: SOURCE_BYTES });
@@ -1231,7 +1262,7 @@ describe("OCR review receipt persistence", () => {
       assert.equal(review.billingDisposition, outcome);
       assert.equal(review.computeCredits, credits);
 
-      const replay = await runQueueAttempt(r2, 4, providerMustNotRun);
+      const replay = await runQueueAttempt(r2, 6, providerMustNotRun);
       assert.equal(replay.ocrCalls, 0);
       assert.equal(replay.acks, 1);
       assert.deepEqual(replay.settlements[0], first.settlements[0]);
@@ -1248,7 +1279,7 @@ describe("OCR review receipt persistence", () => {
       r2.objects.set(reviewKey, { bytes: winner, contentType: "application/json" });
       throw new Error("internal error");
     });
-    const run = await runQueueAttempt(r2, 4, refused);
+    const run = await runQueueAttempt(r2, 6, refused);
     assert.equal(run.ocrCalls, 1);
     assert.equal(run.acks, 1);
     assert.equal(run.settlements[0]?.outcome, "released");

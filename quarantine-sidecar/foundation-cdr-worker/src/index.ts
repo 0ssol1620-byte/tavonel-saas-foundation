@@ -195,16 +195,19 @@ export async function handleRequest(request: Request, env: Env, fetcher: typeof 
  * upload after an idle period fails on infrastructure rather than on the document. `ocr.ts` calls
  * that class of failure `transport`; this is how long the message waits before the next attempt.
  *
- * Attempts 1 and 2 give the endpoint time to boot: nothing is written and nothing is settled, so
- * a redelivery costs the customer nothing. Attempt 3 is terminal -- the endpoint has now been
- * unreachable for three minutes, which is no longer a cold start -- and records the failure the
- * ordinary way so an operator can see the document instead of watching it dead-letter in silence.
- * A transport failure still carries zero credits, so that settlement releases the reservation
- * rather than charging for a reader that never ran. `max_retries` stays the outer bound.
+ * The measured cold starts are 29.8 s and 40.3 s (docs/evidence/ocr/FOUNDATION_GPU_OCR_FULL_SEQUENCE_2026-08-29.md),
+ * so the ladder starts short (15 s, 30 s) and only then settles at 60 s. It used to be a flat
+ * 60 s then 120 s, which made a 30-40 s boot cost up to three minutes of waiting. Attempts 1 to 4
+ * wait: nothing is written and nothing is settled, so a redelivery costs the customer nothing.
+ * Attempt 5 is terminal -- 165 s of waiting, on top of the requests themselves, is no longer a
+ * cold start -- and records the failure the ordinary way so an operator can see the document
+ * instead of watching it dead-letter in silence. A transport failure still carries zero credits,
+ * so that settlement releases the reservation rather than charging for a reader that never ran.
+ * `max_retries` stays the outer bound.
  */
-const OCR_COLD_START_RETRY_DELAYS_S = [60, 120] as const;
+export const OCR_COLD_START_RETRY_DELAYS_S = [15, 30, 60, 60] as const;
 
-function coldStartRetryDelay(attempts: unknown): number | undefined {
+export function coldStartRetryDelay(attempts: unknown): number | undefined {
   const attempt = Number.isInteger(attempts) && (attempts as number) > 0 ? (attempts as number) : 1;
   return OCR_COLD_START_RETRY_DELAYS_S[attempt - 1];
 }
