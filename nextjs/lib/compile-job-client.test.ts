@@ -231,6 +231,33 @@ describe("pickResumableCompileJob (no ?job= in the URL)", () => {
     expect(pickResumableCompileJob([job("f", "failed", null)], now)).toBeUndefined();
     expect(pickResumableCompileJob([], now)).toBeUndefined();
   });
+
+  /* WO-WS-6 (F3): the 2026-11-26 live run. A review package from a smoke compile came back on every load beside the newer candidate. */
+  describe("a review package that a newer compile has followed (WO-WS-6)", () => {
+    const review = (id: string, corpusId: string | null = null) => ({ jobId: id, state: "review_required" as const, settledAt: "2026-11-26T08:24:00Z", corpusId });
+    const done = (id: string, corpusId: string | null = null) => ({ jobId: id, state: "ready" as const, settledAt: "2026-11-26T10:52:16Z", corpusId });
+
+    it("is not resurrected behind a newer ready job", () => {
+      expect(pickResumableCompileJob([done("new"), review("old")], now)).toBeUndefined();
+    });
+    it("is not resurrected behind a newer failed or cancelled job that is no longer recent", () => {
+      const stale = { jobId: "f", state: "failed" as const, settledAt: "2026-11-01T00:00:00Z", corpusId: null };
+      expect(pickResumableCompileJob([stale, review("old")], now)).toBeUndefined();
+      expect(pickResumableCompileJob([{ jobId: "c", state: "cancelled" as const, settledAt: null, corpusId: null }, review("old")], now)).toBeUndefined();
+    });
+    it("is still offered when it is the newest job: a person has yet to decide", () => {
+      expect(pickResumableCompileJob([review("only")], now)?.jobId).toBe("only");
+      expect(pickResumableCompileJob([review("newest"), done("older")], now)?.jobId).toBe("newest");
+    });
+    it("is still offered behind another part of its own corpus, and not behind a different corpus or a plain job", () => {
+      expect(pickResumableCompileJob([done("part2", "corpus-a"), review("part1", "corpus-a")], now)?.jobId).toBe("part1");
+      expect(pickResumableCompileJob([done("other", "corpus-b"), review("part1", "corpus-a")], now)).toBeUndefined();
+      expect(pickResumableCompileJob([done("plain"), review("part1", "corpus-a")], now)).toBeUndefined();
+    });
+    it("a running job older than a newer ready one is still found, as before; only the resting package is dropped", () => {
+      expect(pickResumableCompileJob([done("new"), review("old"), { jobId: "stuck", state: "reading" as const, settledAt: null, corpusId: null }], now)?.jobId).toBe("stuck");
+    });
+  });
 });
 
 /* D0 2026-11-09 R2: a job at rest kept "Compiling 1 source" on the Activity line. */

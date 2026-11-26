@@ -1,8 +1,9 @@
 import type { ScreenStatus } from "@/components/v34/ui/screen";
 import type { AttentionItem } from "@/lib/workspace-onboarding";
 import { countNoun } from "@/lib/plural";
-import type { AskWorldState } from "@/components/workspace/in-page-choices";
+import type { ActiveWorldDiscovery, AskWorldState } from "@/components/workspace/in-page-choices";
 import type { WorkspaceMode } from "@/lib/workspace-onboarding";
+import type { WorldEvidenceRead } from "@/lib/review-queue";
 
 /*
   WO-WS-4: the state each workspace screen's tag carries, read from values the page already holds.
@@ -43,11 +44,50 @@ export function askScreenStatus(activeRevision: number | null, panel: "checking"
   return { tone: "waiting", label: "World not opened" };
 }
 
-/** Home: while the inventory is loading or unavailable the page does not know which World is active. */
-export function homeWorldScreenStatus(activeRevision: number | null, mode: WorkspaceMode): ScreenStatus {
+/**
+  The workspace's own answer to "which Worlds are active": the listing Ask uses (GET /api/v1/collections),
+  or "checking" before it has answered. `activeRevision` elsewhere in this file is the one collection the
+  page has open; the database keeps one active World per collection and a workspace may have several, so
+  an open collection with no active World says nothing about the workspace (WO-WS-6, F1).
+*/
+export type WorkspaceWorlds = ActiveWorldDiscovery | "checking";
+
+const shortCollection = (collectionId: string) => `${collectionId.slice(0, 19)}…`;
+
+/**
+  Home: while the inventory is loading or unavailable the page does not know which World is active.
+  `worlds` is optional so a caller that never read the workspace listing keeps the single-collection
+  words; with it, "No active World" is said only after a listing answered "none" (WO-WS-6).
+*/
+export function homeWorldScreenStatus(activeRevision: number | null, mode: WorkspaceMode, worlds?: WorkspaceWorlds): ScreenStatus {
   if (mode === "loading") return { tone: "waiting", label: "Checking World…" };
   if (mode === "unavailable") return { tone: "waiting", label: "World not checked" };
-  return worldScreenStatus(activeRevision);
+  if (activeRevision !== null || worlds === undefined) return worldScreenStatus(activeRevision);
+  if (worlds === "checking") return { tone: "waiting", label: "Checking Worlds…" };
+  if (worlds.kind === "failed") return { tone: "waiting", label: "Worlds not checked" };
+  if (worlds.kind === "none") return { tone: "waiting", label: "No active World" };
+  if (worlds.kind === "one") return worldScreenStatus(worlds.world.revision);
+  return { tone: "ok", label: countNoun(worlds.worlds.length, "active World") };
+}
+
+/**
+  The Home facts line's World piece. One open collection with an active World names its revision, and says
+  how many Worlds the workspace has when that is more than one. With none open, it names the workspace's
+  own answer: the one active World, or the count and which Ask reads (none until a person chooses).
+*/
+export function homeWorldFact(activeRevision: number | null, worlds?: WorkspaceWorlds): string {
+  if (activeRevision !== null) {
+    if (!Number.isInteger(activeRevision) || activeRevision < 1) throw new Error("screen_status_revision_invalid");
+    const many = worlds !== undefined && worlds !== "checking" && worlds.kind === "several" ? worlds.worlds.length : 0;
+    return many > 1 ? `World v${activeRevision} active here · ${many} Worlds active in this workspace` : `World v${activeRevision} active`;
+  }
+  if (worlds === undefined) return "No active World";
+  if (worlds === "checking") return "Checking Worlds…";
+  if (worlds.kind === "failed") return "Worlds not checked";
+  if (worlds.kind === "none") return "No active World";
+  if (worlds.kind === "one") return `World v${worlds.world.revision} active (${shortCollection(worlds.world.collectionId)})`;
+  const latest = worlds.worlds[0];
+  return `${countNoun(worlds.worlds.length, "active World")} · most recent ${shortCollection(latest.collectionId)} v${latest.revision} · Ask asks you to choose`;
 }
 
 /** The activation block's own status line, unchanged, now in the frame's tag. */
@@ -61,14 +101,22 @@ export function activationScreenStatus(activeRevision: number | null): ScreenSta
   What the review queue shows as waiting: the same count the top bar prints. Without a compiled candidate there
   is nothing to clear, so a zero is not drawn as "all clear": the dot stays a ring.
 */
-export function reviewScreenStatus(reasons: number, hasCandidate: boolean): ScreenStatus {
+export function reviewScreenStatus(reasons: number, hasCandidate: boolean, evidenceRead: WorldEvidenceRead = "ready"): ScreenStatus {
   const n = count(reasons, "reasons");
   if (typeof hasCandidate !== "boolean") throw new Error("screen_status_candidate_invalid");
-  return { tone: n > 0 || !hasCandidate ? "waiting" : "ok", label: `${n} ${n === 1 ? "reason" : "reasons"} to review` };
+  const label = `${n} ${n === 1 ? "reason" : "reasons"} to review`;
+  /* Recorded reasons are all this counts. With the evidence not loaded a zero is not "all clear" (WO-WS-6, F2). */
+  if (hasCandidate && evidenceRead !== "ready") {
+    return { tone: "waiting", label: `${label} · evidence ${evidenceRead === "loading" ? "loading" : "not loaded"}` };
+  }
+  return { tone: n > 0 || !hasCandidate ? "waiting" : "ok", label };
 }
 
 /** How many evidence records the comparison can open. */
-export function evidenceScreenStatus(records: number): ScreenStatus {
+export function evidenceScreenStatus(records: number, evidenceRead: WorldEvidenceRead = "ready"): ScreenStatus {
+  /* Not loaded is not zero: a count over a read that never answered would say there is no evidence. */
+  if (evidenceRead === "loading") return { tone: "waiting", label: "Loading evidence…" };
+  if (evidenceRead === "unavailable") return { tone: "waiting", label: "Evidence not loaded" };
   const n = count(records, "evidence");
   return { tone: n > 0 ? "ok" : "waiting", label: countNoun(n, "evidence record") };
 }

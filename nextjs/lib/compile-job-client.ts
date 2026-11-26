@@ -249,13 +249,20 @@ const RECENT_FAILURE_MS = 24 * 60 * 60 * 1000;
  * `jobs` is `GET /api/compile-jobs`: newest first. The newest job is shown when it is still running
  * or failed within the last 24 h, so a compile that just failed shows its failure rather than an
  * older, stuck one (D0 2026-11-09, cjob-749b behind cjob-130f). Otherwise the first unfinished job.
+ *
+ * WO-WS-6 (F3): `review_required` is unfinished (a person still decides) but it is not running. An
+ * older review package that a newer compile has since followed -- a smoke test, a retry -- was being
+ * pulled back on every load, beside the candidate the person is actually reviewing. It is offered
+ * only while nothing newer exists in this workspace, or when every newer job is another part of the
+ * same corpus. The package itself is not touched: its collection stays reachable by its own link.
  */
-export function pickResumableCompileJob<T extends { state: CompileState; settledAt?: string | null }>(
+export function pickResumableCompileJob<T extends { state: CompileState; settledAt?: string | null; corpusId?: string | null }>(
   jobs: readonly T[], now: number,
 ): T | undefined {
   const newest = jobs[0];
   const settled = Date.parse(newest?.settledAt ?? "");
   // No lower bound: a browser clock behind the server must not hide a failure that just happened.
   if (newest?.state === "failed" && now - settled <= RECENT_FAILURE_MS) return newest;
-  return jobs.find((job) => !isCompileJobTerminal(job.state));
+  return jobs.find((job, index) => !isCompileJobTerminal(job.state)
+    && (job.state !== "review_required" || jobs.slice(0, index).every((newer) => Boolean(job.corpusId) && newer.corpusId === job.corpusId)));
 }

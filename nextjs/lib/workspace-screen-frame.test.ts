@@ -7,7 +7,7 @@ import WorkspaceUltimateShell from "@/components/workspace-ultimate-shell";
 import { ActiveWorldPicker, askWorldPanel, discoveryFailureCopy, type AskWorldState } from "@/components/workspace/in-page-choices";
 import type { WorkspaceMode } from "@/lib/workspace-onboarding";
 import {
-  activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, homeWorldScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus,
+  activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, homeWorldFact, homeWorldScreenStatus, readyScreenStatus, reviewScreenStatus, worldScreenStatus, type WorkspaceWorlds,
 } from "@/app/workspace/screen-status";
 
 /*
@@ -376,5 +376,104 @@ describe("the frame's sheet reads the V34 tokens it may, at contrast", () => {
     expect(ok).toMatch(/border:\s*4px solid var\(--v34-ok\)/);
     expect(waiting).toMatch(/border:\s*2px solid/);
     expect(stopped).toMatch(/border-color:\s*var\(--v34-error\)/);
+  });
+});
+
+/*
+  WO-WS-6, 2026-11-26 live run. Home said "No active World" while the workspace had three active Worlds and Ask listed them: the page's
+  `activeWorld` is the one collection it has open, and the database keeps an active World per collection. Home now carries the
+  workspace listing too, and says "No active World" only after that listing answered "none".
+*/
+describe("Home names the workspace's active Worlds, not only the open collection's (WO-WS-6, F1)", () => {
+  const collectionId = (n: number) => `collection-${n.toString(16).padStart(32, "a")}`;
+  const world = (n: number, updatedAt = "2026-11-26T09:44:22Z") => ({ collectionId: collectionId(n), manifestDigest: `sha256:${"b".repeat(64)}`, revision: n, updatedAt });
+  const none: WorkspaceWorlds = { kind: "none" };
+  const one: WorkspaceWorlds = { kind: "one", world: world(2) };
+  const three: WorkspaceWorlds = { kind: "several", worlds: [world(1), world(2), world(3)] };
+  const failed: WorkspaceWorlds = { kind: "failed", code: null, status: 503 };
+
+  it("with no open World, the tag and the facts follow the listing", () => {
+    expect(homeWorldScreenStatus(null, "returning", none)).toEqual({ tone: "waiting", label: "No active World" });
+    expect(homeWorldScreenStatus(null, "returning", one)).toEqual({ tone: "ok", label: "World v2 active" });
+    expect(homeWorldScreenStatus(null, "returning", three)).toEqual({ tone: "ok", label: "3 active Worlds" });
+    expect(homeWorldFact(null, none)).toBe("No active World");
+    expect(homeWorldFact(null, one)).toBe(`World v2 active (${collectionId(2).slice(0, 19)}…)`);
+    expect(homeWorldFact(null, three)).toContain("3 active Worlds");
+    expect(homeWorldFact(null, three)).toContain("Ask asks you to choose");
+    expect(homeWorldFact(null, three)).toContain(collectionId(1).slice(0, 19));
+  });
+
+  it("a listing that has not answered, or failed, never says 'No active World'", () => {
+    for (const worlds of ["checking", failed] as const) {
+      expect(homeWorldScreenStatus(null, "returning", worlds).label, String(worlds)).not.toBe("No active World");
+      expect(homeWorldFact(null, worlds), String(worlds)).not.toBe("No active World");
+    }
+    expect(homeWorldScreenStatus(null, "returning", "checking").label).toBe("Checking Worlds…");
+    expect(homeWorldScreenStatus(null, "returning", failed).label).toBe("Worlds not checked");
+    expect(homeWorldFact(null, "checking")).toBe("Checking Worlds…");
+    expect(homeWorldFact(null, failed)).toBe("Worlds not checked");
+  });
+
+  it("an open World keeps its own revision, and says how many the workspace has when that is several", () => {
+    expect(homeWorldScreenStatus(3, "returning", none)).toEqual({ tone: "ok", label: "World v3 active" });
+    expect(homeWorldFact(3, one)).toBe("World v3 active");
+    expect(homeWorldFact(3, three)).toBe("World v3 active here · 3 Worlds active in this workspace");
+    expect(homeWorldFact(3, "checking")).toBe("World v3 active");
+    expect(() => homeWorldFact(0, three)).toThrow("screen_status_revision_invalid");
+  });
+
+  it("without a listing the single-collection words are unchanged, and loading/unavailable still make no claim", () => {
+    expect(homeWorldFact(null)).toBe("No active World");
+    expect(homeWorldFact(5)).toBe("World v5 active");
+    expect(homeWorldScreenStatus(null, "loading", three)).toEqual({ tone: "waiting", label: "Checking World…" });
+    expect(homeWorldScreenStatus(null, "unavailable", none)).toEqual({ tone: "waiting", label: "World not checked" });
+  });
+
+  it("the real shell draws the listing's answer in the Home tag", () => {
+    const props = (activeWorlds: WorkspaceWorlds): Parameters<typeof WorkspaceUltimateShell>[0] => ({
+      surface: "home", headerAction: null, activeRevision: null, stateMode: "returning", candidateReady: false, reviewCount: null, activityCount: 0,
+      stateTitle: "2 sources are ready to compile.", stateDescription: "x", stateHero: true, nextAction: { label: "Choose" }, activeWorlds,
+      onNavigate: () => undefined, onUpload: () => undefined, onRefresh: () => undefined, onSignOut: () => undefined, children: null,
+    });
+    expect(renderToStaticMarkup(createElement(WorkspaceUltimateShell, props(three)))).toContain("3 active Worlds");
+    expect(renderToStaticMarkup(createElement(WorkspaceUltimateShell, props(three)))).not.toContain("No active World");
+    expect(renderToStaticMarkup(createElement(WorkspaceUltimateShell, props(none)))).toContain("No active World");
+  });
+
+  it("the page reads the listing for Home and hands it to the facts line and the shell", () => {
+    const page = read("app/workspace/page.tsx");
+    expect(page).toContain("homeWorldFact(activeWorld?.revision ?? null, workspaceWorlds)");
+    expect(page).toContain("activeWorlds={workspaceWorlds}");
+    expect(page).toContain("setWorkspaceWorlds(found)");
+  });
+});
+
+describe("the review tags say when the evidence is not loaded instead of counting zero (WO-WS-6, F2)", () => {
+  it("evidence: a read that has not answered is neither 0 nor a count", () => {
+    expect(evidenceScreenStatus(0, "loading")).toEqual({ tone: "waiting", label: "Loading evidence…" });
+    expect(evidenceScreenStatus(0, "unavailable")).toEqual({ tone: "waiting", label: "Evidence not loaded" });
+    expect(evidenceScreenStatus(7, "unavailable")).toEqual({ tone: "waiting", label: "Evidence not loaded" });
+    expect(evidenceScreenStatus(0, "ready")).toEqual({ tone: "waiting", label: "0 evidence records" });
+    expect(evidenceScreenStatus(2)).toEqual({ tone: "ok", label: "2 evidence records" });
+    expect(() => evidenceScreenStatus(-1, "ready")).toThrow("screen_status_count_invalid:evidence");
+  });
+
+  it("review: 0 recorded reasons beside evidence that is not loaded is not drawn as all clear", () => {
+    expect(reviewScreenStatus(0, true, "ready")).toEqual({ tone: "ok", label: "0 reasons to review" });
+    expect(reviewScreenStatus(0, true, "unavailable")).toEqual({ tone: "waiting", label: "0 reasons to review · evidence not loaded" });
+    expect(reviewScreenStatus(2, true, "loading")).toEqual({ tone: "waiting", label: "2 reasons to review · evidence loading" });
+    // No candidate: there is no evidence to be missing.
+    expect(reviewScreenStatus(0, false, "unavailable")).toEqual({ tone: "waiting", label: "0 reasons to review" });
+  });
+
+  it("the page hands both tags the same evidence read the review queue is built from", () => {
+    const page = read("app/workspace/page.tsx");
+    expect(page).toContain("reviewScreenStatus(reviewCount, Boolean(collectionResult), evidenceRead)");
+    expect(page).toContain("evidenceScreenStatus(worldReadModel?.evidence.length ?? 0, evidenceRead)");
+    expect(page).toContain("    evidenceRead,\n");
+  });
+
+  it("the compile's counters name what they count: relations are edges, not a verified evidence binding", () => {
+    expect(read("app/workspace/page.tsx")).not.toContain("evidence-bound relations");
   });
 });
