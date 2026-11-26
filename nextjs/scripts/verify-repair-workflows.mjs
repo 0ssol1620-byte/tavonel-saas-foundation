@@ -270,7 +270,7 @@ assert(dbRehearsal.includes("if: always() && steps.completed-read-draft.outputs.
 assert(planner.includes("COMPLETED_READ_PRODUCER_PREDECESSOR_SHA = '3a5be63e0901f9f1972f6793cac7891bf064af9e'") && planner.includes('COMPLETED_READ_PRODUCER_BLOBS = Object.freeze(') && planner.includes('verifyCompletedReadProducerScopeEvidence'), 'producer must bind all fifteen exact draft source files');
 assert(planner.includes('completedReadProducerVerification?.eligible && Object.hasOwn(COMPLETED_READ_PRODUCER_BLOBS, path)'), 'OCR safety overrides may require only complete producer evidence');
 for (const path of ['lib/api-error-codes.test.ts', 'lib/settle-route.test.ts', 'lib/completed-read-proof.test.ts']) assert(planner.includes(`'${path}'`), 'producer must select genuine Vitest tests: ' + path);
-assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'public/developer/channel-install.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
+assert(globalVitest.includes('lib/**/*.test.ts') && runner.includes("const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'public/developer/channel-install.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/agent-u37-db.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'])"), 'catalogue full-corpus scans, settle route and helper must remain on Vitest discovery, never Node placeholders');
 assert((repair.match(/npm ci --ignore-scripts --no-audit --no-fund/g) ?? []).length === 1 && repair.includes('CDR_WORKER_RESULT: ${{ steps.cdr-worker.outcome }}'), 'producer must reuse one normal worker install/test/types step and its strict actual-outcome gate');
 assert(intakeStage > asyncStage, 'intake triage draft must stage only after ACL and async authority');
 assert(dbRehearsal.includes('supabase/drafts/migrations/20261004120000_foundation_intake_triage_v3.sql') && dbRehearsal.includes('supabase/drafts/tests/foundation_intake_triage_binding.sql'), 'intake rehearsal must source only the two reviewed drafts');
@@ -1206,7 +1206,18 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     ['acting-workspace', 13, 9, 0, 1], ['member-source-scope', 18, 11, 0, 0], ['connector-provider-qualification', 17, 1, 0, 0],
     ['format-census', 2, 1, 0, 0], ['developer-channel', 4, 3, 0, 0], ['developer-keys-inventory', 1, 1, 0, 0],
     // WO-TRAIN-2: codex/v34-an-8 merged (9a258268), so its pending owner is a program owner now; its suite imports both routes at head.
-    ['agent-audit-routes', 2, 2, 0, 0]];
+    ['agent-audit-routes', 2, 2, 0, 0],
+    // Train 2026-11-26 (WO-TRAIN-5): nine owners for the paths the train's later lanes added (WO-ASK-0, WO-WS-1/2/4, WO-KS-2/3, WO-BIG-2, WO-RTR-1/2,
+    // WO-C-T2, WO-AN-9, the compile stage line); WO-WS-1's spec is a Product QA claim at 1440, the U37 DB-clock suite a registered Node suite.
+    ['ask-verbatim-windows', 6, 11, 0, 0],
+    ['workspace-active-world', 3, 2, 0, 1],
+    ['workspace-product-frame', 5, 2, 2, 0],
+    ['compile-source-stages', 3, 1, 0, 0],
+    ['knowledge-steward-patch', 5, 5, 0, 0],
+    ['global-collection-compile', 2, 1, 0, 0],
+    ['router-shadow', 6, 3, 0, 0],
+    ['workspace-payer-entitlement', 1, 1, 0, 0],
+    ['agent-u37-matrix', 3, 2, 0, 0]];
   // Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8's two routes were pending; WO-TRAIN-2: that lane merged, so none is pending.
   const pendingPins = [];
   // Paths another owner keeps that also select a program owner's suite (round 5: WO-CI-6B's shell suite for the /explore page and stage).
@@ -1216,7 +1227,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
   // Repair runs only part of the file: every planned run of it carries a grep or a grep-invert.
   const repairRunsPart = file => { const runs = planBrowserRuns([file], false); return runs.length > 0 && runs.every(run => run.grep || run.grepInvert); };
   assert(JSON.stringify(Object.keys(V34_PROGRAM_AFFECTED_OWNERS)) === JSON.stringify(pins.map(([group]) => group))
-    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the forty-five reviewed groups and no pending group');
+    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the fifty-four reviewed groups and no pending group');
   for (const [pending, [group, pathCount, unitCount, browserCount, externalCount]] of [...pins.map(pin => [false, pin]), ...pendingPins.map(pin => [true, pin])]) {
     const declared = (pending ? V34_PROGRAM_PENDING_OWNERS : V34_PROGRAM_AFFECTED_OWNERS)[group], owners = AFFECTED_GROUPS.filter(owner => owner.group === group), [owner] = owners;
     const external = Object.keys(owner?.externalChecks ?? {});
@@ -1268,4 +1279,4 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     && planner.includes('name different runners for one external check: ') && planner.includes('externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource)'),
     'page-meter must own the ledger replay without an unrun claim, database-contract must select the five program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
 }
-console.log('V34 program owners: forty-five exact owners (one binding the /explore paths to its checks, the /explore key spec, the one-path spec and the acting-workspace spec verified Product QA claims) and none pending (codex/v34-an-8\'s two routes merged and moved), every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
+console.log('V34 program owners: fifty-four exact owners (one binding the /explore paths to its checks, the /explore key spec, the one-path spec, the acting-workspace spec and the active-World Ask spec verified Product QA claims) and none pending (codex/v34-an-8\'s two routes merged and moved), every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');

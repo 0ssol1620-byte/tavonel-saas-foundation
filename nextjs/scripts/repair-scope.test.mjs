@@ -8393,6 +8393,40 @@ test('affected library-organize-b2 owner: 3 exact paths select 2 direct suites a
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// WO-TRAIN-5: the native office reader, the geometry table reader, the CJK font guard and the vendored Core files they run join the
+// Cloud Run service owner, as exact paths. The owner stays one owner with no executed Repair suite: its qualification is the
+// malware-scan-qualification workflow (pytest tests/ and the image build), deferred as pending debt.
+import { CDR_NATIVE_READER_AFFECTED_PATHS } from './repair-scope.mjs';
+test('affected CDR native reader paths: 63 exact paths belong to cdr-cloudrun-service alone, and a neighbour stays unmapped', () => {
+  const paths = [...CDR_NATIVE_READER_AFFECTED_PATHS];
+  assert.deepEqual(paths, [...new Set(paths)].sort());
+  assert.deepEqual([paths.length, createHash('sha256').update(paths.join('\n')).digest('hex').slice(0, 16)], [63, 'b89182ba759515d8']);
+  const [owner, ...extra] = AFFECTED_GROUPS.filter(o => o.group === 'cdr-cloudrun-service');
+  assert.equal(extra.length, 0);
+  assert.deepEqual([owner.unitFiles, owner.browserFiles, owner.databaseTests, Boolean(owner.worker), Boolean(owner.selector), Boolean(owner.database), Boolean(owner.requireExecutedCheck)], [[], [], [], false, false, false, false]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['cdr-cloudrun-service'], path);
+    assert.ok(existsSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', path)), `${path} is absent at head`);
+  }
+  // The manifest-pinned Core copy: every vendored module and the manifest itself, nothing else.
+  assert.equal(paths.filter(path => path.includes('/vendor/')).length, 49);
+  const map = affectedMap(paths.map(path => affectedRecord('M', [path])));
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.unitFiles, map.browserFiles, map.databaseTests], [[], [], ['cdr-cloudrun-service'], [], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.ok(plan.deferredGroups.includes('cdr-cloudrun-service') && plan.pendingDebt.includes('cdr-cloudrun-service'));
+  for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/new_module.py', 'quarantine-sidecar/cdr-cloudrun/native_reader_v2.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_geometry_v2.py', 'shared/nativeReadContract.js']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// WO-TRAIN-5: the U37 DB-clock suite is a registered Node suite: the Repair runner takes it, and the owner selects both its suites.
+test('affected agent-u37-matrix owner: its Node suite is registered in the Repair runner and the owner selects both its suites', () => {
+  const owner = V34_PROGRAM_AFFECTED_OWNERS['agent-u37-matrix'];
+  assert.deepEqual([...owner.unitFiles], ['lib/agent-proposals-u37.test.ts', 'scripts/db/agent-u37-db.test.mjs']);
+  const runner = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'run-repair-check.mjs'), 'utf8');
+  assert.ok(runner.includes("'scripts/db/agent-u37-db.test.mjs'"), 'the runner must register the suite');
+});
 // W2-D intake stage 1 + table product-DPI harness (codex/w2-d-20261108): one finite owner, restated independently.
 import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites and no browser suite; neighbours keep their owners', () => {
@@ -8594,6 +8628,16 @@ const V34_OWNER_PINS = Object.freeze([
   ['developer-keys-inventory', 1, 'ff744f408484c885', 1, 'ff744f408484c885', [], {}],
   // WO-TRAIN-2: codex/v34-an-8 merged; its pending owner is a program owner now.
   ['agent-audit-routes', 2, 'b5d75d4e64f713f1', 2, '29971313f2d3e397', [], {}],
+  // WO-TRAIN-5: nine owners for the paths the train's later lanes added; the active-World Ask spec is Product QA's claim at 1440.
+  ['ask-verbatim-windows', 6, 'd749e8a356076f00', 11, '586300e12b44a339', [], {}],
+  ['workspace-active-world', 3, '0100582fc90a9d9e', 2, '8175b5631f96fff8', [], { 'e2e/workspace-ask-active-world.spec.ts': v34ProductQa('1440') }],
+  ['workspace-product-frame', 5, 'cc0483ce4041a85a', 2, '7c71ecdbeea3234a', ['e2e/workspace-intake-layout.spec.ts', 'e2e/world-lifecycle.spec.ts'], {}],
+  ['compile-source-stages', 3, 'bc386d90f7452d1b', 1, '55811b7cc38fcba2', [], {}],
+  ['knowledge-steward-patch', 5, 'a443daa6a639c031', 5, '861d433bcec282a1', [], {}],
+  ['global-collection-compile', 2, '0e20772dabd0e2bb', 1, '70e2a40866673d99', [], {}],
+  ['router-shadow', 6, '04047a0f3e9e6c00', 3, '34ce1c2f3d70e5dd', [], {}],
+  ['workspace-payer-entitlement', 1, 'fa1ec06bdaef5790', 1, 'fa1ec06bdaef5790', [], {}],
+  ['agent-u37-matrix', 3, '1f8805f3cee8877d', 2, 'f01b1f3aeedd2c5f', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8739,7 +8783,7 @@ test('affected v34 program owners: the whole program delta maps with no failure,
     'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/login-capability.spec.ts',
     'e2e/marketing-story.spec.ts', 'e2e/mobile-landing.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/recipe-continuation.spec.ts',
     'e2e/resources-filter.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/v34-matrix.spec.ts',
-    'e2e/v34-support.selftest.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
+    'e2e/v34-support.selftest.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-layout.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts', 'e2e/world-lifecycle.spec.ts']);
   for (const file of DB_HARNESS_SUITES) assert.ok(map.unitFiles.includes(file), file);
   assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
   const plan = affectedAskPlan(map);
