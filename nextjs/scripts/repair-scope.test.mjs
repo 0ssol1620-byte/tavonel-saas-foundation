@@ -8736,7 +8736,7 @@ test('affected v34 external claims: each holds at head, and a claim on a runner 
   assert.match(refused(paddle, V34_CI_VITEST, swap('nextjs/vitest.config.ts', '"scripts/billing/*.test.mjs"', '"scripts/billing/*.test.ts"')), /Vitest include does not admit it/);
   assert.match(refused(paddle, V34_CI_VITEST, swap('nextjs/package.json', '"test": "vitest run && pnpm test:scripts"', '"test": "vitest run lib && pnpm test:scripts"')), /bare `vitest run`/);
   assert.match(refused(paddle, { ...V34_CI_VITEST, job: 'root' }), /conditional or does not run in nextjs/);
-  assert.match(refused(paddle, { ...V34_CI_VITEST, run: 'pnpm check' }), /a Vitest claim must name the step `pnpm test`/);
+  assert.match(refused(paddle, { ...V34_CI_VITEST, run: 'pnpm install --frozen-lockfile' }), /a Vitest claim must name the step `pnpm test`/);
   assert.match(refused(paddle, { ...V34_CI_VITEST, run: 'pnpm vitest run' }), /no single unconditional step/);
 });
 test('affected v34 external claims: fuzzed claims and mutated workflow text never throw, and are held only while the exact step survives', () => {
@@ -8862,10 +8862,10 @@ test('affected v34 external claims: filters, rebinding and unreadable config are
     [lens, swap(launch, step, step + '        working-directory: .\n'), /sets its own directory, shell or environment/],
     [lens, swap(launch, step, step + '        env:\n          PWTEST_SKIP_TEST_OUTPUT: "1"\n'), /sets its own directory, shell or environment/],
     [lens, swap(launch, step, step + '        shell: sh\n'), /sets its own directory, shell or environment/],
-    [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs: [preflight, never]\n'), /needs never, which is absent or conditional/],
+    [lens, swap(launch, '  product-qa:\n    name: Product QA (widths + reduced motion + audit)\n', '  product-qa:\n    needs: [preflight, never]\n    name: Product QA (widths + reduced motion + audit)\n'), /needs never, which is absent or conditional/],
     // Round 6: a block list is read as the list it is (the grammar reads it whole), so an absent job in it refuses like one inline.
-    [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs:\n      - preflight\n      - never\n'), /needs never, which is absent or conditional/],
-    [lens, swap(launch, '  product-qa:\n    needs: preflight\n', '  product-qa:\n    needs: [preflight, "a b"]\n'), /a needs list this check cannot read/],
+    [lens, swap(launch, '  product-qa:\n    name: Product QA (widths + reduced motion + audit)\n', '  product-qa:\n    needs:\n      - preflight\n      - never\n    name: Product QA (widths + reduced motion + audit)\n'), /needs never, which is absent or conditional/],
+    [lens, swap(launch, '  product-qa:\n    name: Product QA (widths + reduced motion + audit)\n', '  product-qa:\n    needs: [preflight, "a b"]\n    name: Product QA (widths + reduced motion + audit)\n'), /a needs list this check cannot read/],
     [lens, swap(config, 'testIgnore: [/launch-qa.*\\.spec\\.ts/, auditSpecs, v34Specs],', 'testIgnore: [/launch-qa.*\\.spec\\.ts/, auditSpecs, v34Specs], grepInvert: /./,'), /filters tests by grep or shard/],
     [lens, swap(config, '  retries: 1,\n', '  retries: 1,\n  grep: /nothing/,\n'), /filters tests by grep or shard/],
     [lens, swap(config, '  retries: 1,\n', '  retries: 1,\n  shard: { total: 2, current: 1 },\n'), /filters tests by grep or shard/],
