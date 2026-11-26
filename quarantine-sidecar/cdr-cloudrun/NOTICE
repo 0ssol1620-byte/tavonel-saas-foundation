@@ -42,6 +42,7 @@ Base image and system packages
 | python:3.13-slim-bookworm         | sha256:b6bd71b0dd3811ddbcbc523ec2965fd1e1bcfdf7a20ab24679273d3bee726129 | Python-2.0 (CPython) over Debian bookworm; per-package licences in /usr/share/doc/*/copyright |
 | libreoffice-writer/-calc/-impress | Debian bookworm                                  | MPL-2.0 (LibreOffice), plus bundled components |
 | fonts-dejavu-core                 | Debian bookworm                                  | Bitstream Vera Fonts Licence                |
+| fonts-noto-cjk                    | Debian bookworm                                  | SIL Open Font License 1.1 (/usr/share/doc/fonts-noto-cjk/copyright) |
 | fontconfig, ca-certificates, tini | Debian bookworm                                  | MIT (tini); fontconfig licence; MPL-2.0 (ca-certificates / Mozilla CA bundle) |
 
 LibreOffice runs as a separate `soffice` process invoked over argv; no LibreOffice code is

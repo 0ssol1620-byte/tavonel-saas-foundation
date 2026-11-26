@@ -11,11 +11,20 @@ RUN apt-get update \
        ca-certificates \
        fontconfig \
        fonts-dejavu-core \
+       fonts-noto-cjk \
        libreoffice-calc \
        libreoffice-impress \
        libreoffice-writer \
        tini \
     && rm -rf /var/lib/apt/lists/*
+
+# WO-KO-1: without a CJK face LibreOffice renders Hangul, Kana and Han as missing-glyph boxes, so a
+# Korean/Japanese/Chinese Office source reaches OCR as boxes. fonts-noto-cjk is SIL OFL 1.1. The
+# build fails here, not in production, if the image has no face for any of the three scripts.
+RUN fc-cache -f \
+    && fc-list :lang=ko | grep -q . \
+    && fc-list :lang=ja | grep -q . \
+    && fc-list :lang=zh | grep -q .
 
 RUN useradd --system --uid 10001 --create-home --home-dir /home/cdr cdr
 WORKDIR /app
