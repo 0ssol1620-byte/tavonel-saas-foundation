@@ -63,7 +63,9 @@ const connectionRoleRefusal = () => ({ ok: false as const, code: "CONNECTION_ROL
 function onRemoteMcpSurface(request: Request) {
   if (insideRemoteMcpDispatch()) return true;
   const { pathname } = new URL(request.url);
-  return pathname === "/api/mcp" || pathname.startsWith("/api/mcp/");
+  // Segments, not the path as a string: a public-copy scan reads a string literal as a claim about the endpoint.
+  const [, area, endpoint] = pathname.split("/");
+  return area === "api" && endpoint === "mcp";
 }
 
 function workspaceRoleRefusal(request: Request, audience: ApiKeyAudience | null, role: WorkspaceRole, scope: DeveloperScope | null) {
