@@ -5,11 +5,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
   the same batch, and the workspace stayed on "Structuring what was read." It also ran compile
   turns in-process, so a 60 s stream took the Core lease and died with it. This route reads.
 */
-const { authorize, readJob, readEvents } = vi.hoisted(() => ({
+const { authorize, readJob, readEvents, signer, listObjects } = vi.hoisted(() => ({
   authorize: vi.fn(),
   readJob: vi.fn(),
   readEvents: vi.fn(),
+  signer: vi.fn(),
+  listObjects: vi.fn(),
 }));
+vi.mock("@/lib/r2-synthetic-canary", () => ({ readR2SignerEnv: signer }));
+vi.mock("@/lib/r2-objects", () => ({ listImmutableWorkspaceObjects: listObjects }));
 
 vi.mock("@/lib/developer-auth", () => ({ authorizeFoundationRequest: authorize }));
 vi.mock("@/lib/compile-job-store", () => ({
@@ -33,6 +37,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authorize.mockResolvedValue({ ok: true, principal: { workspaceKey: "pilot", workspaceRole: "owner" } });
   readJob.mockResolvedValue({ ok: true, value: { jobId: JOB, state: "structuring" } });
+  signer.mockReturnValue(null);
 });
 
 describe("GET /api/compile-jobs/{jobId}/events", () => {
@@ -49,5 +54,59 @@ describe("GET /api/compile-jobs/{jobId}/events", () => {
     expect(body).toContain('event: done\ndata: {"settled":true,"cursor":158}');
     expect(readEvents).toHaveBeenCalledOnce();
     expect(turn).not.toHaveBeenCalled();
+  });
+
+  describe("sources frame (stage per source, read-only)", () => {
+    const VERSION = "a".repeat(32);
+    const key = (doc: string, name: string) => `immutable/pilot/pilot/${doc}/${VERSION}/${name}`;
+    const open = () => {
+      readJob.mockResolvedValue({ ok: true, value: { jobId: JOB, state: "reading", documentIds: ["doc_a", "doc_b"], blocked: [] } });
+      // First read: nothing new. Second: the job settles, so the stream ends and the test is not slow.
+      readEvents.mockResolvedValueOnce({ ok: true, value: [] })
+        .mockResolvedValue({ ok: true, value: [event(200, "failed")] });
+    };
+    const get = () => GET(new Request(`https://tavonel.test/api/compile-jobs/${JOB}/events?after=199`), { params: Promise.resolve({ jobId: JOB }) });
+
+    it("sends the stage of each source without an id, so the replay cursor does not move", async () => {
+      open();
+      signer.mockReturnValue({ bucket: "tavonel-saas-foundation-quarantine" });
+      listObjects.mockResolvedValue({ ok: true, objects: [
+        { key: key("doc_a", "sanitized.pdf"), size: 10, lastModified: new Date().toISOString() },
+        { key: key("doc_a", "cdr-receipt.json"), size: 10 },
+      ] });
+      const body = await (await get()).text();
+      const frame = body.split("\n\n").find((part) => part.startsWith("event: sources"));
+      expect(frame).toBeDefined();
+      expect(frame).not.toContain("id:");
+      const payload = JSON.parse(frame!.split("data: ")[1]);
+      expect(payload.stages).toEqual([{ documentId: "doc_a", stage: "waking" }, { documentId: "doc_b", stage: "queued" }]);
+      expect(body).toContain("id: 200\nevent: failed\n");
+      expect(listObjects).toHaveBeenCalledWith({ bucket: "tavonel-saas-foundation-quarantine" }, "pilot");
+      expect(turn).not.toHaveBeenCalled();
+    });
+
+    it("stays silent, and still streams the durable events, when the bucket cannot be read", async () => {
+      open();
+      signer.mockReturnValue({ bucket: "tavonel-saas-foundation-quarantine" });
+      for (const failure of [() => ({ ok: false, code: "LIST_FAILED" }), () => { throw new Error("r2 down"); }]) {
+        readEvents.mockReset();
+        open();
+        listObjects.mockReset();
+        listObjects.mockImplementation(async () => failure());
+        const response = await get();
+        const body = await response.text();
+        expect(response.status).toBe(200);
+        expect(body).not.toContain("event: sources");
+        expect(body).toContain("id: 200\nevent: failed\n");
+      }
+    });
+
+    it("does not look at storage for a job that has already settled", async () => {
+      readJob.mockResolvedValue({ ok: true, value: { jobId: JOB, state: "ready", documentIds: ["doc_a"], blocked: [] } });
+      readEvents.mockResolvedValue({ ok: true, value: [event(300, "ready")] });
+      signer.mockReturnValue({ bucket: "tavonel-saas-foundation-quarantine" });
+      await (await get()).text();
+      expect(listObjects).not.toHaveBeenCalled();
+    });
   });
 });

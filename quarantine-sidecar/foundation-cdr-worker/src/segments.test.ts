@@ -276,7 +276,7 @@ describe("segmented sources", () => {
     assert.deepEqual(queue.sent, [{ object: { key: SOURCE_KEY } }], "continued as a new message with the same body");
 
     // The continuation: its range meets a cold reader. It is deferred, not recorded.
-    assert.deepEqual(await deliver(env, chain.fetch, 1), { acks: 0, retries: 1, delays: [60] });
+    assert.deepEqual(await deliver(env, chain.fetch, 1), { acks: 0, retries: 1, delays: [15] });
     assert.deepEqual(r2.keys(SEGMENTS).filter((key) => key.endsWith("/ocr-review.json")), []);
     assert.equal(chain.settlements.length, 0);
 
