@@ -70,20 +70,27 @@ def synthetic_docx() -> bytes:
 
 class DockerfileInstallsCjkFontsTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.text = DOCKERFILE.read_text(encoding="utf-8")
+        # Docker drops comment lines before it reads an instruction, so the tests do too.
+        lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
+        self.text = "\n".join(line for line in lines if not line.lstrip().startswith("#"))
 
     def test_installs_the_noto_cjk_package_with_the_office_packages(self) -> None:
         install = re.search(r"apt-get install.*?rm -rf /var/lib/apt/lists", self.text, re.DOTALL)
         self.assertIsNotNone(install)
         block = install.group(0) if install else ""
-        self.assertRegex(block, r"(?m)^\s*fonts-noto-cjk\b")
+        # The whole package name: `fonts-noto-cjk-extra` is a different package.
+        self.assertRegex(block, r"(?m)^\s*fonts-noto-cjk(?![\w-])")
         self.assertIn("libreoffice-writer", block)
 
     def test_build_fails_when_a_script_has_no_face(self) -> None:
+        guard = re.search(r"(?m)^RUN fc-cache -f\b(?:.*\\\n)*.*", self.text)
+        self.assertIsNotNone(guard, "the font guard must be one RUN that starts with fc-cache")
+        block = guard.group(0) if guard else ""
         for lang in ("ko", "ja", "zh"):
             with self.subTest(lang=lang):
-                self.assertRegex(self.text, rf"fc-list :lang={lang} \| grep -q \.")
-        self.assertRegex(self.text, r"RUN fc-cache -f\b")
+                self.assertRegex(block, rf"&& fc-list :lang={lang} \| grep -q \.")
+        # A guard that cannot fail the build is no guard.
+        self.assertNotRegex(block, r"\|\|")
 
 
 @unittest.skipUnless(SOFFICE, "requires LibreOffice (soffice); it ships in the CDR service image only")
