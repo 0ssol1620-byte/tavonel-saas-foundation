@@ -26,7 +26,7 @@
 --
 -- Recording it: this file does not edit supabase_migrations.schema_migrations. After it commits, the
 -- operator runs
---   delete from supabase_migrations.schema_migrations where version = '20261123120000';
+--   delete from supabase_migrations.schema_migrations where name = 'workspace_payer_for_members';
 -- in the same session, and writes the version, the time, the md5s above and who ran it into the
 -- campaign ledger.
 \set ON_ERROR_STOP on
