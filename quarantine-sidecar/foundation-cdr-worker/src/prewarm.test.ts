@@ -27,7 +27,7 @@ describe("prewarm", () => {
     for (const value of [undefined, "", "0", "true", "yes", " 1", "1 ", "01"]) {
       const { calls, fetcher } = recorder();
       await prewarmServices({ ...ON, TAVONEL_CDR_PREWARM: value }, KEY, fetcher);
-      assert.deepEqual(calls, [], `flag ${JSON.stringify(value)} stays off`);
+      assert.equal(calls.length, 0, `flag ${JSON.stringify(value)} stays off`);
     }
     assert.deepEqual({ ...prewarmCounts }, { fired: 0, answered: 0, failed: 0, throttled: 0 });
   });
@@ -75,7 +75,7 @@ describe("prewarm", () => {
   it("ignores a key that is not a customer source, and skips an unset OCR URL", async () => {
     const { calls, fetcher } = recorder();
     await prewarmServices(ON, "something/else", fetcher);
-    assert.deepEqual(calls, []);
+    assert.equal(calls.length, 0);
     await prewarmServices({ ...ON, FOUNDATION_OCR_URL: undefined }, KEY, fetcher);
     assert.deepEqual(calls.map(c => c.url), [HEALTH]);
   });
@@ -97,7 +97,7 @@ describe("prewarm", () => {
       ack: () => acks.push(attempts), retry: () => retries.push(attempts) });
     // A non-source key is acknowledged before any warm-up: nothing is sent for it.
     await handleQueue({ messages: [message(1)] } as never, ON as never, fetcher, p => pending.push(p));
-    assert.deepEqual(seen, []);
+    assert.equal(seen.length, 0);
     assert.deepEqual(acks, [1]);
 
     // A real source key: the handler returns while the warm-up is still blocked.
