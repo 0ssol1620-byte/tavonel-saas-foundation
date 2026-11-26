@@ -56,6 +56,9 @@ export const remoteMcpRefreshEnabled = (env: Readonly<Record<string, string | un
 /** The most rows one remote MCP key read returns. A read that matches more fails closed, never silently short. */
 const REMOTE_MCP_READ_LIMIT = 200;
 
+/** The most keys of each kind the Developers inventory lists; more is reported as `truncated`, never cut silently. */
+export const DEVELOPER_INVENTORY_LIMIT = 100;
+
 export type DeveloperApiKey = {
   keyId: string;
   name: string;
@@ -152,6 +155,11 @@ async function insertAudit(workspaceKey: string, action: string, targetId: strin
  * within the refresh TTL, expired included, because an expired key still refreshes until revoked;
  * that includes keys minted before the flag was turned on, which carry no refresh token (DN-7
  * decides whether to drop them). Every key either list shows is revocable from it.
+ *
+ * Each list stops at DEVELOPER_INVENTORY_LIMIT, and `truncated` says when more rows matched (DN-7
+ * precondition 2): the total comes from the same statement as the rows (`Prefer: count=exact`). A full
+ * page whose total is missing or below the rows it holds is DEVELOPER_STORE_BINDING_INVALID, never
+ * presented as complete. A short page is complete by `limit` alone, so it needs no total.
  */
 export async function listDeveloperApiKeys(workspaceKey: string) {
   const config = readSupabaseAdminConfig();
@@ -162,12 +170,19 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
       workspace_key: `eq.${workspaceKey}`,
       ...filters,
       order: "created_at.desc",
-      limit: "100",
+      limit: String(DEVELOPER_INVENTORY_LIMIT),
     });
-    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`);
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_api_keys?${query}`, { headers: { Prefer: "count=exact" } });
     if (!response.ok) return null;
-    const parsed = ((await response.json()) as Array<Record<string, unknown>>).map(parseApiKey);
-    return parsed.some((key) => key === null) ? undefined : parsed as DeveloperApiKey[];
+    const rows = await response.json() as unknown;
+    if (!Array.isArray(rows) || rows.length > DEVELOPER_INVENTORY_LIMIT) return undefined;
+    const parsed = (rows as Array<Record<string, unknown>>).map(parseApiKey);
+    if (parsed.some((key) => key === null)) return undefined;
+    // PostgREST answers "0-99/250", or "*/0" for no rows; the number after the slash is every row that matched.
+    const total = /^(?:\d+-\d+|\*)\/(\d{1,9})$/.exec(response.headers.get("content-range") ?? "")?.[1];
+    if (total !== undefined && Number(total) < parsed.length) return undefined;
+    if (total === undefined && parsed.length === DEVELOPER_INVENTORY_LIMIT) return undefined;
+    return { keys: parsed as DeveloperApiKey[], truncated: total !== undefined && Number(total) > parsed.length };
   };
   try {
     const [manual, remote] = await Promise.all([
@@ -178,7 +193,7 @@ export async function listDeveloperApiKeys(workspaceKey: string) {
     ]);
     if (manual === null || remote === null) return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
     if (manual === undefined || remote === undefined) return { ok: false as const, code: "DEVELOPER_STORE_BINDING_INVALID" };
-    return { ok: true as const, keys: manual, remoteMcpKeys: remote };
+    return { ok: true as const, keys: manual.keys, remoteMcpKeys: remote.keys, truncated: { keys: manual.truncated, remoteMcpKeys: remote.truncated } };
   } catch {
     return { ok: false as const, code: "DEVELOPER_STORE_READ_FAILED" };
   }

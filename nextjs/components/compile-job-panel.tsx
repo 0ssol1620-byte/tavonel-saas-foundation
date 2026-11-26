@@ -3,6 +3,7 @@
 import type { BlockerResolution, CompileBlocker, CompileState } from "@/lib/compile-job-store";
 import type { CorpusProgress } from "@/lib/corpus-batching";
 import type { CompileSizeLimit } from "@/lib/compile-job-client";
+import { CompileSourceStages } from "@/components/compile-source-stages";
 import { blockedPanelCopy, failureSentence, isSizeLimitFailure, REUPLOAD_ONLY_BLOCKER_REASONS, sizeLimitFailureCopy, type PageLocale } from "@/lib/workspace-failure-copy";
 
 /*
@@ -169,6 +170,7 @@ export function CompileJobPanel({
         </>
       ) : null}
       <p className="fine">{job.documentsReady} of {job.documentsTotal} read</p>
+      <CompileSourceStages jobId={job.jobId} state={job.state} names={names} blockedIds={job.blocked.map((entry) => entry.documentId)} />
       {job.errorCode && isSizeLimitFailure(job.errorCode) ? (
         /*
           A size refusal is deterministic: the generic "our servers could not complete this" line

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { resolveActingWorkspace, revalidateActingWorkspace } from "@/lib/acting-workspace";
+import { getRequestUser } from "@/lib/foundation-pilot";
 import { DOCUMENT_ID_PATTERN, groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { presignWorkspaceProgressGet } from "@/lib/r2-presign";
 import { listImmutableWorkspaceObjects } from "@/lib/r2-objects";
@@ -35,8 +36,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!DOCUMENT_ID_PATTERN.test(id)) {
     return NextResponse.json({ code: "UNQUALIFIED_DOCUMENT" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  const access = await resolveActingWorkspace(request, user);
+  if (!access.ok) return NextResponse.json({ code: access.code }, { status: access.status, headers: { "Cache-Control": "no-store" } });
   const { membership } = access;
   const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
   if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: { "Cache-Control": "no-store" } });
@@ -68,6 +69,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const currentUser = await getRequestUser(request);
   if (!currentUser || currentUser.id !== user.id) {
     return NextResponse.json({ code: "AUTH_REQUIRED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  }
+  const currentWorkspace = await revalidateActingWorkspace(request, currentUser, membership);
+  if (!currentWorkspace.ok) {
+    return NextResponse.json({ code: currentWorkspace.code }, { status: currentWorkspace.status, headers: { "Cache-Control": "no-store" } });
   }
   const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "observer");
   if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {

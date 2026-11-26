@@ -116,7 +116,10 @@ function oauthProviderLabel(provider: OAuthProvider) {
   return provider === "google_drive" ? "Google Drive" : provider === "dropbox" ? "Dropbox" : "OneDrive / SharePoint";
 }
 
-export default function ConnectionsPanel() {
+/** The page's in-page confirmation (WO-WS-1), so a revoke never opens a native browser dialog. */
+type ConfirmInPage = (message: string, confirmLabel: string) => Promise<boolean>;
+
+export default function ConnectionsPanel({ confirm }: { confirm: ConfirmInPage }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [oauthConnections, setOAuthConnections] = useState<OAuthConnection[] | null>(null);
   const [oauthProviders, setOAuthProviders] = useState<OAuthProviderState[]>([]);
@@ -213,7 +216,7 @@ export default function ConnectionsPanel() {
   };
 
   const revoke = async (connection: Connection) => {
-    if (!window.confirm(`Revoke ${connection.displayName}? Existing immutable documents and worlds are retained.`)) return;
+    if (!(await confirm(`Revoke ${connection.displayName}? Existing immutable documents and worlds are retained.`, "Revoke connection"))) return;
     setBusy(true);
     try {
       const token = await sessionToken();
@@ -269,7 +272,7 @@ export default function ConnectionsPanel() {
   };
 
   const revokeOAuth = async (connection: OAuthConnection) => {
-    if (!window.confirm(`Revoke ${connection.displayName}? Existing immutable documents and worlds are retained.`)) return;
+    if (!(await confirm(`Revoke ${connection.displayName}? Existing immutable documents and worlds are retained.`, "Revoke connection"))) return;
     setBusy(true);
     try {
       const token = await sessionToken();

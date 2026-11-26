@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildContextPacket, type RankedRetrievalUnit } from "./context-packet";
-import { answerFromContextPacket, answerGroundedQuestion, EVIDENCE_EXCEEDS_ANSWER_LIMIT as ANSWER_REASON } from "./grounded-ask";
+import { answerFromContextPacket, answerGroundedQuestion, CITED_EVIDENCE_NOT_IN_PACKET as INTEGRITY_REASON, EVIDENCE_EXCEEDS_ANSWER_LIMIT as ANSWER_REASON } from "./grounded-ask";
 import type { WorldEvidence } from "./world-read-model";
-import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion, type AskCitationSource } from "./workspace-ask-copy";
+import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion, type AskCitationSource } from "./workspace-ask-copy";
 
 const helper = readFileSync(new URL("./workspace-ask-copy.ts", import.meta.url), "utf8");
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8").replaceAll("\r\n", "\n");
@@ -74,18 +74,40 @@ describe("workspace Ask abstention copy", () => {
     }
   });
 
-  it("leaves every other abstention on its existing English copy, in either page language", () => {
-    for (const reason of [null, "NO_REGION_BOUND_EVIDENCE_MATCH", "CITED_EVIDENCE_NOT_IN_PACKET", "every candidate was rejected by the World Gate"])
+  it("leaves every no-match abstention on its existing English copy, in either page language", () => {
+    for (const reason of [null, "NO_REGION_BOUND_EVIDENCE_MATCH", "every candidate was rejected by the World Gate"])
       for (const languages of [undefined, "ko"] as const)
         expect(askAbstentionCopy(reason, languages)).toEqual({ notice: NO_EVIDENCE_NOTICE, result: NO_EVIDENCE_RESULT, action: null });
   });
 
-  it("matches what the fallback builder returns on overflow, citations included", () => {
+  /*
+    WO-ASK-0 ruling 3: no match, an integrity failure and overflow each have their own sentence.
+    The integrity reason is the compiled builder's own constant, so a rename there fails here.
+  */
+  it("says an integrity failure is an integrity failure, never 'no evidence matched', and offers no action", () => {
+    expect(CITED_EVIDENCE_NOT_IN_PACKET).toBe(INTEGRITY_REASON);
+    for (const languages of [undefined, "en", "ko"] as const) {
+      const noMatch = askAbstentionCopy("NO_REGION_BOUND_EVIDENCE_MATCH", languages);
+      const integrity = askAbstentionCopy(INTEGRITY_REASON, languages);
+      const overflow = askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, languages);
+      expect(new Set([noMatch.notice, integrity.notice, overflow.notice]).size).toBe(3);
+      expect(new Set([noMatch.result, integrity.result, overflow.result]).size).toBe(3);
+      expect(integrity.action).toBeNull();
+      for (const text of [integrity.notice, integrity.result]) expect(text).not.toMatch(/no region-bound evidence|matched/i);
+    }
+    expect(askAbstentionCopy(INTEGRITY_REASON).result).toBe("A citation could not be verified against the retrieved evidence, so nothing was returned.");
+    expect(askAbstentionCopy(INTEGRITY_REASON, "ko").result).toContain("검증");
+  });
+
+  it("is no longer what the fallback builder returns for long evidence; the copy stays for remembered replays", () => {
+    // WO-ASK-0: evidence over the envelope now answers with a window, citations included.
     const result = answerGroundedQuestion(overflowingArtifact(), "renewal clause");
-    expect(result).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
+    expect(result).toMatchObject({ status: "grounded", reason: null });
+    expect(result?.answer.startsWith("Renewal clause")).toBe(true);
     expect(result?.citations).toHaveLength(1);
     expect(result?.citations[0]).toMatchObject({ evidenceId: "evidence-a", sourceId: "source-a", pageNumber1: 4 });
-    expect(askAbstentionCopy(result!.reason, "ko").action).toBe("더 좁은 질문하기");
+    // An answer remembered under an idempotency key before the change can still replay the reason.
+    expect(askAbstentionCopy(EVIDENCE_EXCEEDS_ANSWER_LIMIT, "ko").action).toBe("더 좁은 질문하기");
   });
 
   /*
@@ -186,7 +208,8 @@ function compiledOverflow(units: RankedRetrievalUnit[]) {
     question: "renewal clause",
   });
   const answer = answerFromContextPacket(packet, { collectionId: packet.worldId, manifestDigest: packet.worldVersion });
-  expect(answer).toMatchObject({ status: "abstained", answer: "", reason: EVIDENCE_EXCEEDS_ANSWER_LIMIT });
+  // Long evidence used to abstain here; since WO-ASK-0 it answers with windows, citations unchanged.
+  expect(answer).toMatchObject({ status: "grounded", reason: null });
   expect(answer.citations).toHaveLength(units.length);
   return answer;
 }
@@ -245,7 +268,7 @@ describe("resolving a cited source region against the active read model", () => 
 
   it("opens fallback citations, overflow or grounded, and checks the sourceId they carry", () => {
     const overflow = answerGroundedQuestion(overflowingArtifact(), "renewal clause");
-    expect(overflow?.reason).toBe(EVIDENCE_EXCEEDS_ANSWER_LIMIT);
+    expect(overflow?.citations[0]!.window.regionLength).toBeGreaterThan(overflow!.citations[0]!.excerpt.length);
     expect(resolveCitationRegion(overflow!.citations[0]!, [region("evidence-a", "chunk-a")])).toBe("evidence-a:chunk-a");
 
     const grounded = answerGroundedQuestion(groundedArtifact([ROW]), "renewal clause");

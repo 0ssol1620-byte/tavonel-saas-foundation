@@ -102,16 +102,50 @@ export function googleDriveAclMaxAgeSeconds(env: Readonly<Record<string, string 
   return Number.isInteger(seconds) && seconds >= 60 && seconds <= 900 ? seconds : null;
 }
 
+export const VIEWER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const DOCUMENT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+export const scopeInputValid = (workspaceKey: string, userId: string, documentIds: readonly string[]) =>
+  WORKSPACE_ID_PATTERN.test(workspaceKey) && VIEWER_ID.test(userId) && Array.isArray(documentIds) &&
+  documentIds.length <= 2000 && documentIds.every(id => typeof id === "string" && DOCUMENT_ID.test(id));
+
+/**
+ * WO-C-T3: are all of these sources inside the viewer's member scope? Owners and admins: yes. An
+ * active member: only the sources an owner/admin listed (or all), nothing by default. No active
+ * membership: no. Asked of the database on every call -- nothing here is cached, so a narrowed
+ * scope or a revoked member is refused on the next request. Anything but a boolean answer is
+ * UNAVAILABLE, never an admission.
+ */
+export async function checkMemberSourceScope(workspaceKey: string, userId: string, documentIds: readonly string[]): Promise<
+  { ok: true } | { ok: false; code: "MEMBER_SOURCE_SCOPE_DENIED" | "MEMBER_SOURCE_SCOPE_UNAVAILABLE" }
+> {
+  const config = readSupabaseAdminConfig();
+  if (!config || !scopeInputValid(workspaceKey, userId, documentIds)) return { ok: false, code: "MEMBER_SOURCE_SCOPE_UNAVAILABLE" };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/documents_outside_member_scope", {
+      method: "POST", signal: AbortSignal.timeout(10_000),
+      body: JSON.stringify({ p_workspace_key: workspaceKey, p_user_id: userId, p_document_ids: [...new Set(documentIds)] }),
+    });
+    if (!response.ok) return { ok: false, code: "MEMBER_SOURCE_SCOPE_UNAVAILABLE" };
+    const outside: unknown = await response.json();
+    if (outside === false) return { ok: true };
+    return { ok: false, code: outside === true ? "MEMBER_SOURCE_SCOPE_DENIED" : "MEMBER_SOURCE_SCOPE_UNAVAILABLE" };
+  } catch { return { ok: false, code: "MEMBER_SOURCE_SCOPE_UNAVAILABLE" }; }
+}
+
 /** The viewer id must come from an authenticated route principal, never request JSON or JWT metadata. */
 export async function checkConnectorSourceAccessForViewer(
   workspaceKey: string,
   documentIds: string[],
   viewerUserId: string,
 ): Promise<{ ok: true } | { ok: false; code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" | "CONNECTOR_SOURCE_ACCESS_DENIED" }> {
-  if (!WORKSPACE_ID_PATTERN.test(workspaceKey) ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(viewerUserId) ||
-      documentIds.length > 2000 || documentIds.some(id => typeof id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id))) {
+  if (!scopeInputValid(workspaceKey, viewerUserId, documentIds)) {
     return { ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" };
+  }
+  // The member scope first, before every other path including the legacy fallback below. Its
+  // refusal keeps this function's two codes, so every caller's 403/503 mapping holds unchanged.
+  const scope = await checkMemberSourceScope(workspaceKey, viewerUserId, documentIds);
+  if (!scope.ok) {
+    return { ok: false, code: scope.code === "MEMBER_SOURCE_SCOPE_DENIED" ? "CONNECTOR_SOURCE_ACCESS_DENIED" : "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" };
   }
 
   // Until both OAuth routes and this server-owned lookup are explicitly enabled, preserve the

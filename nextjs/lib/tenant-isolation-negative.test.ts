@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authorize.mockResolvedValue({
     ok: true,
-    principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [] },
+    principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [], workspaceRole: "owner" },
   });
   signerEnv.mockReturnValue({ accountId: "acct", accessKeyId: "id", secretAccessKey: "secret", bucket: "b" });
   // What a workspace-scoped store answers for an id it cannot see: absence, with no hint that
@@ -85,6 +85,9 @@ function hostile(path: string) {
         authorization: "Bearer tvnl_live_probe",
         "x-workspace-key": THEIRS,
         "x-tavonel-workspace": THEIRS,
+        // WO-C-T1: the acting-workspace cookie is read only by lib/acting-workspace.ts, inside
+        // authorization; a route handed a principal never reads it itself.
+        cookie: `tavonel_ws=${THEIRS}`,
       },
       body: JSON.stringify({ question: "What changed in the filing?", workspaceKey: THEIRS }),
     },
@@ -94,7 +97,7 @@ function hostile(path: string) {
 function hostileGet(path: string) {
   return new Request(
     `https://tavonel.test${path}?workspaceKey=${THEIRS}&manifest=${"c".repeat(64)}`,
-    { headers: { authorization: "Bearer tvnl_live_probe", "x-workspace-key": THEIRS } },
+    { headers: { authorization: "Bearer tvnl_live_probe", "x-workspace-key": THEIRS, cookie: `tavonel_ws=${THEIRS}` } },
   );
 }
 

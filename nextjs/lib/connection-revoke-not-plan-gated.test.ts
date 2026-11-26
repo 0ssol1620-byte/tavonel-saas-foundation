@@ -135,15 +135,24 @@ describe("the tenant boundary still holds", () => {
     }
   });
 
-  it("refuses an API key issued for another workspace", async () => {
+  // WO-C-T1: a key is no longer refused for naming a workspace other than its creator's derived
+  // one (a member's key is bound to the shared workspace it was made in). The boundary is the
+  // creator's active membership in the key's own workspace, read for that exact workspace.
+  it("refuses an API key issued for a workspace its creator is not an active member of", async () => {
     m.authenticateDeveloperApiKey.mockResolvedValue({ ok: true, principal: {
       kind: "api-key", keyId: "key-2", workspaceKey: OTHER_WORKSPACE, userId: USER, scopes: ["connections:write"], authorizationRevision: 3,
     } });
+    m.getWorkspaceMembership.mockImplementation(async (workspaceKey: string) => (
+      workspaceKey === OTHER_WORKSPACE
+        ? { ok: true, membership: null }
+        : { ok: true, membership: { state: "active", role: "owner", authorizationRevision: 3 } }
+    ));
     const response = await revokeStorageConnection(new Request(`https://tavonel.com/api/connections/${CONNECTION}`, {
       method: "DELETE", headers: { authorization: `Bearer tvnl_live_${"b".repeat(32)}` },
     }), params);
     expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({ code: "PILOT_ACCESS_REQUIRED" });
+    await expect(response.json()).resolves.toEqual({ code: "WORKSPACE_MEMBERSHIP_REQUIRED" });
+    expect(m.getWorkspaceMembership).toHaveBeenCalledWith(OTHER_WORKSPACE, USER);
     expect(m.revokeFoundationConnection).not.toHaveBeenCalled();
   });
 

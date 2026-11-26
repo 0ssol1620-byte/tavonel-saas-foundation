@@ -1,0 +1,25 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0"
+  ],
+  "retrievedAt": "2026-11-18T13:22:05Z",
+  "scenario": "A delta token the service can no longer serve. The page: 'the service returns an HTTP 410 Gone error with an error response containing one of the error codes below, and a Location header containing a new nextLink that starts a fresh delta enumeration from scratch' (resyncChangesApplyDifferences, resyncChangesUploadDifferences).",
+  "assumes": "The code sits in error.code of Graph's standard error body; the page read does not show the 410 body itself.",
+  "request": {
+    "method": "GET",
+    "url": "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHdelta1",
+    "cursor": "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHdelta1"
+  },
+  "status": 410,
+  "headers": {
+    "location": "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHfresh"
+  },
+  "body": {
+    "error": {
+      "code": "resyncChangesApplyDifferences",
+      "message": "Resync required."
+    }
+  }
+}

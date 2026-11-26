@@ -1107,6 +1107,8 @@ describe("exact-duplicate annotation at compile intake", () => {
   const HIDDEN = "0e0e0e0e-0000-4000-8000-00000000000e";
   const VIEWER = { userId: "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a", provenance: "authenticated_request" } as const;
   const rpc = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    // The compiling viewer's member scope holds every source here; the connector ACL is what hides HIDDEN.
+    if (String(url).endsWith("/rpc/documents_outside_member_scope")) return new Response("false", { status: 200 });
     if (String(url).endsWith("/rpc/connector_documents_blocked")) {
       const ids = (JSON.parse(String(init?.body)) as { p_document_ids: string[] }).p_document_ids;
       return new Response(JSON.stringify(ids.includes(HIDDEN)), { status: 200 });

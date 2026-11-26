@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -43,6 +43,7 @@ describe("developer distribution", () => {
       mcp: "tavonel-mcp.mjs",
       consumerContext: "consumer-context.mjs",
       sourceAgent: "tavonel-source-agent.py",
+      sourceAgentService: "tavonel-source-agent.service",
       verifyExport: "tavonel-verify-export.mjs",
       verifyPackage: "tavonel-verify-package.mjs",
       verifyRoundtrip: "tavonel-verify-roundtrip.py",
@@ -64,6 +65,16 @@ describe("developer distribution", () => {
       const digest = `sha256:${createHash("sha256").update(readFileSync(developerAsset(filename))).digest("hex")}`;
       expect(channel.assets[key].sha256).toBe(digest);
     }
+  });
+
+  it("pins every published developer asset to eol=lf, so a CRLF checkout cannot move a pinned digest", () => {
+    const names = readdirSync(developerAsset("")).filter((name) => name !== "channel-install.test.mjs");
+    expect(names).toContain("tavonel-source-agent.service");
+    const out = spawnSync("git", ["check-attr", "eol", "--", ...names.map((name) => `public/developer/${name}`)], { cwd: fileURLToPath(new URL("..", import.meta.url)), encoding: "utf8" });
+    expect(out.status).toBe(0);
+    const lines = out.stdout.trim().split(/\r?\n/);
+    expect(lines).toHaveLength(names.length);
+    for (const line of lines) expect(line, line).toMatch(/: eol: lf$/);
   });
 
   it("completes a real MCP initialize and exposes read-only tools only", () => {

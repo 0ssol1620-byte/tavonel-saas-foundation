@@ -45,6 +45,7 @@ let documents: Map<string, { version: string; addedAt: string }>;
 let tombstoned: Set<string>;
 let refused: string[];
 let stored: string[];
+let quarantineTruncated: boolean;
 let actives: Map<string, { manifestDigest: string; revision: number }>;
 let jobs: Row[];
 let candidates: Map<string, Row[]>;
@@ -108,7 +109,7 @@ vi.mock("@/lib/r2-objects", async (original) => ({
 vi.mock("@/lib/r2-synthetic-canary", async (original) => ({
   ...await original<typeof import("./r2-synthetic-canary")>(),
   readR2SignerEnv: () => ({ bucket: "b" }),
-  listFoundationQuarantineRejects: async () => ({ ok: true, documentIds: refused, storedDocumentIds: stored, truncated: false }),
+  listFoundationQuarantineRejects: async () => ({ ok: true, documentIds: refused, storedDocumentIds: stored, truncated: quarantineTruncated }),
 }));
 vi.mock("@/lib/customer-source-lifecycle", async (original) => ({
   ...await original<typeof import("./customer-source-lifecycle")>(),
@@ -192,6 +193,7 @@ beforeEach(() => {
   tombstoned = new Set();
   refused = [];
   stored = [];
+  quarantineTruncated = false;
   actives = new Map([[COLLECTION, { manifestDigest: ACTIVE, revision: 2 }]]);
   jobs = [job()];
   candidates = new Map([[COLLECTION, [
@@ -260,6 +262,15 @@ describe("the tool table", () => {
   it("a handler that throws is UNAVAILABLE, never its message", async () => {
     const throwing = { ...tools.agentTool("list_documents")!, handler: async () => { throw new Error("secret detail"); } };
     expect(await tools.callAgentTool(throwing, context, {})).toEqual({ ok: false, code: "UNAVAILABLE" });
+  });
+
+  it("keeps decidingReadFailed through the code table, and only as true (WO-AN-8)", async () => {
+    const tool = tools.agentTool("list_documents")!;
+    const answering = (result: unknown) => ({ ...tool, handler: async () => result as never });
+    expect(await tools.callAgentTool(answering({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", decidingReadFailed: true }), context, {}))
+      .toEqual({ ok: false, code: "NOT_FOUND", decidingReadFailed: true });
+    expect(await tools.callAgentTool(answering({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", decidingReadFailed: "yes" }), context, {}))
+      .toEqual({ ok: false, code: "NOT_FOUND" });
   });
 });
 
@@ -460,6 +471,14 @@ describe("R6 list_documents", () => {
     accessDown = true;
     expect(await call("list_documents", {})).toEqual({ ok: false, code: "UNAVAILABLE" });
   });
+
+  /* WO-AN-8: a quarantine listing cut short at its bound is UNAVAILABLE, never the part read shown as the whole. Mutant: list the truncated part. */
+  it("a quarantine listing that exceeds its bound is UNAVAILABLE, nothing partial", async () => {
+    refused = [doc(21)];
+    quarantineTruncated = true;
+    expect(await call("list_documents", {})).toEqual({ ok: false, code: "UNAVAILABLE" });
+    expect(checkAccess).not.toHaveBeenCalled();
+  });
 });
 
 describe("P3 propose_library_labels", () => {
@@ -513,6 +532,47 @@ describe("P1 / P4", () => {
     corrections = [{ base: CANDIDATE, result: `sha256:${"d".repeat(64)}` }];
     expect(await call("propose_label_correction", { collectionId: COLLECTION, baseManifestDigest: CANDIDATE, objectId: EDITABLE.id,
       before: EDITABLE.label, after: "Corrected", evidenceId: "ev-1", idempotencyKey: "client-key-1" })).toEqual({ ok: false, code: "PROPOSAL_BASE_NOT_HEAD" });
+  });
+
+  /*
+    WO-AN-8: P4's existence decision is the executor's alone -- the tool reads neither the candidate list nor access
+    before it (one listing, one access call per call). A base whose documents are unreadable is NOT_FOUND with no row.
+    Mutant: the executor skips the access read (the row is created).
+  */
+  it("P4 decides existence in the executor only: one listing, one access call; an unreadable base is NOT_FOUND with no row", async () => {
+    const p4 = { collectionId: COLLECTION, baseManifestDigest: CANDIDATE, objectId: EDITABLE.id, before: EDITABLE.label, after: "Corrected",
+      evidenceId: "ev-1", idempotencyKey: "client-key-1" };
+    unreadable.add(DOC_B);
+    expect(await call("propose_label_correction", p4)).toEqual({ ok: false, code: "NOT_FOUND" });
+    expect(creates()).toBe(0);
+    expect(calls.filter((entry) => entry.path.endsWith("/list_collection_candidates"))).toHaveLength(1);
+    expect(checkAccess).toHaveBeenCalledTimes(1);
+    unreadable.clear();
+    calls = [];
+    checkAccess.mockClear();
+    expect((await call("propose_label_correction", p4)).ok).toBe(true);
+    expect(calls.filter((entry) => entry.path.endsWith("/list_collection_candidates"))).toHaveLength(1);
+    expect(checkAccess).toHaveBeenCalledTimes(1);
+  });
+
+  /*
+    WO-AN-8: an access check that cannot answer is the same NOT_FOUND an unreadable id gets, and the result carries
+    decidingReadFailed for the route's log -- through a tool's own decision (R3) and through an executor's (P1, P4).
+  */
+  it("a deciding read that cannot answer is NOT_FOUND flagged decidingReadFailed; a denial is NOT_FOUND unflagged", async () => {
+    const p4 = { collectionId: COLLECTION, baseManifestDigest: CANDIDATE, objectId: EDITABLE.id, before: EDITABLE.label, after: "Corrected",
+      evidenceId: "ev-1", idempotencyKey: "client-key-1" };
+    const cases: [string, unknown][] = [["get_compile_job", { jobId: JOB }], ["propose_compile", { documentIds: [DOC_A], idempotencyKey: "client-key-1" }],
+      ["propose_label_correction", p4]];
+    for (const [name, args] of cases) {
+      accessDown = true;
+      expect(await call(name, args), name).toEqual({ ok: false, code: "NOT_FOUND", decidingReadFailed: true });
+      accessDown = false;
+      unreadable.add(DOC_A);
+      expect(await call(name, args), name).toEqual({ ok: false, code: "NOT_FOUND" });
+      unreadable.clear();
+    }
+    expect(creates()).toBe(0);
   });
 
   it("P4 creates an ontology_label_patch proposal with no document set in the preview", async () => {

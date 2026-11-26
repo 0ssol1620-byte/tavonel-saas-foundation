@@ -31,9 +31,12 @@ import { getFoundationActiveWorld, listFoundationActiveWorlds } from "./world-st
   something this person can read run through `deciding`: any failure of them -- refused, unavailable, thrown --
   is NOT_FOUND, whatever the id (readable-but-absent, unreadable, another tenant's, random), because "the reader
   is down" must not tell "absent" from "exists but unreadable" (§3, §17 (a)). A failure after that decision is
-  what it is (UNAVAILABLE, or the reused function's own refusal). The propose tools make the same decision here,
-  with the same readers, before the executor runs, so an executor's later outage is never mistaken for it.
-  Codes leave through the one table only. The security suite fuzzes both sides of that line for every
+  what it is (UNAVAILABLE, or the reused function's own refusal). P1 and P4 leave that decision to their executor's
+  `prepare` (proposal-compile-plan.ts, proposal-label-correction.ts); P3 still makes it here, because its executor
+  (change-proposals.ts, outside WO-AN-8) does not fold every outage of its reads into not-found yet.
+  A NOT_FOUND that came from a deciding read that failed carries `decidingReadFailed: true` for the route's server
+  log; the agent's answer is the code alone, so the two are byte-identical (WO-AN-8). Codes leave through the one
+  table only. The security suite fuzzes both sides of that line for every
   id-taking tool, and every id class under every reader outage for byte identity.
 */
 
@@ -71,10 +74,16 @@ export function agentCodeOf(internal: string): AgentErrorCode {
   return Object.hasOwn(AGENT_CODE_OF, internal) ? AGENT_CODE_OF[internal]! : "UNAVAILABLE";
 }
 
-export type AgentToolResult = { ok: true; output: unknown } | { ok: false; code: AgentErrorCode };
-type Refusal = { ok: false; code: AgentErrorCode };
-const refuse = (code: AgentErrorCode): Refusal => ({ ok: false, code });
+/** `decidingReadFailed` is for the server log only (WO-AN-8); the route never puts it in the answer. */
+export type AgentToolResult = { ok: true; output: unknown } | Refusal;
+type Refusal = { ok: false; code: AgentErrorCode; decidingReadFailed?: true };
+const refuse = (code: AgentErrorCode, decidingReadFailed = false): Refusal =>
+  (decidingReadFailed ? { ok: false, code, decidingReadFailed: true } : { ok: false, code });
+/** True only when a reused function said so in exactly that form; anything else is not a failed deciding read. */
+const readFailedIn = (failure: object) => (failure as { decidingReadFailed?: unknown }).decidingReadFailed === true;
 const NOT_FOUND = refuse("NOT_FOUND");
+/** The same answer as NOT_FOUND: a read that decides existence could not answer (refused, unavailable or thrown). */
+const READ_FAILED = refuse("NOT_FOUND", true);
 const INPUT_INVALID = refuse("INPUT_INVALID");
 const UNAVAILABLE = refuse("UNAVAILABLE");
 
@@ -194,7 +203,8 @@ async function getProposalTool({ principal }: AgentToolContext, args: unknown): 
   const { proposalId } = input;
   const found = await deciding(() => getProposal(principal.workspaceKey, proposalId));
   // Absent, another tenant's, another grant's and a store that cannot answer are one answer.
-  if (!found?.ok || found.row.agent_grant_id !== principal.grantId || found.row.workspace_key !== principal.workspaceKey) return NOT_FOUND;
+  if (!found?.ok) return found?.code === "PROPOSAL_NOT_FOUND" ? NOT_FOUND : READ_FAILED;
+  if (found.row.agent_grant_id !== principal.grantId || found.row.workspace_key !== principal.workspaceKey) return NOT_FOUND;
   const documents = agentProposalDocuments(found.row);
   if (!documents) return NOT_FOUND;
   const readable = await access(principal, documents);
@@ -213,10 +223,11 @@ async function getCompileJobTool({ principal }: AgentToolContext, args: unknown)
   // The job read and the access check decide the job's existence: any failure of either is the same not-found.
   const { jobId } = input;
   const read = await deciding(() => readCompileJob(principal.workspaceKey, jobId));
-  if (!read?.ok) return NOT_FOUND;
+  if (!read?.ok) return read?.code === "COMPILE_JOB_NOT_FOUND" ? NOT_FOUND : READ_FAILED;
   const job = read.value;
   if (job.workspaceKey !== principal.workspaceKey) return NOT_FOUND;
-  if (await access(principal, job.documentIds) !== "readable") return NOT_FOUND;
+  const readable = await access(principal, job.documentIds);
+  if (readable !== "readable") return readable === "denied" ? NOT_FOUND : READ_FAILED;
   return {
     ok: true,
     output: {
@@ -260,10 +271,10 @@ async function readableCandidates(principal: AgentPrincipal, collectionId: strin
     });
     return response.ok ? asCandidates(await response.json()) : null;
   });
-  if (!listed) return NOT_FOUND;
+  if (!listed) return READ_FAILED;
   const check = accessCache(principal);
   const verdicts = await Promise.all(listed.map((candidate) => check(candidate.documentIds)));
-  if (verdicts.includes("unavailable")) return NOT_FOUND;
+  if (verdicts.includes("unavailable")) return READ_FAILED;
   const candidates = listed.filter((_, index) => verdicts[index] === "readable");
   return candidates.length === 0 ? NOT_FOUND : { ok: true, candidates };
 }
@@ -380,7 +391,8 @@ async function workspaceDocuments(workspaceKey: string): Promise<{ ok: true; doc
   const tombstoned = await readTombstonedUploadDocumentIds(workspaceKey);
   if (!tombstoned.ok) return UNAVAILABLE;
   const quarantine = await listFoundationQuarantineRejects(signer, workspaceKey);
-  // ponytail: a truncated quarantine listing fails the call (no partial flag in R6); page it when a workspace reaches the bound.
+  // A listing cut short at its bound (r2-synthetic-canary.ts: 8 list pages, 20 refusals) fails the call; nothing partial is listed.
+  // ponytail: paging it by AGENT_ACL_SCAN_PAGES needs a page-level reader in r2-synthetic-canary.ts (outside WO-AN-8).
   if (!quarantine.ok || quarantine.truncated) return UNAVAILABLE;
   const selected = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceKey, listed.objects));
   const seen = new Set<string>([...tombstoned.ids]);
@@ -442,7 +454,7 @@ const clientKey = (value: unknown): value is string => text(value, AGENT_CLIENT_
 
 /** The single-row answer of a propose tool. */
 function proposed(created: Awaited<ReturnType<typeof createProposal>>): AgentToolResult {
-  if (!created.ok) return refuse(agentCodeOf(created.code));
+  if (!created.ok) return refuse(agentCodeOf(created.code), readFailedIn(created));
   const shown = view(created.row, true);
   return shown ? { ok: true, output: shown } : UNAVAILABLE;
 }
@@ -456,7 +468,7 @@ async function proposeCompile({ principal }: AgentToolContext, args: unknown): P
     actionType: "compile_plan", raw: { documentIds: input.documentIds }, evidenceIds: undefined, clientKey: input.idempotencyKey,
     toolName: "propose_compile", index: 0,
   });
-  // The dry-run folds a failure of its own existence-deciding reads into not-found (§17 (a)); nothing is folded here.
+  // The dry-run decides existence and folds a failure of its deciding reads into not-found (§17 (a)); nothing is folded here.
   return proposed(created);
 }
 
@@ -481,15 +493,17 @@ async function proposeLibraryLabels({ principal }: AgentToolContext, args: unkno
   // The existence decision: every item names a document this person can read that the Library has a labelled
   // version of. The executor repeats it; deciding it here first keeps an outage of these reads a not-found.
   const documentIds = [...new Set((items as Record<string, unknown>[]).map((item) => item.documentId as string))];
-  if (await access(principal, documentIds) !== "readable") return NOT_FOUND;
+  const readable = await access(principal, documentIds);
+  if (readable !== "readable") return readable === "denied" ? NOT_FOUND : READ_FAILED;
   const library = await deciding(() => readLibraryDocuments(principal.workspaceKey, documentIds, principal.userId));
-  if (!library?.ok || documentIds.some((id) => !Object.hasOwn(library.sourceVersions, id))) return NOT_FOUND;
+  if (!library?.ok) return READ_FAILED;
+  if (documentIds.some((id) => !Object.hasOwn(library.sourceVersions, id))) return NOT_FOUND;
   const created = await createProposalBatch(actorOf(principal), (items as Record<string, unknown>[]).map((item) => ({
     actionType: "library_label",
     raw: { collectionId, expectedManifestDigest, input: { documentId: item.documentId, labelKind: item.labelKind, labelKey: item.labelKey, decision: item.decision } },
     evidenceIds: undefined, clientKey: idempotencyKey, toolName: "propose_library_labels",
   })));
-  if (!created.ok) return refuse(agentCodeOf(created.code));
+  if (!created.ok) return refuse(agentCodeOf(created.code), readFailedIn(created));
   const views = created.created.map(({ row }) => view(row, true));
   return views.every((row) => row !== null) ? { ok: true, output: views } : UNAVAILABLE;
 }
@@ -499,10 +513,7 @@ async function proposeLabelCorrection({ principal }: AgentToolContext, args: unk
   if (!input || !text(input.collectionId, COLLECTION_ID_PATTERN) || !text(input.baseManifestDigest, SHA256) || !text(input.objectId, OBJECT_ID)
     || !label(input.before) || !label(input.after) || !text(input.evidenceId, OBJECT_ID) || !clientKey(input.idempotencyKey)) return INPUT_INVALID;
   const { idempotencyKey, ...raw } = input;
-  // The existence decision, as R5 makes it: the base is a candidate of the collection this person can read.
-  const found = await readableCandidates(principal, input.collectionId);
-  if (!found.ok) return found;
-  if (!found.candidates.some((candidate) => candidate.manifestDigest === input.baseManifestDigest)) return NOT_FOUND;
+  // The existence decision (the base is a candidate whose every document this person can read) is the executor's alone.
   const created = await createProposal(actorOf(principal), {
     actionType: "ontology_label_patch", raw, evidenceIds: undefined, clientKey: idempotencyKey as string, toolName: "propose_label_correction", index: 0,
   });
@@ -605,7 +616,7 @@ export const agentToolList = () => AGENT_MCP_TOOLS.map((tool) => ({
 export async function callAgentTool(tool: AgentTool, context: AgentToolContext, args: unknown): Promise<AgentToolResult> {
   try {
     const result = await tool.handler(context, args);
-    return result.ok ? result : refuse(agentCodeOf(result.code));
+    return result.ok ? result : refuse(agentCodeOf(result.code), readFailedIn(result));
   } catch {
     return UNAVAILABLE;
   }

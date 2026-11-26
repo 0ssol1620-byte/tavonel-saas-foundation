@@ -41,6 +41,16 @@ export type CompilePlanInput = Readonly<{ documentIds: readonly string[]; quote:
 const failure = (code: string, status: number): Failure => ({ ok: false, code, status });
 const NOT_FOUND = failure("PROPOSAL_TARGET_NOT_FOUND", 404);
 const UNAVAILABLE = failure("PROPOSAL_PRECONDITION_UNAVAILABLE", 503);
+/**
+ * NOT_FOUND because a read that decides existence could not answer (WO-AN-8): the same code and status, plus a
+ * flag that only the agent route's server log reads. Every route answers a Failure by its code alone.
+ */
+export const READ_FAILED: Failure = Object.assign(failure("PROPOSAL_TARGET_NOT_FOUND", 404), { decidingReadFailed: true as const });
+
+/** For an agent, a deciding read that throws has failed (null); anyone else's throw goes on to `failClosed` (a 503). */
+export const decidingRead = (agent: boolean) => async <T>(read: () => Promise<T>): Promise<T | null> => {
+  try { return await read(); } catch (error) { if (agent) return null; throw error; }
+};
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const sameKeys = (value: Record<string, unknown>, keys: readonly string[]) => Object.keys(value).sort().join(",") === [...keys].sort().join(",");
 const credits = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -220,13 +230,11 @@ export const compilePlanExecutor: ProposalExecutor<CompilePlanInput> = failClose
     const documentIds = documentSet(raw.documentIds);
     if (!documentIds) return failure("PROPOSAL_REQUEST_INVALID", 400);
     const agent = actor.kind === "agent";
-    const deciding = async <T>(read: () => Promise<T>): Promise<T | null> => {
-      try { return await read(); } catch (error) { if (agent) return null; throw error; }
-    };
+    const deciding = decidingRead(agent);
     const access = await deciding(() => checkConnectorSourceAccessForViewer(actor.workspaceKey, [...documentIds], actor.userId));
-    if (!access?.ok) return NOT_FOUND;
+    if (!access?.ok) return access?.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? NOT_FOUND : READ_FAILED;
     const inventory = await deciding(() => currentVersions(actor.workspaceKey, documentIds));
-    if (!inventory || !inventory.ok) return agent ? NOT_FOUND : inventory ?? UNAVAILABLE;
+    if (!inventory || !inventory.ok) return agent ? READ_FAILED : inventory ?? UNAVAILABLE;
     if (documentIds.some((id) => inventory.versions.get(id) == null)) return NOT_FOUND;
     const verdict = judgeCorpusSet(documentIds.length);
     if (!verdict.ok) return failure(verdict.code, 400);

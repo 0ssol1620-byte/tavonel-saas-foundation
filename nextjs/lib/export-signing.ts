@@ -15,8 +15,11 @@ export const CAPABILITY_MANIFEST_SIGNATURE_SCOPE = "tavonel.signed_capability_ma
 export const WORLD_RELEASE_SIGNATURE_SCOPE = "tavonel.signed_world_release.v1" as const;
 // WO-AN-2: the receipt of an agent-originated proposal a person confirmed (lib/action-receipt-signing.ts).
 export const ACTION_RECEIPT_SIGNATURE_SCOPE = "tavonel.signed_action_receipt.v1" as const;
+// WO-LOC-3: /developer/channel.json, signed by a dedicated channel key (scripts/sign-developer-channel.mjs).
+export const DEVELOPER_CHANNEL_SIGNATURE_SCOPE = "tavonel.signed_developer_channel.v1" as const;
 export type SignatureScope = typeof SIGNATURE_SCOPE | typeof COMPILE_RECEIPT_SIGNATURE_SCOPE | typeof ANSWER_RECEIPT_SIGNATURE_SCOPE
-  | typeof CAPABILITY_MANIFEST_SIGNATURE_SCOPE | typeof WORLD_RELEASE_SIGNATURE_SCOPE | typeof ACTION_RECEIPT_SIGNATURE_SCOPE;
+  | typeof CAPABILITY_MANIFEST_SIGNATURE_SCOPE | typeof WORLD_RELEASE_SIGNATURE_SCOPE | typeof ACTION_RECEIPT_SIGNATURE_SCOPE
+  | typeof DEVELOPER_CHANNEL_SIGNATURE_SCOPE;
 
 export type ExportSignatureV1 = {
   schemaVersion: "tavonel.export_signature.v1";

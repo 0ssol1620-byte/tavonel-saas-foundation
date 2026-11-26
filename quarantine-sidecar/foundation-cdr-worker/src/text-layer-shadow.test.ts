@@ -207,3 +207,108 @@ describe("D2 text-layer shadow (PROGRAM-2026-11-04 §4.D, ADR-2026-11-02 §5)", 
     assert.equal(await run(env, async () => layerResponse(extracted([]))), null);
   });
 });
+
+describe("table-reader shadow store (WO-E-TBL-P2, ADR-2026-11-23 §7 step 2)", () => {
+  const REVISION = `sha256:${"c".repeat(64)}`;
+  const BINDING = `sha256:${"d".repeat(64)}`;
+  const TABLE_KEY = textLayerSiblingKey(IMMUTABLE, "table-read.json");
+  const cell = (row: number, column: number, text: string, bbox1000: number[]) => ({
+    cellId: `p1-t1-r${row}-c${column}`, rowIndex0: row, columnIndex0: column, rowSpan: 1, columnSpan: 1, text, bbox1000, confirmedBy: [],
+  });
+  const placedPage = () => ({
+    pageNumber1: 1, path: "textlayer", read: true,
+    tables: [{ tableId: "p1-t1", state: "placed", signal: null }, { tableId: null, state: "not_placed", signal: "column_split_ambiguous" }],
+    document: {
+      schemaVersion: "tavonel.table_read.v1", inputSha256: INPUT, readerRevision: REVISION, readerBindingSha256: BINDING,
+      pageIndex0: 0, pageNumber1: 1, pageStatus: "read", formulas: [],
+      refusals: [{ bbox1000: null, reasonCode: "TABLE_GRID_INVALID" }],
+      tables: [{
+        tableId: "p1-t1", bbox1000: [100, 100, 600, 140], rowCount: 2, columnCount: 2, headerRowCount: 0, qualityFlags: [],
+        cells: [cell(0, 0, "Total net sales", [100, 100, 300, 115]), cell(0, 1, "391,035", [500, 100, 600, 115]),
+          cell(1, 0, "Cost of sales", [100, 125, 300, 140]), cell(1, 1, "210,352", [500, 125, 600, 140])],
+      }],
+    },
+  });
+  const section = (pages: unknown[], extra: Record<string, unknown> = {}) => ({
+    schemaVersion: "tavonel.cdr_table_read.v1", mode: "shadow", status: "read", reason: null, servedPages: 0,
+    reader: { revision: REVISION, bindingSha256: BINDING, pypdfium2: "5.13.0", constants: {}, calibrated: false }, pages, ...extra,
+  });
+  const notRead = { pageNumber1: 2, path: "ocr:image-content", read: false, tables: [], document: null };
+  const layerPages = [
+    { pageNumber1: 1, path: "textlayer", text: PAGE_ONE }, { pageNumber1: 2, path: "ocr:image-content" },
+  ];
+  const withTables = (tableRead: unknown) => ({ ...extracted(layerPages), tableRead });
+
+  it("stores a qualified section create-once as table-read.json, bound to this object and this layer", async () => {
+    const { bucket, env } = setup();
+    const receipt = await run(env, async () => layerResponse(withTables(section([placedPage(), notRead]))));
+    assert.equal(receipt?.status, "compared");
+    const stored = JSON.parse(new TextDecoder().decode(bucket.objects.get(TABLE_KEY)));
+    assert.equal(stored.sourceImmutableKey, IMMUTABLE);
+    assert.equal(stored.inputSha256, INPUT);
+    assert.equal(stored.textLayerSha256, receipt?.textLayerSha256);
+    assert.equal(stored.servedPages, 0);
+    assert.equal(stored.pages[0].document.sourceImmutableKey, IMMUTABLE, "each page is a complete table_read.v1 document");
+    assert.equal(stored.pages[1].document, null);
+    // Create-once: a second write to the same key does not replace it.
+    assert.equal(await bucket.put(TABLE_KEY, new Uint8Array([1]), { onlyIf: { etagDoesNotMatch: "*" } }), null);
+  });
+
+  it("stores nothing when the CDR's table reader is off (no section)", async () => {
+    const { bucket, env } = setup();
+    const receipt = await run(env, async () => layerResponse(extracted(layerPages)));
+    assert.equal(receipt?.status, "compared");
+    assert.equal(bucket.objects.has(TABLE_KEY), false);
+    assert.equal(bucket.puts.includes(TABLE_KEY), false);
+  });
+
+  it("stores the CDR's operational failure as what it is", async () => {
+    const { bucket, env } = setup();
+    await run(env, async () => layerResponse(withTables(section([], { status: "unavailable", reason: "pdfium_error" }))));
+    const stored = JSON.parse(new TextDecoder().decode(bucket.objects.get(TABLE_KEY)));
+    assert.deepEqual([stored.status, stored.reason, stored.pages], ["unavailable", "pdfium_error", []]);
+  });
+
+  const refused: Array<[string, () => unknown, string]> = [
+    ["a page read that the layer did not class textlayer", () => section([placedPage(), { ...placedPage(), pageNumber1: 2, path: "ocr:image-content" }]), "table_read_page_2_invalid"],
+    ["a document on a page that is not textlayer", () => section([placedPage(), { ...notRead, document: placedPage().document }]), "table_read_page_2_not_textlayer"],
+    ["a page count that differs from the layer", () => section([placedPage()]), "table_read_contract_invalid"],
+    ["another reader's binding", () => {
+      const page = placedPage();
+      return section([{ ...page, document: { ...page.document, readerRevision: `sha256:${"e".repeat(64)}` } }, notRead]);
+    }, "table_read_page_1_TABLE_BINDING_MISMATCH"],
+    ["another input's document", () => {
+      const page = placedPage();
+      return section([{ ...page, document: { ...page.document, inputSha256: `sha256:${"b".repeat(64)}` } }, notRead]);
+    }, "table_read_page_1_TABLE_BINDING_MISMATCH"],
+    ["a cell outside its table", () => {
+      const page = placedPage();
+      const table = { ...page.document.tables[0], cells: [cell(0, 0, "x", [0, 0, 50, 50])] };
+      return section([{ ...page, document: { ...page.document, tables: [table] } }, notRead]);
+    }, "table_read_page_1_receipt_mismatch"],
+    ["a receipt entry missing for a refusal", () => {
+      const page = placedPage();
+      return section([{ ...page, tables: page.tables.slice(0, 1) }, notRead]);
+    }, "table_read_page_1_receipt_mismatch"],
+    ["an unknown mode", () => section([placedPage(), notRead], { mode: "on" }), "table_read_contract_invalid"],
+    ["served pages", () => section([placedPage(), notRead], { servedPages: 1 }), "table_read_contract_invalid"],
+    ["an unknown status", () => section([placedPage(), notRead], { status: "partial" }), "table_read_contract_invalid"],
+  ];
+  for (const [name, build, reason] of refused) {
+    it(`does not store ${name}, and keeps the text-layer receipt`, async () => {
+      const { bucket, env } = setup();
+      const logs: string[] = [];
+      const original = console.log;
+      console.log = (line: string) => { logs.push(line); };
+      try {
+        const receipt = await run(env, async () => layerResponse(withTables(build())));
+        assert.equal(receipt?.status, "compared");
+      } finally {
+        console.log = original;
+      }
+      assert.equal(bucket.objects.has(TABLE_KEY), false);
+      assert.ok(bucket.objects.has(textLayerSiblingKey(IMMUTABLE, "text-layer.json")));
+      assert.ok(logs.some((line) => line.includes(`"reason":"${reason}"`)), logs.join("\n"));
+    });
+  }
+});

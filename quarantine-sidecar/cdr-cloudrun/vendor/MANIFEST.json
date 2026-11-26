@@ -1,0 +1,290 @@
+{
+  "copiedWith": "git show <coreSha>:<source>",
+  "coreRepository": "TAVONEL Core (v34-lanes/core-int, branch codex/v34-core-int)",
+  "coreSha": "783d8d0703878fcd805afb7fd136b6aae694aeb3",
+  "files": [
+    {
+      "bytes": 16314,
+      "path": "akc_cir/__init__.py",
+      "sha256": "sha256:891625675d0e776c0be658af62202b13f4fb96b34711037d9409740dbb195262",
+      "source": "packages/cir-python/src/akc_cir/__init__.py"
+    },
+    {
+      "bytes": 19592,
+      "path": "akc_cir/action_key.py",
+      "sha256": "sha256:b05b7e9c9ab69d656869f22fe4a955eb6a5a39aea6782515c4e1f685e1a7196b",
+      "source": "packages/cir-python/src/akc_cir/action_key.py"
+    },
+    {
+      "bytes": 13648,
+      "path": "akc_cir/answer_compiler.py",
+      "sha256": "sha256:896254670d2a2beaf7d2c3d4909a283609a65d4ecf4b82074535b0a1891e30fc",
+      "source": "packages/cir-python/src/akc_cir/answer_compiler.py"
+    },
+    {
+      "bytes": 11848,
+      "path": "akc_cir/authority.py",
+      "sha256": "sha256:102b4139e795f9cd6341cf7961be70f93b164c0fade31a5c119a6cf4cfa03fa0",
+      "source": "packages/cir-python/src/akc_cir/authority.py"
+    },
+    {
+      "bytes": 2401,
+      "path": "akc_cir/base.py",
+      "sha256": "sha256:637bfb3440a93a8aa033a45b63c422afb47ae633339d42650b6e9f310887cff1",
+      "source": "packages/cir-python/src/akc_cir/base.py"
+    },
+    {
+      "bytes": 4927,
+      "path": "akc_cir/build_receipt.py",
+      "sha256": "sha256:2ed851dd6fe64d80d0bfd02d1e34d6a9620929257fd9b46da1fa83e70abc7bb8",
+      "source": "packages/cir-python/src/akc_cir/build_receipt.py"
+    },
+    {
+      "bytes": 11903,
+      "path": "akc_cir/capability_token.py",
+      "sha256": "sha256:3890acaee17dbac06a2b5d3fad3e0b05b555eb12243d70f3ffa51333eee54d79",
+      "source": "packages/cir-python/src/akc_cir/capability_token.py"
+    },
+    {
+      "bytes": 47001,
+      "path": "akc_cir/collection_events.py",
+      "sha256": "sha256:087200720e299b24e61e10f0932ac16dc13564e442f91a95e47adee0537f479f",
+      "source": "packages/cir-python/src/akc_cir/collection_events.py"
+    },
+    {
+      "bytes": 21979,
+      "path": "akc_cir/consumption_receipt.py",
+      "sha256": "sha256:ab97c7e67ab9b7d80aa9d89eb089339f550e7bc7b4aca42334e17b492b7a25a9",
+      "source": "packages/cir-python/src/akc_cir/consumption_receipt.py"
+    },
+    {
+      "bytes": 15609,
+      "path": "akc_cir/dependency.py",
+      "sha256": "sha256:1c2a89f5847f41c034bea57c52d99530a4cc6221441ba0e30cc3784ff44eda00",
+      "source": "packages/cir-python/src/akc_cir/dependency.py"
+    },
+    {
+      "bytes": 21682,
+      "path": "akc_cir/entity.py",
+      "sha256": "sha256:28879d79c3b3b1190ab4152e0a48a7d22fd8d882b2889f4fe26edd9d813e7fba",
+      "source": "packages/cir-python/src/akc_cir/entity.py"
+    },
+    {
+      "bytes": 1559,
+      "path": "akc_cir/errors.py",
+      "sha256": "sha256:74f0a34a96c560093f2d2ac8b36e5cd2b990642fbc67d061568e5f767d8b1ad5",
+      "source": "packages/cir-python/src/akc_cir/errors.py"
+    },
+    {
+      "bytes": 5605,
+      "path": "akc_cir/events.py",
+      "sha256": "sha256:1dbbe8d40206cfc1d49b93ddb566dd02c4c4239db324c014292296f07737ccf6",
+      "source": "packages/cir-python/src/akc_cir/events.py"
+    },
+    {
+      "bytes": 5946,
+      "path": "akc_cir/exports.py",
+      "sha256": "sha256:0ee1cde6b3fedb3b479090458bc85221abc6f8603ad70a4fa141b573c859eeca",
+      "source": "packages/cir-python/src/akc_cir/exports.py"
+    },
+    {
+      "bytes": 58891,
+      "path": "akc_cir/identity.py",
+      "sha256": "sha256:e7313feee9566cd79b496413ffadfce59994a4570486772a323a41f3c533f784",
+      "source": "packages/cir-python/src/akc_cir/identity.py"
+    },
+    {
+      "bytes": 31234,
+      "path": "akc_cir/inspection.py",
+      "sha256": "sha256:12eb64eb48b48ea71f5177aecfdc5b26dd151f81914f657c9b9477e34ecb53b1",
+      "source": "packages/cir-python/src/akc_cir/inspection.py"
+    },
+    {
+      "bytes": 5304,
+      "path": "akc_cir/knowledge.py",
+      "sha256": "sha256:85cdd23da22fe22372087abba4bdd54e26378132608650a4fa04258c8774a3cc",
+      "source": "packages/cir-python/src/akc_cir/knowledge.py"
+    },
+    {
+      "bytes": 8004,
+      "path": "akc_cir/knowledge_model.py",
+      "sha256": "sha256:9d094bf4b96e1cfd3532e02f6a439eb7e2738bd9bd2d081c0253a556d933906f",
+      "source": "packages/cir-python/src/akc_cir/knowledge_model.py"
+    },
+    {
+      "bytes": 10377,
+      "path": "akc_cir/models.py",
+      "sha256": "sha256:d7a2e6f79749e8cc895d27b44c473d5abf0f53a8590a832f1317baedce0e303a",
+      "source": "packages/cir-python/src/akc_cir/models.py"
+    },
+    {
+      "bytes": 17942,
+      "path": "akc_cir/normalization.py",
+      "sha256": "sha256:83342f8dc5b408ce8fad1701c5b2658606fcb0451e87d8820584261068a1435d",
+      "source": "packages/cir-python/src/akc_cir/normalization.py"
+    },
+    {
+      "bytes": 31461,
+      "path": "akc_cir/ontology.py",
+      "sha256": "sha256:c071807f5289ab86258485b051d906195a50bc3f31d903642e8a2e84e22f7315",
+      "source": "packages/cir-python/src/akc_cir/ontology.py"
+    },
+    {
+      "bytes": 20475,
+      "path": "akc_cir/projection.py",
+      "sha256": "sha256:62095af37682d4e716fcf848138f013e25f0ea4ecd93eb3090a71d60a4483476",
+      "source": "packages/cir-python/src/akc_cir/projection.py"
+    },
+    {
+      "bytes": 2591,
+      "path": "akc_cir/prompts.py",
+      "sha256": "sha256:27301413eb906f29fb35dca3b72b652778ad517e8f3237493326e093a7da8488",
+      "source": "packages/cir-python/src/akc_cir/prompts.py"
+    },
+    {
+      "bytes": 4693,
+      "path": "akc_cir/public_proof.py",
+      "sha256": "sha256:1303abf42e0f995dd0458afddadb99208571fa3bfa50797a821ce97d7f60acaf",
+      "source": "packages/cir-python/src/akc_cir/public_proof.py"
+    },
+    {
+      "bytes": 38866,
+      "path": "akc_cir/reading_order.py",
+      "sha256": "sha256:27f4061c3309cf285d7f6d79ef87176a969180e19aada9382843d8a725394db1",
+      "source": "packages/cir-python/src/akc_cir/reading_order.py"
+    },
+    {
+      "bytes": 12000,
+      "path": "akc_cir/recompilation.py",
+      "sha256": "sha256:bdb9dd01201eb87027166c462b04b9b5e4a0558468ac0765e30dc755e709f0ae",
+      "source": "packages/cir-python/src/akc_cir/recompilation.py"
+    },
+    {
+      "bytes": 27289,
+      "path": "akc_cir/reconciler.py",
+      "sha256": "sha256:7e3d9b427552b9d0ebc2290b9ac2c7637843e266c490a4bf0c2fc9058a9fee3d",
+      "source": "packages/cir-python/src/akc_cir/reconciler.py"
+    },
+    {
+      "bytes": 21349,
+      "path": "akc_cir/recovery_policy.py",
+      "sha256": "sha256:0adc4c34f542b128580f2f3d5c1c774335d228dbc544acc564420cdcd0df9224",
+      "source": "packages/cir-python/src/akc_cir/recovery_policy.py"
+    },
+    {
+      "bytes": 11957,
+      "path": "akc_cir/replay.py",
+      "sha256": "sha256:5894c05a497b2a28bf330b7b8f0ad5174194a5832bc02e7b4d1321fa9354e4a4",
+      "source": "packages/cir-python/src/akc_cir/replay.py"
+    },
+    {
+      "bytes": 10923,
+      "path": "akc_cir/runtime_qualification.py",
+      "sha256": "sha256:538e6d60143871f3af7f3796608b9e4434817c3cb5f8957b7dc04be527aba129",
+      "source": "packages/cir-python/src/akc_cir/runtime_qualification.py"
+    },
+    {
+      "bytes": 17806,
+      "path": "akc_cir/safe_payload.py",
+      "sha256": "sha256:d2118e94052edfa413de98b7855757bd6a6f77298b10f3f6a46ecc5742bcbad7",
+      "source": "packages/cir-python/src/akc_cir/safe_payload.py"
+    },
+    {
+      "bytes": 3091,
+      "path": "akc_cir/schema.py",
+      "sha256": "sha256:87bb59cbf0e000c5adef360aa825da9958402969291fdbe6a2e206fb79252f71",
+      "source": "packages/cir-python/src/akc_cir/schema.py"
+    },
+    {
+      "bytes": 18387,
+      "path": "akc_cir/semantic_diff.py",
+      "sha256": "sha256:769e68cecc2bee7851d767e14bff02999ee6fd55c648cde3e2572a29c33dc7ce",
+      "source": "packages/cir-python/src/akc_cir/semantic_diff.py"
+    },
+    {
+      "bytes": 13270,
+      "path": "akc_cir/temporal.py",
+      "sha256": "sha256:a671cdba32660f46c4c40d2fe1ef3d10589a576095abd3754b8fe968d4566f10",
+      "source": "packages/cir-python/src/akc_cir/temporal.py"
+    },
+    {
+      "bytes": 18772,
+      "path": "akc_cir/tracked_build_context.py",
+      "sha256": "sha256:adb3d785c0282f8d66720efe2cbeff1798b5e64c62c5947a5f40c1d6bea1b2c9",
+      "source": "packages/cir-python/src/akc_cir/tracked_build_context.py"
+    },
+    {
+      "bytes": 15082,
+      "path": "akc_cir/trust.py",
+      "sha256": "sha256:ff73ed0683d7baa2d90175d0052387d94180722285375851ea5dd24335310f37",
+      "source": "packages/cir-python/src/akc_cir/trust.py"
+    },
+    {
+      "bytes": 14021,
+      "path": "akc_cir/world_categories.py",
+      "sha256": "sha256:688de64b025d0d309548c1f60fc1cceb032487575c51fd22a876188244f66591",
+      "source": "packages/cir-python/src/akc_cir/world_categories.py"
+    },
+    {
+      "bytes": 15788,
+      "path": "akc_cir/world_state.py",
+      "sha256": "sha256:c90557a19aacfcff9b1ce173b84c43af9540c727d47fe23272f18722f5c51b76",
+      "source": "packages/cir-python/src/akc_cir/world_state.py"
+    },
+    {
+      "bytes": 22132,
+      "path": "akc_native_parsers/docx_parser.py",
+      "sha256": "sha256:f9d67392cde277ec40d69f80015ca53ef8387107ad7ad7ce9a5fd040d3ed924c",
+      "source": "packages/native-parsers/src/akc_native_parsers/docx_parser.py"
+    },
+    {
+      "bytes": 14974,
+      "path": "akc_native_parsers/html_parser.py",
+      "sha256": "sha256:9cc8fb8355129e4ca051337574aad2cf895137a683c09afbf98943bf79c9fbaa",
+      "source": "packages/native-parsers/src/akc_native_parsers/html_parser.py"
+    },
+    {
+      "bytes": 18609,
+      "path": "akc_native_parsers/models.py",
+      "sha256": "sha256:a5a6fc777f1deedae56aa4d561b8fe0602d51cd9bda51f253e5148420f6e014f",
+      "source": "packages/native-parsers/src/akc_native_parsers/models.py"
+    },
+    {
+      "bytes": 2786,
+      "path": "akc_native_parsers/parser.py",
+      "sha256": "sha256:ff45112917cac52cb45364b5856ad08b98a0859912aa91f50f5904029c440ef9",
+      "source": "packages/native-parsers/src/akc_native_parsers/parser.py"
+    },
+    {
+      "bytes": 21912,
+      "path": "akc_native_parsers/pptx_parser.py",
+      "sha256": "sha256:74fc76cbb154882e088fd0de644a9ddab540c920cbf77b7654333f8b2e65ba43",
+      "source": "packages/native-parsers/src/akc_native_parsers/pptx_parser.py"
+    },
+    {
+      "bytes": 10677,
+      "path": "akc_native_parsers/security.py",
+      "sha256": "sha256:b9b51509a3d9d23bdb4d3d52d5b692999cf89dde08918a939631fb17bd73a912",
+      "source": "packages/native-parsers/src/akc_native_parsers/security.py"
+    },
+    {
+      "bytes": 16334,
+      "path": "akc_native_parsers/subtitle_parser.py",
+      "sha256": "sha256:1c014bb996e21f34906d56a11c204e82dd6cf0941060a3c9283de7b071ec4abb",
+      "source": "packages/native-parsers/src/akc_native_parsers/subtitle_parser.py"
+    },
+    {
+      "bytes": 20815,
+      "path": "akc_native_parsers/xlsx_parser.py",
+      "sha256": "sha256:1a4571a47be37e3f3419476003d691cc2e29036170547905938459881ba2e081",
+      "source": "packages/native-parsers/src/akc_native_parsers/xlsx_parser.py"
+    },
+    {
+      "bytes": 16585,
+      "path": "akc_security/files.py",
+      "sha256": "sha256:ee9fbf2a4bffcc2f4796a032bcd7400e0490e257aa13e9b7726fb2955c3cafba",
+      "source": "packages/security/src/akc_security/files.py"
+    }
+  ],
+  "schema": "tavonel.cdr_vendor_manifest.v1"
+}

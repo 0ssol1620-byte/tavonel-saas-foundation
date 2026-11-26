@@ -3039,6 +3039,12 @@ export const W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES = Object.freeze(['lib/intake
 // never nativeReuse. No browser, database or worker lane.
 export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_PATHS = Object.freeze(['nextjs/lib/compile-limits.test.ts', 'nextjs/lib/compile-limits.ts', 'nextjs/lib/page-count.test.ts', 'nextjs/lib/page-count.ts']);
 export const LARGE_SOURCE_INTAKE_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/compile-limits.test.ts', 'lib/intake-approval-rollout-off.test.ts', 'lib/page-count.test.ts', 'lib/workspace-existing-compile.test.ts']);
+// Train 2026-11-26 (WO-TRAIN-5): the CDR's native office reader (WO-E-TBL-1), its geometry table reader (WO-E-TBL-P2) and the CJK font guard
+// (WO-KO-1), with the Core files vendored beside them (vendor/MANIFEST.json pins each to one Core commit; test_native_reader.py checks every
+// byte and refuses an unlisted module) and the shared contract the child reads (shared/nativeReadContract.ts, read by test_native_reader.py).
+// malware-scan-qualification runs `pytest tests/` and builds the image from the checkout, which COPYs these files; affectedPlan defers it as
+// pending debt, exactly as for the service files above. Exact paths: a new vendored file is a new review.
+export const CDR_NATIVE_READER_AFFECTED_PATHS = Object.freeze(['quarantine-sidecar/cdr-cloudrun/.dockerignore', 'quarantine-sidecar/cdr-cloudrun/NOTICE', 'quarantine-sidecar/cdr-cloudrun/mypy.ini', 'quarantine-sidecar/cdr-cloudrun/native_read_child.py', 'quarantine-sidecar/cdr-cloudrun/native_reader.py', 'quarantine-sidecar/cdr-cloudrun/table_geometry.py', 'quarantine-sidecar/cdr-cloudrun/tests/native_fixtures.py', 'quarantine-sidecar/cdr-cloudrun/tests/native_guarded_run.py', 'quarantine-sidecar/cdr-cloudrun/tests/native_read_golden.json', 'quarantine-sidecar/cdr-cloudrun/tests/table_synth.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_cjk_fonts.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_native_reader.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_geometry.py', 'quarantine-sidecar/cdr-cloudrun/vendor/.gitattributes', 'quarantine-sidecar/cdr-cloudrun/vendor/MANIFEST.json', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/__init__.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/action_key.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/answer_compiler.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/authority.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/base.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/build_receipt.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/capability_token.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/collection_events.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/consumption_receipt.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/dependency.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/entity.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/errors.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/events.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/exports.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/identity.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/inspection.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/knowledge.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/knowledge_model.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/models.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/normalization.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/ontology.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/projection.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/prompts.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/public_proof.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/reading_order.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/recompilation.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/reconciler.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/recovery_policy.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/replay.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/runtime_qualification.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/safe_payload.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/schema.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/semantic_diff.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/temporal.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/tracked_build_context.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/trust.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/world_categories.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/world_state.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/docx_parser.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/html_parser.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/models.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/parser.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/pptx_parser.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/security.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/subtitle_parser.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_native_parsers/xlsx_parser.py', 'quarantine-sidecar/cdr-cloudrun/vendor/akc_security/files.py', 'shared/nativeReadContract.ts']);
 // nativeReuse marks docs/UI-only owners, the only ones that may reuse the historical native inputs. Product, SQL, fixture,
 // harness, staging, CI and dependency owners invalidate them and require a fresh seven-case hosted run.
 // ops-backlog-sli-20261110 (GA ops gap 4): the B35 evaluator gains a compile backlog age. Its own suite and both routes that call it.
@@ -3287,9 +3293,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // db-harness (L5, L7): the local database harness and the race harnesses. Their eight node:test suites run without a DSN and with
   // no skip, through the Repair Node runner; each imports, spawns or reads (pgtap-subset.sql) its own script. Round 8: WO-CAT-8's
   // plan-allowance race joins (its suite imports the script and spawns it without the opt-in and against a closed port).
+  // WO-TRAIN-2: WO-C-T3's member-scope race joins (its suite imports the script and checks its verdict logic and SQL; it needs no DSN).
   'db-harness': Object.freeze({
-    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/plan-allowance-race.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
-    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    paths: Object.freeze(['scripts/db/agent-grant-race.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/pgtap-subset.sql', 'scripts/db/plan-allowance-race.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.mjs', 'scripts/db/world-transition-race.test.mjs']),
+    unitFiles: Object.freeze(['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3456,6 +3463,143 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
+  // Train 2026-11-24 (WO-TRAIN-1, head 74e7a64a): the paths the six train lanes added without an owner, in six owners.
+  // acting-workspace (WO-C-T1): the acting-workspace resolver and the routes it moved. acting-workspace.test.ts imports the resolver and the
+  // mine, select, progress and rollback routes; processing-terms-acceptance-route, document-source-route, progress-route,
+  // world-rollback-source-access and world-discovery-routes import the processing-terms, source, progress, rollback and retrieval-index
+  // routes; route-classification reads every route file. acting-workspace.spec.ts skips itself outside 390 and has no Repair row: Product QA
+  // runs project 390, a claim read at head.
+  'acting-workspace': Object.freeze({
+    paths: Object.freeze(['app/api/access/processing-terms/route.ts', 'app/api/collections/[id]/world/rollback/route.ts', 'app/api/documents/[id]/progress/route.ts', 'app/api/documents/[id]/source/route.ts', 'app/api/v1/collections/[id]/retrieval-index/route.ts', 'app/api/workspaces/mine/route.ts', 'app/api/workspaces/select/route.ts', 'e2e/acting-workspace.spec.ts', 'lib/acting-workspace-roles.test.ts', 'lib/acting-workspace.test.ts', 'lib/acting-workspace.ts', 'lib/customer-data-admission-routes.test.ts', 'lib/world-discovery-routes.test.ts']),
+    unitFiles: Object.freeze(['lib/acting-workspace-roles.test.ts', 'lib/acting-workspace.test.ts', 'lib/customer-data-admission-routes.test.ts', 'lib/document-source-route.test.ts', 'lib/processing-terms-acceptance-route.test.ts', 'lib/progress-route.test.ts', 'lib/route-classification.test.ts', 'lib/world-discovery-routes.test.ts', 'lib/world-rollback-source-access.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({ 'e2e/acting-workspace.spec.ts': productQaClaim('390') }),
+  }),
+  // member-source-scope (WO-C-T3): the member scope gate and the routes it was wired into. member-source-scope.test.ts imports the gate,
+  // the v1 collections list and the member sources route; adversarial-acl-negatives imports the job and cancel routes;
+  // durable-compile-orchestration and corpus-batching read the blockers, cancel and corpus routes; review-route imports v1/reviews;
+  // world-discovery-routes imports manifest-status; route-classification checks every route's memberScope mechanism in its file, which is
+  // a check that reads collections/[id]/world and v1/runs/[runId]/events. WO-TRAIN-2: member-source-scope-routes.test.ts drives both
+  // through their handlers (a member without scope is refused MEMBER_SOURCE_SCOPE_DENIED). The race harness is db-harness's.
+  'member-source-scope': Object.freeze({
+    paths: Object.freeze(['app/api/collections/[id]/world/route.ts', 'app/api/compile-jobs/[jobId]/blockers/route.ts', 'app/api/compile-jobs/[jobId]/cancel/route.ts', 'app/api/compile-jobs/[jobId]/route.ts', 'app/api/compile-jobs/corpus/[corpusId]/route.ts', 'app/api/v1/collections/route.ts', 'app/api/v1/reviews/route.ts', 'app/api/v1/runs/[runId]/events/route.ts', 'app/api/v1/world/[id]/manifest-status/route.ts', 'app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/member-source-scope.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts']),
+    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/corpus-batching.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-discovery-routes.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // connector-provider-qualification (WO-E-CON-1): the synthetic provider pages and the suite that reads and parses every JSON file of
+  // lib/__fixtures__/connector-pages at load.
+  'connector-provider-qualification': Object.freeze({
+    paths: Object.freeze(['lib/__fixtures__/connector-pages/dropbox-continue-409-path.json', 'lib/__fixtures__/connector-pages/dropbox-continue-500.json', 'lib/__fixtures__/connector-pages/dropbox-continue-reset.json', 'lib/__fixtures__/connector-pages/dropbox-deleted-folder-page.json', 'lib/__fixtures__/connector-pages/dropbox-move-page-1.json', 'lib/__fixtures__/connector-pages/dropbox-move-page-2.json', 'lib/__fixtures__/connector-pages/dropbox-move-page-3.json', 'lib/__fixtures__/connector-pages/dropbox-resync-page-1.json', 'lib/__fixtures__/connector-pages/dropbox-resync-page-2.json', 'lib/__fixtures__/connector-pages/graph-delta-410.json', 'lib/__fixtures__/connector-pages/graph-delta-503.json', 'lib/__fixtures__/connector-pages/graph-delta-page-1.json', 'lib/__fixtures__/connector-pages/graph-delta-page-2.json', 'lib/__fixtures__/connector-pages/graph-resync-410.json', 'lib/__fixtures__/connector-pages/graph-resync-page-1.json', 'lib/__fixtures__/connector-pages/graph-resync-page-2.json', 'lib/connector-provider-qualification.test.ts']),
+    unitFiles: Object.freeze(['lib/connector-provider-qualification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // format-census (WO-CEN-1): the census script and the suite that imports it.
+  'format-census': Object.freeze({
+    paths: Object.freeze(['lib/format-census.test.ts', 'scripts/format-census.mjs']),
+    unitFiles: Object.freeze(['lib/format-census.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // developer-channel (WO-LOC-3, WO-LOC-7): developer-distribution.test.ts runs the CLI and pins the digest of every channel asset, the
+  // source agent's systemd unit included; export-signing.test.ts runs the channel signing script on a synthetic channel.
+  // WO-TRAIN-2: channel-install.test.mjs is a registered Repair Node suite and runs itself: it serves channel.json and the assets it names
+  // from 127.0.0.1, installs them into a fresh directory and runs the CLI and MCP from there.
+  'developer-channel': Object.freeze({
+    paths: Object.freeze(['public/developer/channel-install.test.mjs', 'public/developer/tavonel-cli.mjs', 'public/developer/tavonel-source-agent.service', 'scripts/sign-developer-channel.mjs']),
+    unitFiles: Object.freeze(['lib/developer-distribution.test.ts', 'lib/export-signing.test.ts', 'public/developer/channel-install.test.mjs']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // developer-keys-inventory (WO-D19-12): the inventory suite, which runs itself.
+  'developer-keys-inventory': Object.freeze({
+    paths: Object.freeze(['lib/developer-keys-inventory.test.ts']),
+    unitFiles: Object.freeze(['lib/developer-keys-inventory.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-audit-routes (codex/v34-an-8, merged at 9a258268; WO-TRAIN-1's pending owner, moved by WO-TRAIN-2): the agent grant activity
+  // route and the proposal receipt route. change-proposals-routes.test.ts imports both and calls GET; route-classification reads every route.
+  'agent-audit-routes': Object.freeze({
+    paths: Object.freeze(['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts']),
+    unitFiles: Object.freeze(['lib/change-proposals-routes.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // Train 2026-11-26 (WO-TRAIN-5): the paths the train's lanes added after WO-TRAIN-2, in nine owners.
+  // ask-verbatim-windows (WO-ASK-0): Ask answers with verbatim windows of the matching regions. ask-evidence-window.test.ts runs the window
+  // module; retrieval-pipeline.test.ts and ask-synthetic.test.ts import the pipeline and the synthetic statement World fixture; the other
+  // suites import retrieval-pipeline.ts itself (a suite that only mocks it is not listed).
+  'ask-verbatim-windows': Object.freeze({
+    paths: Object.freeze(['lib/__fixtures__/ask-synthetic/statement-world.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-evidence-window.ts', 'lib/ask-synthetic.test.ts', 'lib/retrieval-pipeline.test.ts', 'lib/retrieval-pipeline.ts']),
+    unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-route-limits.test.ts', 'lib/ask-synthetic.test.ts', 'lib/derived-data-admission.test.ts', 'lib/explore-sample.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/retrieval-pipeline.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // workspace-active-world (WO-WS-1): the in-page World choice. workspace-in-page-choices.test.ts imports the component and
+  // workspace-screen-frame.test.ts imports it too; the spec drives it in the browser and is a Product QA claim (no Repair browser row).
+  'workspace-active-world': Object.freeze({
+    paths: Object.freeze(['components/workspace/in-page-choices.tsx', 'e2e/workspace-ask-active-world.spec.ts', 'lib/workspace-in-page-choices.test.ts']),
+    unitFiles: Object.freeze(['lib/workspace-in-page-choices.test.ts', 'lib/workspace-screen-frame.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({ 'e2e/workspace-ask-active-world.spec.ts': productQaClaim('1440') }),
+  }),
+  // workspace-product-frame (WO-WS-2, WO-WS-4): the screen frame and the V34 token layer on the workspace. workspace-screen-frame.test.ts imports
+  // the frame and workspace-v34-tokens.test.ts reads the token layer; the isolated intake-layout spec has a Repair row at 1440, and
+  // e2e/support/workspace-review-actions.ts is imported by world-lifecycle.spec.ts, which has Repair rows at 1440, 390 and reduced-motion.
+  'workspace-product-frame': Object.freeze({
+    paths: Object.freeze(['components/v34/ui/screen.tsx', 'e2e/support/workspace-review-actions.ts', 'e2e/workspace-intake-layout.spec.ts', 'lib/workspace-screen-frame.test.ts', 'lib/workspace-v34-tokens.test.ts']),
+    unitFiles: Object.freeze(['lib/workspace-screen-frame.test.ts', 'lib/workspace-v34-tokens.test.ts']),
+    browserFiles: Object.freeze(['e2e/workspace-intake-layout.spec.ts', 'e2e/world-lifecycle.spec.ts']),
+    externalChecks: Object.freeze({}),
+  }),
+  // compile-source-stages: the per-source stage line. compile-source-stages.test.ts imports the module and the component.
+  'compile-source-stages': Object.freeze({
+    paths: Object.freeze(['components/compile-source-stages.tsx', 'lib/compile-source-stages.test.ts', 'lib/compile-source-stages.ts']),
+    unitFiles: Object.freeze(['lib/compile-source-stages.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // knowledge-steward-patch (WO-KS-2, WO-KS-3): the pure competency coverage evaluator and the ontology patch operations. Each suite
+  // imports its module; change-inbox and world-version-diff import collection-patch.ts.
+  'knowledge-steward-patch': Object.freeze({
+    paths: Object.freeze(['lib/collection-patch.test.ts', 'lib/collection-patch.ts', 'lib/competency-coverage.test.ts', 'lib/competency-coverage.ts', 'lib/ontology-patch.test.ts']),
+    unitFiles: Object.freeze(['lib/change-inbox.test.ts', 'lib/collection-patch.test.ts', 'lib/competency-coverage.test.ts', 'lib/ontology-patch.test.ts', 'lib/world-version-diff.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // global-collection-compile (WO-BIG-2): the per-bound "one World?" judgement. Its own suite imports the module.
+  'global-collection-compile': Object.freeze({
+    paths: Object.freeze(['lib/global-collection-compile.test.ts', 'lib/global-collection-compile.ts']),
+    unitFiles: Object.freeze(['lib/global-collection-compile.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // router-shadow (WO-RTR-1, WO-RTR-2): the evidence table as data, the page classifier and the internal trace store. router-shadow-trace.test.ts
+  // reads the JSON table and imports the classifier; router-shadow-store.test.ts imports the store and the classifier; the hook suite
+  // drives the compile hook over both.
+  'router-shadow': Object.freeze({
+    paths: Object.freeze(['lib/router-evidence-table.v1.json', 'lib/router-shadow-hook.test.ts', 'lib/router-shadow-store.test.ts', 'lib/router-shadow-store.ts', 'lib/router-shadow-trace.test.ts', 'lib/router-shadow-trace.ts']),
+    unitFiles: Object.freeze(['lib/router-shadow-hook.test.ts', 'lib/router-shadow-store.test.ts', 'lib/router-shadow-trace.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // workspace-payer-entitlement (WO-C-T2): a member's work draws on the workspace's plan; the suite runs itself.
+  'workspace-payer-entitlement': Object.freeze({
+    paths: Object.freeze(['lib/workspace-payer-entitlement.test.ts']),
+    unitFiles: Object.freeze(['lib/workspace-payer-entitlement.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // agent-u37-matrix (WO-AN-9): the local half of the U37 matrix. The Vitest suite generates the 102 rows; the DB-clock subset's pure
+  // checks run as a registered Node suite (nine tests, no DSN, no skip: a skipped case fails validateNodeTapReport).
+  'agent-u37-matrix': Object.freeze({
+    paths: Object.freeze(['lib/agent-proposals-u37.test.ts', 'scripts/db/agent-u37-db.mjs', 'scripts/db/agent-u37-db.test.mjs']),
+    unitFiles: Object.freeze(['lib/agent-proposals-u37.test.ts', 'scripts/db/agent-u37-db.test.mjs']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.
@@ -3465,7 +3609,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
 // changes four existing suites, each already owned.
 // WO-AN-7B's migration 20261117130300 and its rollback draft (merged) need no entry: every supabase/{migrations,tests,drafts}/*.sql is
 // the database-contract group's.
-// WO-CI-16 merged and moved to the program owners: nothing is pending.
+// WO-CI-16 merged and moved to the program owners.
+// Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8 (7a2df0e8) adds the agent grant activity route and the proposal receipt route;
+// change-proposals-routes.test.ts on that branch imports both and route-classification reads every route file. WO-TRAIN-2: the lane
+// merged (9a258268), and the owner moved to the program owners; none is pending.
 export const V34_PROGRAM_PENDING_OWNERS = Object.freeze({});
 // D-4 and WO-AN-1: the program's pgTAP files run in the affected SQL fixture job whenever any SQL changes, not only in the full
 // rehearsal (round 7: WO-CAT-3's catalog_v2_offer_codes.sql joins the four). Fixtures that build a SQL-bearing head take this list, never
@@ -3699,7 +3846,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // suite against the digest-pinned clamd and inside the service image built from the checkout, and which affectedPlan defers as pending debt.
   // ADR-2026-11-02 (text-layer-first CDR) adds the text-layer module and its suite, the request boundary that now also gates
   // /v1/text-layer, and the Dockerfile, service.yaml and README that ship and describe them; malware-scan-qualification runs them all.
-  affectedGroup('cdr-cloudrun-service', /^quarantine-sidecar\/cdr-cloudrun\/(?:app\.py|request_boundary\.py|text_layer\.py|measure_limits\.py|Dockerfile|service\.yaml|README\.md|tests\/test_(?:app|text_layer|measurement_limits|measure_limits|page_ranges|service_definition)\.py)$/),
+  affectedGroup('cdr-cloudrun-service', new RegExp(`^(?:quarantine-sidecar/cdr-cloudrun/(?:app\\.py|request_boundary\\.py|text_layer\\.py|measure_limits\\.py|Dockerfile|service\\.yaml|README\\.md|tests/test_(?:app|text_layer|measurement_limits|measure_limits|page_ranges|service_definition)\\.py)|${exactPathAlternation(CDR_NATIVE_READER_AFFECTED_PATHS)})$`)),
   affectedGroup('dropbox-connector', /^nextjs\/lib\/(?:dropbox-[a-z-]+|connector-(?:oauth-adapters|page-integrity|provider-isolation|source-identity|sync-page|replay-world-currency-migration)|sync-worker|source-import|source-version-guard)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/dropbox-source-reconciliation.test.ts', 'lib/connector-oauth-adapters.test.ts', 'lib/sync-worker.test.ts', 'lib/source-import.test.ts',
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',

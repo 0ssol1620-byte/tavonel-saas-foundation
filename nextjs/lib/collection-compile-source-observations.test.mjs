@@ -76,6 +76,8 @@ function compileFixture(options = {}) {
     "./source-dedup": { detectExactDuplicatesAtIntake: async () => null },
     // B2 proposals as they behave with TAVONEL_LIBRARY_ORGANIZE_MODE unset: no computation, no store call.
     "./library-shadow": { organizeLibraryAtIntake: async () => undefined },
+    // Router shadow (RTR-2) as it behaves with TAVONEL_ROUTER_SHADOW_ENABLED unset: the hook records nothing.
+    "./router-shadow-store": { recordRouterShadowTrace: async () => undefined, routerShadowRun: () => null },
   };
   return { ...load("lib/collection-compile-run.ts", mocks), audit, activity };
 }
@@ -155,6 +157,8 @@ test("SYNTHETIC: real public route forwards authenticated principal instead of r
     "@/lib/funnel-events": { recordServerFunnel: () => {} },
     "@/lib/immutable-keys": { DOCUMENT_ID_PATTERN: /^[0-9a-f-]{36}$/ },
     "@/lib/compute-reservation": { assertFoundationIntakeCompileSet: async () => ({ ok: true }) },
+    // WO-C-T3: an owner reads everything, so the member-scope gate has nothing to refuse here.
+    "@/lib/member-source-scope": { memberSourcesRefusal: async () => null },
   });
   await route.POST({ headers: new Map() });
   assert.deepEqual(plain(args[4]), { userId: USER, provenance: "authenticated_request" });

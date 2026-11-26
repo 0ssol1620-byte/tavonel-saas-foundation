@@ -11,7 +11,7 @@
     "F-oauth-token": "TAVONEL as the OAuth 2.1 authorization server of the remote MCP. The credential is an authorization code in the form body, sealed to one client and bound to a PKCE S256 verifier, so nothing ambient exists for a forged request to ride. Requires: single-use code, PKCE, exact redirect binding."
   },
   "corsPosture": "No route sets any Access-Control-Allow-* header, and next.config.mjs adds none. There is therefore no credentialed cross-origin access and no wildcard origin anywhere on the API surface. lib/route-classification.test.ts asserts this.",
-  "cookies": "The only Set-Cookie on the API surface is the self-service trial device cookie (lib/self-service-trial.ts:69, HttpOnly; Secure; SameSite=Lax). It is an abuse signal consumed by bootstrap_foundation_self_service_trial, never an authorization credential: app/api/access/bootstrap/route.ts rejects the request with AUTH_REQUIRED before reading it unless a Bearer JWT is present.",
+  "cookies": "The API surface sets two cookies. The first is the self-service trial device cookie (lib/self-service-trial.ts:69, HttpOnly; Secure; SameSite=Lax). It is an abuse signal consumed by bootstrap_foundation_self_service_trial, never an authorization credential: app/api/access/bootstrap/route.ts rejects the request with AUTH_REQUIRED before reading it unless a Bearer JWT is present. The second is the acting-workspace cookie `tavonel_ws` (app/api/workspaces/select/route.ts, HttpOnly; Secure; SameSite=Lax; Path=/; 30 days, WO-C-T1). It selects among the caller's own active workspace memberships and grants nothing: lib/acting-workspace.ts honours it only after a Bearer JWT authenticated the request and only while the user holds an active foundation_workspace_members row for the named workspace, re-read on every request; otherwise the user's own workspace. Privilege still comes only from the Bearer header. Billing and access bootstrap never read it.",
   "routes": {
     "app/api/access/bootstrap/route.ts": {
       "type": "A-bearer",
@@ -36,6 +36,14 @@
       ],
       "credential": "bearer:supabase-jwt",
       "note": "WO-AN-3 Disconnect. Session only (a tvnl_agt_ bearer is not a JWT: AUTH_REQUIRED); never behind the flag, never plan-gated. Revokes the caller's own grant, its credential and its open proposals in one transaction; any other id is the same 404."
+    },
+    "app/api/agent-grants/[id]/activity/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-10 per-grant activity. Session only; never behind the flag, never plan-gated. Only the person who made the grant reads it (any other id is the same 404). Rows carry type, state, times and whether a signed receipt exists; no preview, document id, principal or digest. ?format=ndjson answers the same page as a download."
     },
     "app/api/agent-grants/route.ts": {
       "type": "A-bearer",
@@ -389,6 +397,14 @@
       "credential": "bearer:supabase-jwt",
       "note": "Session only: the inbox deep link. Unreadable, foreign, absent, malformed and unknown-type ids are the same 404 body."
     },
+    "app/api/proposals/[id]/receipt/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-10 signed receipt download. Session only: an API key or agent credential is refused. Answers only the stored signed receipt (verifies offline); absent, foreign, unreadable, malformed and unsigned ids are the same 404 body."
+    },
     "app/api/proposals/[id]/decision/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -680,6 +696,15 @@
       ],
       "credential": "bearer:supabase-jwt"
     },
+    "app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-C-T3 member source scope. Owner/admin only (requireWorkspaceMembership), repeated in set_member_source_scope; PUT needs an Idempotency-Key and replaces the scope, effective on the member's next request."
+    },
     "app/api/workspaces/[workspaceKey]/members/[userId]/route.ts": {
       "type": "A-bearer",
       "methods": [
@@ -687,6 +712,22 @@
         "DELETE"
       ],
       "credential": "bearer:supabase-jwt"
+    },
+    "app/api/workspaces/select/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Sets the acting-workspace cookie tavonel_ws only after the Bearer JWT is authenticated and an active membership in the named workspace is read; choosing one's own workspace clears it. The cookie selects among the caller's own memberships; privilege still comes only from the Bearer header."
+    },
+    "app/api/workspaces/mine/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "Lists the caller's own active workspace memberships and which one the request acts in, with each workspace's owner display name (the name only: never the owner's user id, email or other metadata; read server-side from Supabase Auth with the service role). The cookie selects among the caller's own memberships; privilege still comes only from the Bearer header."
     },
     "app/api/access/processing-terms/route.ts": {
       "type": "A-bearer",
@@ -738,6 +779,149 @@
       ],
       "credential": "oauth:authorization-code+pkce",
       "note": "Remote MCP token endpoint (G11), 404 while off. Mints a developer key holding only the granted read scopes, expiring with the token, through the authorization-revision-checked key RPC."
+    }
+  },
+  "memberScope": {
+    "purpose": "WO-C-T3: every API route, by how a workspace member's source scope reaches it. A member reads a World only when every source behind it is in their scope (TC-D2); lists drop what a member cannot read and never return its count, title or id. lib/route-classification.test.ts fails when a route is in none of the three maps or in two, when an entry names a file that no longer exists, or when an enforced route's file does not contain the mechanism its entry names.",
+    "enforced": {
+      "app/api/agent-mcp/route.ts": "refused:AGENT_MCP_MEMBER_UNAVAILABLE: the agent tools list Worlds without a scope, so a member's agent is refused",
+      "app/api/agent-grants/[id]/activity/route.ts": "chokepoint-via:listGrantActivity: proposals under the grant are dropped when the viewer cannot read their documents (filterReadableProposals)",
+      "app/api/collections/[id]/ask/route.ts": "chokepoint: the active World's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
+      "app/api/collections/[id]/download/route.ts": "chokepoint: the package's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
+      "app/api/collections/[id]/promote/route.ts": "chokepoint: the candidate's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
+      "app/api/collections/[id]/route.ts": "chokepoint: the candidate's sources through checkConnectorSourceAccessForViewer; out of scope is 403",
+      "app/api/collections/[id]/search/route.ts": "world-gate: the served version's sources (memberCollectionScopeRefusal) before the allowance; 403 MEMBER_SOURCE_SCOPE_DENIED",
+      "app/api/collections/[id]/world/route.ts": "world-gate: the active World's sources (memberCollectionScopeRefusal); 403 MEMBER_SOURCE_SCOPE_DENIED",
+      "app/api/collections/compile/route.ts": "sources-gate: the requested documents (memberSourcesRefusal); a member compiles only in scope (TC-D7)",
+      "app/api/compile-jobs/[jobId]/blockers/route.ts": "sources-gate: the job's documents before a member resolves anything (memberSourcesRefusal)",
+      "app/api/compile-jobs/[jobId]/cancel/route.ts": "sources-gate: the job's documents (memberSourcesRefusal)",
+      "app/api/compile-jobs/[jobId]/events/route.ts": "sources-gate: the job's documents before the stream opens (memberSourcesRefusal)",
+      "app/api/compile-jobs/[jobId]/route.ts": "sources-gate: the job's documents (memberSourcesRefusal); 403 MEMBER_SOURCE_SCOPE_DENIED",
+      "app/api/compile-jobs/corpus/[corpusId]/route.ts": "sources-gate: every part's documents (memberSourcesRefusal); one out of scope refuses the corpus",
+      "app/api/compile-jobs/route.ts": "chokepoint: the requested documents through checkConnectorSourceAccessForViewer",
+      "app/api/documents/[id]/candidates/route.ts": "chokepoint: the document through checkConnectorSourceAccessForViewer",
+      "app/api/documents/[id]/lifecycle/route.ts": "chokepoint: the document through checkConnectorSourceAccessForViewer",
+      "app/api/documents/[id]/progress/route.ts": "chokepoint: the document through checkConnectorSourceAccessForViewer",
+      "app/api/documents/[id]/source/route.ts": "chokepoint: the document through checkConnectorSourceAccessForViewer",
+      "app/api/documents/route.ts": "filter: rows outside the member's scope are dropped (filterMemberReadableDocumentIds), never counted; then the chokepoint",
+      "app/api/library/decisions/route.ts": "chokepoint: the document through checkConnectorSourceAccessForViewer",
+      "app/api/library/route.ts": "chokepoint-via:readLibraryDocuments: each id through checkConnectorSourceAccessForViewer",
+      "app/api/proposals/[id]/receipt/route.ts": "chokepoint-via:readProposalReceipt: an unreadable proposal is the same 404 (filterReadableProposals)",
+      "app/api/proposals/[id]/decision/route.ts": "chokepoint-via:decideProposal: the proposal's documents through checkConnectorSourceAccessForViewer",
+      "app/api/proposals/[id]/route.ts": "chokepoint-via:filterReadableProposals: an unreadable proposal is the same 404",
+      "app/api/proposals/[id]/undo/route.ts": "chokepoint-via:undoProposal: the proposal's documents through checkConnectorSourceAccessForViewer",
+      "app/api/proposals/route.ts": "chokepoint-via:filterReadableProposals: proposals naming an unreadable document are dropped",
+      "app/api/v1/collections/[id]/ask/route.ts": "delegates:../../../../collections/[id]/ask/route",
+      "app/api/v1/collections/[id]/download/route.ts": "delegates:../../../../collections/[id]/download/route",
+      "app/api/v1/collections/[id]/retrieval-index/route.ts": "chokepoint: the active World's sources through checkConnectorSourceAccessForViewer",
+      "app/api/v1/collections/[id]/route.ts": "delegates:../../../collections/[id]/route",
+      "app/api/v1/collections/[id]/search/route.ts": "delegates:../../../../collections/[id]/search/route",
+      "app/api/v1/collections/[id]/world/route.ts": "delegates:../../../../collections/[id]/world/route",
+      "app/api/v1/collections/compile/route.ts": "delegates:../../../collections/compile/route",
+      "app/api/v1/collections/route.ts": "world-gate: a member's page keeps only Worlds whose every source is in scope (memberCollectionScopeRefusal); the cursor is always a returned id",
+      "app/api/v1/documents/route.ts": "delegates:../../documents/route",
+      "app/api/v1/reviews/route.ts": "world-gate: the World reviewed or listed (memberCollectionScopeRefusal)",
+      "app/api/v1/runs/[runId]/events/route.ts": "refused:MEMBER_SOURCE_SCOPE_DENIED: a connector run names sources no scope was checked against",
+      "app/api/v1/world/[id]/[lens]/route.ts": "world-gate: the version read (memberCollectionScopeRefusal)",
+      "app/api/v1/world/[id]/ask/route.ts": "delegates:../../../collections/[id]/ask/route",
+      "app/api/v1/world/[id]/manifest-status/route.ts": "world-gate: the active or bound World (memberCollectionScopeRefusal)",
+      "app/api/v1/world/[id]/route.ts": "world-gate: the version read (memberCollectionScopeRefusal)"
+    },
+    "elsewhere": {
+      "app/api/collections/[id]/world/rollback/route.ts": "Acts in the caller's own derived workspace only (foundationPilotAccess) on this base; WO-C-T1 keeps rollback owner/admin (TC-D7) when it moves the route to the acting workspace.",
+      "app/api/mcp/route.ts": "Remote MCP: never edited here. WO-C-T1 refuses the mcp audience for members (TC-D3, REMOTE_MCP_MEMBER_UNAVAILABLE); its delegated v1 reads carry the gates above, its direct World list does not."
+    },
+    "noSourceContent": {
+      "app/api/access/bootstrap/route.ts": "Access bootstrap and processing terms of the caller; no source content.",
+      "app/api/access/processing-terms/route.ts": "Access bootstrap and processing terms of the caller; no source content.",
+      "app/api/account/test-reset/route.ts": "Founder-only account reset; no source content.",
+      "app/api/agent-grants/[id]/route.ts": "The caller's own agent grants; no source content.",
+      "app/api/agent-grants/route.ts": "The caller's own agent grants; no source content.",
+      "app/api/billing/checkout/route.ts": "Billing of the caller's own workspace; no source content.",
+      "app/api/billing/portal/route.ts": "Billing of the caller's own workspace; no source content.",
+      "app/api/billing/refund-request/route.ts": "Billing of the caller's own workspace; no source content.",
+      "app/api/billing/status/route.ts": "Billing of the caller's own workspace; no source content.",
+      "app/api/connections/[id]/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/connections/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/contact/route.ts": "Public contact form; no tenant data.",
+      "app/api/csp-report/route.ts": "Browser CSP reports; no tenant data.",
+      "app/api/developer/keys/[id]/rotate/route.ts": "The caller's own API keys; no source content.",
+      "app/api/developer/keys/[id]/route.ts": "The caller's own API keys; no source content.",
+      "app/api/developer/keys/route.ts": "The caller's own API keys; no source content.",
+      "app/api/enterprise/audit/export/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
+      "app/api/enterprise/dashboard/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
+      "app/api/enterprise/identity/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
+      "app/api/enterprise/overview/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
+      "app/api/enterprise/policies/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
+      "app/api/export/trust/route.ts": "The public export-signing trust record; no tenant data.",
+      "app/api/healthz/route.ts": "Liveness; no tenant data.",
+      "app/api/internal/agent-grants/revoke-all/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/billing/gate-enforce/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/billing/settle/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/cdr/identity/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/change-notify/run/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/deletions/attest/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/deletions/retention/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/deletions/run/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/jobs/acl-refresh/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/jobs/run/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/model-provider/reconcile/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/oauth-secrets/v1/secrets/[operation]/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/probe/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/remote-mcp/revoke-all/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/sli-alerts/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/internal/sli/route.ts": "Signed internal service route; no user principal and no response content for a member.",
+      "app/api/mcp/oauth/authorize/route.ts": "OAuth for the remote MCP; issues credentials, returns no source content.",
+      "app/api/mcp/oauth/register/route.ts": "OAuth for the remote MCP; issues credentials, returns no source content.",
+      "app/api/mcp/oauth/token/route.ts": "OAuth for the remote MCP; issues credentials, returns no source content.",
+      "app/api/openapi/route.ts": "Public API description; no tenant data.",
+      "app/api/operations/p0/admission/route.ts": "Operator console; no customer source content.",
+      "app/api/operations/p0/credits/release/route.ts": "Operator console; no customer source content.",
+      "app/api/operations/p0/route.ts": "Operator console; no customer source content.",
+      "app/api/operator/status/v1/route.ts": "Operator status; no customer source content.",
+      "app/api/paddle/webhook/route.ts": "Payment webhook; no user principal.",
+      "app/api/proof-pdf/route.ts": "A fixed public sample PDF; no tenant data.",
+      "app/api/readyz/route.ts": "Readiness; no tenant data.",
+      "app/api/research-updates/route.ts": "Public research updates; no tenant data.",
+      "app/api/status/route.ts": "Public service status; no tenant data.",
+      "app/api/status/v2/route.ts": "Public service status; no tenant data.",
+      "app/api/uploads/approval/cancel/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/uploads/approval/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/uploads/capability/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/uploads/confirm/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/uploads/release/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/uploads/synthetic-canary/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/capabilities/route.ts": "The public capability manifest; no tenant data.",
+      "app/api/v1/connections/[id]/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/connections/[id]/sync/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/connections/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/developer/audit/route.ts": "The caller's own API keys and their audit; no source content.",
+      "app/api/v1/developer/keys/[id]/rotate/route.ts": "The caller's own API keys and their audit; no source content.",
+      "app/api/v1/oauth-connectors/authorize/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/oauth-connectors/callback/[provider]/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/oauth-connectors/connections/[id]/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/oauth-connectors/connections/[id]/sync/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/oauth-connectors/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/oauth-connectors/viewer-links/revoke/route.ts": "Connector configuration and sync control; returns no document, World, evidence or search content.",
+      "app/api/v1/runs/events/route.ts": "Always 400 RUN_ID_REQUIRED; reads nothing.",
+      "app/api/v1/uploads/approval/cancel/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/approval/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/capability/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/confirm/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/quote/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/release/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/triage/complete/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/triage/preflight/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/triage/receipt/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/v1/uploads/triage/stage/route.ts": "Intake of the caller's own files (attempts and admissions bound to the caller); returns no other person's source content.",
+      "app/api/workspace-invites/accept/route.ts": "Invite acceptance; no source content.",
+      "app/api/workspaces/[workspaceKey]/invites/[inviteId]/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
+      "app/api/workspaces/[workspaceKey]/invites/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
+      "app/api/workspaces/[workspaceKey]/members/[userId]/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
+      "app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
+      "app/api/workspaces/[workspaceKey]/members/route.ts": "Membership, invites and source scopes themselves (owner/admin manage); no source content.",
+      "app/api/workspaces/mine/route.ts": "The caller's own active memberships, owner names and plan labels; no source content.",
+      "app/api/workspaces/select/route.ts": "Chooses the caller's acting workspace among their own active memberships; no source content."
     }
   }
 }

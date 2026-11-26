@@ -1,7 +1,9 @@
 import type { PaddleBillingAction } from "./paddle-billing-event";
 import type { CheckoutBinding } from "./billing-binding";
 import type { BillingOffer } from "./billing-catalog";
+import { foundationWorkspaceId } from "./foundation-pilot";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import { getWorkspaceMembership } from "./workspace-membership";
 
 export type FoundationBillingAccount = {
   workspaceKey: string;
@@ -78,11 +80,30 @@ function normalizeAccount(row: Record<string, unknown>, workspaceKey: string, us
   };
 }
 
-export async function getFoundationBillingAccount(workspaceKey: string, userId: string) {
+const ACCOUNT_COLUMNS = "workspace_key,user_id,access_plan,plan_code,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,overage_enabled,overage_units,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type BillingAccountRead =
+  | { ok: true; account: FoundationBillingAccount }
+  | { ok: false; code: string };
+
+/**
+ * The billing account a caller draws on in a workspace. `account.userId` is the PAYER: the caller
+ * for an account of their own; for an active admin or member (WO-C-T2) the holder of the workspace's
+ * account, or its active owner when it has none -- so a reader tells the two apart by
+ * `account.userId !== userId`. The same rule as foundation_workspace_payer (20261123120000).
+ *
+ * The caller's own account is read exactly as before. Only when there is none, in a workspace that is
+ * not the caller's own (`foundationWorkspaceId`), is their membership read: an active admin or member
+ * draws on the workspace's account. Two accounts, or no account and no single active owner, is an
+ * integrity failure, never an empty plan. Without an active admin or member row the answer is the
+ * empty account it always was.
+ */
+export async function getFoundationBillingAccount(workspaceKey: string, userId: string): Promise<BillingAccountRead> {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "BILLING_STORE_NOT_CONFIGURED" };
   const query = new URLSearchParams({
-    select: "workspace_key,user_id,access_plan,plan_code,subscription_status,credit_balance,lifetime_credits_purchased,lifetime_credits_reversed,overage_enabled,overage_units,billing_hold,paddle_customer_id,paddle_subscription_id,subscription_cancel_at,updated_at",
+    select: ACCOUNT_COLUMNS,
     workspace_key: `eq.${workspaceKey}`,
     user_id: `eq.${userId}`,
     limit: "1",
@@ -95,12 +116,63 @@ export async function getFoundationBillingAccount(workspaceKey: string, userId: 
   }
   if (!response.ok) return { ok: false as const, code: "BILLING_STORE_READ_FAILED" };
   const rows = await response.json() as Array<Record<string, unknown>>;
-  return {
-    ok: true as const,
-    account: rows[0]
-      ? normalizeAccount(rows[0], workspaceKey, userId)
-      : { workspaceKey, userId, ...EMPTY_BILLING_ACCOUNT },
-  };
+  if (rows[0]) return { ok: true as const, account: normalizeAccount(rows[0], workspaceKey, userId) };
+  if (workspaceKey === foundationWorkspaceId(userId)) {
+    return { ok: true as const, account: { workspaceKey, userId, ...EMPTY_BILLING_ACCOUNT } };
+  }
+  return getMemberWorkspaceAccount(config, workspaceKey, userId);
+}
+
+async function readRows(config: NonNullable<ReturnType<typeof readSupabaseAdminConfig>>, path: string) {
+  try {
+    const response = await supabaseAdminRequest(config, path);
+    if (!response.ok) return null;
+    const rows: unknown = await response.json().catch(() => null);
+    return Array.isArray(rows) ? rows as Array<Record<string, unknown>> : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getMemberWorkspaceAccount(
+  config: NonNullable<ReturnType<typeof readSupabaseAdminConfig>>,
+  workspaceKey: string,
+  userId: string,
+): Promise<BillingAccountRead> {
+  // The membership row is read directly (WO-C-T1's resolver is not on this base).
+  const actor = await getWorkspaceMembership(workspaceKey, userId);
+  if (!actor.ok) return { ok: false, code: actor.code };
+  if (!actor.membership || actor.membership.state !== "active" || actor.membership.role === "owner") {
+    return { ok: true, account: { workspaceKey, userId, ...EMPTY_BILLING_ACCOUNT } };
+  }
+  // The payer is the holder of the workspace's account, the user foundation_workspace_capped_plan
+  // (20261117160000) reads; a workspace with no account answers to its active owner.
+  const accounts = await readRows(config, `/rest/v1/foundation_billing_accounts?${new URLSearchParams({
+    select: ACCOUNT_COLUMNS,
+    workspace_key: `eq.${workspaceKey}`,
+    limit: "2",
+  })}`);
+  if (!accounts) return { ok: false, code: "BILLING_STORE_READ_FAILED" };
+  if (accounts.length > 0) {
+    const row = accounts[0];
+    if (accounts.length > 1 || row.workspace_key !== workspaceKey
+      || typeof row.user_id !== "string" || !UUID.test(row.user_id)) {
+      return { ok: false, code: "BILLING_ACCOUNT_INTEGRITY_FAILED" };
+    }
+    return { ok: true, account: normalizeAccount(row, workspaceKey, row.user_id) };
+  }
+  const owners = await readRows(config, `/rest/v1/foundation_workspace_members?${new URLSearchParams({
+    select: "user_id",
+    workspace_key: `eq.${workspaceKey}`,
+    role: "eq.owner",
+    state: "eq.active",
+    limit: "2",
+  })}`);
+  if (!owners) return { ok: false, code: "BILLING_STORE_READ_FAILED" };
+  const ownerId = owners.length === 1 && typeof owners[0].user_id === "string" && UUID.test(owners[0].user_id)
+    ? owners[0].user_id : null;
+  if (!ownerId) return { ok: false, code: "BILLING_ACCOUNT_PAYER_UNRESOLVED" };
+  return { ok: true, account: { workspaceKey, userId: ownerId, ...EMPTY_BILLING_ACCOUNT } };
 }
 
 /**

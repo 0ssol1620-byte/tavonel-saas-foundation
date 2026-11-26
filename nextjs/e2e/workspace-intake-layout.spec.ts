@@ -6,6 +6,12 @@ import { expect, test } from "@playwright/test";
    workspace-intake-triage suite remains the acceptance gate for the mounted workflow. */
 const workspaceCss = ["tavonel.css", "workspace-final-polish.css", "workspace-no1.css"]
   .map((name) => readFileSync(new URL(`../app/${name}`, import.meta.url), "utf8")).join("\n");
+/* The workspace <main> carries the V34 token sheet's `.site` (WO-WS-2), and the workspace sheets read its
+   --v34-* names -- the focus ring among them (WO-WS-3). Without the block every such var() is invalid and the
+   ring is not drawn, so the fixture's <main> takes the same `.site` declarations, read from the sheet. */
+const v34Site = readFileSync(new URL("../components/v34/tokens.module.css", import.meta.url), "utf8")
+  .replace(/\r\n/g, "\n").match(/^\.site \{[\s\S]*?\n\}/m)?.[0];
+if (!v34Site) throw new Error("components/v34/tokens.module.css has no .site block; update this isolated fixture.");
 const triageSource = readFileSync(new URL("../components/intake-triage-review.tsx", import.meta.url), "utf8");
 const introduction = triageSource.match(/<h3>Source inventory and cost review<\/h3>[\s\S]*?(?=\{!batch)/)?.[0]
   .replaceAll("className=", "class=");
@@ -27,11 +33,12 @@ test("nested triage keeps the inventory edge, natural Clear height and usable so
   await page.route("**/*", (route) => route.abort());
   await page.setContent(`<!doctype html><html><head><style>
     @layer reset, tokens, base, components, utilities, overrides;
+    ${v34Site}
     ${workspaceCss}
     /* Only the surrounding allocation is synthetic; tested intake rules come from the sheets. */
     .fixture.fixture { display: block; margin: 24px 16px; }
     @media (min-width: 1024px) { .fixture.fixture { margin: 24px 40px 24px 264px; } }
-  </style></head><body><main id="fixture" class="fixture workspace one-path-workspace">
+  </style></head><body><main id="fixture" class="fixture workspace one-path-workspace site">
     <section class="workspace-intake"><div class="workspace-preflight">
       <p class="fine">Page counts were counted from the documents themselves. You will never be charged above the maximum shown.</p>
       <ul class="workspace-preflight-files" data-fixture-inventory><li><strong>scan.pdf</strong><span>Staged source inventory</span></li></ul>

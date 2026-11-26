@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "tavonel.router_evidence_table.v1",
+  "tableVersion": 1,
+  "source": "ADR-012 section 3 (Core codex/v34-rtr-0 6963fde3). Internal; never a public DTO. No threshold here is calibrated.",
+  "classes": {
+    "native_text": { "rowId": "RT-1", "incumbentRoute": "native_text" },
+    "raster_text": { "rowId": "RT-3", "incumbentRoute": "rapidocr_raster" },
+    "no_text": { "rowId": "RT-3", "incumbentRoute": "rapidocr_raster" }
+  },
+  "rows": [
+    {
+      "id": "RT-1",
+      "route": "native_text",
+      "supports": "native text, as the incumbent already does; no other reader was compared under the same condition, so the incumbent stays",
+      "receipt": "foundation-ocr-gpu/app.py:585-608 (behaviour, not evidence); ADR-012 section 3 RT-1",
+      "costUsdPerPage": null
+    },
+    {
+      "id": "RT-3",
+      "route": "rapidocr_raster",
+      "supports": "no same-condition evidence: the incumbent stays",
+      "receipt": "ADR-012 section 3 RT-3 and section 2 (Phase 5 corpus not assembled)",
+      "costUsdPerPage": null
+    }
+  ],
+  "unobservable": [
+    { "id": "RT-2a", "why": "S4 stratum R: SEC source pages read as images; production pages with a text layer are born-digital and go native" },
+    { "id": "RT-2b", "why": "S4 stratum H: synthetically degraded pages; no production page is observable as such" }
+  ]
+}

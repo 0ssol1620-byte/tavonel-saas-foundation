@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { actionBody, agentBadge, batchEligible, decisionProblem, deepLinkGone, listable, ProposalItem, rowActions } from "../components/change-proposals-panel";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { actionBody, agentBadge, batchEligible, decisionLine, decisionProblem, deepLinkGone, listable, ProposalItem, receiptOffered, rowActions, saveAsFile } from "../components/change-proposals-panel";
 import type { PublicProposal } from "./change-proposals";
 import { PROMPT_INJECTION_FIXTURES } from "./prompt-injection.fixtures";
 
@@ -167,5 +167,65 @@ describe("proposal rows (WO-AN-6)", () => {
   it("the runbook says what the kill switch covers and what a later grant is (WO-AN-6B)", () => {
     const adr = readFileSync(new URL("../../docs/adr/0009-agent-proposals.md", import.meta.url), "utf8");
     expect(adr).toContain("The kill switch disconnects every grant committed before it commits; a grant created afterwards is a new one, and the flag is what forbids new grants.");
+  });
+});
+
+describe("proposal rows show the audit (WO-AN-10)", () => {
+  const decided = (over: Record<string, unknown> = {}) =>
+    label({ state: "executed", previewDigest: null, decidedAt: "2026-11-18T09:30:45.000Z", youDecided: true, receiptAvailable: true, ...over });
+
+  it("says who confirmed and when, in UTC, and never names a person", () => {
+    expect(decisionLine(decided())).toBe("Confirmed by you at 2026-11-18 09:30 UTC");
+    expect(decisionLine(decided({ youDecided: false }))).toBe("Confirmed by another member of this workspace at 2026-11-18 09:30 UTC");
+    expect(decisionLine(decided({ state: "rejected" }))).toBe("Rejected by you at 2026-11-18 09:30 UTC");
+    expect(html(decided())).toContain("Confirmed by you at 2026-11-18 09:30 UTC");
+  });
+  it("says nothing it was not told: no decider, no time, a time that is not one, or an answer from an older server", () => {
+    expect(decisionLine(decided({ youDecided: null }))).toBeNull();
+    expect(decisionLine(decided({ decidedAt: null }))).toBeNull();
+    expect(decisionLine(decided({ decidedAt: "not a time" }))).toBeNull();
+    const { youDecided: _omitted, ...older } = decided();
+    expect(decisionLine(older as unknown as PublicProposal)).toBeNull();
+    expect(decisionLine(label({ youDecided: true, decidedAt: "2026-11-18T09:30:45.000Z" }))).toBeNull();
+    for (const state of ["proposed", "expired", "stale", "withdrawn"]) expect(decisionLine(decided({ state })), state).toBeNull();
+  });
+  it("offers the signed receipt only where the server says one is stored, and never on a proposed row", () => {
+    const withReceipt = (proposal: PublicProposal) => renderToStaticMarkup(createElement(ProposalItem, { proposal, disabled: false, onAct: () => undefined, onReceipt: () => undefined }));
+    expect(withReceipt(decided())).toContain("Signed receipt");
+    expect(withReceipt(decided({ state: "failed" }))).toContain("Signed receipt");
+    expect(withReceipt(decided({ state: "undone" }))).toContain("Signed receipt");
+    expect(withReceipt(decided({ receiptAvailable: false }))).not.toContain("Signed receipt");
+    expect(withReceipt(label({ receiptAvailable: true }))).not.toContain("Signed receipt");
+    expect(html(decided())).not.toContain("Signed receipt");
+    expect(receiptOffered(decided({ receiptAvailable: undefined }))).toBe(false);
+  });
+});
+
+describe("saveAsFile (WO-AN-10)", () => {
+  const click = vi.fn();
+  const anchor = { href: "", download: "", click };
+  beforeEach(() => {
+    click.mockClear();
+    anchor.href = "";
+    anchor.download = "";
+    vi.stubGlobal("document", { createElement: () => anchor });
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:test", revokeObjectURL: () => undefined }));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads the path with the session and hands the body to the browser under the given name", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await saveAsFile("/api/proposals/x/receipt", "receipt-x.json")).toBe(true);
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/proposals/x/receipt");
+    expect(anchor).toMatchObject({ href: "blob:test", download: "receipt-x.json" });
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+  it("a refusal or a lost connection downloads nothing and says so", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 404 })));
+    expect(await saveAsFile("/api/proposals/x/receipt", "r.json")).toBe(false);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    expect(await saveAsFile("/api/proposals/x/receipt", "r.json")).toBe(false);
+    expect(click).not.toHaveBeenCalled();
   });
 });

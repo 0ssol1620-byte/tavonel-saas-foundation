@@ -174,12 +174,13 @@ describe("prepare: the creation dry-run", () => {
     expect(store.map((call) => call.path)).toEqual(["/rest/v1/rpc/quote_foundation_compile_recharge"]);
   });
 
+  /* WO-AN-8: the unavailable case also carries decidingReadFailed (server log only); the denied one does not. */
   it.each([
-    ["denied", { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" }],
-    ["unavailable", { ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" }],
-  ])("access %s is the same not-found, checked before anything else", async (_name, answer) => {
+    ["denied", { ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" }, {}],
+    ["unavailable", { ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" }, { decidingReadFailed: true }],
+  ])("access %s is the same not-found, checked before anything else", async (_name, answer, flag) => {
     checkAccess.mockResolvedValue(answer);
-    expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404 });
+    expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404, ...flag });
     expect(listObjects).not.toHaveBeenCalled();
     expect(store).toEqual([]);
   });
@@ -216,9 +217,10 @@ describe("prepare: the creation dry-run", () => {
       [`the listing throwing ${String(value)}`, () => listObjects.mockImplementation(async () => { throw value; })],
     ]),
   ];
+  /* WO-AN-8: the same not-found, flagged decidingReadFailed for the route's log (the absent cases above are not flagged). */
   it.each(deciding)("agent: %s is the same not-found as an unreadable id, and nothing is quoted", async (_name, arrange) => {
     arrange();
-    expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404 });
+    expect(await prepare([DOC_A])).toEqual({ ok: false, code: "PROPOSAL_TARGET_NOT_FOUND", status: 404, decidingReadFailed: true });
     expect(store).toEqual([]);
   });
 

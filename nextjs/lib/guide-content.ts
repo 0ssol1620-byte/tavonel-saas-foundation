@@ -205,7 +205,7 @@ const EN: GuideChapter[] = [
   /*
     2. /explore, the entry act: components/explore/evidence-workbench.tsx (scope line, "Find a
     sample question", "Retrieved source passage", the Result/Source tabs below 760px) and the
-    prepared questions in lib/explore-sample.ts. "Complete text ... not a rewrite" is
+    prepared questions in lib/explore-sample.ts. "Source text ... not a rewrite" is
     `EXPLORE_COPY.askNote` (lib/explore-story.ts).
   */
   {
@@ -218,7 +218,7 @@ const EN: GuideChapter[] = [
         items: [
           "Open /explore. The note at the top names the sample and the date its sources were captured.",
           "Under **Find a sample question**, choose a prepared question, or type to filter them.",
-          "Read the answer under **Retrieved source passage**. It is the complete text of the source regions the retriever selected, not a rewrite of it.",
+          "Read the answer under **Retrieved source passage**. It is source text the retriever selected, not a rewrite of it: from each cited region, the part that matches the question, word for word. “…” marks where a region goes on.",
           "Each row under the passage names its source file and page. Choose a row to open that page; on a phone, **Result** and **Source** switch between the passage and the page.",
         ],
       },
@@ -589,7 +589,7 @@ const KO: GuideChapter[] = [
         items: [
           "/explore를 엽니다. 맨 위의 안내가 샘플과 그 원문을 수집한 날짜를 알려 줍니다.",
           "**Find a sample question** 아래에서 준비된 질문 하나를 고르거나, 입력해서 질문을 거릅니다.",
-          "**Retrieved source passage** 아래의 답을 읽습니다. 검색이 고른 원문 영역의 전체 텍스트이며, 다시 쓴 글이 아닙니다.",
+          "**Retrieved source passage** 아래의 답을 읽습니다. 검색이 고른 원문 영역마다 질문과 맞는 부분을 그대로 옮긴 것이며, 다시 쓴 글이 아닙니다. “…”는 영역이 더 이어진다는 표시입니다.",
           "발췌 아래의 각 행은 원문 파일과 페이지를 알려 줍니다. 행을 고르면 그 페이지가 열립니다. 휴대폰에서는 **Result**와 **Source**로 발췌와 페이지를 오갑니다.",
         ],
       },

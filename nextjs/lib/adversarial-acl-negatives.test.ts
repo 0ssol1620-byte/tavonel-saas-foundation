@@ -65,6 +65,7 @@ const h = vi.hoisted(() => ({
   rateLimit: vi.fn(),
   getCandidate: vi.fn(),
   rollbackAccess: vi.fn(),
+  membership: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -120,6 +121,11 @@ vi.mock("@/lib/world-rollback-source-access", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./world-rollback-source-access")>()),
   checkRollbackSourceAccess: h.rollbackAccess,
 }));
+// WO-C-T1: the acting-workspace cookie is resolved against this read; by default nobody is a member.
+vi.mock("@/lib/workspace-membership", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./workspace-membership")>()),
+  getWorkspaceMembership: h.membership,
+}));
 vi.mock("@/lib/connector-source-access", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./connector-source-access")>()),
   checkConnectorSourceAccessForViewer: h.connector,
@@ -139,7 +145,7 @@ import { GET as documentSource } from "../app/api/documents/[id]/source/route";
 import { GET as v1World } from "../app/api/v1/world/[id]/route";
 import { GET as v1Lens } from "../app/api/v1/world/[id]/[lens]/route";
 
-const alpha = { ok: true, principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [] } };
+const alpha = { ok: true, principal: { kind: "api-key", workspaceKey: MINE, userId: "user-alpha", scopes: [], workspaceRole: "owner" } };
 const alphaUser = { id: "user-alpha" };
 const alphaPilot = (role: string) => ({ membership: { workspaceId: MINE, role } });
 
@@ -154,6 +160,7 @@ function resetFakes() {
   h.spend.mockResolvedValue({ ok: true });
   h.signerEnv.mockReturnValue({ accountId: "acct", accessKeyId: "id", secretAccessKey: "secret", bucket: "b" });
   h.connector.mockResolvedValue({ ok: true });
+  h.membership.mockResolvedValue({ ok: true, membership: null });
   // Without this the unmocked limiter answers 503 before any workspace-scoped lookup runs.
   h.rateLimit.mockResolvedValue({ ok: true });
   h.getCandidate.mockImplementation(async (_signer: unknown, workspace: string) => {
@@ -393,6 +400,40 @@ for (const key of ["promote", "rollback"] as const) {
   });
 }
 
+// WO-C-T1: the session routes resolve the acting workspace from the `tavonel_ws` cookie. A cookie
+// naming the other tenant without an active membership in it, a revoked one, or a malformed value
+// leaves every store hop on the caller's own workspace; a membership store that cannot be read is
+// a 503 before any store hop, never the caller's own workspace standing in.
+for (const key of SESSION) {
+  const route = ROUTES[key]!;
+  const cookie = (value: string) => ({ cookie: `tavonel_ws=${value}` });
+  add(`${route.name}: acting-workspace cookie naming a workspace the caller is not a member of`, async () => {
+    const r = await assertRefusal("cookie non-member", await route.call(foreignId(route.kind), cookie(THEIRS)), [foreignId(route.kind)]);
+    assertNoStore(key, "cookie non-member", r.cache);
+    expect(h.membership).toHaveBeenCalledWith(THEIRS, alphaUser.id);
+    if (key === "promote" || key === "rollback") expect(scopes.length, "store was asked").toBeGreaterThan(0);
+  });
+  add(`${route.name}: acting-workspace cookie for a revoked membership`, async () => {
+    h.membership.mockResolvedValue({ ok: true, membership: { workspaceKey: THEIRS, userId: alphaUser.id, role: "admin", state: "revoked", acceptedAt: "2026-11-18T00:00:00Z", revokedAt: "2026-11-18T01:00:00Z", authorizationRevision: 2 } });
+    const r = await assertRefusal("cookie revoked", await route.call(foreignId(route.kind), cookie(THEIRS)), [foreignId(route.kind)]);
+    assertNoStore(key, "cookie revoked", r.cache);
+  });
+  add(`${route.name}: malformed acting-workspace cookie is not even looked up`, async () => {
+    for (const value of [`${THEIRS}/../x`, `"${THEIRS}"`, `${THEIRS}; tavonel_ws=${THEIRS}`, "x".repeat(5_000)]) {
+      const r = await assertRefusal(`cookie ${value.slice(0, 20)}`, await route.call(foreignId(route.kind), cookie(value)), [foreignId(route.kind)]);
+      assertNoStore(key, "cookie malformed", r.cache);
+    }
+    expect(h.membership).not.toHaveBeenCalled();
+  });
+  add(`${route.name}: membership store down for a requested workspace is 503 before any store hop`, async () => {
+    h.membership.mockResolvedValue({ ok: false, code: "WORKSPACE_MEMBERSHIP_READ_FAILED", status: 503 });
+    const r = await assertRefusal("cookie store down", await route.call(foreignId(route.kind), cookie(THEIRS)), [foreignId(route.kind)]);
+    expect(r.status).toBe(503);
+    expect(r.cache).toBe("no-store");
+    expect(scopes).toEqual([]);
+  });
+}
+
 add("v1 world lens: lens outside the six is refused before any read", async () => {
   const response = await v1Lens(get(`/api/v1/world/${THEIR_COLLECTION}/..%2f..%2fdocuments`), params({ id: THEIR_COLLECTION, lens: "../../documents" }));
   const r = await assertRefusal("lens", response, [THEIR_COLLECTION]);
@@ -550,7 +591,7 @@ describe(`seeded generated negatives (ADVERSARIAL_N=${N}, seed ${SEED})`, () => 
         h.productAccess.mockResolvedValue({ ok: false, code: "PLAN_REQUIRED", status: 403 });
         h.activationAccess.mockResolvedValue({ ok: false, code: "PLAN_REQUIRED", status: 403 });
       }
-      const smuggle = rnd() < 0.5 ? { "x-forwarded-workspace": THEIRS, "x-tenant": THEIRS, cookie: `workspace=${THEIRS}` } : undefined;
+      const smuggle = rnd() < 0.5 ? { "x-forwarded-workspace": THEIRS, "x-tenant": THEIRS, cookie: `workspace=${THEIRS}; tavonel_ws=${THEIRS}` } : undefined;
       const label = `#${i} ${route.name} id=${JSON.stringify(id.slice(0, 60))}`;
       try {
         const response = await route.call(id, smuggle);

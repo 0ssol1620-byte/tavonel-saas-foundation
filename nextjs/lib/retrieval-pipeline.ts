@@ -1,6 +1,7 @@
 import { buildContextPacket, type ContextPacket, type RankedRetrievalUnit } from "./context-packet";
 import type { EmbedderAdapter } from "./embedder-adapter";
-import { expandedTokens } from "./lexical-tokens";
+import { expandedTokens, tokens } from "./lexical-tokens";
+import { entityTerms, entityTier, questionTerms } from "./ask-evidence-window";
 import { reciprocalRankFusion, toRankedList, type FusionInput } from "./rank-fusion";
 import { rerankWithFallback, type RerankerAdapter } from "./reranker-adapter";
 import { candidateIdentityKey } from "./adaptive-router";
@@ -392,12 +393,24 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
 
   const gated = applyWorldGate(input.workspaceKey, gateCandidates, () => input.worldManifestDigest);
 
+  /*
+    Entity terms first (WO-ASK-0, ask-evidence-window.ts rule 1), judged over every hydrated
+    candidate by document. A stable sort: within each tier the fused/reranked order stands, and
+    when the question has no entity term every tier is 0 and nothing moves. Every eligible unit was
+    hydrated (gateCandidates reads unitById), so its tokens exist.
+  */
+  const terms = questionTerms(question);
+  const tokensOf = new Map(hydrated.value.map(unit => [unit.unitId, new Set(tokens(unit.text))]));
+  const entities = entityTerms(terms, hydrated.value.map(unit => ({ source: unit.documentId, tokens: tokensOf.get(unit.unitId)! })));
+  const tierOf = new Map(gated.eligible.map(candidate => [candidate.unitId, entityTier(entities, tokensOf.get(candidate.unitId)!)]));
+  const eligible = [...gated.eligible].sort((left, right) => tierOf.get(right.unitId)! - tierOf.get(left.unitId)!);
+
   // --- ContextPacket -------------------------------------------------------------------
   const lexicalRankOf = new Map(lexicalIds.map((id, index) => [id, index + 1]));
   const denseRankOf = new Map(denseIds.map((id, index) => [id, index + 1]));
   const structureRankOf = new Map(structureIds.map((id, index) => [id, index + 1]));
 
-  const ranked: RankedRetrievalUnit[] = gated.eligible.slice(0, contextLimit).map((candidate) => {
+  const ranked: RankedRetrievalUnit[] = eligible.slice(0, contextLimit).map((candidate) => {
     const unit = unitById.get(candidate.unitId);
     return {
       unitId: candidate.unitId,

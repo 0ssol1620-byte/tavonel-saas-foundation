@@ -5,6 +5,7 @@ import {
   readCompileJob,
   resolveCompileJobBlockers,
 } from "@/lib/compile-job-store";
+import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,17 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   }
 
   const { jobId } = await context.params;
+  // A member resolves blockers only on a job whose every source is in their scope (WO-C-T3).
+  // Owners and admins read every source, so their path is unchanged and reads nothing extra.
+  if (auth.principal.workspaceRole !== "owner" && auth.principal.workspaceRole !== "admin") {
+    const before = await readCompileJob(auth.principal.workspaceKey, jobId);
+    if (!before.ok) {
+      const status = before.code === "COMPILE_JOB_NOT_FOUND" ? 404 : before.code === "COMPILE_JOB_SCOPE_INVALID" ? 400 : 503;
+      return NextResponse.json({ code: before.code }, { status, headers: HEADERS });
+    }
+    const scopeRefusal = await memberSourcesRefusal(auth.principal, before.value.documentIds);
+    if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: HEADERS });
+  }
   const resolved = await resolveCompileJobBlockers({
     workspaceKey: auth.principal.workspaceKey,
     jobId,

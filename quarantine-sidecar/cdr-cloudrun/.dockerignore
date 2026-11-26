@@ -5,3 +5,4 @@ __pycache__/
 .git/
 .pytest_cache/
 .venv/
+**/__pycache__/

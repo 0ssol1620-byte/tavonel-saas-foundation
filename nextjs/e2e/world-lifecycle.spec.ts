@@ -333,8 +333,9 @@ for (const action of ["activation", "rollback"] as const) {
     const reason = page.getByLabel(action === "activation" ? "Human review record" : "Rollback reason");
     await reason.fill("Synthetic review of retained source evidence.");
     const button = page.getByRole("button", { name: action === "activation" ? "Activate reviewed candidate" : "Rollback to this version" });
-    page.once("dialog", dialog => dialog.accept());
+    // The confirmation is an in-page dialog now (WO-WS-1): accept it with its consequence-named button.
     await button.click();
+    await page.getByRole("dialog").getByRole("button", { name: action === "activation" ? "Activate this candidate" : "Roll back the active pointer", exact: true }).click();
     await expect(page.getByText(`The ${action} response could not be confirmed.`, { exact: false })).toBeVisible();
     await expect(page.getByText("the active pointer may have changed.", { exact: false })).toBeVisible();
     await expect(reason).toHaveValue("Synthetic review of retained source evidence.");
@@ -1218,13 +1219,13 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
     .getByLabel("Human review record")
     .fill("Verified ontology, graph and evidence bindings.");
   await expect(activate).toBeEnabled();
-  let confirmationSeen = false;
-  page.once("dialog", async dialog => {
-    confirmationSeen = dialog.type() === "confirm";
-    await dialog.dismiss();
-  });
+  // The confirmation is an in-page dialog now (WO-WS-1): it is seen, then dismissed with Cancel.
   await activate.click();
-  expect(confirmationSeen).toBe(true);
+  const confirmation = page.getByRole("dialog");
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText("Activate this exact immutable candidate as the collection's current world?");
+  await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   const rollback = page.getByRole("button", {
     name: "Rollback to this version",
@@ -1364,8 +1365,8 @@ test("pins correction, evidence, activation and browser history to the selected 
     expect(route.request().postDataJSON()).toMatchObject({ manifestDigest: corrected, expectedCurrentManifest: activeManifest, expectedCurrentRevision: 2 });
     await route.fulfill({ status: 409, json: { code: "WORLD_COMPARE_AND_SWAP_CONFLICT" } });
   });
-  page.once("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "Activate reviewed candidate" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Activate this candidate", exact: true }).click();
   await expect(page.getByText("Activation failed.", { exact: false })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(encodeURIComponent(candidateManifest)));

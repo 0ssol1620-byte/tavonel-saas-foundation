@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { applyCandidatePatch } from "@/lib/collection-patch";
 import { mayPublish, registerCollectionArtifact } from "@/lib/compile-artifact-provenance";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
 import { requireFoundationSession } from "@/lib/developer-auth";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { collectionCandidateKey, COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
@@ -81,6 +82,9 @@ export async function POST(request: Request) {
   }
   // A reviewer submits the digest they inspected. Other revisions may already exist;
   // storage listing order must not decide which revision this decision belongs to.
+  // A member reviews a World only when every source behind that version is in their scope (WO-C-T3).
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, collectionId, manifestDigest);
+  if (scopeRefusal) return refuse(scopeRefusal.code, scopeRefusal.status);
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, collectionId, manifestDigest);
   if (!loaded.ok) return refuse(loaded.code, loaded.status);
   if (loaded.model.world.manifestDigest !== manifestDigest) {
@@ -189,6 +193,8 @@ export async function GET(request: Request) {
   if (!COLLECTION_ID_PATTERN.test(collectionId)) {
     return refuse("REVIEW_REQUEST_INVALID", 400);
   }
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, collectionId);
+  if (scopeRefusal) return refuse(scopeRefusal.code, scopeRefusal.status);
   const listed = await listFoundationReviewDecisions(auth.principal.workspaceKey, collectionId, REVIEW_DECISION_READ_LIMIT);
   if (!listed.ok) return refuse(listed.code, 503);
   /*

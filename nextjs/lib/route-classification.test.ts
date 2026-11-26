@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import classification from "./security/route-classification.json";
@@ -155,5 +155,67 @@ describe("webhook routes (Type C)", () => {
     for (const helper of ["paddle-webhook.ts", "compute-settlement-auth.ts"]) {
       expect(readFileSync(resolve(import.meta.dirname, helper), "utf8"), helper).toMatch(/300_000/);
     }
+  });
+});
+
+/*
+  WO-C-T3: a workspace member reads a World only when every source behind it is in their scope,
+  and lists drop what a member cannot read. Every API route is in exactly one of three maps, so a
+  new route that returns document, World, evidence, search or ask content cannot arrive without
+  someone deciding how a member's scope reaches it. An enforced entry names its mechanism, and the
+  route file must contain that mechanism; a delegating entry must point at a route that is itself
+  enforced.
+*/
+describe("member source scope classification", () => {
+  const scope = classification.memberScope as {
+    enforced: Record<string, string>; elsewhere: Record<string, string>; noSourceContent: Record<string, string>;
+  };
+  const maps = [scope.enforced, scope.elsewhere, scope.noSourceContent];
+  const TOKEN: Record<string, string> = {
+    chokepoint: "checkConnectorSourceAccessForViewer",
+    "world-gate": "memberCollectionScopeRefusal",
+    "sources-gate": "memberSourcesRefusal",
+    filter: "filterMemberReadableDocumentIds",
+  };
+
+  it("puts every API route in exactly one map", () => {
+    const placed = routes.map((route) => [route.key, maps.filter((map) => route.key in map).length] as const)
+      .filter(([, count]) => count !== 1)
+      .map(([key, count]) => `${key}: ${count}`);
+    expect(placed).toEqual([]);
+  });
+
+  it("names no route that no longer exists", () => {
+    const known = new Set(routes.map((route) => route.key));
+    expect(maps.flatMap((map) => Object.keys(map)).filter((key) => !known.has(key))).toEqual([]);
+  });
+
+  it("gives every unenforced route a reason", () => {
+    for (const map of [scope.elsewhere, scope.noSourceContent]) {
+      for (const [key, reason] of Object.entries(map)) expect(reason.length, key).toBeGreaterThan(20);
+    }
+  });
+
+  it("finds the named mechanism in every enforced route's file", () => {
+    const wrong: string[] = [];
+    for (const [key, value] of Object.entries(scope.enforced)) {
+      const source = readFileSync(resolve(nextjsRoot, key), "utf8");
+      const [mechanism, rest] = [value.slice(0, value.indexOf(":")), value.slice(value.indexOf(":") + 1)];
+      if (mechanism in TOKEN) {
+        if (!source.includes(TOKEN[mechanism]!)) wrong.push(`${key}: no ${TOKEN[mechanism]}`);
+      } else if (mechanism === "chokepoint-via") {
+        const fn = rest.split(":")[0]!;
+        if (!/^[A-Za-z]+$/.test(fn) || !source.includes(fn)) wrong.push(`${key}: no ${fn}`);
+      } else if (mechanism === "refused") {
+        const code = rest.split(":")[0]!;
+        if (!source.includes(`"${code}"`)) wrong.push(`${key}: no ${code}`);
+      } else if (mechanism === "delegates") {
+        const target = relative(nextjsRoot, resolve(dirname(resolve(nextjsRoot, key)), `${rest}.ts`)).split(sep).join("/");
+        if (!source.includes(`from "${rest}"`) || !(target in scope.enforced)) wrong.push(`${key}: delegates to unenforced ${target}`);
+      } else {
+        wrong.push(`${key}: unknown mechanism ${mechanism}`);
+      }
+    }
+    expect(wrong).toEqual([]);
   });
 });

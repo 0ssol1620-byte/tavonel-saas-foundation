@@ -1,0 +1,63 @@
+{
+  "synthetic": true,
+  "label": "Synthetic. Written by hand from the provider's public API documentation for WO-E-CON-1; never captured from a provider. No provider was called and no account or token was used. Ids, names, paths, cursors and tokens are invented. Pins a response shape, not provider behaviour the page does not state. retrievedAt is the UTC clock read immediately after the documentation fetch (an upper bound).",
+  "source": [
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0"
+  ],
+  "retrievedAt": "2026-11-18T13:22:05Z",
+  "scenario": "Initial delta: the first page of the enumeration, continued by @odata.nextLink.",
+  "request": {
+    "method": "GET",
+    "url": "https://graph.microsoft.com/v1.0/me/drive/root/delta?%24top=25",
+    "cursor": null
+  },
+  "status": 200,
+  "headers": {},
+  "body": {
+    "value": [
+      {
+        "id": "SYNTHFOLDER01",
+        "name": "Reports",
+        "folder": {
+          "childCount": 2
+        },
+        "eTag": "eSYNTHfolder1",
+        "parentReference": {
+          "driveId": "b!SYNTHdrive",
+          "id": "SYNTHROOT"
+        }
+      },
+      {
+        "id": "SYNTHITEM01",
+        "name": "q3.pdf",
+        "eTag": "eSYNTHitem01v1",
+        "cTag": "cSYNTHitem01v1",
+        "lastModifiedDateTime": "2026-10-01T09:00:00Z",
+        "size": 4096,
+        "file": {
+          "mimeType": "application/pdf"
+        },
+        "parentReference": {
+          "driveId": "b!SYNTHdrive",
+          "id": "SYNTHFOLDER01"
+        }
+      },
+      {
+        "id": "SYNTHITEM02",
+        "name": "q4.pdf",
+        "eTag": "eSYNTHitem02v1",
+        "cTag": "cSYNTHitem02v1",
+        "lastModifiedDateTime": "2026-10-01T09:00:00Z",
+        "size": 4096,
+        "file": {
+          "mimeType": "application/pdf"
+        },
+        "parentReference": {
+          "driveId": "b!SYNTHdrive",
+          "id": "SYNTHFOLDER01"
+        }
+      }
+    ],
+    "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/drive/root/delta?token=SYNTHnext1"
+  }
+}

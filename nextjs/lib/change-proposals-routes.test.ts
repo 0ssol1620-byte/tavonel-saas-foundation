@@ -11,13 +11,14 @@ type RpcAnswer = { status: number; body: unknown };
 const error = (message: string): RpcAnswer => ({ status: 400, body: { code: "P0001", message } });
 
 const requireFoundationSession = vi.fn<(request: Request, plan?: string) => Promise<unknown>>();
+const requireFoundationRevokeSession = vi.fn<(request: Request) => Promise<unknown>>();
 const revalidateFoundationSession = vi.fn<(request: Request, principal: unknown) => Promise<unknown>>();
 const checkAccess = vi.fn<(workspaceKey: string, ids: string[], userId: string) => Promise<unknown>>();
 const getActiveWorld = vi.fn<(workspaceKey: string, collectionId: string) => Promise<unknown>>();
 const decideLibraryLabel = vi.fn<(workspaceKey: string, input: Record<string, unknown>, userId: string) => Promise<unknown>>();
 const readLibraryDocuments = vi.fn<(workspaceKey: string, ids: readonly string[], userId: string) => Promise<unknown>>();
 
-vi.mock("@/lib/developer-auth", () => ({ requireFoundationSession, revalidateFoundationSession }));
+vi.mock("@/lib/developer-auth", () => ({ requireFoundationSession, requireFoundationRevokeSession, revalidateFoundationSession }));
 vi.mock("@/lib/connector-source-access", () => ({ checkConnectorSourceAccessForViewer: checkAccess }));
 vi.mock("@/lib/world-store", () => ({ getFoundationActiveWorld: getActiveWorld }));
 vi.mock("@/lib/library-shadow", () => ({ decideLibraryLabel, readLibraryDocuments }));
@@ -82,6 +83,11 @@ const rpc = (name: string, body: Record<string, unknown>): RpcAnswer => {
       .sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, body.p_limit as number).map(({ r }) => withGrant(r));
     return { status: 200, body: page };
   }
+  if (name === "read_foundation_agent_grant") {
+    const grant = grants.get(body.p_grant_id as string);
+    const mine = grant && grant.workspace_key === body.p_workspace_key && grant.user_id === body.p_user_id;
+    return { status: 200, body: mine ? { grantId: body.p_grant_id, authorizationRevision: 3, createdAt: "2026-11-16T12:00:00Z", revokedAt: grant.live ? null : "2026-11-17T00:00:00Z" } : null };
+  }
   const row = rows.find((candidate) => candidate.proposal_id === body.p_proposal_id && candidate.workspace_key === body.p_workspace_key);
   if (!row) return error("proposal_not_found");
   if (name === "get_world_change_proposal") return { status: 200, body: withGrant(row) };
@@ -120,6 +126,8 @@ const list = await import("../app/api/proposals/route");
 const byId = await import("../app/api/proposals/[id]/route");
 const decision = await import("../app/api/proposals/[id]/decision/route");
 const undo = await import("../app/api/proposals/[id]/undo/route");
+const receiptRoute = await import("../app/api/proposals/[id]/receipt/route");
+const activityRoute = await import("../app/api/agent-grants/[id]/activity/route");
 const { DECISION_MAX_DURATION_S, PROPOSAL_RESUME_AFTER_MS } = await import("./agent-access");
 const signing = await import("./export-signing");
 
@@ -240,6 +248,7 @@ beforeEach(() => {
   delete registry.compile_plan;
   vi.useRealTimers();
   requireFoundationSession.mockResolvedValue(session);
+  requireFoundationRevokeSession.mockResolvedValue(session);
   revalidateFoundationSession.mockResolvedValue(revalidated);
   checkAccess.mockResolvedValue({ ok: true });
   getActiveWorld.mockResolvedValue({ ok: true, world: { manifestDigest: DIGEST } });
@@ -689,7 +698,7 @@ const agentRow = async (grantId = GRANT) => {
   if (!created.ok) throw new Error(created.code);
   return created.row.proposal_id;
 };
-const agentOn = () => { vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true"); stubSigner(true); };
+const agentOn = () => { vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true"); vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", WS); stubSigner(true); };
 
 describe("lookup by id (§5.5, §6)", () => {
   it("GET /api/proposals/[id] finds a row with no collection (a stub second type) and answers the public DTO", async () => {
@@ -817,6 +826,7 @@ describe("agent-origin rows (§6 steps 3 and 7, I-11, I-14, I-27)", () => {
 
   it("signer missing: 503 PROPOSAL_RECEIPT_SIGNER_NOT_CONFIGURED and the decide RPC is never called", async () => {
     vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "true");
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", WS);
     stubSigner(false);
     const id = await agentRow();
     const answer = await confirm(id);
@@ -1148,5 +1158,178 @@ describe("fuzz: decision bodies and cursors", () => {
       expect([200, 400], `case ${index}: ${text}`).toContain(answer.status);
       if (answer.status === 400) expect(calls, `case ${index}`).not.toContain("list_world_change_proposals_page");
     }
+  });
+});
+
+describe("WO-AN-10: the audit people see", () => {
+  const getReceipt = (id: string) => receiptRoute.GET(new Request(`https://tavonel.com/api/proposals/${id}/receipt`), { params: Promise.resolve({ id }) });
+  const getActivity = (id: string, query = "") =>
+    activityRoute.GET(new Request(`https://tavonel.com/api/agent-grants/${id}/activity${query}`), { params: Promise.resolve({ id }) });
+  const RANDOM = "00000000-0000-4000-8000-0000000000ff";
+  const SIGNED = { payloadJson: "{}", signature: { keyId: "k" } };
+  /** A real confirmation through the real signer: the receipt this stores is the one the route must serve. */
+  const confirmedAgentRow = async () => {
+    agentOn();
+    const id = await agentRow();
+    expect((await (await confirm(id)).json()).proposal.state).toBe("executed");
+    return id;
+  };
+
+  it("serves exactly the stored signed receipt, as an attachment, and it verifies offline", async () => {
+    const id = await confirmedAgentRow();
+    const answer = await getReceipt(id);
+    expect(answer.status).toBe(200);
+    expect(answer.headers.get("cache-control")).toBe("no-store");
+    expect(answer.headers.get("content-disposition")).toBe(`attachment; filename="receipt-${id}.json"`);
+    const served = await answer.json() as { payloadJson: string; signature: Parameters<typeof signing.verifyExportSignature>[1] };
+    expect(served).toEqual((rows[0]!.receipt as { signedReceipt: unknown }).signedReceipt);
+    const trust = signing.readExportTrustStoreEnv(SIGNER_ENV)!;
+    expect(signing.verifyExportSignatureWithTrustStore(Buffer.from(served.payloadJson, "utf8"), served.signature, trust, new Date(), signing.ACTION_RECEIPT_SIGNATURE_SCOPE)).toBe(true);
+    // The outcome record names the person who decided; only the signed part leaves.
+    expect(JSON.stringify(served)).not.toContain(USER);
+  });
+
+  it("an undone agent row still serves the receipt of its execution", async () => {
+    const id = await confirmedAgentRow();
+    expect((await undoIt(id)).status).toBe(200);
+    expect(stateOf(id)).toBe("undone");
+    const answer = await getReceipt(id);
+    expect(answer.status).toBe(200);
+    expect(await answer.json()).toEqual((rows[0]!.receipt as { executed: { signedReceipt: unknown } }).executed.signedReceipt);
+  });
+
+  it("absent, malformed, foreign, unreadable, proposed and unsigned rows are the same 404 body", async () => {
+    const proposed = await agentRow();
+    const unsigned = seedRow({ state: "executed", receipt: { result: { ok: true } } });
+    const foreign = seedRow({ workspace_key: "pilot-other0000000001", state: "executed", principal_kind: "agent", agent_grant_id: GRANT, receipt: { signedReceipt: SIGNED } });
+    const signed = seedRow({ state: "executed", principal_kind: "agent", agent_grant_id: GRANT, receipt: { signedReceipt: SIGNED } });
+    // A receipt on a row that has not reached an outcome is never served, whatever the store holds.
+    const early = ["confirmed", "rejected", "stale", "withdrawn"].map((state) => seedRow({ state, principal_kind: "agent", agent_grant_id: GRANT, receipt: { signedReceipt: SIGNED } }).proposal_id);
+    const absent = await getReceipt(RANDOM);
+    expect(absent.status).toBe(404);
+    const reference = await absent.text();
+    for (const id of [proposed, ...early, unsigned.proposal_id, foreign.proposal_id, "not-a-uuid", "x\r\nSet-Cookie: a=b"]) {
+      const answer = await getReceipt(id);
+      expect([id, answer.status]).toEqual([id, 404]);
+      expect(await answer.text()).toBe(reference);
+      expect(answer.headers.get("content-disposition")).toBeNull();
+    }
+    expect((await getReceipt(signed.proposal_id)).status).toBe(200);
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    const unreadable = await getReceipt(signed.proposal_id);
+    expect([unreadable.status, await unreadable.text()]).toEqual([404, reference]);
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+    expect((await getReceipt(signed.proposal_id)).status).toBe(503);
+  });
+
+  it("refuses an API key (403) and an agent credential (401); no store read happens", async () => {
+    const id = await confirmedAgentRow();
+    calls = [];
+    requireFoundationSession.mockResolvedValue(apiKey);
+    expect((await getReceipt(id)).status).toBe(403);
+    requireFoundationSession.mockResolvedValue({ ok: false, code: "AUTH_REQUIRED", status: 401 });
+    expect((await getReceipt(id)).status).toBe(401);
+    expect(calls).toEqual([]);
+  });
+
+  it("the row says who decided without naming anyone, and offers the receipt only where one is stored", async () => {
+    const id = await confirmedAgentRow();
+    const mine = (await (await readOne(id)).json()).proposal;
+    expect(mine).toMatchObject({ state: "executed", youDecided: true, receiptAvailable: true });
+    expectNoInternals(mine);
+    requireFoundationSession.mockResolvedValue(otherPerson);
+    expect((await (await readOne(id)).json()).proposal).toMatchObject({ youDecided: false, receiptAvailable: true });
+    requireFoundationSession.mockResolvedValue(session);
+    const open = await agentRow(GRANT_2);
+    expect((await (await readOne(open)).json()).proposal).toMatchObject({ state: "proposed", youDecided: null, receiptAvailable: false });
+    const person = await idOf(await create(proposalBody(topic), "proposal-key-0002"));
+    await confirm(person);
+    expect((await (await readOne(person)).json()).proposal).toMatchObject({ state: "executed", youDecided: true, receiptAvailable: false });
+  });
+
+  it("activity lists only this grant's rows, newest first, with no preview, document, principal or digest", async () => {
+    agentOn();
+    const first = await agentRow();
+    const other = await agentRow(GRANT_2);
+    const made = await agentLabel(GRANT, "client-key-0002");
+    if (!made.ok) throw new Error(made.code);
+    const third = made.row.proposal_id;
+    await confirm(first);
+    const answer = await getActivity(GRANT);
+    expect(answer.status).toBe(200);
+    expect(answer.headers.get("cache-control")).toBe("no-store");
+    const body = await answer.json() as { activity: Record<string, unknown>[]; nextCursor: string | null };
+    expect(body.activity.map((row) => row.proposalId)).toEqual([third, first]);
+    expect(body.activity.map((row) => row.proposalId)).not.toContain(other);
+    expect(body.activity[1]).toEqual({ proposalId: first, actionType: "library_label", state: "executed", createdAt: expect.any(String), decidedAt: expect.any(String), receiptAvailable: true });
+    expect(Object.keys(body.activity[0]!).sort()).toEqual(["actionType", "createdAt", "decidedAt", "proposalId", "receiptAvailable", "state"]);
+    expect(body.nextCursor).toBeNull();
+    const text = JSON.stringify(body);
+    for (const secret of [DOC, USER, GRANT, DIGEST]) expect(text).not.toContain(secret);
+  });
+
+  it("another person's grant, another workspace's, an unknown and a malformed id are the same 404; a revoked grant still reads", async () => {
+    await agentRow();
+    const unknown = await getActivity(RANDOM);
+    expect(unknown.status).toBe(404);
+    const reference = await unknown.text();
+    requireFoundationRevokeSession.mockResolvedValue(otherPerson);
+    for (const id of [GRANT, "not-a-uuid"]) {
+      const answer = await getActivity(id);
+      expect([id, answer.status, await answer.text()]).toEqual([id, 404, reference]);
+    }
+    requireFoundationRevokeSession.mockResolvedValue({ ...session, principal: { ...session.principal, workspaceKey: "pilot-other0000000001" } });
+    expect((await getActivity(GRANT)).status).toBe(404);
+    requireFoundationRevokeSession.mockResolvedValue(session);
+    grants.get(GRANT)!.live = false;
+    expect(((await (await getActivity(GRANT)).json()) as { activity: unknown[] }).activity).toHaveLength(1);
+  });
+
+  it("refuses without a session, and a store that cannot answer is a 503, never an empty list", async () => {
+    requireFoundationRevokeSession.mockResolvedValue({ ok: false, code: "AUTH_REQUIRED", status: 401 });
+    expect((await getActivity(GRANT)).status).toBe(401);
+    requireFoundationRevokeSession.mockResolvedValue(session);
+    storeDown = true;
+    expect((await getActivity(GRANT)).status).toBe(503);
+  });
+
+  it("rows the viewer can no longer read are dropped before the page is cut", async () => {
+    await agentRow();
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_DENIED" });
+    expect(((await (await getActivity(GRANT)).json()) as { activity: unknown[] }).activity).toEqual([]);
+    checkAccess.mockResolvedValue({ ok: false, code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" });
+    expect((await getActivity(GRANT)).status).toBe(503);
+  });
+
+  it("pages by cursor, and the NDJSON export of each page is exactly the listed rows", async () => {
+    for (let index = 0; index < 55; index += 1) seedRow({ principal_kind: "agent", agent_grant_id: GRANT, state: "proposed" });
+    seedRow({ principal_kind: "agent", agent_grant_id: GRANT_2 });
+    const one = await (await getActivity(GRANT)).json() as { activity: { proposalId: string }[]; nextCursor: string };
+    expect(one.activity).toHaveLength(50);
+    expect(typeof one.nextCursor).toBe("string");
+    const exported = await getActivity(GRANT, "?format=ndjson");
+    expect(exported.headers.get("content-type")).toContain("application/x-ndjson");
+    expect(exported.headers.get("content-disposition")).toBe(`attachment; filename="agent-activity-${GRANT}.ndjson"`);
+    expect(exported.headers.get("x-next-cursor")).toBe(one.nextCursor);
+    const text = await exported.text();
+    expect(text.endsWith("\n")).toBe(true);
+    expect(text.trimEnd().split("\n").map((line) => JSON.parse(line))).toEqual(one.activity);
+    const two = await (await getActivity(GRANT, `?cursor=${encodeURIComponent(one.nextCursor)}`)).json() as { activity: { proposalId: string }[]; nextCursor: string | null };
+    expect(two.activity).toHaveLength(5);
+    expect(two.nextCursor).toBeNull();
+    const rest = await getActivity(GRANT, `?format=ndjson&cursor=${encodeURIComponent(one.nextCursor)}`);
+    expect(rest.headers.get("x-next-cursor")).toBeNull();
+    expect((await rest.text()).trimEnd().split("\n").map((line) => JSON.parse(line))).toEqual(two.activity);
+    expect(new Set([...one.activity, ...two.activity].map((row) => row.proposalId)).size).toBe(55);
+  });
+
+  it("an unknown format or a bad cursor is 400 and reads nothing", async () => {
+    await agentRow();
+    calls = [];
+    for (const query of ["?format=csv", "?format=", "?cursor=!!"]) {
+      const answer = await getActivity(GRANT, query);
+      expect([query, answer.status]).toEqual([query, 400]);
+    }
+    expect(calls).not.toContain("list_world_change_proposals_page");
   });
 });

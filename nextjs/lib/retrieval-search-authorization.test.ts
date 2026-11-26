@@ -53,6 +53,7 @@ const PRINCIPAL = {
   userId: "user-1",
   keyId: "key-1",
   scopes: ["ask:read"],
+  workspaceRole: "owner" as const,
   accessSource: "paid" as const,
 };
 const ACTIVE = {

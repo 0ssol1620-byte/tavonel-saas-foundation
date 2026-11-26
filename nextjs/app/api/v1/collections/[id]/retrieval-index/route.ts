@@ -4,7 +4,6 @@ import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { foundationPilotAccess } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { getWorkspaceCollectionCandidate } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -58,20 +57,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ code: "COLLECTION_ID_INVALID" }, { status: 400, headers: NO_STORE });
   }
 
-  const pilot = foundationPilotAccess(auth.principal.userId);
-  if (!pilot || pilot.membership.workspaceId !== auth.principal.workspaceKey) {
-    return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
-  }
+  // WO-C-T1: the role is the principal's, read from its active membership in the workspace it acts
+  // in (a key's own workspace, or a session's acting one); pilot access was checked there too.
+  const role = auth.principal.workspaceRole;
   // Before the role refusal, so the plan answer a caller gets here is the plan answer promotion
   // gives them: an evaluation trial, and a plan that cannot activate at all, are told that rather
   // than told their role is wrong.
   const activation = await authorizeFoundationProduct(
-    auth.principal.workspaceKey, auth.principal.userId, "activation", pilot.membership.role,
+    auth.principal.workspaceKey, auth.principal.userId, "activation", role,
   );
   if (!activation.ok) {
     return NextResponse.json({ code: activation.code }, { status: activation.status, headers: NO_STORE });
   }
-  if (pilot.membership.role !== "owner" && pilot.membership.role !== "admin") {
+  // TC-D7: rebuilding the index a promote compiles is the member's too, since a member may promote.
+  if (role !== "owner" && role !== "admin" && role !== "member") {
     return NextResponse.json({ code: "RETRIEVAL_COMPILE_ROLE_REQUIRED" }, { status: 403, headers: NO_STORE });
   }
 

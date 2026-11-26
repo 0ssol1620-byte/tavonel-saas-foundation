@@ -6,6 +6,7 @@ import {
   type ContextPacketItem,
 } from "./context-packet";
 import { expandedTokens, tokens } from "./lexical-tokens";
+import { entityTerms, entityTier, evidenceWindow, markedWindow, questionTerms, termSpread, type EvidenceWindow } from "./ask-evidence-window";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 
@@ -58,6 +59,7 @@ export type GroundedAnswer = {
       authority: number;
     };
     excerpt: string;
+    window: EvidenceWindow;
   }>;
   receipt: {
     collectionId: string;
@@ -198,40 +200,28 @@ function canonicalize(value: unknown): string {
     .join(",")}}`;
 }
 
-function normalizeEvidence(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-// A bounded preview for the citation list only. It is never the answer: clipping at 417
-// characters dropped late qualifiers, following-sentence exceptions, negations, units and dates.
-function excerpt(text: string) {
-  const normalized = normalizeEvidence(text);
-  return normalized.length <= 420
-    ? normalized
-    : `${normalized.slice(0, 417)}...`;
-}
-
 /*
-  Answer-length envelopes, counted in normalized characters including the "\n\n" separators.
-  They are the previous DEFAULT answer sizes made explicit -- fallback: 3 previews of 420 plus two
-  separators; compiled: the pipeline's default contextLimit of 10 previews plus nine separators.
-  They are not model token budgets and say nothing about whether an answer is correct.
+  Answer-length envelopes including the "\n\n" separators -- fallback: 3 parts of 420 plus two
+  separators; compiled: the pipeline's default contextLimit of 10 plus nine. Each part is a
+  verbatim window of at most EVIDENCE_WINDOW_CHARACTERS (416) with its cut markers ("… ", " …",
+  markedWindow), so the answer -- the parts joined in rank order -- stays inside its envelope by
+  construction. They are not model token budgets and say nothing about whether an answer is
+  correct.
+
+  WO-ASK-0 (lead ruling): evidence longer than the envelope used to abstain with
+  EVIDENCE_EXCEEDS_ANSWER_LIMIT and return no text at all, even when the asked line was in a cited
+  region. Ask writes no answer, so length is no reason to return nothing: each cited region now
+  contributes the window of it that matches the question (ask-evidence-window.ts). The citation's
+  `excerpt` is that window verbatim and its `window` says where in the region it sits; the answer
+  marks each cut edge with "…". The reason code is no longer produced; it stays exported because
+  answers remembered under an idempotency key before this change replay with it and the
+  workspace copy still names it.
 */
 export const FALLBACK_ANSWER_CHARACTER_LIMIT = 3 * 420 + 2 * 2;
 export const COMPILED_ANSWER_CHARACTER_LIMIT = 10 * 420 + 9 * 2;
 export const EVIDENCE_EXCEEDS_ANSWER_LIMIT = "EVIDENCE_EXCEEDS_ANSWER_LIMIT";
-
-/**
- * The complete selected evidence, in the given order, or null when it does not fit `limit`.
- * Never clips, drops or reorders an item to make it fit: an answer that is only part of the
- * selected evidence is an abstention, not a shorter answer. Length is checked before joining.
- */
-function completeEvidenceAnswer(texts: string[], limit: number): string | null {
-  const normalized = texts.map(normalizeEvidence);
-  const length =
-    normalized.reduce((sum, text) => sum + text.length, 0) + 2 * Math.max(0, normalized.length - 1);
-  return length <= limit ? normalized.join("\n\n") : null;
-}
+/** The integrity abstention: a citation the packet verifier could not find in the packet. */
+export const CITED_EVIDENCE_NOT_IN_PACKET = "CITED_EVIDENCE_NOT_IN_PACKET";
 
 export function answerGroundedQuestion(
   value: unknown,
@@ -268,6 +258,10 @@ export function answerGroundedQuestion(
   const averageLength =
     chunkTokens.reduce((sum, row) => sum + row.length, 0) /
     Math.max(1, chunks.length);
+  // Entity terms are judged over the whole World, by how many sources hold each question word.
+  const terms = questionTerms(normalizedQuestion);
+  const tokenSets = chunkTokens.map(row => new Set(row));
+  const entities = entityTerms(terms, chunks.map((chunk, index) => ({ source: chunk.sourceId, tokens: tokenSets[index]! })));
   const unnormalized = chunks
     .map((chunk, index) => {
       const row = chunkTokens[index];
@@ -298,7 +292,7 @@ export function answerGroundedQuestion(
         Math.max(1, rawQueryTokens.length);
       const queryYears = new Set(queryTokens.filter(token => /^\d{4}$/.test(token)));
       const temporal = chunk.temporalRefs.some(item => queryYears.has(item)) ? 1 : 0;
-      return { chunk, lexical, graph, temporal };
+      return { chunk, lexical, graph, temporal, tier: entityTier(entities, tokenSets[index]!) };
     })
     .filter(item => item.lexical > 0 || item.graph > 0 || item.temporal > 0);
   const maxLexical = Math.max(0, ...unnormalized.map(item => item.lexical));
@@ -314,12 +308,16 @@ export function answerGroundedQuestion(
     })
     .sort(
       (left, right) =>
+        right.tier - left.tier ||
         right.score - left.score ||
         left.chunk.chunkId.localeCompare(right.chunk.chunkId)
     )
     .slice(0, 3);
 
-  const citations = ranked.map(({ chunk, score, lexical, graph, temporal }) => ({
+  const spread = termSpread(terms, ranked.map(({ chunk }) => new Set(tokens(chunk.text))));
+  const citations = ranked.map(({ chunk, score, lexical, graph, temporal }) => {
+    const window = evidenceWindow(chunk.text, terms, spread, entities);
+    return {
     evidenceId: chunk.evidenceId,
     sourceId: chunk.sourceId,
     sourceVersionId: chunk.sourceVersionId,
@@ -336,25 +334,15 @@ export function answerGroundedQuestion(
       temporal: Number(temporal.toFixed(6)),
       authority: Number(chunk.authorityScore.toFixed(6)),
     },
-    excerpt: excerpt(chunk.text),
-  }));
-  const answer = completeEvidenceAnswer(
-    ranked.map(({ chunk }) => chunk.text),
-    FALLBACK_ANSWER_CHARACTER_LIMIT
-  );
-  const status =
-    citations.length > 0 && answer !== null ? ("grounded" as const) : ("abstained" as const);
-  // On overflow the citations stay: they are verified evidence, and opening them is the only
-  // complete reading left once no partial answer is returned.
+    excerpt: chunk.text.slice(window.start, window.end),
+    window,
+    };
+  });
+  const grounded = citations.length > 0;
   const unsigned = {
-    status,
-    answer: answer ?? "",
-    reason:
-      citations.length === 0
-        ? "NO_REGION_BOUND_EVIDENCE_MATCH"
-        : answer === null
-          ? EVIDENCE_EXCEEDS_ANSWER_LIMIT
-          : null,
+    status: grounded ? ("grounded" as const) : ("abstained" as const),
+    answer: citations.map((citation, index) => markedWindow(ranked[index]!.chunk.text, citation.window)).join("\n\n"),
+    reason: grounded ? null : "NO_REGION_BOUND_EVIDENCE_MATCH",
     citations,
   };
   return {
@@ -381,10 +369,9 @@ export function answerGroundedQuestion(
   answer for the first time in production, and nothing would have caught it.
 
   So both paths now answer the same way and say so: `answerMode: "evidence_excerpts"`. The
-  answer is the complete text of the cited evidence, concatenated in rank order (the 420-character
-  `excerpt` is only the citation preview); evidence too long for the path's answer envelope
-  abstains with its citations kept rather than being clipped. That is the founder default and it
-  is stated rather than implied -- no model generates anything here. There is no LLM in this
+  answer is the cited excerpts concatenated in rank order, each a verbatim window of its region
+  whose `window` says where it sits (WO-ASK-0; see the envelope note above). It is stated rather
+  than implied -- no model generates anything here. There is no LLM in this
   file, no LLM behind the compiled path, and choosing one is a Model Arena decision (masterplan
   Phase 4-5), not something a retrieval fix gets to settle.
 
@@ -415,6 +402,7 @@ export type PacketCitation = {
   claimIds: string[];
   entityIds: string[];
   excerpt: string;
+  window: EvidenceWindow;
   retrieval: ContextPacketItem["retrieval"];
 };
 
@@ -444,8 +432,16 @@ export function answerFromContextPacket(
   meta: { collectionId: string; manifestDigest: string },
 ): PacketAnswer {
   const cited = packet.items.filter(item => item.evidenceIds.length > 0 && item.text.trim().length > 0);
+  // The pipeline already ordered the items (ask-evidence-window.ts rule 1); this only cuts windows.
+  // Entity terms here are judged over the cited items by document version.
+  const terms = questionTerms(packet.question);
+  const citedTokens = cited.map(item => new Set(tokens(item.text)));
+  const spread = termSpread(terms, citedTokens);
+  const entities = entityTerms(terms, cited.map((item, index) => ({ source: item.sourceVersionId, tokens: citedTokens[index]! })));
   const citations: PacketCitation[] = cited
-    .map(item => ({
+    .map(item => {
+      const window = evidenceWindow(item.text, terms, spread, entities);
+      return {
       evidenceId: item.evidenceIds[0]!,
       evidenceIds: [...item.evidenceIds],
       unitId: item.unitId,
@@ -455,28 +451,26 @@ export function answerFromContextPacket(
       authority: item.authority,
       claimIds: [...item.claimIds],
       entityIds: [...item.entityIds],
-      excerpt: excerpt(item.text),
+      excerpt: item.text.slice(window.start, window.end),
+      window,
       retrieval: { ...item.retrieval },
-    }));
+      };
+    });
 
   const verified = verifyGroundedCitations(citations.map(citation => citation.evidenceId), packet);
-  const answer = completeEvidenceAnswer(cited.map(item => item.text), COMPILED_ANSWER_CHARACTER_LIMIT);
-  const status =
-    citations.length > 0 && verified.valid && answer !== null ? ("grounded" as const) : ("abstained" as const);
-  // Verification outranks length: an unverified citation is never retained, overflow or not.
+  const status = citations.length > 0 && verified.valid ? ("grounded" as const) : ("abstained" as const);
+  // An unverified citation is an integrity failure: nothing is retained.
   const reason =
     status === "grounded"
       ? null
       : !verified.valid
-        ? "CITED_EVIDENCE_NOT_IN_PACKET"
-        : citations.length === 0
-          ? (packet.abstentionReasons[0] ?? "NO_REGION_BOUND_EVIDENCE_MATCH")
-          : EVIDENCE_EXCEEDS_ANSWER_LIMIT;
+        ? CITED_EVIDENCE_NOT_IN_PACKET
+        : (packet.abstentionReasons[0] ?? "NO_REGION_BOUND_EVIDENCE_MATCH");
   const unsigned = {
     status,
-    answer: status === "grounded" ? (answer ?? "") : "",
+    answer: status === "grounded" ? citations.map((citation, index) => markedWindow(cited[index]!.text, citation.window)).join("\n\n") : "",
     reason,
-    citations: status === "grounded" || reason === EVIDENCE_EXCEEDS_ANSWER_LIMIT ? citations : [],
+    citations: status === "grounded" ? citations : [],
   };
   return {
     ...unsigned,

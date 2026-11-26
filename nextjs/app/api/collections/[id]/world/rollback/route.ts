@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { checkActivationRateLimit } from "@/lib/activation-rate-limit";
 import { authorizeFoundationProduct } from "@/lib/billing-product-access";
-import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
+import { resolveActingWorkspace, revalidateActingWorkspace } from "@/lib/acting-workspace";
+import { getRequestUser } from "@/lib/foundation-pilot";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { rollbackFoundationWorld } from "@/lib/world-store";
 import { checkRollbackSourceAccess } from "@/lib/world-rollback-source-access";
@@ -79,8 +80,9 @@ export async function POST(
       { status: 400, headers: NO_STORE }
     );
   }
-  const access = foundationPilotAccess(user.id);
-  if (!access) return NextResponse.json({ code: "PILOT_ACCESS_REQUIRED" }, { status: 403, headers: NO_STORE });
+  // WO-C-T1: the workspace the person acts in -- their own, or one they are an active member of.
+  const access = await resolveActingWorkspace(request, user);
+  if (!access.ok) return NextResponse.json({ code: access.code }, { status: access.status, headers: NO_STORE });
   const { membership } = access;
   const productAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", membership.role);
   if (!productAccess.ok) return NextResponse.json({ code: productAccess.code }, { status: productAccess.status, headers: NO_STORE });
@@ -112,13 +114,13 @@ export async function POST(
   });
   // Storage and policy reads can outlive the session or its workspace role.
   const currentUser = await getRequestUser(request);
-  const currentPilot = currentUser ? foundationPilotAccess(currentUser.id) : null;
-  if (!currentUser || currentUser.id !== user.id || !currentPilot ||
-      currentPilot.membership.workspaceId !== membership.workspaceId ||
-      (currentPilot.membership.role !== "owner" && currentPilot.membership.role !== "admin")) {
+  if (!currentUser || currentUser.id !== user.id) {
     return NextResponse.json({ code: "AUTHORIZATION_CHANGED_RETRY" }, { status: 403, headers: NO_STORE });
   }
-  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", currentPilot.membership.role);
+  // Same workspace, same role (owner or admin, checked above); a revoke in between differs.
+  const currentAccess = await revalidateActingWorkspace(request, currentUser, membership);
+  if (!currentAccess.ok) return NextResponse.json({ code: currentAccess.code }, { status: currentAccess.status, headers: NO_STORE });
+  const currentProductAccess = await authorizeFoundationProduct(membership.workspaceId, user.id, "activation", membership.role);
   if (!currentProductAccess.ok) return NextResponse.json({ code: currentProductAccess.code }, {
     status: currentProductAccess.status, headers: NO_STORE,
   });

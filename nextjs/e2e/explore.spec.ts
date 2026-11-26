@@ -480,12 +480,11 @@ test("Ask quotes the source and its citation lands in the Evidence act", async (
   await expect(panel.locator("blockquote")).toContainText("Research and development 10,887");
   await panel.getByRole("button", { name: "What were Products and Services net sales for the three months ended in December?" }).click();
   await expect(panel.locator("blockquote")).toContainText("Net sales: Products $ 113,743");
-  // The Company Background evidence exceeds the complete-answer limit: no quotation, the reason in
-  // words, and its source regions still there to open.
+  // The Company Background evidence exceeds the complete-answer limit. Since WO-ASK-0 it is quoted
+  // as verbatim windows of its regions, each cut edge marked "…", with its source regions to open.
   await panel.getByRole("button", { name: "What products does Apple's Company Background say it designs and markets?" }).click();
-  await expect(panel.locator("blockquote")).toHaveCount(0);
-  await expect(panel.getByRole("status")).toContainText("No answer is shown for this question.");
-  await expect(panel.getByRole("status")).toContainText("longer than the complete-answer limit");
+  await expect(panel.locator("blockquote")).toContainText("designs, manufactures and markets smartphones");
+  await expect(panel.locator("blockquote")).toContainText("…");
   await expect(panel).not.toContainText("EVIDENCE_EXCEEDS_ANSWER_LIMIT");
   await expect(panel.getByText(/^\d+ SOURCE REGIONS?$/)).toBeVisible();
   await expect(panel.getByRole("button", { name: /^apple-.*\.pdf/ }).first()).toBeVisible();

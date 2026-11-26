@@ -16,13 +16,13 @@
 
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { spawn, spawnSync } from "node:child_process";
+import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
+import { constants, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFile, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SOURCE_DIRECTORY = fileURLToPath(new URL(".", import.meta.url));
@@ -417,4 +417,274 @@ test("an asset whose bytes do not match the manifest is rejected and not written
   } finally {
     await close(corrupted.server);
   }
+});
+
+/*
+  WO-LOC-3: the signed channel. A throwaway Ed25519 key made here signs a copy of this directory with the
+  real script (scripts/sign-developer-channel.mjs). The verifying CLI is the published tavonel-cli.mjs with
+  only its CHANNEL_TRUST_PIN line replaced by that key, run from its own directory -- the CLI a developer
+  already holds. The install downloads into a staging directory, runs verify-channel on it, and copies
+  into the install directory only on success, so every refusal below leaves the install directory empty.
+*/
+const SIGN_SCRIPT_DIRECTORY = fileURLToPath(new URL("../../scripts/", import.meta.url));
+const CHANNEL_SCOPE = "tavonel.signed_developer_channel.v1";
+const PIN_LINE = /^const CHANNEL_TRUST_PIN = .*;$/m;
+const META_FILES = ["channel.json", "channel.json.sig", "channel-trust.json"];
+
+function channelKey(keyId, { notBefore = Date.now() - 60_000, expiresAt = Date.now() + 86_400_000, status = "active" } = {}) {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  const der = createPublicKey(privateKey).export({ format: "der", type: "spki" });
+  const record = {
+    keyId, keyVersion: 1, algorithm: "Ed25519", status,
+    notBefore: new Date(notBefore).toISOString(), expiresAt: new Date(expiresAt).toISOString(),
+    publicKeySpkiDerBase64: der.toString("base64"), publicKeySpkiSha256: `sha256:${sha256Hex(der)}`,
+  };
+  return {
+    privateKey,
+    privateKeyBase64: privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+    record,
+    trust: { schemaVersion: "tavonel.export_trust.v2", minimumSignatureVersion: 2, activeKeyId: keyId, keys: [record] },
+  };
+}
+
+/* An independent copy of the canonical form, so the test does not import what it checks. */
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+/* A hand-made house v2 signature, for the two cases the signing script refuses to produce. */
+async function signByHand(directory, key, { scope = CHANNEL_SCOPE, issuedAt, expiresAt }) {
+  const payload = Buffer.from(canonical(JSON.parse(readFileSync(join(directory, "channel.json"), "utf8"))), "utf8");
+  const fields = {
+    schemaVersion: "tavonel.export_signature.v2", algorithm: "Ed25519", signatureScope: scope, keyId: key.record.keyId,
+    keyVersion: 1, issuedAt, expiresAt, signedPayloadSha256: `sha256:${sha256Hex(payload)}`,
+  };
+  const signature = sign(null, Buffer.concat([Buffer.from(`${JSON.stringify(fields)}\n`, "utf8"), payload]), key.privateKey);
+  await writeFile(join(directory, "channel.json.sig"), JSON.stringify({
+    ...fields, publicKeySpkiDerBase64: key.record.publicKeySpkiDerBase64, publicKeySpkiSha256: key.record.publicKeySpkiSha256,
+    signatureBase64: signature.toString("base64"),
+  }));
+}
+
+async function pinnedCli(key) {
+  const source = readFileSync(join(SOURCE_DIRECTORY, CLI), "utf8");
+  assert.equal(source.match(new RegExp(PIN_LINE.source, "gm"))?.length, 1, "the published CLI has exactly one pin line");
+  const directory = await mkdtemp(join(temporaryRoot, "pinned-cli-"));
+  const pin = { keyId: key.record.keyId, publicKeySpkiSha256: key.record.publicKeySpkiSha256 };
+  await writeFile(join(directory, CLI), source.replace(PIN_LINE, `const CHANNEL_TRUST_PIN = ${JSON.stringify(pin)};`));
+  return directory;
+}
+
+/* A copy of this directory's channel plus a trust record, signed by the real script unless `signer` is null. */
+async function channelCopy(key, signer = key) {
+  const directory = await mkdtemp(join(temporaryRoot, "channel-"));
+  for (const name of ["channel.json", ...MANIFEST_FILES]) await copyFile(join(SOURCE_DIRECTORY, name), join(directory, name));
+  await writeFile(join(directory, "channel-trust.json"), JSON.stringify(key.trust, null, 2));
+  if (signer) {
+    const outcome = await run(SIGN_SCRIPT_DIRECTORY, "sign-developer-channel.mjs", [directory],
+      childEnv(api.origin, { TAVONEL_CHANNEL_SIGNING_KEY: signer.privateKeyBase64 }));
+    assert.equal(outcome.code, 0, outcome.stderr);
+    assert.ok(!`${outcome.stdout}${outcome.stderr}`.includes(signer.privateKeyBase64), "the signing script printed the key");
+  }
+  return directory;
+}
+
+async function serveDirectory(directory) {
+  const server = createServer((request, response) => {
+    const name = /^\/developer\/([^/?]+)$/.exec(request.url ?? "")?.[1];
+    const path = request.method === "GET" && name && SAFE_FILENAME.test(name) ? join(directory, name) : null;
+    if (!path || !existsSync(path)) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200, { "content-type": "application/octet-stream" }).end(readFileSync(path));
+  });
+  return { server, origin: await listen(server) };
+}
+
+async function verifiedInstall(channelDirectory, cliDirectory, installDirectory) {
+  const served = await serveDirectory(channelDirectory);
+  const staging = await mkdtemp(join(temporaryRoot, "staging-"));
+  try {
+    const channelBytes = await fetchBytes(`${served.origin}/developer/channel.json`);
+    await writeFile(join(staging, "channel.json"), channelBytes);
+    // A missing signature or trust record is downloaded as absent, so verify-channel names it.
+    for (const name of ["channel.json.sig", "channel-trust.json"]) {
+      const response = await fetch(`${served.origin}/developer/${name}`, { signal: AbortSignal.timeout(10_000) });
+      if (response.ok) await writeFile(join(staging, name), Buffer.from(await response.arrayBuffer()));
+    }
+    for (const asset of Object.values(JSON.parse(channelBytes.toString("utf8")).assets)) {
+      const name = assetFilename(asset.url);
+      await writeFile(join(staging, name), await fetchBytes(`${served.origin}/developer/${name}`));
+    }
+    const outcome = await run(cliDirectory, CLI, ["verify-channel", staging], childEnv(api.origin));
+    if (outcome.code !== 0) throw new Error(outcome.stderr.trim());
+    for (const name of await readdir(staging)) await copyFile(join(staging, name), join(installDirectory, name), constants.COPYFILE_EXCL);
+    return JSON.parse(outcome.stdout);
+  } finally {
+    await close(served.server);
+  }
+}
+
+describe("signed channel", () => {
+  let key;
+  let cli;
+  before(async () => {
+    key = channelKey("test-developer-channel");
+    cli = await pinnedCli(key);
+  });
+
+  test("a channel signed by the pinned key installs, and the install holds the channel, its signature and every asset", async () => {
+    const install = await mkdtemp(join(temporaryRoot, "signed-ok-"));
+    api.take();
+    const result = await verifiedInstall(await channelCopy(key), cli, install);
+    assert.equal(result.code, "CHANNEL_VERIFIED");
+    assert.equal(result.keyId, "test-developer-channel");
+    assert.equal(result.assets, MANIFEST_FILES.length);
+    assert.deepEqual((await readdir(install)).sort(), [...META_FILES, ...MANIFEST_FILES].sort());
+    assert.deepEqual(api.take(), [], "verify-channel calls no API");
+  });
+
+  const refusals = [
+    ["a swapped asset whose digest is rewritten in channel.json", /^Error: tavonel: CHANNEL_SIGNATURE_INVALID:/, async (directory) => {
+      const swapped = Buffer.concat([readFileSync(join(directory, CLI)), Buffer.from("\n// swapped\n")]);
+      await writeFile(join(directory, CLI), swapped);
+      const channelFile = join(directory, "channel.json");
+      const manifest = JSON.parse(readFileSync(channelFile, "utf8"));
+      manifest.assets.cli.sha256 = `sha256:${sha256Hex(swapped)}`;
+      await writeFile(channelFile, JSON.stringify(manifest, null, 2));
+    }],
+    ["an asset whose bytes differ from the signed channel", /^Error: tavonel: CHANNEL_ASSET_MISMATCH: tavonel-source-agent\.py$/, async (directory) => {
+      const bytes = readFileSync(join(directory, "tavonel-source-agent.py"));
+      bytes[0] ^= 0xff;
+      await writeFile(join(directory, "tavonel-source-agent.py"), bytes);
+    }],
+    ["a valid signature by the pinned key under another scope", /^Error: tavonel: CHANNEL_SIGNATURE_SCOPE_MISMATCH:/, (directory) =>
+      signByHand(directory, key, { scope: "tavonel.signed_export_manifest.v1", issuedAt: new Date().toISOString(), expiresAt: key.record.expiresAt })],
+    ["a missing signature", /^Error: tavonel: CHANNEL_SIGNATURE_MISSING: channel\.json\.sig$/, (directory) => rm(join(directory, "channel.json.sig"))],
+    ["a trust record that revokes the key", /^Error: tavonel: CHANNEL_KEY_REVOKED:/, (directory) =>
+      writeFile(join(directory, "channel-trust.json"), JSON.stringify({ ...key.trust, keys: [{ ...key.record, status: "revoked" }] }))],
+    ["a missing trust record", /^Error: tavonel: CHANNEL_TRUST_MISSING: channel-trust\.json$/, (directory) => rm(join(directory, "channel-trust.json"))],
+  ];
+  for (const [label, refusal, tamper] of refusals) {
+    test(`refused before anything is written: ${label}`, async () => {
+      const directory = await channelCopy(key);
+      await tamper(directory);
+      const install = await mkdtemp(join(temporaryRoot, "signed-refused-"));
+      await assert.rejects(verifiedInstall(directory, cli, install), refusal);
+      assert.deepEqual(await readdir(install), []);
+    });
+  }
+
+  // The site-compromise class: whoever can change the site can publish any key and any trust record.
+  for (const [label, impostor] of [
+    ["an unknown key id", () => channelKey("another-channel-key")],
+    ["the pinned key id on a different key", () => channelKey("test-developer-channel")],
+  ]) {
+    test(`refused before anything is written: a channel signed with ${label} and its own trust record`, async () => {
+      const install = await mkdtemp(join(temporaryRoot, "signed-impostor-"));
+      await assert.rejects(verifiedInstall(await channelCopy(impostor()), cli, install), /^Error: tavonel: CHANNEL_KEY_UNKNOWN:/);
+      assert.deepEqual(await readdir(install), []);
+    });
+  }
+
+  // The same class, with every claimed fingerprint copied from the pin: only the hash of the key bytes differs.
+  test("refused before anything is written: a different key that claims the pinned key id and fingerprint everywhere", async () => {
+    const impostor = channelKey("test-developer-channel");
+    const record = { ...impostor.record, publicKeySpkiSha256: key.record.publicKeySpkiSha256 };
+    const forged = { ...impostor, record, trust: { ...impostor.trust, keys: [record] } };
+    const directory = await channelCopy(forged, null);
+    await signByHand(directory, forged, { issuedAt: new Date().toISOString(), expiresAt: record.expiresAt });
+    const install = await mkdtemp(join(temporaryRoot, "signed-forged-"));
+    await assert.rejects(verifiedInstall(directory, cli, install), /^Error: tavonel: CHANNEL_KEY_UNKNOWN:/);
+    assert.deepEqual(await readdir(install), []);
+  });
+
+  test("refused before anything is written: a signature past its expiry", async () => {
+    const day = 86_400_000;
+    const old = channelKey("test-developer-channel", { notBefore: Date.now() - 3 * day, expiresAt: Date.now() - day });
+    const directory = await channelCopy(old, null);
+    await signByHand(directory, old, { issuedAt: new Date(Date.now() - 2 * day).toISOString(), expiresAt: old.record.expiresAt });
+    const install = await mkdtemp(join(temporaryRoot, "signed-expired-"));
+    await assert.rejects(verifiedInstall(directory, await pinnedCli(old), install), /^Error: tavonel: CHANNEL_SIGNATURE_EXPIRED:/);
+    assert.deepEqual(await readdir(install), []);
+  });
+
+  /*
+    The committed channel is in one of two states, never between them: the published CLI pins no key and
+    no signature or trust record is published, or it pins one and the committed channel verifies with it.
+  */
+  test("the committed channel is unpinned and unsigned, or pinned and verified", async () => {
+    const source = readFileSync(join(SOURCE_DIRECTORY, CLI), "utf8");
+    const outcome = await run(SOURCE_DIRECTORY, CLI, ["verify-channel", SOURCE_DIRECTORY], childEnv(api.origin));
+    if (source.match(PIN_LINE)?.[0] === "const CHANNEL_TRUST_PIN = null;") {
+      assert.equal(outcome.code, 1);
+      assert.match(outcome.stderr, /^tavonel: CHANNEL_TRUST_NOT_PINNED:/);
+      assert.equal(existsSync(join(SOURCE_DIRECTORY, "channel.json.sig")), false);
+      assert.equal(existsSync(join(SOURCE_DIRECTORY, "channel-trust.json")), false);
+    } else {
+      assert.equal(outcome.code, 0, outcome.stderr);
+      assert.equal(JSON.parse(outcome.stdout).code, "CHANNEL_VERIFIED");
+    }
+  });
+});
+
+/*
+  WO-LOC-7: the Linux user unit. systemd is not available where this runs, so what is proved here is the
+  unit's text and the one piece of shell it carries (ExecStartPre), run through sh with systemd's own
+  specifier rules applied. That the unit loads and sandboxes on a real host is `systemd-analyze --user
+  verify` plus a start on Linux, which this test does not do.
+*/
+describe("the source agent user unit", () => {
+  const UNIT_NAME = "tavonel-source-agent.service";
+  const unit = readFileSync(join(SOURCE_DIRECTORY, UNIT_NAME), "utf8");
+  const lines = unit.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("#"));
+  const values = (key) => lines.filter((line) => line.startsWith(`${key}=`)).map((line) => line.slice(key.length + 1));
+
+  test("is in the manifest with the digest of its bytes", () => {
+    const asset = MANIFEST.assets.sourceAgentService;
+    assert.equal(asset.url, `https://tavonel.com/developer/${UNIT_NAME}`);
+    assert.equal(asset.sha256, `sha256:${sha256Hex(readFileSync(join(SOURCE_DIRECTORY, UNIT_NAME)))}`);
+  });
+
+  test("sets the hardening keys, one writable path, and never carries a key", () => {
+    for (const [key, value] of [["NoNewPrivileges", "yes"], ["ProtectSystem", "strict"], ["Restart", "on-failure"]]) {
+      assert.deepEqual(values(key), [value], key);
+    }
+    assert.deepEqual(values("ReadOnlyPaths"), ["%h"]);
+    assert.deepEqual(values("ReadWritePaths"), ["%h/.local/state/tavonel"]);
+    assert.deepEqual(values("EnvironmentFile"), ["%h/.config/tavonel/agent.env"]);
+    assert.match(values("ExecStart")[0], /^\/usr\/bin\/python3 \S+tavonel-source-agent\.py --watch /);
+    assert.doesNotMatch(unit, /TAVONEL_API_KEY=/);
+    assert.doesNotMatch(unit, /tvnl_/);
+  });
+
+  test("ExecStartPre refuses a loose key file and any empty binding, and passes a complete one", (context) => {
+    const probe = spawnSync("sh", ["-c", "exit 0"]);
+    if (probe.error) return context.skip("no POSIX sh on this machine: run on the hosted Linux step");
+    const body = /^ExecStartPre=\/bin\/sh -c '(.*)'$/m.exec(unit)?.[1];
+    assert.ok(body, "ExecStartPre is a single-quoted sh -c");
+    const script = body.replace(/%(.)|\$\$/g, (whole, specifier) => (whole === "$$" ? "$" : specifier === "%" ? "%" : specifier === "h" ? "/home/synthetic" : whole));
+    assert.doesNotMatch(script, /%[^a]/, "no systemd specifier is left unresolved");
+    const fakeBin = mkdtempSync(join(tmpdir(), "unit-stat-"));
+    writeFileSync(join(fakeBin, "stat"), '#!/bin/sh\necho "$FAKE_MODE"\n', { mode: 0o755 });
+    try {
+      const good = { TAVONEL_API_KEY: "synthetic-not-a-key", TAVONEL_SOURCE_ROOT: "/approved", TAVONEL_CONNECTION_ID: "c", TAVONEL_APPROVE_CREDITS: "5", FAKE_MODE: "600" };
+      const exit = (overrides) => spawnSync("sh", ["-c", script], { env: { PATH: `${fakeBin}${delimiter}${process.env.PATH}`, ...good, ...overrides } }).status;
+      assert.equal(exit({}), 0);
+      for (const bad of [{ FAKE_MODE: "644" }, { FAKE_MODE: "660" }, { FAKE_MODE: "" }, { TAVONEL_API_KEY: "" }, { TAVONEL_SOURCE_ROOT: "" },
+        { TAVONEL_CONNECTION_ID: "" }, { TAVONEL_APPROVE_CREDITS: "" }]) {
+        assert.notEqual(exit(bad), 0, JSON.stringify(Object.keys(bad)) + JSON.stringify(bad));
+      }
+      for (const name of ["TAVONEL_API_KEY", "TAVONEL_SOURCE_ROOT", "TAVONEL_CONNECTION_ID", "TAVONEL_APPROVE_CREDITS"]) {
+        const env = { PATH: `${fakeBin}${delimiter}${process.env.PATH}`, ...good };
+        delete env[name];
+        assert.notEqual(spawnSync("sh", ["-c", script], { env }).status, 0, `${name} unset`);
+      }
+    } finally {
+      rmSync(fakeBin, { recursive: true, force: true });
+    }
+  });
 });

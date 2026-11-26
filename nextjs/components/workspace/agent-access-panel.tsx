@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { AGENT_CLIENT_LABEL_UNVERIFIED, AGENT_PROPOSAL_CONSENT } from "@/lib/agent-consent";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import type { GrantActivityRow } from "@/lib/change-proposals";
 import styles from "./agent-access-panel.module.css";
 
 /*
@@ -34,6 +35,91 @@ async function api(path: string, init: RequestInit = {}) {
   const token = client ? (await client.auth.getSession()).data.session?.access_token ?? null : null;
   return fetch(path, { ...init, cache: "no-store", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init.body ? { "Content-Type": "application/json" } : {}) } });
+}
+
+const STATE_WORD: Record<string, string> = {
+  proposed: "Proposed", confirmed: "Confirmed", executed: "Done", rejected: "Rejected",
+  expired: "Expired", stale: "Out of date", failed: "Failed", undone: "Undone", withdrawn: "Withdrawn",
+};
+const TYPE_WORD: Record<string, string> = { library_label: "Label", compile_plan: "Compile", ontology_label_patch: "Label correction" };
+const ISO = (iso: string) => new Date(iso).toISOString().slice(0, 16).replace("T", " ");
+
+/** One activity line, from the row alone: type, state, created, decided (UTC, so it reads the same everywhere). */
+export function activityLine(row: GrantActivityRow): string {
+  return `${TYPE_WORD[row.actionType] ?? "Change"} · ${STATE_WORD[row.state] ?? row.state} · proposed ${ISO(row.createdAt)} UTC`
+    + (row.decidedAt ? ` · decided ${ISO(row.decidedAt)} UTC` : "") + (row.receiptAvailable ? " · signed receipt stored" : "");
+}
+
+const isActivityRow = (r: unknown): r is GrantActivityRow => Boolean(r) && typeof (r as GrantActivityRow).proposalId === "string"
+  && typeof (r as GrantActivityRow).state === "string" && typeof (r as GrantActivityRow).actionType === "string"
+  && Number.isFinite(Date.parse((r as GrantActivityRow).createdAt))
+  && ((r as GrantActivityRow).decidedAt === null || Number.isFinite(Date.parse((r as GrantActivityRow).decidedAt as string)));
+
+/** The listed rows as NDJSON: every row now shown (all pages read so far), in order, one object per line. */
+export function activityNdjson(rows: readonly GrantActivityRow[]): string {
+  return rows.map((row) => JSON.stringify(row)).join("\n") + "\n";
+}
+
+function downloadRows(rows: readonly GrantActivityRow[], filename: string) {
+  const url = URL.createObjectURL(new Blob([activityNdjson(rows)], { type: "application/x-ndjson" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * What one grant's agent proposed: a page at a time, and the same rows as an NDJSON download. A malformed answer shows nothing.
+ * This is the only reader of the activity route; it reads once it is mounted, which AgentAccessView does only for the grant a
+ * person opened.
+ */
+export function GrantActivity({ grantId }: { grantId: string }) {
+  const [rows, setRows] = useState<GrantActivityRow[] | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [busy, setBusy] = useState(false);
+  const base = `/api/agent-grants/${encodeURIComponent(grantId)}/activity`;
+
+  const read = useCallback(async (cursor: string | null) => {
+    setBusy(true);
+    try {
+      const response = await api(cursor ? `${base}?cursor=${encodeURIComponent(cursor)}` : base);
+      const body = await response.json().catch(() => null) as { activity?: unknown[]; nextCursor?: unknown } | null;
+      if (!response.ok || !body || !Array.isArray(body.activity) || !body.activity.every(isActivityRow)) { setState("unavailable"); return; }
+      setRows((current) => [...(cursor ? current ?? [] : []), ...(body.activity as GrantActivityRow[])]);
+      setNext(typeof body.nextCursor === "string" ? body.nextCursor : null);
+      setState("ready");
+    } catch {
+      setState("unavailable");
+    } finally {
+      setBusy(false);
+    }
+  }, [base]);
+  useEffect(() => { void read(null); }, [read]);
+
+  if (state === "loading") return <p className={styles.muted} aria-busy="true">Reading activity…</p>;
+  if (state === "unavailable") {
+    return <p className={styles.muted} role="status">Activity could not be read. <button type="button" className={styles.link} onClick={() => { setState("loading"); void read(null); }}>Try again</button></p>;
+  }
+  return (
+    <div className={styles.activity}>
+      {rows && rows.length > 0 ? (
+        <ul className={styles.list} aria-label="Activity">
+          {rows.map((row) => <li key={row.proposalId} className={styles.activityRow}>{activityLine(row)}</li>)}
+        </ul>
+      ) : <p className={styles.muted}>This connection has not proposed anything.</p>}
+      <div className={styles.actions}>
+        {next ? <button type="button" className={styles.action} disabled={busy} onClick={() => void read(next)}>Show more</button> : null}
+        {rows && rows.length > 0 ? (
+          <button type="button" className={styles.action} disabled={busy}
+            onClick={() => downloadRows(rows, `agent-activity-${grantId}.ndjson`)}>
+            Export these rows
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 const isGrant = (g: unknown): g is Grant => Boolean(g) && typeof (g as Grant).grantId === "string" && typeof (g as Grant).clientLabel === "string"
@@ -108,6 +194,7 @@ export default function AgentAccessPanel() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openActivity, setOpenActivity] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [token, dispatch] = useReducer(revealAfter, null as Reveal);
 
@@ -165,7 +252,8 @@ export default function AgentAccessPanel() {
   return (
     <AgentAccessView load={load} label={label} busy={busy} notice={notice} token={token}
       onLabel={setLabel} onCreate={create} onClose={() => dispatch({ type: "close" })}
-      onDisconnect={(grant) => void disconnect(grant)} onRetry={() => void refresh()} />
+      onDisconnect={(grant) => void disconnect(grant)} onRetry={() => void refresh()}
+      openActivity={openActivity} onActivity={(grantId) => setOpenActivity((current) => (current === grantId ? null : grantId))} />
   );
 }
 
@@ -173,6 +261,8 @@ type ViewProps = {
   load: Load; label: string; busy: boolean; notice: string | null; token: Reveal;
   onLabel: (value: string) => void; onCreate: (event: React.FormEvent) => void; onClose: () => void;
   onDisconnect: (grant: Grant) => void; onRetry: () => void;
+  /** WO-AN-10: the grant whose Activity is open (one at a time), and the toggle. */
+  openActivity: string | null; onActivity: (grantId: string) => void;
 };
 
 /**
@@ -180,8 +270,11 @@ type ViewProps = {
  * answered `creatable: true`: a workspace that POST would refuse is never shown a capability it cannot use. The list of
  * existing connections and Disconnect are rendered whatever `creatable` says: revoking is never gated. A workspace
  * with nothing to offer and nothing to disconnect renders nothing; so does a read still in flight.
+ * WO-AN-10: Activity is offered on every listed grant, revoked ones included, and like Disconnect it is never gated by
+ * `creatable` (its route is not behind the flag). Its read happens only once a person opens it; with no list rendered,
+ * no Activity is mounted and nothing is read.
  */
-export function AgentAccessView({ load, label, busy, notice, token, onLabel, onCreate, onClose, onDisconnect, onRetry }: ViewProps) {
+export function AgentAccessView({ load, label, busy, notice, token, onLabel, onCreate, onClose, onDisconnect, onRetry, openActivity, onActivity }: ViewProps) {
   const grants = load.state === "ready" ? load.grants : [];
   const creatable = load.state === "ready" && load.creatable;
   if (load.state === "loading") return null;
@@ -216,9 +309,14 @@ export function AgentAccessView({ load, label, busy, notice, token, onLabel, onC
                   {!grant.revokedAt ? (grant.lastUsedAt ? ` · last used ${day(grant.lastUsedAt)}` : " · not used yet") : ""}
                 </p>
               </div>
-              {!grant.revokedAt ? (
-                <button type="button" className={styles.action} disabled={busy} aria-label={`Disconnect “${grant.clientLabel}”`} onClick={() => onDisconnect(grant)}>Disconnect</button>
-              ) : null}
+              <div className={styles.actions}>
+                <button type="button" className={styles.action} aria-expanded={openActivity === grant.grantId} aria-label={`Activity of “${grant.clientLabel}”`}
+                  onClick={() => onActivity(grant.grantId)}>Activity</button>
+                {!grant.revokedAt ? (
+                  <button type="button" className={styles.action} disabled={busy} aria-label={`Disconnect “${grant.clientLabel}”`} onClick={() => onDisconnect(grant)}>Disconnect</button>
+                ) : null}
+              </div>
+              {openActivity === grant.grantId ? <GrantActivity grantId={grant.grantId} /> : null}
             </li>
           ))}
         </ul>

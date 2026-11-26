@@ -62,7 +62,7 @@ const T = "2026-11-10T00:00:00.000Z";
 const ACTIVATED = "2026-11-02T08:00:00.000Z";
 const evId = (index: number) => `ev-${String(index).padStart(32, "0")}`;
 
-const principal = { kind: "api-key", workspaceKey: WORKSPACE, userId: "u", keyId: "k", scopes: ["worlds:read", "ask:read"], authorizationRevision: 3 };
+const principal = { kind: "api-key", workspaceKey: WORKSPACE, userId: "u", keyId: "k", scopes: ["worlds:read", "ask:read"], authorizationRevision: 3, workspaceRole: "owner" };
 
 // What loadWorldReadModel really builds for a digest that is not the active one: status "candidate"
 // on the World and every fact, and that same digest handed to the freshness read as the candidate

@@ -4703,6 +4703,8 @@ test('affected source agent admission: lookalikes, the shared distribution suite
     'nextjs/lib/source-agent-runtime.spec.ts','nextjs/lib/source-agent-runtimeXtest.ts','nextjs/lib/source-agent/runtime.test.ts','nextjs/lib/source-agent-runtime.test.ts.bak',
     'lib/source-agent-runtime.test.ts','nextjs/scripts/source-agent-runtime.test.ts']) {
     if (assertFixRound3Endpoint(path) || assertW1RemoteMcpEndpoint(path)) continue;
+    // Train 2026-11-24 (WO-TRAIN-1): the CLI has an owner now, developer-channel alone; source-agent still does not admit it.
+    if (path === 'nextjs/public/developer/tavonel-cli.mjs') { assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),['developer-channel'],path); continue; }
     assert.deepEqual(AFFECTED_GROUPS.filter(o=>o.match.test(path)).map(o=>o.group),[],path);
     const map=affectedMap([affectedRecord('M',[path])]);
     assert.deepEqual([map.failures,map.groups,map.unmappedPaths,map.unitFiles,map.browserFiles],[[`unmapped changed endpoint: ${path}`],[],[path],[],[]],path);
@@ -7553,7 +7555,9 @@ test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 
   const plan = affectedAskPlan(affectedMap(G1_COPY_TRUTH_AFFECTED_PATHS.map(path => affectedRecord('M', ['nextjs/' + path]))));
   assert.deepEqual([plan.unitFiles, plan.browserFiles, plan.runDetailIntegrity, plan.runCdrWorkerChecks], [affectedUnion(suites, CONSENT_POSTER_AFFECTED_UNIT_FILES), affectedUnion(browsers, CONSENT_POSTER_AFFECTED_BROWSER_FILES), false, false]);
   assert.deepEqual([...new Set(planBrowserRuns(plan.browserFiles, false).map(run => run.project))].sort(), ['1440', '390', 'reduced-motion']);
-  for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs', 'lib/operations.ts.bak']) {
+  // Train 2026-11-24 (WO-TRAIN-1): the CLI beside the MCP client has its own owner now; g1-copy-truth still does not admit it.
+  assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/public/developer/tavonel-cli.mjs')).map(o => o.group), ['developer-channel']);
+  for (const adjacent of ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'lib/operations.ts.bak']) {
     const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
@@ -8389,6 +8393,40 @@ test('affected library-organize-b2 owner: 3 exact paths select 2 direct suites a
     assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
   }
 });
+// WO-TRAIN-5: the native office reader, the geometry table reader, the CJK font guard and the vendored Core files they run join the
+// Cloud Run service owner, as exact paths. The owner stays one owner with no executed Repair suite: its qualification is the
+// malware-scan-qualification workflow (pytest tests/ and the image build), deferred as pending debt.
+import { CDR_NATIVE_READER_AFFECTED_PATHS } from './repair-scope.mjs';
+test('affected CDR native reader paths: 63 exact paths belong to cdr-cloudrun-service alone, and a neighbour stays unmapped', () => {
+  const paths = [...CDR_NATIVE_READER_AFFECTED_PATHS];
+  assert.deepEqual(paths, [...new Set(paths)].sort());
+  assert.deepEqual([paths.length, createHash('sha256').update(paths.join('\n')).digest('hex').slice(0, 16)], [63, 'b89182ba759515d8']);
+  const [owner, ...extra] = AFFECTED_GROUPS.filter(o => o.group === 'cdr-cloudrun-service');
+  assert.equal(extra.length, 0);
+  assert.deepEqual([owner.unitFiles, owner.browserFiles, owner.databaseTests, Boolean(owner.worker), Boolean(owner.selector), Boolean(owner.database), Boolean(owner.requireExecutedCheck)], [[], [], [], false, false, false, false]);
+  for (const path of paths) {
+    assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['cdr-cloudrun-service'], path);
+    assert.ok(existsSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', path)), `${path} is absent at head`);
+  }
+  // The manifest-pinned Core copy: every vendored module and the manifest itself, nothing else.
+  assert.equal(paths.filter(path => path.includes('/vendor/')).length, 49);
+  const map = affectedMap(paths.map(path => affectedRecord('M', [path])));
+  assert.deepEqual([map.failures, map.unmappedPaths, map.groups, map.unitFiles, map.browserFiles, map.databaseTests], [[], [], ['cdr-cloudrun-service'], [], [], []]);
+  assert.deepEqual([map.runCdrWorkerChecks, map.runSelectorContracts, map.databaseChanged], [false, false, false]);
+  const plan = affectedAskPlan(map);
+  assert.ok(plan.deferredGroups.includes('cdr-cloudrun-service') && plan.pendingDebt.includes('cdr-cloudrun-service'));
+  for (const adjacent of ['quarantine-sidecar/cdr-cloudrun/vendor/akc_cir/new_module.py', 'quarantine-sidecar/cdr-cloudrun/native_reader_v2.py', 'quarantine-sidecar/cdr-cloudrun/tests/test_table_geometry_v2.py', 'shared/nativeReadContract.js']) {
+    const unknown = affectedMap([affectedRecord('A', [adjacent], '000000')]);
+    assert.deepEqual([unknown.failures, unknown.unmappedPaths], [[`unmapped changed endpoint: ${adjacent}`], [adjacent]], adjacent);
+  }
+});
+// WO-TRAIN-5: the U37 DB-clock suite is a registered Node suite: the Repair runner takes it, and the owner selects both its suites.
+test('affected agent-u37-matrix owner: its Node suite is registered in the Repair runner and the owner selects both its suites', () => {
+  const owner = V34_PROGRAM_AFFECTED_OWNERS['agent-u37-matrix'];
+  assert.deepEqual([...owner.unitFiles], ['lib/agent-proposals-u37.test.ts', 'scripts/db/agent-u37-db.test.mjs']);
+  const runner = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'run-repair-check.mjs'), 'utf8');
+  assert.ok(runner.includes("'scripts/db/agent-u37-db.test.mjs'"), 'the runner must register the suite');
+});
 // W2-D intake stage 1 + table product-DPI harness (codex/w2-d-20261108): one finite owner, restated independently.
 import { W2_D_INTAKE_STAGE1_AFFECTED_PATHS, W2_D_INTAKE_STAGE1_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
 test('affected w2-d-intake-stage1 owner: 3 exact paths select 2 direct suites and no browser suite; neighbours keep their owners', () => {
@@ -8554,7 +8592,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-qa-harness', 10, '0fc4323c29acf1c5', 0, 'e3b0c44298fc1c14', ['e2e/v34-matrix.spec.ts', 'e2e/v34-support.selftest.spec.ts'],
     { 'e2e/v34-matrix.spec.ts': v34MatrixJob('v34-chromium'), 'e2e/v34-support.selftest.spec.ts': v34MatrixJob('v34-selftest') }],
   // Round 8: WO-CAT-8's plan-allowance race joins (15 -> 17 paths, 7 -> 8 Node suites).
-  ['db-harness', 17, '1da7e8b49a015cc0', 8, '2aa2e1825aad2ec0', [], {}],
+  // WO-TRAIN-2: WO-C-T3's member-scope race joins (17 -> 19 paths, 8 -> 9 Node suites).
+  ['db-harness', 19, '7a111122556a7503', 9, '78282f0c350c0f3c', [], {}],
   ['agent-proposals', 5, '3169e14af02855ea', 2, '777d8d8269835876', [], {}],
   ['proposals-decision-path', 3, 'db1504de4a1b9f29', 6, 'a26a71baeb81f76d', [], {}],
   ['agent-grants', 6, 'ff6e8a683eb77229', 5, '281a9e72832c855e', [], {}],
@@ -8578,6 +8617,27 @@ const V34_OWNER_PINS = Object.freeze([
   ['v34-shell-client-weight', 2, '601b907f0fb5b3b8', 2, 'c5dc2177d17f842a', [], {}],
   ['source-availability', 5, 'f4a2bee82d192af7', 4, 'a51c2808fd4904e3', [], {}],
   ['root-stylesheet-scope', 2, '62941b95a605b38f', 2, 'e6fc291b724a57a1', [], {}],
+  // Train 2026-11-24 (WO-TRAIN-1): the train lanes' 53 owned paths, in six owners; acting-workspace.spec.ts is Product QA's claim at 390.
+  ['acting-workspace', 13, '86d90f197fc018c4', 9, 'f717502531e6e8a0', [], { 'e2e/acting-workspace.spec.ts': v34ProductQa('390') }],
+  // WO-TRAIN-2: member-source-scope-routes.test.ts drives the world and run-events handlers (17 -> 18 paths, 10 -> 11 suites).
+  ['member-source-scope', 18, 'fdb1ab49386f4bb8', 11, 'ff7b88ff343634d0', [], {}],
+  ['connector-provider-qualification', 17, '6703f379e43e1fc9', 1, '368f502c594389f5', [], {}],
+  ['format-census', 2, '069edb130111c258', 1, '68cac7ee81a96597', [], {}],
+  // WO-TRAIN-2: the clean-install suite is a registered Node suite and joins developer-channel (3 -> 4 paths, 2 -> 3 suites).
+  ['developer-channel', 4, 'bb8674d247659760', 3, 'd323ec8d54d7598d', [], {}],
+  ['developer-keys-inventory', 1, 'ff744f408484c885', 1, 'ff744f408484c885', [], {}],
+  // WO-TRAIN-2: codex/v34-an-8 merged; its pending owner is a program owner now.
+  ['agent-audit-routes', 2, 'b5d75d4e64f713f1', 2, '29971313f2d3e397', [], {}],
+  // WO-TRAIN-5: nine owners for the paths the train's later lanes added; the active-World Ask spec is Product QA's claim at 1440.
+  ['ask-verbatim-windows', 6, 'd749e8a356076f00', 11, '586300e12b44a339', [], {}],
+  ['workspace-active-world', 3, '0100582fc90a9d9e', 2, '8175b5631f96fff8', [], { 'e2e/workspace-ask-active-world.spec.ts': v34ProductQa('1440') }],
+  ['workspace-product-frame', 5, 'cc0483ce4041a85a', 2, '7c71ecdbeea3234a', ['e2e/workspace-intake-layout.spec.ts', 'e2e/world-lifecycle.spec.ts'], {}],
+  ['compile-source-stages', 3, 'bc386d90f7452d1b', 1, '55811b7cc38fcba2', [], {}],
+  ['knowledge-steward-patch', 5, 'a443daa6a639c031', 5, '861d433bcec282a1', [], {}],
+  ['global-collection-compile', 2, '0e20772dabd0e2bb', 1, '70e2a40866673d99', [], {}],
+  ['router-shadow', 6, '04047a0f3e9e6c00', 3, '34ce1c2f3d70e5dd', [], {}],
+  ['workspace-payer-entitlement', 1, 'fa1ec06bdaef5790', 1, 'fa1ec06bdaef5790', [], {}],
+  ['agent-u37-matrix', 3, '1f8805f3cee8877d', 2, 'f01b1f3aeedd2c5f', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };
@@ -8585,7 +8645,7 @@ const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billi
 const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
 const v34Executed = map => map.unitFiles.length + map.browserFiles.length + map.databaseTests.length;
 const DB_HARNESS_SUITES = ['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs',
-  'scripts/db/local-cluster.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
+  'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
 test('affected v34 program owners: every owner keeps its exact paths, at least one executed suite and its external claims', () => {
   assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
   for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {
@@ -8723,7 +8783,7 @@ test('affected v34 program owners: the whole program delta maps with no failure,
     'e2e/landing-hero-film-loading.spec.ts', 'e2e/landing-hero-mobile.spec.ts', 'e2e/launch-qa-accessibility.spec.ts', 'e2e/launch-qa-remote-mcp.spec.ts', 'e2e/login-capability.spec.ts',
     'e2e/marketing-story.spec.ts', 'e2e/mobile-landing.spec.ts', 'e2e/overflow-audit.spec.ts', 'e2e/overlap-audit.spec.ts', 'e2e/p4-followups.spec.ts', 'e2e/recipe-continuation.spec.ts',
     'e2e/resources-filter.spec.ts', 'e2e/self-serve-journey.spec.ts', 'e2e/specimen-strip.spec.ts', 'e2e/ultimate-mobile-a11y.spec.ts', 'e2e/upload-entry.spec.ts', 'e2e/v34-matrix.spec.ts',
-    'e2e/v34-support.selftest.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts']);
+    'e2e/v34-support.selftest.spec.ts', 'e2e/visual-refinement.spec.ts', 'e2e/workspace-intake-layout.spec.ts', 'e2e/workspace-intake-triage.spec.ts', 'e2e/workspace-source-observation.spec.ts', 'e2e/world-lifecycle.spec.ts']);
   for (const file of DB_HARNESS_SUITES) assert.ok(map.unitFiles.includes(file), file);
   assert.equal(map.nativeEvidence.disposition, 'fresh-seven-case-native-run-required');
   const plan = affectedAskPlan(map);
@@ -8908,17 +8968,56 @@ test('affected v34 harness owners: the database and V34 harness paths each selec
   // The local cluster and the pgTAP subset are not exercised by the affected SQL lane, so database-contract does not take them.
   assert.equal(AFFECTED_GROUPS.find(o => o.group === 'database-contract').match.test('nextjs/scripts/db/pgtap-subset.sql'), false);
 });
+// WO-TRAIN-2: channel-install.test.mjs groups its cases in describe blocks, so its TAP plan counts top-level entries (6) while
+// "# tests" counts every case (31). The Node runner accepts such a report only when every top-level entry is ok and their count is
+// the plan; a flat report (suites 0) keeps the old rule, plan equal to tests.
+test('affected v34 node runner: a registered suite grouped in describe blocks is accepted only when every top-level entry passes', () => {
+  const file = 'public/developer/channel-install.test.mjs';
+  const summary = (tests, suites) => `# tests ${tests}\n# suites ${suites}\n# pass ${tests}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n`;
+  const grouped = 'TAP version 13\n# Subtest: flat\nok 1 - flat\n# Subtest: group\n    # Subtest: inner a\n    ok 1 - inner a\n    # Subtest: inner b\n'
+    + "    ok 2 - inner b\n    1..2\nok 2 - group\n  ---\n  type: 'suite'\n  ...\n1..2\n" + summary(3, 1);
+  assert.deepEqual(validateNodeTapReport(grouped, [file]), { files: 1, tests: 3, passed: 3, failed: 0, skipped: 0, todo: 0 });
+  // A failed top-level entry is refused even when the summary lines claim a pass.
+  assert.throws(() => validateNodeTapReport(grouped.replace('\nok 2 - group', '\nnot ok 2 - group'), [file]), /executed passing tests/);
+  // Top-level entries that do not add up to the plan (one missing) are refused.
+  assert.throws(() => validateNodeTapReport(grouped.replace('\nok 2 - group', ''), [file]), /executed passing tests/);
+  // No suites line: refused, never read as a flat report or a grouped one.
+  assert.throws(() => validateNodeTapReport(grouped.replace('# suites 1\n', ''), [file]), /executed passing tests/);
+  // Flat: the plan must still equal the test count.
+  const flat = 'TAP version 13\n# Subtest: a\nok 1 - a\n# Subtest: b\nok 2 - b\n1..2\n';
+  assert.deepEqual(validateNodeTapReport(flat + summary(2, 0), [file]).tests, 2);
+  assert.throws(() => validateNodeTapReport(flat + summary(3, 0), [file]), /executed passing tests/);
+  // A skipped case inside a group is refused as before.
+  assert.throws(() => validateNodeTapReport(grouped.replace('# skipped 0', '# skipped 1'), [file]), /executed passing tests/);
+});
 // WO-CI-7 round 3 (L8): owners for paths two running lanes add, ready before the files exist.
 test('affected v34 pending owners: a lane path absent at head is owned, selected only by its own change, and fails closed without its suite', () => {
   // Round 5: WO-AN-5 and WO-CI-6B merged and moved to the program owners. Round 6: WO-CI-6C merged too. Round 8: WO-CI-16 is in
   // flight (codex/v34-ci-16 at 2c52aa89) and adds the shell's current() and its client-weight suite.
-  // WO-CI-16 merged and moved to the program owners: nothing is pending at this head.
+  // WO-CI-16 merged and moved to the program owners. Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8 (7a2df0e8) adds two routes; its own
+  // rebase round must not reopen this file, so the owner holds in both states: before the merge its paths are absent and nothing at
+  // head selects it; after, each path is present and maps to it alone with an executed check.
+  // WO-TRAIN-2: the lane merged (9a258268) and the owner moved to the program owners: none is pending, both routes are at head, each
+  // maps to agent-audit-routes alone, and the suite it selects imports both routes at this head.
   assert.deepEqual(Object.keys(V34_PROGRAM_PENDING_OWNERS), []);
+  const moved = V34_PROGRAM_AFFECTED_OWNERS['agent-audit-routes'];
+  assert.deepEqual(moved, { paths: ['app/api/agent-grants/[id]/activity/route.ts', 'app/api/proposals/[id]/receipt/route.ts'],
+    unitFiles: ['lib/change-proposals-routes.test.ts', 'lib/route-classification.test.ts'], browserFiles: [], externalChecks: {} });
+  const routesSuite = v34ReadHead('nextjs/lib/change-proposals-routes.test.ts') ?? '';
+  for (const path of moved.paths) {
+    assert.ok(existsSync(v34RepoPath(`nextjs/${path}`)), path);
+    assert.ok(routesSuite.includes(`await import("../${path.replace(/\.ts$/, '')}")`), `change-proposals-routes.test.ts imports ${path}`);
+    const merged = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+    assert.deepEqual([merged.failures, merged.groups, merged.unitFiles], [[], ['agent-audit-routes'], [...moved.unitFiles]], path);
+  }
   for (const [group, owner] of Object.entries(V34_PROGRAM_PENDING_OWNERS)) {
     assert.deepEqual([...owner.paths], [...new Set(owner.paths)].sort(), group);
     for (const path of owner.paths) {
-      assert.equal(existsSync(v34RepoPath(`nextjs/${path}`)), false, `${path} is not in this tree yet`);
       assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(`nextjs/${path}`)).map(o => o.group), [group], path);
+      if (!existsSync(v34RepoPath(`nextjs/${path}`))) continue;
+      // The lane has merged: the path, changed alone at head, selects the owner's suites and nothing fails.
+      const merged = v34Map([affectedRecord('M', [`nextjs/${path}`])]);
+      assert.deepEqual([merged.failures, merged.groups, merged.unitFiles], [[], [group], [...owner.unitFiles]], path);
     }
     // Every suite it names exists now or is one of its own paths, so nothing else can select an absent suite through it.
     for (const suite of [...owner.unitFiles, ...owner.browserFiles]) assert.ok(existsSync(v34RepoPath(`nextjs/${suite}`)) || owner.paths.includes(suite), `${group}: ${suite}`);
@@ -8932,6 +9031,15 @@ test('affected v34 pending owners: a lane path absent at head is owned, selected
     }
     assert.deepEqual([lane.failures, lane.groups], [[], [group]], group);
     const ownSuite = owner.unitFiles.find(suite => owner.paths.includes(suite));
+    // An owner that brings no suite of its own selects suites present at head; the lane's change with any one of them gone fails closed on it.
+    if (!ownSuite) {
+      for (const suite of owner.unitFiles) {
+        assert.ok(existsSync(v34RepoPath(`nextjs/${suite}`)), `${group}: ${suite}`);
+        const gone = v34Map(owner.paths.map(p => affectedRecord('A', [`nextjs/${p}`], '000000')), { headHasFile: path => path !== `nextjs/${suite}` && arrived(path) });
+        assert.deepEqual(gone.failures, [`selected owner check is absent at head: ${suite}`], `${group}: ${suite}`);
+      }
+      continue;
+    }
     // An owner whose only path is its own suite has no partial change to test: absent, nothing selects it.
     if (owner.paths.length === 1) { assert.deepEqual(owner.paths, [ownSuite], group); continue; }
     const partial = v34Map(owner.paths.filter(p => p !== ownSuite).map(p => affectedRecord('A', [`nextjs/${p}`], '000000')), { headHasFile: path => path !== `nextjs/${ownSuite}` && arrived(path) });

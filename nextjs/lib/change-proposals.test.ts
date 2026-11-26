@@ -94,6 +94,8 @@ describe("toPublicProposal", () => {
       proposalId: PROPOSAL, actionType: "library_label", state: "proposed", collectionId: COLLECTION, preview: input,
       previewDigest: lib.proposalPreviewDigest(PROPOSAL, "library_label", input), resumable: false, evidenceIds: ["ev-1"],
       expiresAt: "2026-11-23T00:00:00Z", createdAt: "2026-11-16T00:00:00Z", decidedAt: null, proposer: { kind: "person" }, notes: [],
+      // WO-AN-10: two more fields, neither an id: who decided relative to this viewer, and whether a signed receipt is stored.
+      youDecided: null, receiptAvailable: false,
     });
     expect(JSON.stringify(publicRow)).not.toMatch(new RegExp(`principal|secret-key|manifest|${base.input_sha256}|${VIEWER}`));
   });

@@ -6,6 +6,7 @@ import {
   resolveBoundSnapshot,
   worldModelSnapshot,
 } from "@/lib/consumer-context-api";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
 import { getFoundationActiveWorld } from "@/lib/world-store";
@@ -44,6 +45,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         return NextResponse.json({ code: active.code }, { status: active.code === "WORLD_ID_INVALID" ? 400 : 503, headers: NO_STORE });
       }
     }
+    // A member reads this version only when every source behind it is in their scope (WO-C-T3).
+    const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, selected);
+    if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
     const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
     if (!loaded.ok) return NextResponse.json({ code: loaded.code, bytes: loaded.bytes, bound: loaded.bound }, { status: loaded.status, headers: NO_STORE });
     return NextResponse.json({ code: "OK", model: loaded.model }, { headers: NO_STORE });
@@ -60,6 +64,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       { status: CONSUMER_CONTEXT_REFUSALS.CONSUMER_CONTEXT_SNAPSHOT_MISMATCH, headers: NO_STORE },
     );
   }
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, digest);
+  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, digest);
   if (!loaded.ok) return NextResponse.json({ code: loaded.code, bytes: loaded.bytes, bound: loaded.bound }, { status: loaded.status, headers: NO_STORE });
   const released = await releaseConsumerContext({

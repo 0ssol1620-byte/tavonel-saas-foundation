@@ -56,7 +56,8 @@ function request(path: string, body: unknown) {
 describe("customer-data approval before asynchronous intake", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    const principal = { kind: "session", workspaceKey: WORKSPACE, userId: DOCUMENT, accessSource: "subscription" };
+    // WO-C-T1: a real principal always carries its role; the owner's is what these routes saw before.
+    const principal = { kind: "session", workspaceKey: WORKSPACE, userId: DOCUMENT, accessSource: "subscription", workspaceRole: "owner" };
     authorize.mockResolvedValue({ ok: true, principal });
     session.mockResolvedValue({ ok: true, principal });
     gate.mockResolvedValue(false);

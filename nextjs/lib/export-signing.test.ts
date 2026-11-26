@@ -1,10 +1,16 @@
-import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET as getExportTrust } from "../app/api/export/trust/route";
 import {
   ANSWER_RECEIPT_SIGNATURE_SCOPE,
   CAPABILITY_MANIFEST_SIGNATURE_SCOPE,
   COMPILE_RECEIPT_SIGNATURE_SCOPE,
+  DEVELOPER_CHANNEL_SIGNATURE_SCOPE,
   WORLD_RELEASE_SIGNATURE_SCOPE,
   createExportSigner,
   isScopedSignature,
@@ -241,14 +247,14 @@ describe("Foundation signed exports", () => {
     }) })).toBeNull();
   });
 
-  it("keeps capability-manifest and world-release signatures to their own scope and refuses v1", () => {
+  it("keeps capability-manifest, world-release and developer-channel signatures to their own scope and refuses v1", () => {
     const material = keys();
     const payload = Buffer.from("scoped payload");
     const scopes: SignatureScope[] = [
       "tavonel.signed_export_manifest.v1", COMPILE_RECEIPT_SIGNATURE_SCOPE, ANSWER_RECEIPT_SIGNATURE_SCOPE,
-      CAPABILITY_MANIFEST_SIGNATURE_SCOPE, WORLD_RELEASE_SIGNATURE_SCOPE,
+      CAPABILITY_MANIFEST_SIGNATURE_SCOPE, WORLD_RELEASE_SIGNATURE_SCOPE, DEVELOPER_CHANNEL_SIGNATURE_SCOPE,
     ];
-    for (const scope of [CAPABILITY_MANIFEST_SIGNATURE_SCOPE, WORLD_RELEASE_SIGNATURE_SCOPE]) {
+    for (const scope of [CAPABILITY_MANIFEST_SIGNATURE_SCOPE, WORLD_RELEASE_SIGNATURE_SCOPE, DEVELOPER_CHANNEL_SIGNATURE_SCOPE]) {
       const signer = createExportSigner({
         keyId: "scoped-key", keyVersion: 1, privateKeyPkcs8DerBase64: material.privateKeyPkcs8DerBase64,
         notBefore: "2026-09-01T00:00:00.000Z", expiresAt: "2026-10-01T00:00:00.000Z",
@@ -265,5 +271,87 @@ describe("Foundation signed exports", () => {
     expect(v1.schemaVersion).toBe("tavonel.export_signature.v1");
     expect(isScopedSignature(v1, WORLD_RELEASE_SIGNATURE_SCOPE)).toBe(false);
     expect(isScopedSignature(v1, CAPABILITY_MANIFEST_SIGNATURE_SCOPE)).toBe(false);
+    expect(isScopedSignature(v1, DEVELOPER_CHANNEL_SIGNATURE_SCOPE)).toBe(false);
+  });
+
+  /*
+    WO-LOC-3: the channel signing script is a Node built-ins copy of the house v2 signer, so this runs the real
+    script on a synthetic channel and checks its output with this module. The channel is written with sorted
+    keys and no whitespace, which makes the file its own canonical JSON.
+  */
+  describe("scripts/sign-developer-channel.mjs", () => {
+    const script = fileURLToPath(new URL("../scripts/sign-developer-channel.mjs", import.meta.url));
+    let directory = "";
+    afterEach(() => {
+      if (directory) rmSync(directory, { recursive: true, force: true });
+    });
+
+    function channelDirectory(trustedKey: string) {
+      directory = mkdtempSync(join(tmpdir(), "tavonel-channel-sign-"));
+      const asset = Buffer.from("asset bytes\n");
+      writeFileSync(join(directory, "a.mjs"), asset);
+      const channel = Buffer.from(JSON.stringify({
+        assets: { a: { sha256: `sha256:${createHash("sha256").update(asset).digest("hex")}`, url: "https://tavonel.com/developer/a.mjs" } },
+        version: "2026.11.18.1",
+      }));
+      writeFileSync(join(directory, "channel.json"), channel);
+      const publicKey = createPublicKey(createPrivateKey({ key: Buffer.from(trustedKey, "base64"), format: "der", type: "pkcs8" }))
+        .export({ format: "der", type: "spki" });
+      const trust: ExportTrustStore = {
+        schemaVersion: "tavonel.export_trust.v2", minimumSignatureVersion: 2, activeKeyId: "test-channel-key",
+        keys: [{
+          keyId: "test-channel-key", keyVersion: 1, algorithm: "Ed25519", status: "active",
+          notBefore: new Date(Date.now() - 60_000).toISOString(), expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          publicKeySpkiDerBase64: publicKey.toString("base64"),
+          publicKeySpkiSha256: `sha256:${createHash("sha256").update(publicKey).digest("hex")}`,
+        }],
+      };
+      writeFileSync(join(directory, "channel-trust.json"), JSON.stringify(trust));
+      return { channel, trust };
+    }
+
+    function runScript(key: string | undefined) {
+      const env = { ...process.env };
+      delete env.TAVONEL_CHANNEL_SIGNING_KEY;
+      if (key !== undefined) env.TAVONEL_CHANNEL_SIGNING_KEY = key;
+      return spawnSync(process.execPath, [script, directory], { env, encoding: "utf8", timeout: 10_000 });
+    }
+
+    it("signs under the developer-channel scope only, verifiable with the trust record", () => {
+      const key = keys().privateKeyPkcs8DerBase64;
+      const { channel, trust } = channelDirectory(key);
+      const outcome = runScript(key);
+      expect(outcome.status, outcome.stderr).toBe(0);
+      expect(`${outcome.stdout}${outcome.stderr}`).not.toContain(key);
+      const signature = JSON.parse(readFileSync(join(directory, "channel.json.sig"), "utf8")) as ExportSignatureV2;
+      expect(isScopedSignature(signature, DEVELOPER_CHANNEL_SIGNATURE_SCOPE)).toBe(true);
+      expect(verifyExportSignatureWithTrustStore(channel, signature, trust, new Date(), DEVELOPER_CHANNEL_SIGNATURE_SCOPE)).toBe(true);
+      for (const scope of [WORLD_RELEASE_SIGNATURE_SCOPE, CAPABILITY_MANIFEST_SIGNATURE_SCOPE, "tavonel.signed_export_manifest.v1"] as const) {
+        expect(verifyExportSignatureWithTrustStore(channel, signature, trust, new Date(), scope)).toBe(false);
+      }
+      expect(verifyExportSignatureWithTrustStore(Buffer.from(channel.toString().replace("2026.11.18.1", "2026.11.18.2")),
+        signature, trust, new Date(), DEVELOPER_CHANNEL_SIGNATURE_SCOPE)).toBe(false);
+    }, 15_000);
+
+    it("refuses, writing no signature, without a key, with a key the trust record does not name, or with a stale asset", () => {
+      const key = keys().privateKeyPkcs8DerBase64;
+      const other = keys().privateKeyPkcs8DerBase64;
+      const cases: [string | undefined, RegExp, (() => void)?][] = [
+        [undefined, /CHANNEL_SIGNING_KEY_MISSING/],
+        ["not-a-key", /CHANNEL_SIGNING_KEY_INVALID/],
+        [other, /CHANNEL_SIGNING_KEY_NOT_TRUSTED/],
+        [key, /CHANNEL_ASSET_MISMATCH/, () => writeFileSync(join(directory, "a.mjs"), "changed after the digest\n")],
+      ];
+      for (const [signingKey, refusal, tamper] of cases) {
+        channelDirectory(key);
+        tamper?.();
+        const outcome = runScript(signingKey);
+        expect(outcome.status).toBe(1);
+        expect(outcome.stderr).toMatch(refusal);
+        if (signingKey) expect(`${outcome.stdout}${outcome.stderr}`).not.toContain(signingKey);
+        expect(existsSync(join(directory, "channel.json.sig"))).toBe(false);
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }, 30_000);
   });
 });

@@ -5,6 +5,7 @@ import {
   resolveBoundSnapshot,
   worldModelSnapshot,
 } from "@/lib/consumer-context-api";
+import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { loadWorldReadModel } from "@/lib/world-read-model";
 import { pageTokenKey, sealClaims, unsealClaims } from "@/lib/sealed-claims";
@@ -147,6 +148,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       selected = resolvedAt.manifestDigest;
     }
   }
+  // A member reads a lens only when every source behind the served version is in their scope.
+  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, selected);
+  if (scopeRefusal) return fail(scopeRefusal.code, scopeRefusal.status);
   const loaded = await loadWorldReadModel(auth.principal.workspaceKey, id, selected);
   if (!loaded.ok) return NextResponse.json({ code: loaded.code, bytes: loaded.bytes, bound: loaded.bound }, { status: loaded.status, headers: NO_STORE });
   /*

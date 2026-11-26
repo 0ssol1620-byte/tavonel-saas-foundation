@@ -37,6 +37,8 @@ import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
 import { detectExactDuplicatesAtIntake, type ExactDuplicateNote } from "./source-dedup";
 import { organizeLibraryAtIntake } from "./library-shadow";
+import { recordRouterShadowTrace, routerShadowRun, type RouterShadowDocument } from "./router-shadow-store";
+import type { DocumentListItem } from "./immutable-keys";
 
 /** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
 const sizeLimitPayload = (result: object) => ("sizeLimit" in result ? { sizeLimit: result.sizeLimit } : {});
@@ -121,6 +123,48 @@ async function readCompileAuthorization(workspaceId: string, documentIds: readon
   return readCustomerSourceAuthorization(workspaceId, "direct_upload");
 }
 
+/** An OCR body whose schema or key set this compile does not accept. A v1 read is known, not unknown. */
+function ocrSchemaUnbound(json: Record<string, unknown>) {
+  return (json.schemaVersion !== "tavonel.ocr_result.v1" && json.schemaVersion !== "tavonel.ocr_result.v2" &&
+      json.schemaVersion !== "tavonel.ocr_result.v3") ||
+    json.recognitionConflicts !== undefined ||
+    (json.schemaVersion === "tavonel.ocr_result.v3" && Object.keys(json).some((key) =>
+      !new Set(["schemaVersion", "status", "text", "pageCount", "inputSha256", "sourceImmutableKey", "regions",
+                "readerRevision", "readerBindingSha256", "recognitionConflictCount"]).has(key)));
+}
+
+function ocrCandidate(document: DocumentListItem, json: Record<string, unknown>) {
+  return {
+    documentId: document.documentId,
+    versionKey: document.versionKey,
+    sanitizedKey: document.sanitizedKey,
+    ocrJsonKey: document.ocrJsonKey,
+    pageCount: json.pageCount,
+    text: json.text,
+    inputSha256: json.inputSha256,
+    sourceImmutableKey: json.sourceImmutableKey,
+    ocrSchemaVersion: json.schemaVersion,
+    readerRevision: json.readerRevision,
+    readerBindingSha256: json.readerBindingSha256,
+    recognitionConflictCount: json.recognitionConflictCount,
+    // Only a region-capturing reader (v2, v3) may supply regions. A v1 body that carries some
+    // anyway is refused as OCR_REGIONS_REQUIRED below, never compiled on geometry v1 never read.
+    regions: json.schemaVersion === "tavonel.ocr_result.v2" || json.schemaVersion === "tavonel.ocr_result.v3" ? json.regions : undefined,
+  };
+}
+
+/** What the router shadow may know of one document: the compile's own checks, applied to it alone. */
+function routerShadowDocument(document: DocumentListItem, body: unknown): RouterShadowDocument {
+  const ref = { documentId: document.documentId, versionKey: document.versionKey };
+  if (body === null || typeof body !== "object" || ocrSchemaUnbound(body as Record<string, unknown>)) {
+    return { ...ref, failure: "OCR_BINDING_INVALID" };
+  }
+  const candidate = ocrCandidate(document, body as Record<string, unknown>);
+  if (documentsWithoutRegions([candidate]).length > 0) return { ...ref, failure: OCR_REGIONS_REQUIRED };
+  const input = validateCollectionOcrInput(candidate);
+  return input ? { ...ref, input } : { ...ref, failure: "OCR_BINDING_INVALID" };
+}
+
 export async function runCollectionCompile(
   workspaceId: string,
   documentIds: readonly string[],
@@ -129,6 +173,29 @@ export async function runCollectionCompile(
   observationPrincipal?: CompileObservationPrincipal,
   /** The invocation's wall clock, when a scheduler tick owns it: Core is given what is left of it minus the settlement reserve. */
   deadlineAt?: number,
+): Promise<CollectionCompileRun> {
+  /*
+    The router shadow (ADR-012 section 5) writes beside the compile, never in its way: its write
+    starts once the OCR bodies are read, Core is dispatched without waiting for it, and it is
+    settled here, after the compile has its answer. It never rejects, and the answer is not read
+    from it. Off (the default) it resolves at once without a store call.
+  */
+  const shadowWrites: Promise<void>[] = [];
+  try {
+    return await compileOnce(workspaceId, documentIds, logicalCollectionKey, compileJobId, observationPrincipal, deadlineAt, shadowWrites);
+  } finally {
+    await Promise.all(shadowWrites);
+  }
+}
+
+async function compileOnce(
+  workspaceId: string,
+  documentIds: readonly string[],
+  logicalCollectionKey: string | undefined,
+  compileJobId: string | undefined,
+  observationPrincipal: CompileObservationPrincipal | undefined,
+  deadlineAt: number | undefined,
+  shadowWrites: Promise<void>[],
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
   // An invocation identity, distinct from a durable job (which can have several attempts).
@@ -253,42 +320,18 @@ export async function runCollectionCompile(
   }
   // An OCR result that could not be read at all is a binding failure, not a missing-region one.
   const bodies = fetched.map((result) => (result.ok ? result.json : null));
+  shadowWrites.push(recordRouterShadowTrace(workspaceId, routerShadowRun(compileJobId ?? null, observationRunId),
+    () => selected.map((item, index) => routerShadowDocument(item!, bodies[index]))));
   if (bodies.some((body) => body === null || typeof body !== "object")) {
     return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   }
   // The v3 conflict contract is region-scoped. Never silently discard an
   // unrecognized sidecar or let an unknown OCR version fall back to v2.
   // A v1 read is known, not unknown: it reaches OCR_REGIONS_REQUIRED below and is never dispatched.
-  if (bodies.some((body) => {
-    const json = body as Record<string, unknown>;
-    return (json.schemaVersion !== "tavonel.ocr_result.v1" && json.schemaVersion !== "tavonel.ocr_result.v2" &&
-        json.schemaVersion !== "tavonel.ocr_result.v3") ||
-      json.recognitionConflicts !== undefined ||
-      (json.schemaVersion === "tavonel.ocr_result.v3" && Object.keys(json).some((key) =>
-        !new Set(["schemaVersion", "status", "text", "pageCount", "inputSha256", "sourceImmutableKey", "regions",
-                  "readerRevision", "readerBindingSha256", "recognitionConflictCount"]).has(key)));
-  })) return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
-  const candidates = bodies.map((body, index) => {
-    const document = selected[index]!;
-    const json = body as Record<string, unknown>;
-    return {
-      documentId: document.documentId,
-      versionKey: document.versionKey,
-      sanitizedKey: document.sanitizedKey,
-      ocrJsonKey: document.ocrJsonKey,
-      pageCount: json.pageCount,
-      text: json.text,
-      inputSha256: json.inputSha256,
-      sourceImmutableKey: json.sourceImmutableKey,
-      ocrSchemaVersion: json.schemaVersion,
-      readerRevision: json.readerRevision,
-      readerBindingSha256: json.readerBindingSha256,
-      recognitionConflictCount: json.recognitionConflictCount,
-      // Only a region-capturing reader (v2, v3) may supply regions. A v1 body that carries some
-      // anyway is refused as OCR_REGIONS_REQUIRED below, never compiled on geometry v1 never read.
-      regions: json.schemaVersion === "tavonel.ocr_result.v2" || json.schemaVersion === "tavonel.ocr_result.v3" ? json.regions : undefined,
-    };
-  });
+  if (bodies.some((body) => ocrSchemaUnbound(body as Record<string, unknown>))) {
+    return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
+  }
+  const candidates = bodies.map((body, index) => ocrCandidate(selected[index]!, body as Record<string, unknown>));
 
   /*
     A document read before region capture is refused, and told apart from a malformed one.
