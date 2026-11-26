@@ -485,8 +485,9 @@ test("Proposals: an agent compile row names who suggested it, lists the document
   expect(store.confirmBodies).toHaveLength(1);
   expect(store.confirmBodies[0]).toMatchObject({ decision: "confirm", previewDigest: `sha256:${"1".repeat(64)}` });
   expect(store.executions).toHaveLength(1);
-  // No undo exists for a compile.
-  await expect(row.getByRole("button")).toHaveCount(0);
+  // No undo exists for a compile. An executed agent row offers its signed receipt (WO-AN-10), and nothing else.
+  await expect(row.getByRole("button").filter({ hasNotText: "Signed receipt" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "Undo" })).toHaveCount(0);
   expect(await overflow(page)).toBeLessThanOrEqual(1);
 });
 
