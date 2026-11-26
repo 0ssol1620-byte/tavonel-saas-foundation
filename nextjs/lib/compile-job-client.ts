@@ -266,3 +266,27 @@ export function pickResumableCompileJob<T extends { state: CompileState; settled
   return jobs.find((job, index) => !isCompileJobTerminal(job.state)
     && (job.state !== "review_required" || jobs.slice(0, index).every((newer) => Boolean(job.corpusId) && newer.corpusId === job.corpusId)));
 }
+
+/** An earlier review package the start-up pick did not open, with the one link that reaches it. */
+export type EarlierReviewPackage = { jobId: string; collectionId: string | null; href: string };
+
+/**
+ * The `review_required` jobs `pickResumableCompileJob` leaves unopened, from the same list (no request).
+ * A package a person still has to decide on must not become invisible because a newer compile exists
+ * (WO-WS-6, F3): Home says how many there are and links each. A job in the opened job's corpus is
+ * reachable through that corpus and is not listed. The link is the collection (its candidate and
+ * review) when the job produced one, else the job itself.
+ */
+export function earlierReviewPackages(
+  jobs: readonly { jobId: string; state: CompileState; collectionId?: string | null; corpusId?: string | null }[],
+  opened: { jobId: string; corpusId?: string | null } | undefined,
+): EarlierReviewPackage[] {
+  return jobs
+    .filter((job) => job.state === "review_required" && job.jobId !== opened?.jobId
+      && !(opened?.corpusId && job.corpusId === opened.corpusId))
+    .map((job) => ({
+      jobId: job.jobId,
+      collectionId: job.collectionId ?? null,
+      href: job.collectionId ? `/workspace?collection=${encodeURIComponent(job.collectionId)}` : `/workspace?job=${encodeURIComponent(job.jobId)}`,
+    }));
+}

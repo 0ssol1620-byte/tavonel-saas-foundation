@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readSourceStages } from "./compile-source-stages";
-import { compileJobRestingNotice, drainSseFrames, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
+import { compileJobRestingNotice, drainSseFrames, earlierReviewPackages, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
 import { COMPILE_STATES } from "./compile-job-store";
 
 /*
@@ -280,5 +280,33 @@ describe("a compile job at rest", () => {
       expect(isCompileJobResting(state)).toBe(false);
       expect(compileJobRestingNotice(state)).toBeNull();
     }
+  });
+});
+
+describe("earlierReviewPackages: what the start-up pick leaves unopened stays pointed at (WO-WS-6, F3)", () => {
+  const now = Date.parse("2026-11-26T12:00:00Z");
+  const job = (jobId: string, state: "ready" | "review_required" | "reading" | "failed", extra: { collectionId?: string | null; corpusId?: string | null } = {}) =>
+    ({ jobId, state, settledAt: "2026-11-26T08:24:00Z", ...extra });
+
+  it("lists the old review package the pick hid, linked by its collection, else by its job", () => {
+    const jobs = [job("new", "ready", { collectionId: "collection-n" }), job("old", "review_required", { collectionId: "collection-o" }), job("older", "review_required")];
+    expect(pickResumableCompileJob(jobs, now)).toBeUndefined();
+    expect(earlierReviewPackages(jobs, undefined)).toEqual([
+      { jobId: "old", collectionId: "collection-o", href: "/workspace?collection=collection-o" },
+      { jobId: "older", collectionId: null, href: "/workspace?job=older" },
+    ]);
+  });
+  it("does not list the job that was opened, and lists nothing when there is no review package", () => {
+    const jobs = [job("only", "review_required")];
+    expect(earlierReviewPackages(jobs, pickResumableCompileJob(jobs, now))).toEqual([]);
+    expect(earlierReviewPackages([job("a", "ready"), job("b", "reading")], undefined)).toEqual([]);
+    expect(earlierReviewPackages([], undefined)).toEqual([]);
+  });
+  it("does not list another part of the opened job's corpus: it is reached through the corpus", () => {
+    const jobs = [job("p2", "review_required", { corpusId: "corpus-a" }), job("p1", "review_required", { corpusId: "corpus-a" }), job("x", "review_required", { corpusId: "corpus-b" })];
+    expect(earlierReviewPackages(jobs, jobs[0]).map((item) => item.jobId)).toEqual(["x"]);
+  });
+  it("encodes what it links to", () => {
+    expect(earlierReviewPackages([job("a", "review_required", { collectionId: "c&d=1" })], undefined)[0].href).toBe("/workspace?collection=c%26d%3D1");
   });
 });

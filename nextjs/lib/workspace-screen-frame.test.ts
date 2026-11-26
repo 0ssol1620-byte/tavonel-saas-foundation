@@ -477,3 +477,23 @@ describe("the review tags say when the evidence is not loaded instead of countin
     expect(read("app/workspace/page.tsx")).not.toContain("evidence-bound relations");
   });
 });
+
+describe("one listing request, and an answer never outlives the World it was read for (WO-WS-6 review)", () => {
+  const page = () => read("app/workspace/page.tsx");
+  it("Home's effect and Ask's effect both read the listing through the one shared, keyed call", () => {
+    const source = page();
+    expect(source).toContain("const listActiveWorlds = (): Promise<ActiveWorldDiscovery> => {");
+    expect(source).toContain("if (listingInflight.current?.key === key) return listingInflight.current.promise;");
+    expect(source.match(/await listActiveWorlds\(\)|void listActiveWorlds\(\)/g)).toHaveLength(2);
+    // The only direct caller of the listing is the shared call.
+    expect(source.match(/discoverActiveWorlds\(token\)/g)).toHaveLength(1);
+  });
+  it("the open World changing puts the listing back to 'checking' before the new answer", () => {
+    expect(page()).toContain('setWorkspaceWorlds("checking");\n    void listActiveWorlds()');
+  });
+  it("Home says how many earlier review packages are pending, from the job list already read", () => {
+    const source = page();
+    expect(source).toContain("setEarlierReviews(earlierReviewPackages(json.jobs ?? [], open));");
+    expect(source).toContain('data-testid="earlier-review-packages"');
+  });
+});

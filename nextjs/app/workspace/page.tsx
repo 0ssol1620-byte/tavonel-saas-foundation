@@ -89,7 +89,7 @@ import type { WorldReadModel } from "@/lib/world-read-model";
 import { compileLimitsNotice, judgeCompileSet } from "@/lib/compile-limits";
 import { describeCorpusStart, judgeCorpusSet, type CorpusProgress } from "@/lib/corpus-batching";
 import { CompileJobPanel, type CompileJobView } from "@/components/compile-job-panel";
-import { compileJobRestingNotice, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "@/lib/compile-job-client";
+import { compileJobRestingNotice, earlierReviewPackages, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob, type EarlierReviewPackage } from "@/lib/compile-job-client";
 import { measureSelection, refusablePageCount, type PageCountResult } from "@/lib/page-count";
 import {
   buildPreflightSummary,
@@ -820,19 +820,37 @@ export default function WorkspacePage() {
     chosen here: Ask's own rule for which World it reads is untouched.
   */
   const [workspaceWorlds, setWorkspaceWorlds] = useState<WorkspaceWorlds>("checking");
+  /* WO-WS-6 (F3): review packages older than a newer compile, which the start-up pick does not open. */
+  const [earlierReviews, setEarlierReviews] = useState<EarlierReviewPackage[]>([]);
+  /*
+    One listing request per moment, shared by Home's effect and Ask's. A call made while another for the
+    same open World (its manifest digest, "" for none) is in flight gets that call's answer; a call after
+    the open World changed starts its own, so an answer that began before an activation is never reused.
+  */
+  const listingInflight = useRef<{ key: string; promise: Promise<ActiveWorldDiscovery> } | null>(null);
+  const listActiveWorlds = (): Promise<ActiveWorldDiscovery> => {
+    const key = activeWorld?.manifestDigest ?? "";
+    if (listingInflight.current?.key === key) return listingInflight.current.promise;
+    const entry: { key: string; promise: Promise<ActiveWorldDiscovery> } = {
+      key,
+      promise: (async (): Promise<ActiveWorldDiscovery> => {
+        try {
+          const token = await getAuthToken();
+          return token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED", status: 401 };
+        } catch {
+          return { kind: "failed", code: null, status: null };
+        }
+      })().finally(() => { if (listingInflight.current === entry) listingInflight.current = null; }),
+    };
+    listingInflight.current = entry;
+    return entry.promise;
+  };
   useEffect(() => {
     if (session !== "signed-in" || !workspaceStartupReady) return;
     let current = true;
-    void (async () => {
-      let found: ActiveWorldDiscovery;
-      try {
-        const token = await getAuthToken();
-        found = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED", status: 401 };
-      } catch {
-        found = { kind: "failed", code: null, status: null };
-      }
-      if (current) setWorkspaceWorlds(found);
-    })();
+    // The open World changed (or this is the first read): the last answer is not shown as this one's.
+    setWorkspaceWorlds("checking");
+    void listActiveWorlds().then((found) => { if (current) setWorkspaceWorlds(found); });
     return () => { current = false; };
     // getAuthToken only reads the session; the open World's identity is what makes the listing stale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1091,13 +1109,8 @@ export default function WorkspacePage() {
     const run = ++discoveryRun.current;
     const started = candidateLoadSequence.current;
     void (async () => {
-      let found: ActiveWorldDiscovery;
-      try {
-        const token = await getAuthToken();
-        found = token ? await discoverActiveWorlds(token) : { kind: "failed", code: "AUTH_REQUIRED", status: 401 };
-      } catch {
-        found = { kind: "failed", code: null, status: null };
-      }
+      // Shared with Home's read of the same listing while one is in flight (WO-WS-6), so a load makes one request.
+      const found = await listActiveWorlds();
       // A newer listing owns the panel now.
       if (run !== discoveryRun.current) return;
       // Another collection was loaded meanwhile: this answer is stale and must not replace it.
@@ -1174,6 +1187,8 @@ export default function WorkspacePage() {
         if (!response.ok) return;
         const json = await response.json() as { jobs?: Array<CompileJobView & { settledAt?: string | null }> };
         const open = pickResumableCompileJob(json.jobs ?? [], Date.now());
+        // From the list already in hand: a review package this pick leaves unopened stays pointed at.
+        setEarlierReviews(earlierReviewPackages(json.jobs ?? [], open));
         if (!open) return;
         // A part found on its own is still part of a run, and showing it alone would say
         // "12 sources" about a compile the customer started with 128.
@@ -3011,6 +3026,8 @@ export default function WorkspacePage() {
   const workspaceState = deriveWorkspaceState(workspaceStateInput);
   const onboardingSteps = deriveOnboardingSteps(workspaceStateInput);
   const attentionItems = deriveAttentionItems(workspaceStateInput);
+  // A package whose collection is the one open here is not "earlier": it is the one on screen.
+  const pendingEarlierReviews = earlierReviews.filter((item) => item.collectionId === null || item.collectionId !== collectionResult?.collectionId);
   const runIntent = (intent: WorkspaceIntent | undefined) => {
     if (intent === "upload") {
       if (activationPolicy.customerIntake.enabled && intakeOpen) fileRef.current?.click();
@@ -3523,6 +3540,21 @@ export default function WorkspacePage() {
             with its own written label -- the state is legible without reading a colour, and a
             second blocked state can no longer hide behind the first one's heading.
           */}
+          {/*
+            WO-WS-6 (F3): the start-up pick opens one compile job, and an older review package is not it. It is
+            still waiting on a person, so Home says so and links each, from the job list already read.
+          */}
+          {tab === "overview" && surface === "home" && pendingEarlierReviews.length > 0 ? (
+            <p className="fine" role="status" data-testid="earlier-review-packages">
+              {pendingEarlierReviews.length === 1 ? "1 earlier review package is still pending." : `${pendingEarlierReviews.length} earlier review packages are still pending.`}{" "}
+              {pendingEarlierReviews.slice(0, 5).map((item, index) => (
+                <button key={item.jobId} type="button" className="btn ghost" onClick={() => window.location.assign(item.href)}>
+                  Open review package {index + 1}
+                </button>
+              ))}
+              {pendingEarlierReviews.length > 5 ? ` ${pendingEarlierReviews.length - 5} more are not listed here.` : null}
+            </p>
+          ) : null}
           {tab === "overview" && surface === "home" && attentionItems.length > 0 ? (
             <Screen title="Needs attention" titleAs="h2" titleId="workspace-attention-title" status={attentionScreenStatus(attentionItems)}
               bodyClassName="workspace-attention" role="alert" aria-labelledby="workspace-attention-title">
