@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readSourceStages } from "./compile-source-stages";
 import { compileJobRestingNotice, drainSseFrames, frameFromEvent, isCompileJobResting, isCompileJobTerminal, observeCompileJob, pickResumableCompileJob } from "./compile-job-client";
 import { COMPILE_STATES } from "./compile-job-store";
 
@@ -90,6 +91,23 @@ describe("SSE frame parsing", () => {
 });
 
 describe("observing a durable compile", () => {
+  it("hands a sources frame to the stage store, never to the state view and never as a cursor", async () => {
+    const JOB = "cjob-00000000000000000000000000000002";
+    const sources = `event: sources\ndata: ${JSON.stringify({ observedAt: "t", stages: [{ documentId: "a", stage: "waking" }] })}\n\n`;
+    const malformed = `event: sources\ndata: {"stages":"no"}\n\n`;
+    const requested: string[] = [];
+    const responses = [stream([eventFrame(1, "reading"), sources, malformed]), stream([eventFrame(2, "ready")])];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      requested.push(String(input));
+      return new Response(responses.shift()!, { headers: { "content-type": "text/event-stream" } });
+    }) as unknown as typeof fetch;
+    const seen: number[] = [];
+    await observeCompileJob({ jobId: JOB, authToken: async () => "t", onFrame: (frame) => seen.push(frame.sequence), fetchImpl, sleep: async () => undefined });
+    expect(seen).toEqual([1, 2]);
+    expect(readSourceStages(JOB)?.stages).toEqual([{ documentId: "a", stage: "waking" }]);
+    expect(requested[1]).toContain("after=1");
+  });
+
   it("resumes from the last received sequence when the stream ends early", async () => {
     const requested: string[] = [];
     const responses = [

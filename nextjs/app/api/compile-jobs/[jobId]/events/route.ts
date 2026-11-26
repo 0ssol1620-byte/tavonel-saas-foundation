@@ -1,6 +1,10 @@
 import { isTerminalCompileState, readCompileJob, readCompileJobEvents } from "@/lib/compile-job-store";
 import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { deriveSourceStages, type SourceStagesPayload } from "@/lib/compile-source-stages";
+import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
+import { listImmutableWorkspaceObjects } from "@/lib/r2-objects";
+import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,6 +30,32 @@ export const maxDuration = 60;
   buffers event streams should use it, and loses nothing but latency.
 */
 const ENCODER = new TextEncoder();
+
+/*
+  Where each source is, from the objects that already exist. Read-only, and sent without an id
+  so it cannot move the replay cursor: a reconnect resumes from the last durable event exactly as
+  before. Any failure is silence -- the counter still works without it.
+
+  ponytail: one bucket listing per viewer every SOURCES_EVERY_MS. If viewers of one workspace ever
+  multiply, coalesce the listing per workspace; today the scheduled worker lists it once a minute.
+*/
+const SOURCES_EVERY_MS = 5_000;
+
+async function readSourceStagesPayload(
+  workspaceKey: string, documentIds: readonly string[], blocked: readonly { documentId: string }[],
+): Promise<SourceStagesPayload | null> {
+  try {
+    const signer = readR2SignerEnv();
+    if (!signer || documentIds.length === 0) return null;
+    const listed = await listImmutableWorkspaceObjects(signer, workspaceKey);
+    if (!listed.ok) return null;
+    const { documents } = selectCurrentDocumentVersions(groupImmutableDocuments(workspaceKey, listed.objects));
+    const now = Date.now();
+    return { observedAt: new Date(now).toISOString(), stages: deriveSourceStages(documentIds, documents, blocked, now) };
+  } catch {
+    return null;
+  }
+}
 
 function frame(id: number, event: string, data: unknown) {
   return ENCODER.encode(`id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -70,6 +100,10 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
 
   const deadline = Date.now() + 50_000;
   let cursor = after;
+  let lastSourcesAt = 0;
+  let lastSources = "";
+  const documentIds = Array.isArray(job.value.documentIds) ? job.value.documentIds : [];
+  const watchSources = !isTerminalCompileState(job.value.state) && documentIds.length > 0;
   let closed = false;
   request.signal.addEventListener("abort", () => { closed = true; });
 
@@ -113,6 +147,16 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
           if (isTerminalCompileState(event.state)) { settled = true; break; }
         }
         if (settled || closed) break;
+        if (watchSources && Date.now() - lastSourcesAt >= SOURCES_EVERY_MS) {
+          lastSourcesAt = Date.now();
+          const payload = await readSourceStagesPayload(workspaceKey, documentIds, Array.isArray(job.value.blocked) ? job.value.blocked : []);
+          const text = payload ? JSON.stringify(payload.stages) : "";
+          // Only a change is sent; observedAt alone is not one.
+          if (payload && text !== lastSources) {
+            lastSources = text;
+            if (!send(ENCODER.encode(`event: sources\ndata: ${JSON.stringify(payload)}\n\n`))) break;
+          }
+        }
         // A comment frame, so a silent job still holds the connection open through a proxy
         // with an idle timeout. It carries no id and cannot disturb the replay cursor.
         if (!send(ENCODER.encode(": ping\n\n"))) break;

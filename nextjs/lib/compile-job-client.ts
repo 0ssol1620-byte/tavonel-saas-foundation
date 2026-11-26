@@ -1,4 +1,5 @@
 import type { CompileBlocker, CompileState } from "./compile-job-store";
+import { publishSourceStages } from "./compile-source-stages";
 
 /*
   Watching a durable compile from the browser.
@@ -218,6 +219,7 @@ export async function observeCompileJob(options: ObserveOptions): Promise<Compil
           } catch {
             continue;
           }
+          if (raw.event === "sources") { publishSourceStages(options.jobId, parsed); continue; }
           const frame = frameFromEvent(parsed);
           if (!frame) continue;
           // Terminal is sticky: a row after it (cjob-157f2f23 seq 159, `structuring` after
