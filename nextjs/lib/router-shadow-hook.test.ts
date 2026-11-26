@@ -209,7 +209,8 @@ describe("no public surface carries the trace", () => {
   it("only the compile run imports the store, and only the store imports the classifier", () => {
     // Every tracked or new source file under nextjs/ (git honours .gitignore, so node_modules and .next are out).
     const importers = execFileSync("git", ["grep", "-l", "--untracked", "-E", "router-shadow-(store|trace)|router-evidence-table", "--",
-      "*.ts", "*.tsx", "*.mts", "*.js", "*.mjs", ":!*.test.*", ":!*.spec.*"], { cwd: ROOT, encoding: "utf8" })
+      // scripts/repair-scope.mjs is the CI owner registry: it names the files it owns as strings, it imports nothing.
+      "*.ts", "*.tsx", "*.mts", "*.js", "*.mjs", ":!*.test.*", ":!*.spec.*", ":!scripts/repair-scope.mjs"], { cwd: ROOT, encoding: "utf8" })
       .split(/\r?\n/).filter(Boolean).sort();
     expect(importers).toEqual(["lib/collection-compile-run.ts", "lib/router-shadow-store.ts", "lib/router-shadow-trace.ts"]);
   });
