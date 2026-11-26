@@ -76,6 +76,11 @@ const WIDE_ALLOWED = new Map<string, string>([
   // {1,32} workspace key as the intake-side tables above, 20261107100000_library_organize_shadow among them.
   ...["20261116130000_library_label_decisions", "20261116130100_world_change_proposals"]
     .map((n) => [`supabase/migrations/${n}.sql`, "Library decision table, {1,32} like the intake-side tables"] as [string, string]),
+  // WO-C-T2: replaces reserve_foundation_intake_admission_unchecked whole, keyed on the payer. The intake
+  // admission validator has been {1,32} since 0008 (20261117160100_intake_admission_rearm, above, is its
+  // previous body); the replacement keeps that width, it does not widen a tenant key. Provisional file
+  // name: if the lead renames the migration at merge, rename this entry with it.
+  ["supabase/migrations/20261123120000_workspace_payer_for_members.sql", "intake admission body replaced whole, {1,32} since the intake admission contract"],
 ]);
 
 const tsSites = sites(sourceFiles("lib").concat(sourceFiles("app")), TS_PATTERN);
