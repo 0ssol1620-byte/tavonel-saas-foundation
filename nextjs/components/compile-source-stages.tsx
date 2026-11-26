@@ -45,7 +45,7 @@ export function CompileSourceStages({
         {count("attention") > 0 ? ` · ${count("attention")} need a decision` : ""}
       </p>
       {waking ? (
-        <p className="fine">The reader is starting up. The first read after a quiet period typically takes about 30 to 40 seconds.</p>
+        <p className="fine">The reader may still be starting up. After a quiet period, the first read typically takes about 30 to 40 seconds.</p>
       ) : null}
       <ul className="fine" aria-label="Progress by source">
         {rows.slice(0, MAX_ROWS).map(row => (
