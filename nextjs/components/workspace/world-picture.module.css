@@ -1,0 +1,70 @@
+/* WO-WS-5: the World drawn in the workspace. Nothing here animates; the camera moves only when the reader drags. */
+.root { display: grid; gap: 12px; min-width: 0; color: var(--text-hi); }
+
+/* The renderer clears to this ground (WORLD_GROUND in lib/v34/world-geometry.ts), so the stage and the first frame are one colour. */
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 900 / 620;
+  max-height: 70vh;
+  overflow: hidden;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 6px;
+  background-color: #07100e;
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #07100e;
+  /* Vertical swipes scroll the page; a touch never orbits. */
+  touch-action: pan-y;
+}
+.root[data-orbit="true"] .canvas { cursor: grab; }
+.root[data-orbit="true"] .canvas:active { cursor: grabbing; }
+
+/* No live canvas below 900 px: the list is the whole picture there. */
+@media (max-width: 899px) { .stage { display: none; } }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; font-size: var(--t-3, 14px); }
+.legend li { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.legend b { font: 600 13px var(--f-mono); font-variant-numeric: tabular-nums; }
+/* The kind colours are made for the dark ground (9:1 there), so each swatch carries that ground around it: the dot keeps its contrast on the light page. */
+.swatch { box-sizing: content-box; width: 10px; height: 10px; border: 5px solid #07100e; border-radius: 50%; flex: none; }
+
+.line, .showing { margin: 0; max-width: 74ch; color: var(--text-mid); font-size: var(--t-3, 14px); line-height: 1.55; }
+.showing { font-variant-numeric: tabular-nums; }
+
+.find { display: grid; gap: 4px; max-width: 28rem; font-size: var(--t-3, 14px); }
+.find input { min-height: 44px; padding: 8px 12px; border: 1px solid var(--hairline-hi); border-radius: 7px; background: var(--g1); color: var(--text-hi); font: inherit; }
+.list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.list li, .list button { min-width: 0; }
+.list button, .detail button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--hairline-hi);
+  border-radius: 7px;
+  background: var(--g1);
+  color: var(--text-hi);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.list button span { overflow-wrap: anywhere; font-weight: 600; }
+.list button small { color: var(--text-mid); font-size: 13px; }
+.list button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--verified); }
+
+.detail { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--hairline-hi); border-radius: 7px; background: var(--g1); min-width: 0; }
+.detail strong { overflow-wrap: anywhere; }
+.detail span { color: var(--text-mid); font-size: var(--t-3, 14px); }
+.detail button { width: auto; justify-self: start; font-weight: 600; }
+
+.error { margin: 0; color: var(--unresolved); }
+
+@media (min-width: 900px) {
+  .list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

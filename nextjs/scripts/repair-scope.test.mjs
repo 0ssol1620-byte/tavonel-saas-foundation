@@ -8638,6 +8638,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['router-shadow', 6, '04047a0f3e9e6c00', 3, '34ce1c2f3d70e5dd', [], {}],
   ['workspace-payer-entitlement', 1, 'fa1ec06bdaef5790', 1, 'fa1ec06bdaef5790', [], {}],
   ['agent-u37-matrix', 3, '1f8805f3cee8877d', 2, 'f01b1f3aeedd2c5f', [], {}],
+  // WO-WS-5: the workspace's World picture (adapter, component, sheet and the one suite that reads them).
+  ['workspace-world-picture', 4, '6451582d9235f6c0', 1, '23c7aa5fe8fa1e5f', [], {}],
 ]);
 // Paths another owner keeps that also select a program owner's suite.
 const V34_BOUND_PATHS = { 'v34-retained-shell': [['app/explore/page.tsx', 'public-marketing-surface'], ['components/explore/explore-stage.module.css', 'public-marketing-surface'], ['components/explore/explore-stage.tsx', 'paper-product-route-css']] };

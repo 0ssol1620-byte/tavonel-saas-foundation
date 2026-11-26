@@ -3600,6 +3600,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
+  // workspace-world-picture (WO-WS-5): the workspace draws its active World with the public pages' renderer. workspace-world-picture.test.ts imports
+  // the adapter, and reads the component and the sheet (a World that is not the active one, a sample, a fetch, an animation or a hover outside the gate fails it).
+  'workspace-world-picture': Object.freeze({
+    paths: Object.freeze(['components/workspace/world-picture.module.css', 'components/workspace/world-picture.tsx', 'lib/workspace-world-picture.test.ts', 'lib/workspace-world-picture.ts']),
+    unitFiles: Object.freeze(['lib/workspace-world-picture.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.
