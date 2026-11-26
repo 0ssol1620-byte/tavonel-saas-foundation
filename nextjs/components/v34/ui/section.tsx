@@ -9,10 +9,13 @@ import s from "./section.module.css";
  * `title` is an h2 and names the region; a band without one is an unnamed region and gets no label.
  * `aside` turns the band into two columns: the heading, the lead and the children on the left, the
  * aside on the right (a stacked column under 900px).
+ * `className` is for a route to add one rule of its own to the band (Home defers its below-the-fold bands); it
+ * is appended after the surface and band classes and changes no markup.
  */
-export function Section({ surface = "paper", id, eyebrow, title, lead, aside, children }: {
+export function Section({ surface = "paper", id, className, eyebrow, title, lead, aside, children }: {
   surface?: V34Surface;
   id?: string;
+  className?: string;
   eyebrow?: string;
   title?: ReactNode;
   lead?: ReactNode;
@@ -30,7 +33,7 @@ export function Section({ surface = "paper", id, eyebrow, title, lead, aside, ch
     </header>
   ) : null;
   return (
-    <section id={id} className={`${surfaceClass(surface)} ${s.section}`} aria-labelledby={title ? headingId : undefined}>
+    <section id={id} className={`${surfaceClass(surface)} ${s.section}${className ? ` ${className}` : ""}`} aria-labelledby={title ? headingId : undefined}>
       <div className={s.shell}>
         {aside ? (
           <div className={s.split}>
