@@ -1,0 +1,488 @@
+{
+  "functions": {
+    "public.accept_foundation_workspace_invite": {
+      "versions": [
+        "20260920110000",
+        "20261117150200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.admit_foundation_knowledge_query": {
+      "versions": [
+        "20261117150000",
+        "20261117160000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.advance_foundation_compile_job": {
+      "versions": [
+        "0038",
+        "20260911120200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.apply_foundation_billing_event": {
+      "versions": [
+        "0005",
+        "20261117140000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.apply_foundation_billing_event_v3": {
+      "versions": [
+        "0010",
+        "0011",
+        "20261117140000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.apply_foundation_billing_event_v4": {
+      "versions": [
+        "0035",
+        "20260911130000",
+        "20261117140000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.apply_foundation_billing_event_v6": {
+      "versions": [
+        "20260927120000",
+        "20261117140000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.apply_foundation_connection_batch": {
+      "versions": [
+        "0012",
+        "20261004100000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.archive_founder_test_reset_evidence": {
+      "versions": [
+        "20260920133000",
+        "20260927105000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.assert_foundation_workspace_has_owner": {
+      "versions": [
+        "20260920110100",
+        "20260920110200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.attest_source_deletion_inventory": {
+      "versions": [
+        "20260921110000",
+        "20260921120000",
+        "20260927102000",
+        "20260930010000",
+        "20260930013000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.claim_foundation_job": {
+      "versions": [
+        "0025",
+        "20260909210203"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.claim_source_deletion_sweep": {
+      "versions": [
+        "20260920132000",
+        "20260927102000",
+        "20260930011000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.close_source_deletion_derived": {
+      "versions": [
+        "20260927104000",
+        "20260930010000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.complete_foundation_job_batch": {
+      "versions": [
+        "0025",
+        "0027",
+        "0028",
+        "0029"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.confirm_foundation_intake_admission": {
+      "versions": [
+        "0032",
+        "0051",
+        "20260927102000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.connector_documents_blocked": {
+      "versions": [
+        "20260909194025",
+        "20260920100000",
+        "20260927101000",
+        "20260927102000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.consume_foundation_api_rate_limit": {
+      "versions": [
+        "0012",
+        "20261117130000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.consume_foundation_oauth_authorization": {
+      "versions": [
+        "0013",
+        "0018",
+        "20260920121000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.create_foundation_agent_grant": {
+      "versions": [
+        "20261117130000",
+        "20261117130200",
+        "20261117130300"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.create_foundation_api_key_authorized": {
+      "versions": [
+        "20260920121000",
+        "20261105000000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.create_foundation_workspace_invite": {
+      "versions": [
+        "20260920110000",
+        "20260920110200",
+        "20261117150200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.create_world_change_proposal": {
+      "versions": [
+        "20261116130100",
+        "20261117130000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.customer_data_workspace_grant_receipt": {
+      "versions": [
+        "20260930030000",
+        "20260930070000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.customer_data_workspace_grant_sha256": {
+      "versions": [
+        "20260930030000",
+        "20260930070000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.customer_source_deletion_status": {
+      "versions": [
+        "20260927102000",
+        "20260927103000",
+        "20260927104000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.decide_world_change_proposal": {
+      "versions": [
+        "20261116130100",
+        "20261117130000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.enforce_foundation_retrieval_compile_run_active_world": {
+      "versions": [
+        "0021",
+        "20260930010000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.enqueue_connector_sync": {
+      "versions": [
+        "20260909210203",
+        "20261007100000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.enqueue_foundation_compile_job": {
+      "versions": [
+        "0038",
+        "0040",
+        "0041",
+        "0042"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.finalize_founder_test_reset": {
+      "versions": [
+        "20260920133000",
+        "20260927105000",
+        "20261002120000",
+        "20261002140000",
+        "20261104091000",
+        "20261105010000",
+        "20261107100100",
+        "20261116130200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.foundation_workspace_seat_limit": {
+      "versions": [
+        "20261117150200",
+        "20261117160000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.founder_test_reset_assertions": {
+      "versions": [
+        "20260920133000",
+        "20260927105000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.founder_test_reset_rows_fingerprint": {
+      "versions": [
+        "20260920133000",
+        "20260927105000",
+        "20261002120000",
+        "20261002140000",
+        "20261104091000",
+        "20261105010000",
+        "20261107100100",
+        "20261116130200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.founder_test_reset_table_counts": {
+      "versions": [
+        "20260920133000",
+        "20260927105000",
+        "20261002120000",
+        "20261002140000",
+        "20261104091000",
+        "20261105010000",
+        "20261107100100",
+        "20261116130200"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.guard_connector_document_binding": {
+      "versions": [
+        "20260909193323",
+        "20260920133000",
+        "20261001150000",
+        "20261002140000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.guard_connector_source_suspension": {
+      "versions": [
+        "20260909194025",
+        "20260920133000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.guard_customer_data_release_stage": {
+      "versions": [
+        "20260930070000",
+        "20261027120000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.issue_customer_data_workspace_grant": {
+      "versions": [
+        "20260930030000",
+        "20260930070000",
+        "20260930080000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.prevent_foundation_world_transition_receipt_mutation": {
+      "versions": [
+        "20260920120000",
+        "20260920133000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.prevent_source_deletion_evidence_mutation": {
+      "versions": [
+        "20260920132000",
+        "20260920133000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.record_connector_document_binding_after": {
+      "versions": [
+        "20261001120000",
+        "20261001150000",
+        "20261001170000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.record_connector_document_binding_current": {
+      "versions": [
+        "20261001090000",
+        "20261001150000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.record_source_deletion_purge_failure": {
+      "versions": [
+        "20260927103000",
+        "20260930011000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reject_foundation_compile_event_mutation": {
+      "versions": [
+        "0038",
+        "20260920133000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reject_foundation_job_event_mutation": {
+      "versions": [
+        "0034",
+        "20260920133000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reserve_foundation_compute": {
+      "versions": [
+        "0009",
+        "0033"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reserve_foundation_compute_v3": {
+      "versions": [
+        "0045",
+        "20261124000100"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reserve_foundation_intake_admission": {
+      "versions": [
+        "0008",
+        "0026",
+        "0030",
+        "0031",
+        "0032",
+        "0045",
+        "0048",
+        "0051",
+        "20260927102000",
+        "20261117150100",
+        "20261117160000",
+        "20261117160100"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reserve_foundation_intake_admission_unchecked": {
+      "versions": [
+        "20261110040000",
+        "20261117160100",
+        "20261117160200",
+        "20261124000100"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.reserve_model_provider_spend_v1": {
+      "versions": [
+        "20260920131000",
+        "20261002130000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.revoke_all_foundation_agent_grants": {
+      "versions": [
+        "20261117130000",
+        "20261117130100",
+        "20261117130200",
+        "20261117130300"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.rotate_foundation_api_key": {
+      "versions": [
+        "0013",
+        "20260920121000",
+        "20261105000000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.search_foundation_retrieval_units_dense": {
+      "versions": [
+        "0023",
+        "0052"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.settle_foundation_compute": {
+      "versions": [
+        "0009",
+        "0033"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.settle_foundation_compute_v3": {
+      "versions": [
+        "0045",
+        "20260911120000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.settle_foundation_knowledge_query": {
+      "versions": [
+        "20261117150000",
+        "20261117160000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.settle_model_provider_spend_v1": {
+      "versions": [
+        "20260920131000",
+        "20261002130000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.source_deletion_affected_worlds": {
+      "versions": [
+        "20260930010000",
+        "20260930013000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.source_deletion_inventory_candidate": {
+      "versions": [
+        "20260921110000",
+        "20260921120000",
+        "20260927102000",
+        "20260930010000",
+        "20260930013000"
+      ],
+      "reason": "legacy, predates guard"
+    },
+    "public.source_legal_hold_state": {
+      "versions": [
+        "20260920132000",
+        "20260927102000"
+      ],
+      "reason": "legacy, predates guard"
+    }
+  }
+}
