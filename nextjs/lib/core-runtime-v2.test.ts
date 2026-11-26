@@ -715,14 +715,51 @@ describe("Core-computed relations and contradictions survive the projection", ()
 
     /*
       And the other half of the same inconsistency, which the blueprint fix leaves standing on its
-      own: `counts.topics` is a hard-coded 0. That is the true count today -- the projection emits
-      no Topic node and drops the Core ontology terms -- but a literal cannot notice the day it
-      stops being true, and the pair (blueprint implies topics / count says none) is exactly what
-      the evidence lane flagged. Tied to the projection here, so either half moving fails.
+      own: the engine has no Topic concept, so `counts.topics` is absent (null) with
+      `topicConcept: "not_in_engine"` rather than a literal 0 (WO-ENT-UX-1: a 0 reads as "looked,
+      found none"). Re-pointed from `toBe(0)`, not loosened: the pair (no Topic node / no topic
+      count) must still move together, so either half changing fails.
     */
-    expect(projected!.validation.counts.topics, "counts.topics is a literal; keep it honest").toBe(0);
-    expect(projected!.ontology.nodes.some((node) => node.kind === "Topic"))
-      .toBe(projected!.validation.counts.topics > 0);
+    expect(projected!.validation.counts.topics, "no topic concept: absent, never a number").toBeNull();
+    expect(projected!.validation.counts.topicConcept).toBe("not_in_engine");
+    expect(projected!.ontology.nodes.some((node) => node.kind === "Topic")).toBe(false);
+  });
+
+  /*
+    WO-ENT-UX-1. An entity was rendered as its stable id (`entity_0c48...`) because the label chain
+    stopped at `title ?? text ?? evidenceId`, and the Core entity payload carries only
+    `canonicalName` (semantics.py `SemanticEntity.as_record`).
+  */
+  it("labels an entity by its canonicalName, not by its stable id", async () => {
+    const projected = projectProductCoreV2Candidate(await response(SEMANTIC_OBJECTS), inputs());
+    const label = (id: string) => projected!.ontology.nodes.find((node) => node.id === id)!.label;
+
+    expect(label("entity-1")).toBe("Feedwater Pump 200");
+    // The other kinds keep the field the Core writes for them.
+    expect(label("document-1")).toBe("Source one");
+    expect(label("claim-1")).toBe("The pump ran at 42 bar.");
+    expect(label("evidence-1")).toBe("ev-1");
+    expect(projected!.ontology.nodes.every((node) => node.label.trim().length > 0 && node.label.length <= 2_000)).toBe(true);
+  });
+
+  it("falls back to the stable id only when no label field carries text, never to an empty label", async () => {
+    const blank = SEMANTIC_OBJECTS.map((item) => item.stableId === "entity-1"
+      ? object("entity", "entity-1", [], { canonicalName: "   " })
+      : item);
+    const projected = projectProductCoreV2Candidate(await response(blank), inputs());
+
+    expect(projected).not.toBeNull();
+    expect(projected!.ontology.nodes.find((node) => node.id === "entity-1")!.label).toBe("entity-1");
+    expect(projected!.ontology.nodes.every((node) => node.label.trim().length > 0)).toBe(true);
+  });
+
+  it("a title still wins over a canonicalName on the same payload", async () => {
+    const both = SEMANTIC_OBJECTS.map((item) => item.stableId === "entity-1"
+      ? object("entity", "entity-1", [], { title: "Pump (title)", canonicalName: "Feedwater Pump 200" })
+      : item);
+    const projected = projectProductCoreV2Candidate(await response(both), inputs());
+
+    expect(projected!.ontology.nodes.find((node) => node.id === "entity-1")!.label).toBe("Pump (title)");
   });
 
   it("refuses an object kind it has never been taught instead of dropping it", async () => {

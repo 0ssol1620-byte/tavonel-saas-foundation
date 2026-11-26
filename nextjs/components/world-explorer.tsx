@@ -31,7 +31,8 @@ export interface CollectionShape {
   validation: {
     counts: {
       documents: number;
-      topics: number;
+      /* null = the engine has no Topic concept (Core V2); never shown as 0. */
+      topics: number | null;
       entities: number;
       claims: number;
       relations: number;
@@ -72,13 +73,15 @@ function CompilePasses({ collection }: { collection: CollectionShape }) {
     <div className="passes">
       {PASSES.map((pass) => {
         const produced = pass.kinds.reduce((total, kind) => total + (byKind.get(kind) ?? 0), 0);
+        // "none" says the pass ran and found nothing; an engine with no topic concept did not look.
+        const notInEngine = pass.id === "03" && collection.validation.counts.topics === null;
         return (
           <div className="pass" key={pass.id} data-empty={produced === 0 ? 1 : 0}>
             <span className="pass-i">{pass.id}</span>
             <span className="pass-n">{pass.name}</span>
             {/* A pass that produced nothing says so rather than being hidden. An absent row
                 would read as a pass that did not run. */}
-            <span className="pass-v">{produced === 0 ? "none" : produced.toLocaleString("en-US")}</span>
+            <span className="pass-v">{notInEngine ? "not in engine" : produced === 0 ? "none" : produced.toLocaleString("en-US")}</span>
           </div>
         );
       })}
@@ -227,16 +230,17 @@ export default function WorldExplorer({ collection, onUpload }: { collection: Co
       <CompilePasses collection={collection} />
 
       <div className="arch-counts">
-        {[
+        {([
           ["Documents", counts.documents],
-          ["Topics", counts.topics],
+          // Omitted, not zero, when the engine has no Topic concept.
+          ...(counts.topics === null ? [] : [["Topics", counts.topics] as const]),
           ["Entities", counts.entities],
           ["Claims", counts.claims],
           ["Relations", counts.relations],
           ["Nodes", nodes],
           ["Edges", edges],
           ["Package files", counts.packageFiles],
-        ].map(([label, value]) => (
+        ] as ReadonlyArray<readonly [string, number]>).map(([label, value]) => (
           <div className="ac" key={String(label)}>
             <span className="ac-v">{Number(value).toLocaleString("en-US")}</span>
             <span className="ac-k">{label}</span>
