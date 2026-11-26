@@ -1,7 +1,7 @@
 import { isTerminalCompileState, readCompileJob, readCompileJobEvents } from "@/lib/compile-job-store";
 import { memberSourcesRefusal } from "@/lib/member-source-scope";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
-import { deriveSourceStages, type SourceStagesPayload } from "@/lib/compile-source-stages";
+import { createSourceStagesPoller, deriveSourceStages, type SourceStagesPayload } from "@/lib/compile-source-stages";
 import { groupImmutableDocuments, selectCurrentDocumentVersions } from "@/lib/immutable-keys";
 import { listImmutableWorkspaceObjects } from "@/lib/r2-objects";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -36,10 +36,14 @@ const ENCODER = new TextEncoder();
   so it cannot move the replay cursor: a reconnect resumes from the last durable event exactly as
   before. Any failure is silence -- the counter still works without it.
 
+  The listing never runs inside the loop's own await: createSourceStagesPoller starts it in the
+  background with a deadline, so a slow or hung bucket cannot delay the durable event frames or
+  the heartbeat. A listing that misses its deadline sends nothing, and the browser drops the
+  previous frame once it is stale; no stage is invented in between.
+
   ponytail: one bucket listing per viewer every SOURCES_EVERY_MS. If viewers of one workspace ever
   multiply, coalesce the listing per workspace; today the scheduled worker lists it once a minute.
 */
-const SOURCES_EVERY_MS = 5_000;
 
 async function readSourceStagesPayload(
   workspaceKey: string, documentIds: readonly string[], blocked: readonly { documentId: string }[],
@@ -100,10 +104,10 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
 
   const deadline = Date.now() + 50_000;
   let cursor = after;
-  let lastSourcesAt = 0;
-  let lastSources = "";
   const documentIds = Array.isArray(job.value.documentIds) ? job.value.documentIds : [];
   const watchSources = !isTerminalCompileState(job.value.state) && documentIds.length > 0;
+  const blockedAtOpen = Array.isArray(job.value.blocked) ? job.value.blocked : [];
+  const sources = createSourceStagesPoller(() => readSourceStagesPayload(workspaceKey, documentIds, blockedAtOpen));
   let closed = false;
   request.signal.addEventListener("abort", () => { closed = true; });
 
@@ -125,6 +129,11 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
 
       let settled = false;
       while (!closed && !settled && Date.now() < deadline) {
+        // Before the durable events, so a listing that finished during the last second is not lost to a terminal frame.
+        if (watchSources) {
+          const payload = sources.poll();
+          if (payload && !send(ENCODER.encode(`event: sources\ndata: ${JSON.stringify(payload)}\n\n`))) break;
+        }
         /*
           A reader only. This loop used to run a compile turn in-process every 3 s, which
           meant a 60 s stream could take the compile lease and start Core with seconds left on its
@@ -147,16 +156,6 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
           if (isTerminalCompileState(event.state)) { settled = true; break; }
         }
         if (settled || closed) break;
-        if (watchSources && Date.now() - lastSourcesAt >= SOURCES_EVERY_MS) {
-          lastSourcesAt = Date.now();
-          const payload = await readSourceStagesPayload(workspaceKey, documentIds, Array.isArray(job.value.blocked) ? job.value.blocked : []);
-          const text = payload ? JSON.stringify(payload.stages) : "";
-          // Only a change is sent; observedAt alone is not one.
-          if (payload && text !== lastSources) {
-            lastSources = text;
-            if (!send(ENCODER.encode(`event: sources\ndata: ${JSON.stringify(payload)}\n\n`))) break;
-          }
-        }
         // A comment frame, so a silent job still holds the connection open through a proxy
         // with an idle timeout. It carries no id and cannot disturb the replay cursor.
         if (!send(ENCODER.encode(": ping\n\n"))) break;

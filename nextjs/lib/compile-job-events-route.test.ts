@@ -101,6 +101,23 @@ describe("GET /api/compile-jobs/{jobId}/events", () => {
       }
     });
 
+    it("is not held up by a bucket listing that never answers: the durable events and the heartbeat still go out", async () => {
+      open();
+      signer.mockReturnValue({ bucket: "tavonel-saas-foundation-quarantine" });
+      listObjects.mockImplementation(() => new Promise(() => undefined));
+      const started = Date.now();
+      const response = await get();
+      const body = await response.text();
+      // The loop awaited the listing before; with it hung the stream could not reach the settled event at all.
+      expect(Date.now() - started).toBeLessThan(4_000);
+      expect(body).toContain(": ping\n\n");
+      expect(body).toContain("id: 200\nevent: failed\n");
+      expect(body).toContain('event: done\ndata: {"settled":true,"cursor":200}');
+      expect(body).not.toContain("event: sources");
+      expect(listObjects).toHaveBeenCalledTimes(1);
+      expect(turn).not.toHaveBeenCalled();
+    });
+
     it("does not look at storage for a job that has already settled", async () => {
       readJob.mockResolvedValue({ ok: true, value: { jobId: JOB, state: "ready", documentIds: ["doc_a"], blocked: [] } });
       readEvents.mockResolvedValue({ ok: true, value: [event(300, "ready")] });
