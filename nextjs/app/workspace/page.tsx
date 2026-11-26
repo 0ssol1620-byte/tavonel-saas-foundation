@@ -4000,7 +4000,7 @@ export default function WorkspacePage() {
                   </div>
                 ) : collectionResult ? (
                   <p className="world-empty" role="status">
-                    This compile's package carries no page-and-region evidence to open: {collectionResult.validation.counts.claims} claims and {collectionResult.validation.counts.relations} relations were counted, and 0 evidence regions.
+                    This compile&apos;s package carries no page-and-region evidence to open: {collectionResult.validation.counts.claims} claims and {collectionResult.validation.counts.relations} relations were counted, and 0 evidence regions.
                   </p>
                 ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
               </Screen>
