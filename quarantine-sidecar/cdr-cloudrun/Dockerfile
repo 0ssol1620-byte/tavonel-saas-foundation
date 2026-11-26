@@ -22,8 +22,15 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 # NOTICE travels with the distribution it describes, not only with the repository.
-COPY app.py malware.py request_boundary.py text_layer.py NOTICE ./
+COPY app.py malware.py request_boundary.py table_geometry.py text_layer.py NOTICE ./
 RUN chown -R cdr:cdr /app /home/cdr
+# The native reader (WO-E-TBL-1) is copied after the chown, so its files and vendor/ subtree are
+# root-owned: the service user cannot edit a vendored file or write bytecode under vendor/. /app
+# itself stays the service user's (as for app.py), so this is not a defence against code already
+# running as `cdr`. Its Python dependencies are not installed by this file yet; until they are, a
+# flagged-on read answers `reader_absent`.
+COPY native_reader.py native_read_child.py ./
+COPY vendor ./vendor
 USER cdr
 
 EXPOSE 8080

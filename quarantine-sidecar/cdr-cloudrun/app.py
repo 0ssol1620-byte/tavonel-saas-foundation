@@ -20,15 +20,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from time import monotonic
-from typing import Final
+from typing import Annotated, Final
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from PIL import Image, UnidentifiedImageError
-from request_boundary import CdrRequestBoundary
+from request_boundary import AUTHENTICATED_PATHS, CdrRequestBoundary
 
+import native_reader
+import table_geometry
 import text_layer
 
 from malware import (
@@ -51,6 +53,11 @@ except MalwareScanError as exc:
 # The text-layer flag is read per request, so a flip needs no rebuild; a value it cannot parse
 # refuses the boot here, the same way, rather than being read as "off" (or "on") later.
 text_layer.text_layer_enabled()
+# The native reader's flag is read once, here: off registers nothing (WO-E-TBL-1), and a value it
+# cannot parse refuses the boot. On, a broken vendored pin is logged now and named in every read.
+NATIVE_READ_ENABLED: Final = native_reader.native_read_enabled()
+if NATIVE_READ_ENABLED:
+    native_reader.boot_state()
 
 APP_NAME: Final = "tavonel-pdf-raster-cdr"
 SIGNATURE_TTL_SECONDS: Final = 300
@@ -891,6 +898,7 @@ app.add_middleware(
     # File content remains capped separately. This only allows bounded multipart framing.
     max_body_bytes=LIMITS.input_bytes + 64 * 1024,
     receive_timeout_seconds=15.0,
+    authenticated_paths=AUTHENTICATED_PATHS | ({native_reader.PATH} if NATIVE_READ_ENABLED else set()),
 )
 
 
@@ -1031,7 +1039,16 @@ def read_text_layer(request: Request, source: UploadFile = File(...)) -> Respons
         scale = qualified_text_layer_scale(pdf_source)
         # A layer PDFium cannot read is a refused receipt, not an error (text_layer.read_document);
         # anything else raised here is this service failing, and surfaces as one.
-        receipt = text_layer.read_document(pdf_source.read_bytes(), expected_digest, scale)
+        pdf_bytes = pdf_source.read_bytes()
+        receipt = text_layer.read_document(pdf_bytes, expected_digest, scale)
+        # Table reader shadow (WO-E-TBL-P2): off adds nothing, so the body is byte-identical.
+        # A reader failure is a recorded status; it never takes the text-layer receipt down with it.
+        if table_geometry.reader_mode() == "shadow":
+            try:
+                receipt["tableRead"] = table_geometry.read_document(pdf_bytes, receipt)
+            except Exception:
+                logger.exception("table reader failed")
+                receipt["tableRead"] = table_geometry.unavailable("reader_error")
     finally:
         source.file.close()
         remove_tree(work_dir)
@@ -1045,3 +1062,55 @@ def read_text_layer(request: Request, source: UploadFile = File(...)) -> Respons
             "x-tavonel-text-layer-sha256": f"sha256:{hashlib.sha256(body).hexdigest()}",
         },
     )
+
+
+def read_native_cells(request: Request, source: Annotated[UploadFile, File()]) -> Response:
+    """`tavonel.native_read.v1` for a DOCX, XLSX or PPTX: its table cells with their source locations.
+
+    Registered only when TAVONEL_CDR_NATIVE_READ is "1" at boot. The same signed request, digest
+    check and malware scan as /v1/disarm, then the Office package refusals, then the reader in its
+    own bounded child (native_reader.py). It returns data, never a document, and it is answered
+    separately: /v1/disarm never calls it, so the PDF path answers as it would without it whether
+    this reader works, fails or is absent. A reader failure is a 200 carrying `native_read: "unavailable"` and its reason; only
+    the request boundary (authentication, digest, scan) refuses with an error status.
+    """
+    expected_digest = getattr(request.state, "cdr_authenticated_input_sha256", None)
+    if not isinstance(expected_digest, str):
+        raise HTTPException(401, "CDR request boundary authentication is required")
+    file_name, mime_type = validate_input(source.filename, source.content_type)
+    work_dir = Path(tempfile.mkdtemp(prefix="tavonel-cdr-native-"))
+    try:
+        input_path = work_dir / file_name
+        actual_digest, _ = copy_and_digest(source, input_path)
+        if not hmac.compare_digest(expected_digest, actual_digest):
+            raise HTTPException(422, "CDR source digest does not match the uploaded body")
+        scan_or_refuse(input_path, actual_digest)
+        if mime_type not in native_reader.child.READER_MIMES:
+            result = native_reader.child.unavailable("unsupported_format", actual_digest)
+        else:
+            try:
+                reject_risky_office_package(input_path, mime_type)
+            except HTTPException:
+                result = native_reader.child.unavailable("office_package_refused", actual_digest)
+            else:
+                result = native_reader.read(
+                    input_path, mime_type, actual_digest, LIMITS.input_bytes, work_dir,
+                    office_process_environment(work_dir),
+                )
+    finally:
+        source.file.close()
+        remove_tree(work_dir)
+    body = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={
+            "cache-control": "no-store",
+            "x-tavonel-input-sha256": expected_digest,
+            "x-tavonel-native-read-sha256": f"sha256:{hashlib.sha256(body).hexdigest()}",
+        },
+    )
+
+
+if NATIVE_READ_ENABLED:
+    app.add_api_route(native_reader.PATH, read_native_cells, methods=["POST"])
