@@ -3880,6 +3880,10 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  // WO-LF-2: the connection batch contract and the local-folder upload gate select their route suites.
+  affectedGroup('local-folder-lf2', /^nextjs\/lib\/(?:developer-contracts|local-folder-connection-gate)(?:\.test)?\.ts$/,
+    { unitFiles: ['lib/local-folder-connection-gate.test.ts', 'lib/developer-contracts.test.ts', 'lib/intake-approval-rollout-off.test.ts',
+      'lib/connection-source-inventory.test.ts'] }),
   // ops-backlog-sli-20261110: 2 exact paths select 3 direct suites and no browser suite.
   affectedGroup('ops-backlog-sli-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(OPS_BACKLOG_SLI_AFFECTED_PATHS)})$`),
     { unitFiles: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES }),
