@@ -395,20 +395,63 @@ export async function loadUnitsByIds(
   return { ok: true as const, value: rows.map(toStoredUnit).filter((unit): unit is StoredUnitRow => unit !== null) };
 }
 
+/**
+ * WO-PROJ-K2: the document behind each unit id, and nothing else -- no text, so a unit the viewer
+ * may not see is never read into this process to be filtered out. Batched so the `in.(...)`
+ * filter stays a short URL. A unit with no row is absent from the map, and the caller treats
+ * absent as not admitted.
+ */
+export async function loadUnitDocumentIds(
+  workspaceKey: string,
+  compileRunId: string,
+  unitIds: string[],
+): Promise<StoreResult<Map<string, string>>> {
+  if (!validScope(workspaceKey) || !RUN_ID.test(compileRunId)) return fail("RETRIEVAL_SCOPE_INVALID");
+  const unique = [...new Set(unitIds)];
+  const documentOf = new Map<string, string>();
+  if (unique.length === 0) return { ok: true as const, value: documentOf };
+  const config = readSupabaseAdminConfig();
+  if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
+  for (let start = 0; start < unique.length; start += 100) {
+    const query = new URLSearchParams({
+      select: "unit_id,document_id",
+      workspace_key: `eq.${workspaceKey}`,
+      compile_run_id: `eq.${compileRunId}`,
+      unit_id: `in.(${unique.slice(start, start + 100).join(",")})`,
+    });
+    let response: Response;
+    try {
+      response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_units?${query}`);
+    } catch {
+      return fail("RETRIEVAL_STORE_READ_FAILED");
+    }
+    if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
+    const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+    if (!Array.isArray(rows)) return fail("RETRIEVAL_STORE_READ_FAILED");
+    for (const row of rows) {
+      if (typeof row.unit_id === "string" && typeof row.document_id === "string") documentOf.set(row.unit_id, row.document_id);
+    }
+  }
+  return { ok: true as const, value: documentOf };
+}
+
 // Loads the claim/entity ids of the units a query already matched, to seed the structure
 // path (structure-search.ts ranks by overlap against these). Kept separate from
 // loadUnitsByIds because it runs BEFORE fusion, on a small seed set, and needs no text.
+// `withDocumentId` (WO-PROJ-K2, projection only) adds the document so the caller can drop units
+// outside the viewer's projection before ranking; without it the request is unchanged.
 export async function loadStructureCandidates(
   workspaceKey: string,
   compileRunId: string,
   limit: number,
-): Promise<StoreResult<Array<{ unitId: string; claimIds: string[]; entityIds: string[] }>>> {
+  withDocumentId = false,
+): Promise<StoreResult<Array<{ unitId: string; claimIds: string[]; entityIds: string[]; documentId?: string }>>> {
   if (!validScope(workspaceKey) || !RUN_ID.test(compileRunId)) return fail("RETRIEVAL_SCOPE_INVALID");
   const config = readSupabaseAdminConfig();
   if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
 
   const query = new URLSearchParams({
-    select: "unit_id,claim_ids,entity_ids",
+    select: withDocumentId ? "unit_id,claim_ids,entity_ids,document_id" : "unit_id,claim_ids,entity_ids",
     workspace_key: `eq.${workspaceKey}`,
     compile_run_id: `eq.${compileRunId}`,
     limit: String(Math.min(Math.max(limit, 1), 2000)),
@@ -429,6 +472,7 @@ export async function loadStructureCandidates(
       unitId: String(row.unit_id ?? ""),
       claimIds: Array.isArray(row.claim_ids) ? row.claim_ids.map(String) : [],
       entityIds: Array.isArray(row.entity_ids) ? row.entity_ids.map(String) : [],
+      ...(withDocumentId ? { documentId: typeof row.document_id === "string" ? row.document_id : "" } : {}),
     })),
   };
 }
