@@ -39,7 +39,27 @@ export type RetrievalStoreFailure =
   | "RETRIEVAL_STORE_WRITE_FAILED"
   | "RETRIEVAL_SCOPE_INVALID"
   | "RETRIEVAL_PROFILE_NOT_FOUND"
-  | "RETRIEVAL_RUN_NOT_FOUND";
+  | "RETRIEVAL_RUN_NOT_FOUND"
+  | "RETRIEVAL_SCOPE_TOO_LARGE";
+
+/*
+  WO-PROJ-K2-E2: the most document ids a scoped retrieval call may carry. The scoped RPCs
+  (20261127040000) refuse more with `retrieval_scoped_search_documents_invalid`; the app refuses
+  first, typed, so no request is made and no embedder is called for a scope it cannot serve.
+*/
+export const MAX_SCOPED_DOCUMENT_IDS = 2000;
+
+/**
+ * The scope list a scoped RPC receives: unique and sorted, so the request does not depend on the
+ * order a Set was built in. Empty or a malformed id is RETRIEVAL_SCOPE_INVALID (an empty projection
+ * is refused upstream; scoped to nothing is never sent). Oversize is RETRIEVAL_SCOPE_TOO_LARGE.
+ */
+export function scopedDocumentIds(documentIds: Iterable<string>): StoreResult<string[]> {
+  const unique = [...new Set(documentIds)].sort();
+  if (unique.length > MAX_SCOPED_DOCUMENT_IDS) return fail("RETRIEVAL_SCOPE_TOO_LARGE");
+  if (unique.length === 0 || !unique.every((id) => id.length >= 1 && id.length <= 256)) return fail("RETRIEVAL_SCOPE_INVALID");
+  return { ok: true as const, value: unique };
+}
 
 export type StoreResult<T> = { ok: true; value: T } | { ok: false; code: RetrievalStoreFailure };
 
@@ -395,63 +415,39 @@ export async function loadUnitsByIds(
   return { ok: true as const, value: rows.map(toStoredUnit).filter((unit): unit is StoredUnitRow => unit !== null) };
 }
 
-/**
- * WO-PROJ-K2: the document behind each unit id, and nothing else -- no text, so a unit the viewer
- * may not see is never read into this process to be filtered out. Batched so the `in.(...)`
- * filter stays a short URL. A unit with no row is absent from the map, and the caller treats
- * absent as not admitted.
- */
-export async function loadUnitDocumentIds(
-  workspaceKey: string,
-  compileRunId: string,
-  unitIds: string[],
-): Promise<StoreResult<Map<string, string>>> {
-  if (!validScope(workspaceKey) || !RUN_ID.test(compileRunId)) return fail("RETRIEVAL_SCOPE_INVALID");
-  const unique = [...new Set(unitIds)];
-  const documentOf = new Map<string, string>();
-  if (unique.length === 0) return { ok: true as const, value: documentOf };
-  const config = readSupabaseAdminConfig();
-  if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
-  for (let start = 0; start < unique.length; start += 100) {
-    const query = new URLSearchParams({
-      select: "unit_id,document_id",
-      workspace_key: `eq.${workspaceKey}`,
-      compile_run_id: `eq.${compileRunId}`,
-      unit_id: `in.(${unique.slice(start, start + 100).join(",")})`,
-    });
-    let response: Response;
-    try {
-      response = await supabaseAdminRequest(config, `/rest/v1/foundation_retrieval_units?${query}`);
-    } catch {
-      return fail("RETRIEVAL_STORE_READ_FAILED");
-    }
-    if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
-    const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
-    if (!Array.isArray(rows)) return fail("RETRIEVAL_STORE_READ_FAILED");
-    for (const row of rows) {
-      if (typeof row.unit_id === "string" && typeof row.document_id === "string") documentOf.set(row.unit_id, row.document_id);
-    }
-  }
-  return { ok: true as const, value: documentOf };
-}
-
 // Loads the claim/entity ids of the units a query already matched, to seed the structure
 // path (structure-search.ts ranks by overlap against these). Kept separate from
 // loadUnitsByIds because it runs BEFORE fusion, on a small seed set, and needs no text.
-// `withDocumentId` (WO-PROJ-K2, projection only) adds the document so the caller can drop units
-// outside the viewer's projection before ranking; without it the request is unchanged.
+// `documentIds` (WO-PROJ-K2-E2, a partial projection only) reads the pool through the scoped RPC:
+// admitted units only, ordered by unit_id. Without it the request is unchanged.
 export async function loadStructureCandidates(
   workspaceKey: string,
   compileRunId: string,
   limit: number,
-  withDocumentId = false,
-): Promise<StoreResult<Array<{ unitId: string; claimIds: string[]; entityIds: string[]; documentId?: string }>>> {
+  documentIds?: readonly string[],
+): Promise<StoreResult<Array<{ unitId: string; claimIds: string[]; entityIds: string[] }>>> {
   if (!validScope(workspaceKey) || !RUN_ID.test(compileRunId)) return fail("RETRIEVAL_SCOPE_INVALID");
+  const toCandidates = (rows: Array<Record<string, unknown>>) => rows.map((row) => ({
+    unitId: String(row.unit_id ?? ""),
+    claimIds: Array.isArray(row.claim_ids) ? row.claim_ids.map(String) : [],
+    entityIds: Array.isArray(row.entity_ids) ? row.entity_ids.map(String) : [],
+  }));
+  if (documentIds !== undefined) {
+    const scoped = scopedDocumentIds(documentIds);
+    if (!scoped.ok) return scoped;
+    const result = await callRpc("foundation_retrieval_structure_candidates_scoped", {
+      p_workspace_key: workspaceKey,
+      p_compile_run_id: compileRunId,
+      p_document_ids: scoped.value,
+      p_limit: Math.min(Math.max(limit, 1), 2000),
+    });
+    return result.ok ? { ok: true as const, value: toCandidates(result.value) } : result;
+  }
   const config = readSupabaseAdminConfig();
   if (!config) return fail("RETRIEVAL_STORE_NOT_CONFIGURED");
 
   const query = new URLSearchParams({
-    select: withDocumentId ? "unit_id,claim_ids,entity_ids,document_id" : "unit_id,claim_ids,entity_ids",
+    select: "unit_id,claim_ids,entity_ids",
     workspace_key: `eq.${workspaceKey}`,
     compile_run_id: `eq.${compileRunId}`,
     limit: String(Math.min(Math.max(limit, 1), 2000)),
@@ -466,15 +462,7 @@ export async function loadStructureCandidates(
   if (!response.ok) return fail("RETRIEVAL_STORE_READ_FAILED");
   const rows = (await response.json().catch(() => null)) as Array<Record<string, unknown>> | null;
   if (!rows) return fail("RETRIEVAL_STORE_READ_FAILED");
-  return {
-    ok: true as const,
-    value: rows.map((row) => ({
-      unitId: String(row.unit_id ?? ""),
-      claimIds: Array.isArray(row.claim_ids) ? row.claim_ids.map(String) : [],
-      entityIds: Array.isArray(row.entity_ids) ? row.entity_ids.map(String) : [],
-      ...(withDocumentId ? { documentId: typeof row.document_id === "string" ? row.document_id : "" } : {}),
-    })),
-  };
+  return { ok: true as const, value: toCandidates(rows) };
 }
 
 // ---- Search execution (the two 0023 RPCs) -------------------------------------------
@@ -501,20 +489,34 @@ async function callRpc(name: string, body: unknown): Promise<StoreResult<Array<R
 // Executes the lexical search. Returns unit IDs already in best-first order, which is
 // exactly what toRankedList (rank-fusion.ts) consumes -- the native ts_rank_cd score is
 // deliberately dropped here, because only rank position may enter RRF.
+// `documentIds` (WO-PROJ-K2-E2, a partial projection only) ranks inside those documents through the
+// scoped RPC (20261127040000): no hidden unit is ranked, returned or counted. Without it the request
+// is unchanged.
 export async function runLexicalSearch(params: {
   workspaceKey: string;
   compileRunId: string;
   queryTokens: string[];
   limit: number;
+  documentIds?: readonly string[];
 }): Promise<StoreResult<string[]>> {
   if (!validScope(params.workspaceKey) || !RUN_ID.test(params.compileRunId)) return fail("RETRIEVAL_SCOPE_INVALID");
+  const scoped = params.documentIds === undefined ? null : scopedDocumentIds(params.documentIds);
+  if (scoped && !scoped.ok) return scoped;
   if (params.queryTokens.length === 0) return { ok: true as const, value: [] };
-  const result = await callRpc("search_foundation_retrieval_units_lexical", {
-    p_workspace_key: params.workspaceKey,
-    p_compile_run_id: params.compileRunId,
-    p_query_tokens: params.queryTokens,
-    p_limit: params.limit,
-  });
+  const result = scoped
+    ? await callRpc("search_foundation_retrieval_units_lexical_scoped", {
+        p_workspace_key: params.workspaceKey,
+        p_compile_run_id: params.compileRunId,
+        p_query_tokens: params.queryTokens,
+        p_document_ids: scoped.value,
+        p_limit: params.limit,
+      })
+    : await callRpc("search_foundation_retrieval_units_lexical", {
+        p_workspace_key: params.workspaceKey,
+        p_compile_run_id: params.compileRunId,
+        p_query_tokens: params.queryTokens,
+        p_limit: params.limit,
+      });
   if (!result.ok) return result;
   return { ok: true as const, value: result.value.map((row) => String(row.unit_id ?? "")).filter((id) => id.length > 0) };
 }
@@ -529,17 +531,30 @@ export async function runDenseSearch(params: {
   queryEmbedding: number[];
   metric: DenseMetric;
   limit: number;
+  documentIds?: readonly string[];
 }): Promise<StoreResult<string[]>> {
   if (!validScope(params.workspaceKey) || !RUN_ID.test(params.compileRunId)) return fail("RETRIEVAL_SCOPE_INVALID");
+  const scoped = params.documentIds === undefined ? null : scopedDocumentIds(params.documentIds);
+  if (scoped && !scoped.ok) return scoped;
   if (params.queryEmbedding.length === 0) return { ok: true as const, value: [] };
-  const result = await callRpc("search_foundation_retrieval_units_dense", {
-    p_workspace_key: params.workspaceKey,
-    p_compile_run_id: params.compileRunId,
-    p_retrieval_profile_id: params.retrievalProfileId,
-    p_query_embedding: params.queryEmbedding,
-    p_metric: params.metric,
-    p_limit: params.limit,
-  });
+  const result = scoped
+    ? await callRpc("search_foundation_retrieval_units_dense_scoped", {
+        p_workspace_key: params.workspaceKey,
+        p_compile_run_id: params.compileRunId,
+        p_retrieval_profile_id: params.retrievalProfileId,
+        p_query_embedding: params.queryEmbedding,
+        p_metric: params.metric,
+        p_document_ids: scoped.value,
+        p_limit: params.limit,
+      })
+    : await callRpc("search_foundation_retrieval_units_dense", {
+        p_workspace_key: params.workspaceKey,
+        p_compile_run_id: params.compileRunId,
+        p_retrieval_profile_id: params.retrievalProfileId,
+        p_query_embedding: params.queryEmbedding,
+        p_metric: params.metric,
+        p_limit: params.limit,
+      });
   if (!result.ok) return result;
   return { ok: true as const, value: result.value.map((row) => String(row.unit_id ?? "")).filter((id) => id.length > 0) };
 }

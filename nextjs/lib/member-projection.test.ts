@@ -22,8 +22,8 @@ import {
   decideMemberProjection, memberProjectionMode, projectionAdmits, projectionShadowFields, projectSourceGroups,
   recordProjectionShadow, type ProjectionDecision,
 } from "./member-projection";
-import { PROJECTION_WINDOW_EXHAUSTED, runRetrievalPipeline } from "./retrieval-pipeline";
-import { buildPublicRetrievalRoute } from "./model-attempt-receipt";
+import { runRetrievalPipeline } from "./retrieval-pipeline";
+import { MAX_SCOPED_DOCUMENT_IDS } from "./retrieval-store";
 import { getWorldFreshness } from "./world-store";
 import { buildBgeM3BaselineProfile } from "./retrieval-profile";
 import type { EmbedderAdapter } from "./embedder-adapter";
@@ -54,7 +54,7 @@ type World = { units: Row[]; lexical: string[]; dense: string[] };
 let world: World;
 let readable: (asked: string[]) => unknown;
 let calls: Array<{ path: string; body: unknown }>;
-let failDocumentMap = false;
+let failRpc: Set<string>;
 let infoLines: string[];
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
@@ -67,7 +67,7 @@ beforeEach(() => {
   world = { units: [...HIDDEN, ...VISIBLE], lexical: ids([...HIDDEN, ...VISIBLE]), dense: ids([HIDDEN[2]!, VISIBLE[1]!, HIDDEN[0]!, VISIBLE[0]!]) };
   readable = (asked) => asked.filter(id => id === D1);
   calls = [];
-  failDocumentMap = false;
+  failRpc = new Set();
   rerankerSaw = [];
   infoLines = [];
   vi.spyOn(console, "info").mockImplementation((line: unknown) => { infoLines.push(String(line)); });
@@ -78,13 +78,22 @@ beforeEach(() => {
     const name = /\/rpc\/([a-z_0-9]+)$/.exec(url.pathname)?.[1];
     if (name === "member_readable_document_ids") return json(readable(body.p_document_ids));
     if (name === "connector_documents_blocked") return json(false);
+    if (name && failRpc.has(name)) return json({ code: "PGRST202", message: "not found" }, 404);
     if (name === "search_foundation_retrieval_units_lexical") return json(world.lexical.slice(0, body.p_limit).map(unit_id => ({ unit_id })));
     if (name === "search_foundation_retrieval_units_dense") return json(world.dense.slice(0, body.p_limit).map(unit_id => ({ unit_id })));
+    // The scoped RPCs (20261127040000) as the database runs them: the same native order, inside the
+    // admitted documents only (supabase/tests/foundation_retrieval_search_rpc_scoped.sql proves that half).
+    const inScope = (id: string) => (body?.p_document_ids ?? []).includes(world.units.find(unit => unit.unit_id === id)?.document_id);
+    if (name === "search_foundation_retrieval_units_lexical_scoped") return json(world.lexical.filter(inScope).slice(0, body.p_limit).map(unit_id => ({ unit_id })));
+    if (name === "search_foundation_retrieval_units_dense_scoped") return json(world.dense.filter(inScope).slice(0, body.p_limit).map(unit_id => ({ unit_id })));
+    if (name === "foundation_retrieval_structure_candidates_scoped") {
+      return json(world.units.filter(unit => inScope(unit.unit_id)).sort((a, b) => a.unit_id.localeCompare(b.unit_id)).slice(0, body.p_limit)
+        .map(unit => ({ unit_id: unit.unit_id, claim_ids: unit.claim_ids, entity_ids: unit.entity_ids })));
+    }
     if (url.pathname.endsWith("/foundation_retrieval_profiles")) return json([{ id: PROFILE.id }]);
     if (url.pathname.endsWith("/foundation_retrieval_compile_runs")) return json([{ run_id: RUN_ID, status: "completed" }]);
     if (url.pathname.endsWith("/foundation_retrieval_units")) {
       const select = url.searchParams.get("select") ?? "";
-      if (failDocumentMap && select === "unit_id,document_id") return json({ message: "down" }, 500);
       const wanted = /^in\.\((.*)\)$/.exec(url.searchParams.get("unit_id") ?? "")?.[1]?.split(",");
       const rows = wanted ? world.units.filter(unit => wanted.includes(unit.unit_id)) : world.units;
       return json(rows.map(unit => ({
@@ -226,13 +235,14 @@ describe("the decision", () => {
 });
 
 describe("the retrieval pipeline, projected", () => {
-  it("is unchanged when the projection is absent, null or `all`: same requests, same packet", async () => {
+  it("is unchanged when the projection is absent, null or `all`: same requests and bodies, same packet", async () => {
     const baseline = await run();
-    const baselineCalls = calls.map(call => call.path);
+    const baselineCalls = [...calls];
+    expect(baselineCalls.some(call => call.path.includes("_scoped"))).toBe(false);
     for (const projection of [null, { kind: "all", key: "7:all" } as const]) {
       calls = [];
       await expect(run(projection)).resolves.toEqual(baseline);
-      expect(calls.map(call => call.path)).toEqual(baselineCalls);
+      expect(calls).toEqual(baselineCalls);
     }
     // And today's pipeline is what the fixture says it is: the hidden units fill the context.
     expect(baseline.ok && baseline.packet.items.map(item => item.unitId).every(id => id.includes("-h"))).toBe(true);
@@ -248,12 +258,9 @@ describe("the retrieval pipeline, projected", () => {
     expect(projected.ok && alone.ok).toBe(true);
     if (!projected.ok || !alone.ok) return;
     expect(projected.packet).toEqual(alone.packet);
-    const { lexicalCandidateCount, denseCandidateCount, fusedCandidateCount } = alone.diagnostics;
-    expect(projected.diagnostics).toMatchObject({ lexicalCandidateCount, denseCandidateCount, fusedCandidateCount });
-    // N1: the structure pool is an unordered 2000-row read; a projected viewer gets no count from it.
-    expect(projected.diagnostics.structureCandidateCount).toBeNull();
-    expect(projected.diagnostics.degradations).toEqual(alone.diagnostics.degradations);
-    expect(projected.diagnostics.contextCutoff).toEqual(alone.diagnostics.contextCutoff);
+    // Every count included: the scoped structure pool is the admitted units, ordered, so its size is
+    // the admitted World's (N1 is gone with the unordered read).
+    expect(projected.diagnostics).toEqual(alone.diagnostics);
     expect(projectedReranker).toEqual(rerankerSaw);
   });
 
@@ -263,9 +270,12 @@ describe("the retrieval pipeline, projected", () => {
     if (!result.ok) return;
     expect(result.packet.items).toHaveLength(3);
     expect(result.packet.items.every(item => item.unitId.includes("-v"))).toBe(true);
-    // The window is widened for a projected query only.
-    const limits = calls.filter(call => call.path.includes("/rpc/search_")).map(call => (call.body as { p_limit: number }).p_limit);
-    expect(limits).toEqual([500, 500]);
+    // No window: each scoped source is asked for candidateLimit, inside the admitted documents.
+    const searches = calls.filter(call => call.path.includes("/rpc/search_"));
+    expect(searches.map(call => call.path)).toEqual([
+      "/rest/v1/rpc/search_foundation_retrieval_units_lexical_scoped", "/rest/v1/rpc/search_foundation_retrieval_units_dense_scoped",
+    ]);
+    expect(searches.map(call => call.body)).toEqual(searches.map(() => expect.objectContaining({ p_limit: 6, p_document_ids: [D1] })));
   });
 
   it("never reads hidden text, never shows it to the reranker, never counts it", async () => {
@@ -276,13 +286,41 @@ describe("the retrieval pipeline, projected", () => {
     for (const read of textReads) expect(read.path).not.toMatch(/retrieval-unit-h\d/);
     expect(rerankerSaw.flat().some(text => text.includes("Globex"))).toBe(false);
     expect(JSON.stringify(result)).not.toContain("Globex");
-    expect(result.diagnostics).toMatchObject({ lexicalCandidateCount: 4, denseCandidateCount: 2, structureCandidateCount: null });
+    expect(result.diagnostics).toMatchObject({ lexicalCandidateCount: 4, denseCandidateCount: 2, structureCandidateCount: 4 });
+    // No unscoped read of any kind: no unit-to-document map, no unscoped RPC, no REST structure read.
+    expect(calls.some(call => /\/rpc\/search_foundation_retrieval_units_(lexical|dense)$/.test(call.path))).toBe(false);
+    expect(calls.some(call => call.path.includes("select=unit_id,document_id") || call.path.includes("select=unit_id,claim_ids"))).toBe(false);
   });
 
-  it("fails closed when the unit-to-document map cannot be read", async () => {
-    failDocumentMap = true;
+  it("fails closed, never unscoped, when the scoped lexical RPC is missing or fails", async () => {
+    failRpc.add("search_foundation_retrieval_units_lexical_scoped");
     await expect(run(partial([D1]))).resolves.toEqual({ ok: false, code: "RETRIEVAL_STORE_READ_FAILED" });
     expect(rerankerSaw).toEqual([]);
+    expect(calls.some(call => /\/rpc\/search_foundation_retrieval_units_(lexical|dense)$/.test(call.path))).toBe(false);
+  });
+
+  it("degrades dense and structure like any outage, and says so, when their scoped RPCs fail", async () => {
+    failRpc.add("search_foundation_retrieval_units_dense_scoped");
+    failRpc.add("foundation_retrieval_structure_candidates_scoped");
+    const result = await run(partial([D1]));
+    if (!result.ok) throw new Error(result.code);
+    expect(result.diagnostics.degradations).toEqual([
+      "dense retrieval skipped: RETRIEVAL_STORE_READ_FAILED", "structure retrieval skipped: unit metadata unavailable",
+    ]);
+    expect(result.packet.items.every(item => item.unitId.includes("-v"))).toBe(true);
+    expect(JSON.stringify(result)).not.toContain("Globex");
+  });
+
+  it("refuses, typed and before any read or model call, a scope the scoped RPCs cannot take", async () => {
+    const embed = vi.spyOn(embedder, "embedQuery");
+    const tooMany = Array.from({ length: MAX_SCOPED_DOCUMENT_IDS + 1 }, (_unused, n) => `doc-${n}`);
+    await expect(run(partial(tooMany))).resolves.toEqual({ ok: false, code: "RETRIEVAL_SCOPE_TOO_LARGE" });
+    await expect(run(partial([]))).resolves.toEqual({ ok: false, code: "RETRIEVAL_SCOPE_INVALID" });
+    expect(calls).toEqual([]);
+    expect(embed).not.toHaveBeenCalled();
+    // At the cap it is served.
+    const atCap = [D1, ...tooMany.slice(0, MAX_SCOPED_DOCUMENT_IDS - 1)];
+    await expect(run(partial(atCap))).resolves.toMatchObject({ ok: true });
   });
 
   it("abstains, without saying why, when nothing admitted matches", async () => {
@@ -291,58 +329,30 @@ describe("the retrieval pipeline, projected", () => {
     expect(result.packet.items).toEqual([]);
     expect(result.packet.abstentionReasons).toEqual(["no retrieval source returned a candidate for this question"]);
     expect(result.diagnostics).toMatchObject({ lexicalCandidateCount: 0, denseCandidateCount: 0, fusedCandidateCount: 0 });
-    // An unsaturated window is exhaustive: no incompleteness is claimed.
-    expect(result.diagnostics.degradations).not.toContain(PROJECTION_WINDOW_EXHAUSTED);
+    expect(result.diagnostics.degradations).toEqual([]);
   });
 });
 
 /*
-  E1 (review r1): a source that fills its 500-unit window with hidden units may have pushed the
-  member's own units past it. The result must say it may be incomplete -- without a count.
+  E2 (review r1): under the filtered path, the number of requests (an id-to-document read per 100
+  returned ids) and the 500-unit window grew with how many hidden units matched the query, a timing
+  and rank oracle on hidden sources. With the scoped RPCs the app's requests are a function of the
+  question and the admitted set only. This pins it: 6 hidden matches or 500, the same requests,
+  byte for byte, and the same result. (What the database does inside one call is measured by
+  supabase/tests/foundation_retrieval_search_rpc_scoped.sql; wall-clock time is not measured here.)
 */
-describe("a saturated projected window", () => {
+describe("hidden volume", () => {
   const many = Array.from({ length: 500 }, (_unused, n) => row(`s${n}`, D2, `Globex notice period termination filler ${n}`));
-  const saturate = (dense: string[]) => {
-    world = { units: [...many, ...VISIBLE], lexical: ids([...many, ...VISIBLE]), dense };
-  };
 
-  it("degrades, and the public route names `access_scope_incomplete`, when admitted units may lie past the window", async () => {
-    saturate(ids([VISIBLE[1]!, VISIBLE[0]!]));
-    const result = await run(partial([D1]));
-    if (!result.ok) throw new Error(result.code);
-    expect(result.packet.items.length).toBeGreaterThan(0);
-    expect(result.diagnostics.degradations).toContain(PROJECTION_WINDOW_EXHAUSTED);
-    expect(buildPublicRetrievalRoute([], result.diagnostics.degradations).degradationClasses).toEqual(["access_scope_incomplete"]);
-    // The id-to-document read was batched (5 x 100 + the rest), and still read no text.
-    expect(calls.filter(call => call.path.includes("select=unit_id,document_id")).length).toBe(6);
-  });
-
-  it("never abstains as if nothing existed: the reason says the result may be incomplete, and no count", async () => {
-    saturate(ids([many[0]!]));
-    const result = await run(partial([D1]));
-    if (!result.ok) throw new Error(result.code);
-    expect(result.packet.items).toEqual([]);
-    expect(result.packet.abstentionReasons).toEqual(["results may be incomplete for this viewer's access"]);
-    expect(JSON.stringify(result.packet)).not.toMatch(/\b500\b|Globex|0000000[12]-/);
-  });
-
-  it("claims nothing when the window held enough admitted units", async () => {
-    // 500 rows, six of them admitted near the top: candidateLimit (6) is met inside the window.
-    world = {
-      units: [...many, ...VISIBLE, row("v5", D1, "Acme notice 5"), row("v6", D1, "Acme notice 6")],
-      lexical: [...ids([...VISIBLE, row("v5", D1, "x"), row("v6", D1, "x")]), ...ids(many)].slice(0, 500),
-      dense: [],
-    };
-    const result = await run(partial([D1]));
-    if (!result.ok) throw new Error(result.code);
-    expect(result.diagnostics.degradations).not.toContain(PROJECTION_WINDOW_EXHAUSTED);
-  });
-
-  it("is never claimed without a projection, however full the window", async () => {
-    saturate(ids([VISIBLE[1]!]));
-    const result = await run();
-    if (!result.ok) throw new Error(result.code);
-    expect(result.diagnostics.degradations).not.toContain(PROJECTION_WINDOW_EXHAUSTED);
+  it("does not change a single request, or the result, of a projected query", async () => {
+    const few = await run(partial([D1]));
+    const fewCalls = [...calls];
+    world = { units: [...many, ...VISIBLE], lexical: ids([...many, ...VISIBLE]), dense: ids([...many.slice(0, 300), VISIBLE[1]!, VISIBLE[0]!]) };
+    calls = [];
+    const crowded = await run(partial([D1]));
+    expect(calls).toEqual(fewCalls);
+    expect(crowded).toEqual(few);
+    expect(crowded.ok && crowded.diagnostics.degradations).toEqual([]);
   });
 });
 
