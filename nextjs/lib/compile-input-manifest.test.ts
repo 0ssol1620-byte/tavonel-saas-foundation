@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import type { CollectionOcrInput } from "./collection-compiler";
@@ -434,7 +435,7 @@ describe("compile input manifest", () => {
       expect(results.filter(([, c]) => c === "ok" || !String(c).startsWith("manifest_"))).toEqual([]);
     });
 
-    it("never throws and never accepts a manifest with any one field replaced, deleted or added", () => {
+    it("never throws and never accepts a manifest with any one field replaced, deleted or added", async () => {
       const { manifest, chunkBodies } = built();
       const DELETE = Symbol("delete");
       const hostile: unknown[] = [
@@ -487,6 +488,9 @@ describe("compile input manifest", () => {
         if (original && typeof original === "object" && !Array.isArray(original)) {
           check(`${path.join(".")}+extra`, sealed(mutate([...path, "extra"], 1), [...path, "extra"]), false);
         }
+        // Synchronous otherwise: 24-54 s in one stretch, which outlives vitest's fixed 60 s worker RPC window
+        // on a loaded hosted runner ("Timeout calling onTaskUpdate", WO-CI-VITEST-RPC-1). One macrotask per path.
+        await yieldToEventLoop();
       }
       expect(failures).toEqual([]);
     }, 120_000);
