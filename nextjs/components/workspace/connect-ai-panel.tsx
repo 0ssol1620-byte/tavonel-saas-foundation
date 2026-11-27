@@ -53,13 +53,27 @@ type ClientId = (typeof CLIENTS)[number]["id"];
   above the panel), the panel is switched off -- it used to show the remote steps then, so a page that
   forgot the layout offered a URL that answers 404. Only a server's `true` opens it.
 */
-const Availability = createContext<boolean>(false);
-export function RemoteMcpAvailability({ enabled, children }: { enabled: boolean; children?: ReactNode }) {
-  return <Availability.Provider value={enabled === true}>{children}</Availability.Provider>;
+/*
+  WO-FIRST5-P1 (#11, #19). Two more server reads ride the same provider, as booleans and a day count,
+  never an env value: whether a free evaluation may connect (TAVONEL_TRIAL_AI_ACCESS_ENABLED, the flag
+  the token endpoint refuses on) and the refresh window when TAVONEL_REMOTE_MCP_REFRESH_ENABLED is on
+  (null when off). Absent, both read as off, which is what the panel said before.
+*/
+type AvailabilityValue = { enabled: boolean; trialAiAccess: boolean; refreshDays: number | null };
+const Availability = createContext<AvailabilityValue>({ enabled: false, trialAiAccess: false, refreshDays: null });
+export function RemoteMcpAvailability({ enabled, trialAiAccess = false, refreshDays = null, children }: {
+  enabled: boolean; trialAiAccess?: boolean; refreshDays?: number | null; children?: ReactNode;
+}) {
+  const value = { enabled: enabled === true, trialAiAccess: trialAiAccess === true, refreshDays: typeof refreshDays === "number" && refreshDays > 0 ? refreshDays : null };
+  return <Availability.Provider value={value}>{children}</Availability.Provider>;
 }
 
-export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headingLevel?: "h2" | "h3" }) {
-  const enabled = useContext(Availability);
+/** Whether a free evaluation may connect an assistant, as the layout read it; false where no server said. */
+export const useTrialAiAccess = () => useContext(Availability).trialAiAccess;
+
+/** `trial`: this workspace is on a free evaluation, as the workspace's own access read says. */
+export default function ConnectAiPanel({ headingLevel: Heading = "h3", trial = false }: { headingLevel?: "h2" | "h3"; trial?: boolean }) {
+  const { enabled, trialAiAccess, refreshDays } = useContext(Availability);
   const [origin, setOrigin] = useState("https://tavonel.com");
   const [client, setClient] = useState<ClientId>("claude");
 
@@ -76,6 +90,12 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
         <>
           <p role="status">An MCP client reads your active World through the local MCP bridge, with an API key from a paid plan.</p>
           <Link className="btn btn-ghost" href="/docs/mcp">Local MCP setup</Link>
+        </>
+      ) : trial && !trialAiAccess ? (
+        /* WO-FIRST5-P1 (#11): said here, before the customer sets up their AI, not on the sign-in page after it. */
+        <>
+          <p role="status">A free evaluation cannot connect Claude or ChatGPT. A paid plan can. You can keep asking your World on this page.</p>
+          <Link className="btn btn-ghost" href="/pricing">See plans</Link>
         </>
       ) : (
         <>
@@ -100,9 +120,11 @@ export default function ConnectAiPanel({ headingLevel: Heading = "h3" }: { headi
             <summary>What the assistant can read, and for how long</summary>
             <ul>
               <li>Permissions: {CONNECT_AI_SCOPES.map((scope, index) => <span key={scope}>{index > 0 ? ", " : ""}<code>{scope}</code></span>)}. Nothing that writes.</li>
-              <li>One workspace. The access lasts one hour and is not renewed in the background, so your assistant asks you to reconnect after that.</li>
+              <li>{refreshDays === null
+                ? "One workspace. The access lasts one hour and is not renewed in the background, so your assistant asks you to reconnect after that."
+                : `One workspace. The access renews while your assistant uses it and lasts up to ${refreshDays} days without use.`}</li>
               <li>Each connection appears as an API key named <code>MCP: …</code> under Workspace › Developers; revoking it ends access on the next request.</li>
-              <li>A paid workspace can connect, and so can a free evaluation where trial AI access is on. During a canary only named workspaces can, and if yours is not one the sign-in page says so and nothing is granted.</li>
+              <li>{trialAiAccess ? "A paid workspace or a free evaluation can connect." : "A paid workspace can connect."} During a canary only named workspaces can, and if yours is not one the sign-in page says so and nothing is granted.</li>
             </ul>
           </details>
           <p className={styles.note}>

@@ -62,12 +62,17 @@ const SURFACE_TITLES: Record<WorkspaceSurface, string> = {
   settings: "Settings",
 };
 
+/** A free evaluation's allowance as bootstrap sends it: totals for the evaluation, not what is left. */
+export type TrialLimits = { files: number; pages: number; worlds: number };
+/** What else the bootstrap said: the trial allowance, or the code a refused bootstrap answered with (null for a network failure). */
+export type AccessDetail = { limits: TrialLimits | null; failure: { code: string | null; status: number } | null };
+
 type AccessSummary = {
   source: "owner" | "paid" | "trial" | "unentitled";
   accessPlan: "observer_access" | "studio_access" | null;
   billingExempt: boolean;
   expiresAt: string | null;
-  limits: { files: number; pages: number; worlds: number } | null;
+  limits: TrialLimits | null;
   customerDataEnabled: boolean;
   /** Sent with an open workspace: a qualification grant processes files but is never billable. */
   processingStage?: "production" | "qualification" | null;
@@ -100,7 +105,7 @@ type Props = {
   stateHero?: boolean;
   nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void };
   /** The access source from /api/access/bootstrap, so the page can gate surface bodies the same way the rail is gated. */
-  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null, sourcePending: SourcePendingReason | null, resume: ResumeAccess | null) => void;
+  onAccess?: (source: AccessSummary["source"] | null, customerDataEnabled: boolean | null, sourcePending: SourcePendingReason | null, resume: ResumeAccess | null, detail?: AccessDetail) => void;
   /** Changing this re-runs the bootstrap read, e.g. after the owner records the processing terms. */
   accessEpoch?: number;
   onNavigate: (surface: WorkspaceSurface) => void;
@@ -156,13 +161,13 @@ export default function WorkspaceUltimateShell({
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) { if (current) onAccess?.(null, null, null, null); return; }
+      if (!token) { if (current) onAccess?.(null, null, null, null, { limits: null, failure: { code: "AUTH_REQUIRED", status: 401 } }); return; }
       const response = await fetch("/api/access/bootstrap", {
         method: "POST",
         credentials: "same-origin",
         headers: { authorization: `Bearer ${token}` },
       });
-      const body = await response.json().catch(() => null) as { access?: AccessSummary; sourcePending?: unknown } | null;
+      const body = await response.json().catch(() => null) as { access?: AccessSummary; sourcePending?: unknown; code?: unknown } | null;
       if (current && response.ok && body?.access) {
         const reason = !body.access.customerDataEnabled && SOURCE_PENDING_REASONS.includes(body.sourcePending as string)
           ? body.sourcePending as SourcePendingReason
@@ -175,9 +180,10 @@ export default function WorkspaceUltimateShell({
         onAccess?.(source, customerDataEnabled, reason, {
           source, billingExempt: billingExempt === true, customerDataEnabled, sourcePending: reason,
           processingStage: processingStage === "production" || processingStage === "qualification" ? processingStage : null,
-        });
-      } else if (current) onAccess?.(null, null, null, null);
-    })().catch(() => { if (current) onAccess?.(null, null, null, null); });
+        }, { limits: body.access.limits ?? null, failure: null });
+      // WO-FIRST5-P1 (#9): a refused bootstrap keeps its code, so the page can say what it was instead of "Refresh".
+      } else if (current) onAccess?.(null, null, null, null, { limits: null, failure: { code: typeof body?.code === "string" ? body.code : null, status: response.status } });
+    })().catch(() => { if (current) onAccess?.(null, null, null, null, { limits: null, failure: { code: null, status: 0 } }); });
     return () => { current = false; };
     // onAccess is the page's handler; bootstrap runs once per mount and again only when the page
     // bumps accessEpoch, never because a handler identity changed.
