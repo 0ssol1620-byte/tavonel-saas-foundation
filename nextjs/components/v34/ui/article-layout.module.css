@@ -2,11 +2,34 @@
   padding: clamp(32px, 5vw, 64px) 0 clamp(48px, 7vw, 96px);
 }
 
-/* The reading column starts on the container edge, where the wordmark is (UX-L2 R1, lead decision 5),
-   and keeps its 760px measure; under that width it fills the shell between the V34 gutters. */
+/* UI-B. The article takes the whole V34 shell, centred, like the blueprint's reader: the header
+   (<= 980px) and the cover (<= 1000px) start on the container edge, where the wordmark is (UX-L2 R1,
+   lead decision 5), and from 1100px the body is a ~700px text column with the sources beside it.
+   The old 760px column left 580px of dead paper to the right of the text at 1440. */
 .column {
-  width: min(760px, var(--v34-shell));
-  margin-inline: max(var(--v34-gutter), (100% - var(--v34-max)) / 2) auto;
+  width: var(--v34-shell);
+  margin-inline: auto;
+}
+
+.reader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+@media (min-width: 1100px) {
+  .reader {
+    grid-template-columns: minmax(0, 700px) minmax(240px, 350px);
+    gap: 54px;
+    align-items: start;
+  }
+
+  /* The sources are the aside: same DOM order (after the text), placed beside it. */
+  .reader > .sources {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+  }
 }
 
 .crumbs {
@@ -46,6 +69,7 @@
 }
 
 .head {
+  max-width: 980px;
   margin-bottom: 28px;
 }
 
@@ -80,6 +104,7 @@
 
 .cover {
   min-width: 0;
+  max-width: 1000px;
   margin: 0 0 36px;
 }
 
@@ -105,10 +130,15 @@
   line-height: 1.25;
 }
 
+/* 36rem is 576px: at 17px this face sets about 74 characters a line (average glyph ~7.8px; a `ch`
+   here is the 10.6px zero, so 58ch printed 79). The 16px / 68ch pair it replaces printed 82-93. The grid column above stays 700px so a figure or
+   a table in the body keeps the width the blueprint gives its art; only the prose is held to the
+   measure. */
 .p {
-  max-width: 68ch;
+  max-width: 36rem;
   margin: 0 0 1.1em;
-  line-height: 1.65;
+  font-size: 1.0625rem;
+  line-height: 1.7;
 }
 
 .quote {
@@ -122,9 +152,10 @@
 .list {
   display: grid;
   gap: 8px;
-  max-width: 68ch;
+  max-width: 36rem;
   margin: 0 0 1.2em;
   padding-left: 1.2em;
+  font-size: 1.0625rem;
 }
 
 .listItem {
@@ -137,6 +168,7 @@
 }
 
 .sources {
+  min-width: 0;
   margin-top: 56px;
   padding-top: 8px;
   border-top: 1px solid var(--v34-fg-rule);

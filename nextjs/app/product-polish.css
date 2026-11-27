@@ -441,6 +441,32 @@
 .scene.doc .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child) > .trust-next {
   grid-column: 1;
 }
+/*
+  UI-B. The long-form text pages keep the title rail and the reading column.
+
+  /terms and /trust are `.policy-page` documents whose title column holds the H1 and nothing
+  else, so the two rules above collapsed them to one column: a 1260px H1 over 680px paragraphs
+  hugging the left edge, with ~580px of empty shell to their right. /privacy, /refunds and
+  /subprocessors put an effective-date line beside the H1, kept the two tracks, and read fine.
+  These are the same two tracks /privacy has (the 420-480px rail, the reading column beside it),
+  above the 1321px where tavonel.css collapses `.body` anyway, so a narrower window is unchanged.
+  /trust puts `.policy-copy` on `.body` itself, which `tavonel.css` turns into a flex column;
+  on this route it is the two-track grid again. Specificity beats the D32 rules above by one class.
+  `:has(.policy-copy)` keeps the framed 404, which shares `.policy-page` and holds no policy
+  document, as it was.
+*/
+@media (min-width: 1321px) {
+  .scene.doc.policy-page:has(.policy-copy) .body:has(> .stack:first-child > .document-title:only-child),
+  .scene.doc.policy-page:has(.policy-copy) .body:has(> .stack:first-child > .doc-breadcrumb + .document-title:last-child),
+  .scene.doc.policy-page:has(.policy-copy) .body.policy-copy {
+    grid-template-columns: minmax(420px, 480px) minmax(0, 1fr);
+  }
+  .scene.doc.policy-page:has(.policy-copy) .body.policy-copy {
+    display: grid;
+    gap: clamp(36px, 4vw, 64px);
+    align-items: start;
+  }
+}
 
 /*
   BQ-106. The legend for the connector tier chip, on /integrations.
