@@ -27,7 +27,9 @@ import { useCallback, useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 
-type View = { client: { name: string; redirectOrigin: string }; scopes: string[] };
+type View = { client: { name: string; redirectOrigin: string }; scopes: string[]; lifetime: string };
+// The server states how long the connection lasts (it knows the refresh flag); this is only for a response that predates the field.
+const ONE_HOUR = "The token is bound to this workspace and expires after an hour. Revoke it under Workspace › Developers.";
 type Check = { id: string; ok?: boolean; code: string; action?: { href: string } };
 type Phase =
   | { kind: "checking" }
@@ -94,7 +96,7 @@ export default function OAuthAuthorizePage() {
         });
         return;
       }
-      setPhase({ kind: "consent", view: { client: body.client, scopes: body.scopes } as View });
+      setPhase({ kind: "consent", view: { client: body.client, scopes: body.scopes, lifetime: typeof body.lifetime === "string" ? body.lifetime : ONE_HOUR } as View });
     } catch {
       setPhase({ kind: "invalid", description: failureSentence(null, 503), back: null });
     }
@@ -225,7 +227,7 @@ export default function OAuthAuthorizePage() {
               </p>
               <ul className="auth-facts">
                 <li><b>Read only.</b> It can list sources and active Worlds, search, ask and read evidence. It cannot upload, compile, activate, roll back or change billing.</li>
-                <li><b>One workspace.</b> The token is bound to this workspace and expires after an hour. Revoke it under Workspace › Developers.</li>
+                <li><b>One workspace.</b> {view.lifetime}</li>
                 <li><b>Name not verified.</b> The client chose its own name. Check the address above before you allow it.</li>
                 <li><b>Scopes.</b> {view.scopes.join(", ")}</li>
               </ul>

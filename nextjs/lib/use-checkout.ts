@@ -131,6 +131,8 @@ export function useCheckout(
               : checkout.code === "BILLING_PLAN_CHANGE_REQUIRED" || checkout.code === "BILLING_PLAN_ALREADY_ACTIVE"
                   || checkout.code === "BILLING_SUBSCRIPTION_NEEDS_PORTAL"
                 ? { href: "/workspace/settings/usage", label: "Manage or cancel subscription" }
+                : checkout.code === "WORKSPACE_HAS_MEMBERS"
+                  ? { href: "/workspace/admin", label: "Open Members & invitations" }
                 : checkout.code === "BILLING_RESUBSCRIBE_CONTACT"
                   ? { href: "mailto:support@tavonel.com", label: "Write to support@tavonel.com" }
                   : undefined,

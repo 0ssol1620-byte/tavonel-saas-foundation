@@ -35,6 +35,17 @@ export function olderKeysNote(truncated: unknown): string | null {
   return null;
 }
 
+/**
+ * The first line of a key's status. A remote MCP connection's own key lasts an hour; with refresh on
+ * (`days` from GET /api/developer/keys, absent when off) it is replaced as the client uses it, so the
+ * key's expiry date would say the connection ends when it does not.
+ */
+export function keyStatusLine(key: Pick<ApiKey, "revokedAt" | "expiresAt" | "remoteMcp">, days: number | null, format: (iso: string) => string): string {
+  if (key.revokedAt) return "Revoked";
+  if (key.remoteMcp && days !== null) return `Renews while used · up to ${days} days without use`;
+  return key.expiresAt ? `Expires ${format(key.expiresAt)}` : "No expiry";
+}
+
 async function sessionToken() {
   const client = getSupabaseBrowserClient();
   const { data } = client ? await client.auth.getSession() : { data: { session: null } };
@@ -54,6 +65,7 @@ export default function DeveloperPanel({ confirm }: { confirm: ConfirmInPage }) 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("Reading API key inventory.");
   const [olderNote, setOlderNote] = useState<string | null>(null);
+  const [refreshDays, setRefreshDays] = useState<number | null>(null);
 
   const load = async () => {
     const token = await sessionToken();
@@ -62,12 +74,13 @@ export default function DeveloperPanel({ confirm }: { confirm: ConfirmInPage }) 
       return;
     }
     const response = await fetch("/api/developer/keys", { headers: { authorization: `Bearer ${token}` } });
-    const json = await response.json() as { code?: string; keys?: ApiKey[]; remoteMcpKeys?: ApiKey[]; truncated?: unknown };
+    const json = await response.json() as { code?: string; keys?: ApiKey[]; remoteMcpKeys?: ApiKey[]; truncated?: unknown; remoteMcpRefreshDays?: unknown };
     if (!response.ok || !Array.isArray(json.keys)) {
       setNotice(`API keys could not be read. ${failureSentence(json.code, response.status)}`);
       return;
     }
     setOlderNote(olderKeysNote(json.truncated));
+    setRefreshDays(typeof json.remoteMcpRefreshDays === "number" && json.remoteMcpRefreshDays > 0 ? json.remoteMcpRefreshDays : null);
     // Live remote MCP keys first, read apart from the hand-made ones so neither crowds the other out.
     setKeys([...(json.remoteMcpKeys ?? []).map((key) => ({ ...key, remoteMcp: true as const })), ...json.keys]);
     setNotice(json.keys.length > 0 ? `${json.keys.filter((key) => !key.revokedAt).length} active key(s).` : "No API key has been issued.");
@@ -184,7 +197,7 @@ export default function DeveloperPanel({ confirm }: { confirm: ConfirmInPage }) 
             {keys?.map((key) => (
               <article key={key.keyId} data-revoked={key.revokedAt ? "true" : "false"}>
                 <KeyRound size={16} aria-hidden="true" />
-                <div><strong>{key.name}</strong><small>{key.remoteMcp ? `tvnl_mcp_${key.prefix}_... · remote MCP connection` : `tvnl_live_${key.prefix}_...`} · {key.scopes.join(" · ")}</small><small>{key.revokedAt ? "Revoked" : key.expiresAt ? `Expires ${new Intl.DateTimeFormat().format(new Date(key.expiresAt))}` : "No expiry"}{key.lastUsedAt ? ` · last used ${new Intl.DateTimeFormat().format(new Date(key.lastUsedAt))}` : " · never used"}</small></div>
+                <div><strong>{key.name}</strong><small>{key.remoteMcp ? `tvnl_mcp_${key.prefix}_... · remote MCP connection` : `tvnl_live_${key.prefix}_...`} · {key.scopes.join(" · ")}</small><small>{keyStatusLine(key, refreshDays, (iso) => new Intl.DateTimeFormat().format(new Date(iso)))}{key.lastUsedAt ? ` · last used ${new Intl.DateTimeFormat().format(new Date(key.lastUsedAt))}` : " · never used"}</small></div>
                 {!key.revokedAt ? <button type="button" className="icon-action" disabled={busy} onClick={() => void revoke(key)} aria-label={`Revoke ${key.name}`}><Trash2 size={15} /></button> : null}
               </article>
             ))}

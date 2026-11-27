@@ -152,7 +152,7 @@ export type RemoteMcpClientRegistration = {
   client_id_issued_at: number;
   client_name: string;
   redirect_uris: string[];
-  grant_types: ["authorization_code"];
+  grant_types: ["authorization_code"] | ["authorization_code", "refresh_token"];
   response_types: ["code"];
   token_endpoint_auth_method: "none";
 };
@@ -161,6 +161,8 @@ export type RemoteMcpClientRegistration = {
 export type RemoteMcpConsentView = {
   client: { name: string; redirectOrigin: string };
   scopes: DeveloperScope[];
+  /** How long the connection lasts, said the way the refresh flag currently makes it true. */
+  lifetime: string;
 };
 
 /** OAuth 2.1 token response. Public: the token and its lifetime, never the key id behind it. */
@@ -291,6 +293,7 @@ export function registerClient(
   body: unknown,
   key: Buffer,
   now = Date.now(),
+  env: Env = process.env,
 ): { ok: true; registration: RemoteMcpClientRegistration } | { ok: false; error: string; error_description: string } {
   const input = body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : null;
   if (!input) return { ok: false, error: "invalid_client_metadata", error_description: "The registration body is not a JSON object." };
@@ -313,7 +316,7 @@ export function registerClient(
       client_name: claims.n,
       redirect_uris: claims.r,
       // RFC 7591 §3.2.1: the server answers with the values it will actually use.
-      grant_types: ["authorization_code"],
+      grant_types: remoteMcpRefreshEnabled(env) ? ["authorization_code", "refresh_token"] : ["authorization_code"],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
     },
@@ -356,7 +359,13 @@ function redirectWith(redirectUri: string, origin: string, params: Record<string
 
 const sameResource = (value: string, origin: string) => value.replace(/\/$/, "") === remoteMcpUrls(origin).resource;
 
-export function checkAuthorizationRequest(params: AuthorizationParameters, key: Buffer, origin: string): AuthorizationCheck {
+/** Flag off: the one-hour sentence, verbatim. Flag on: renewal and the real refresh window, read from the constant the token endpoint uses. */
+export function consentLifetime(env: Env = process.env): string {
+  if (!remoteMcpRefreshEnabled(env)) return "The token is bound to this workspace and expires after an hour. Revoke it under Workspace › Developers.";
+  return `The connection is bound to this workspace. It renews automatically while it is used, lasts up to ${REMOTE_MCP_REFRESH_TTL_SECONDS / 86400} days without use, and can be revoked at any time under Workspace › Developers.`;
+}
+
+export function checkAuthorizationRequest(params: AuthorizationParameters, key: Buffer, origin: string, env: Env = process.env): AuthorizationCheck {
   const client = openClient(params.client_id, key);
   if (!client) return { ok: false, redirectTo: null, error: "invalid_client", description: "This client is not registered with this server." };
   const redirectUri = params.redirect_uri ?? "";
@@ -391,7 +400,7 @@ export function checkAuthorizationRequest(params: AuthorizationParameters, key: 
   return {
     ok: true,
     request: { clientId: params.client_id!, client, redirectUri, codeChallenge: params.code_challenge!, scopes, state },
-    view: { client: { name: client.n, redirectOrigin: new URL(redirectUri).origin }, scopes },
+    view: { client: { name: client.n, redirectOrigin: new URL(redirectUri).origin }, scopes, lifetime: consentLifetime(env) },
   };
 }
 

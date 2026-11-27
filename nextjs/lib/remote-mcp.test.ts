@@ -407,7 +407,11 @@ describe("consent", () => {
   it("describes a valid request without any workspace, user or key identifier", async () => {
     const clientId = await registeredClient();
     const body = await (await consent("describe", authorizationRequest(clientId))).json();
-    expect(body).toEqual({ code: "AUTHORIZATION_REQUEST_VALID", client: { name: "Example agent", redirectOrigin: "https://client.example" }, scopes: READ_SCOPES });
+    // WO-MCP-REFRESH-2: the view now also carries `lifetime` (flag unset here: the one-hour sentence, unchanged). Still no identifier.
+    expect(body).toEqual({
+      code: "AUTHORIZATION_REQUEST_VALID", client: { name: "Example agent", redirectOrigin: "https://client.example" }, scopes: READ_SCOPES,
+      lifetime: "The token is bound to this workspace and expires after an hour. Revoke it under Workspace › Developers.",
+    });
   });
 
   it("never redirects to an unverified client or an unregistered redirect URI", async () => {

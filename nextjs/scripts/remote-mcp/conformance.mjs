@@ -28,7 +28,10 @@ const record = (label, request, response) => {
   return response;
 };
 
-const shadow = await startShadow();
+// The server's mode is chosen here, so it is known, not guessed: --refresh starts it with TAVONEL_REMOTE_MCP_REFRESH_ENABLED=true.
+// Every surface below must agree with it (WO-MCP-REFRESH-2); a mixed state fails.
+const refreshOn = process.argv.includes("--refresh");
+const shadow = await startShadow(refreshOn ? { extraEnv: { TAVONEL_REMOTE_MCP_REFRESH_ENABLED: "true" } } : {});
 const { base } = shadow;
 try {
   /* -------------------------------------------------------------- discovery */
@@ -63,12 +66,14 @@ try {
     chatgpt: "https://chatgpt.com/connector_platform_oauth_redirect",
     loopback: "http://127.0.0.1:33418/callback",
   };
+  const registeredGrants = [];
   for (const [client, uri] of Object.entries(redirectUris)) {
     const registered = record(`RFC 7591 register (${client} redirect)`, { method: "POST", path: "/api/mcp/oauth/register", redirect_uris: [uri] },
       await http(base, "POST", "/api/mcp/oauth/register", { json: { client_name: `${client} shadow`, redirect_uris: [uri], token_endpoint_auth_method: "none" } }));
     check(`registers a public client with the ${client} redirect URI`, "RFC 7591 §3.2.1",
       registered.status === 201 && registered.json?.token_endpoint_auth_method === "none" && registered.json?.redirect_uris?.[0] === uri,
       { status: registered.status, grant_types: registered.json?.grant_types });
+    registeredGrants.push(registered.json?.grant_types);
   }
   const confidential = await http(base, "POST", "/api/mcp/oauth/register", { json: { redirect_uris: [redirectUris.claude], token_endpoint_auth_method: "client_secret_basic" } });
   check("refuses a confidential client registration", "RFC 7591 §3.2.2 (invalid_client_metadata)", confidential.status === 400 && confidential.json?.error === "invalid_client_metadata", confidential.json?.error);
@@ -81,10 +86,10 @@ try {
       && Boolean(flow.redirect?.searchParams.get("state")) && /^tvmcp_code_/.test(flow.code ?? ""),
     flow.redirect ? [...flow.redirect.searchParams.keys()].sort() : null);
   record("token exchange (A)", { method: "POST", path: "/api/mcp/oauth/token", resource: "present" }, flow.token);
-  check("token response: Bearer, 3600 s, read scopes, no-store, no refresh token", "OAuth 2.1 §3.2.3; RFC 6749 §5.1",
+  check("token response: Bearer, 3600 s, read scopes, no-store; a refresh token exactly when refresh is on", "OAuth 2.1 §3.2.3; RFC 6749 §5.1",
     flow.token?.status === 200 && flow.token.json?.token_type === "Bearer" && flow.token.json?.expires_in === 3600
       && flow.token.json?.scope === "ask:read collections:download collections:read documents:read worlds:read"
-      && !("refresh_token" in (flow.token.json ?? {})) && flow.token.headers["cache-control"] === "no-store",
+      && ("refresh_token" in (flow.token.json ?? {})) === refreshOn && flow.token.headers["cache-control"] === "no-store",
     { status: flow.token?.status, keys: Object.keys(flow.token?.json ?? {}).sort(), cacheControl: flow.token?.headers["cache-control"] });
 
   const register = async () => (await http(base, "POST", "/api/mcp/oauth/register", { json: { client_name: "Negative", redirect_uris: [redirectUris.claude] } })).json.client_id;
@@ -95,6 +100,14 @@ try {
       state: "s", resource: `${base}/api/mcp`, ...extra } } });
   };
   const negClient = await register();
+  const consentView = await describe(negClient);
+  check(`refresh is ${refreshOn ? "on" : "off"} in the metadata, every registration, the token response and the consent copy alike (no mixed state)`, "RFC 8414 §2 grant_types_supported; RFC 7591 §3.2.1; WO-MCP-REFRESH-2",
+    (asm.json?.grant_types_supported?.includes("refresh_token") === refreshOn)
+      && registeredGrants.length === 3 && registeredGrants.every((grants) => Array.isArray(grants) && grants.includes("refresh_token") === refreshOn)
+      && (("refresh_token" in (flow.token?.json ?? {})) === refreshOn)
+      && (consentView.json?.lifetime?.includes("renews automatically") === refreshOn)
+      && (consentView.json?.lifetime?.includes("expires after an hour") === !refreshOn),
+    { refreshOn, metadata: asm.json?.grant_types_supported, registrations: registeredGrants, tokenKeys: Object.keys(flow.token?.json ?? {}).sort(), lifetime: consentView.json?.lifetime });
   for (const [label, extra, error] of [
     ["PKCE plain refused", { code_challenge_method: "plain" }, "invalid_request"],
     ["PKCE missing refused", { code_challenge: undefined, code_challenge_method: undefined }, "invalid_request"],
@@ -196,14 +209,15 @@ try {
       handshakeTheCodeProduces: [
         "POST /api/mcp tools/call without a token -> 401, WWW-Authenticate: Bearer resource_metadata=\"<origin>/.well-known/oauth-protected-resource/api/mcp\"",
         "GET that URL (or the bare /.well-known/oauth-protected-resource) -> 200 {resource:<origin>/api/mcp, authorization_servers:[<origin>], scopes_supported:[5 read scopes], bearer_methods_supported:[header]}",
-        "GET /.well-known/oauth-authorization-server -> 200 {issuer:<origin>, authorization_endpoint:/oauth/authorize, token_endpoint:/api/mcp/oauth/token, registration_endpoint:/api/mcp/oauth/register, code_challenge_methods_supported:[S256], token_endpoint_auth_methods_supported:[none], grant_types_supported:[authorization_code], authorization_response_iss_parameter_supported:true}",
+        `GET /.well-known/oauth-authorization-server -> 200 {issuer:<origin>, authorization_endpoint:/oauth/authorize, token_endpoint:/api/mcp/oauth/token, registration_endpoint:/api/mcp/oauth/register, code_challenge_methods_supported:[S256], token_endpoint_auth_methods_supported:[none], grant_types_supported:[authorization_code${refreshOn ? ", refresh_token" : ""}], authorization_response_iss_parameter_supported:true}`,
         "POST /api/mcp/oauth/register (RFC 7591, public client) -> 201 with a sealed client_id; no client secret",
         "Browser: /oauth/authorize?response_type=code&client_id&redirect_uri&code_challenge&code_challenge_method=S256&state&resource -> person signs in and clicks Allow -> redirect_uri?code&state&iss",
-        "POST /api/mcp/oauth/token (form) grant_type=authorization_code&code&client_id&code_verifier[&redirect_uri][&resource] -> 200 {access_token, token_type:Bearer, expires_in:3600, scope}; no refresh_token",
+        "POST /api/mcp/oauth/token (form) grant_type=authorization_code&code&client_id&code_verifier[&redirect_uri][&resource] -> 200 {access_token, token_type:Bearer, expires_in:3600, scope}" + (refreshOn ? ", refresh_token (single use, rotated)" : "; no refresh_token"),
         "POST /api/mcp with Authorization: Bearer <token>, MCP-Protocol-Version 2025-06-18 (or none) -> one application/json body per message; GET 405; DELETE 405; no Mcp-Session-Id",
       ],
       knownRisksFromVendorDocs: [
-        "No refresh token: both clients will ask the person to reconnect every hour.",
+        refreshOn ? "Refresh is on in this run: a client that refreshes keeps the connection; one that does not still asks again every hour. Real client behaviour was not exercised."
+          : "No refresh token: both clients will ask the person to reconnect every hour.",
         "ChatGPT deep research / company knowledge expect tools named search and fetch (developers.openai.com/api/docs/mcp); not offered. Developer mode acceptance of arbitrary tools was not confirmed from docs.",
         "ChatGPT prefers Client ID Metadata Documents and links the 2025-11-25 auth spec; DCR is documented as still supported.",
         "A request carrying MCP-Protocol-Version 2025-11-25 is refused 400 (measured above); a client that negotiates honestly on initialize receives 2025-06-18.",
