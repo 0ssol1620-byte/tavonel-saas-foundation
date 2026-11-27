@@ -331,6 +331,14 @@ describe("WO-LF-0: local-folder copy says what the agent does today", () => {
     expect(read("lib/connector-source-identity.ts")).toContain('const PROVIDERS: readonly string[] = ["google_drive", "dropbox", "microsoft_graph"];');
   });
 
+  it("/privacy suspends on removal only for connected cloud accounts, and says what a local-folder deletion does", () => {
+    const privacy = copy("app/privacy/page.tsx");
+    expect(privacy).toContain("Removing a source from a connected Google Drive, Dropbox or OneDrive/SharePoint account, or losing access to it, suspends it");
+    expect(privacy).toContain("With the local-folder upload agent, a file deleted from the folder is not removed or suspended on its own: its uploaded document stays until a workspace owner or administrator requests its deletion, as described next.");
+    expect(privacy).not.toContain("Removing a connected source, or losing access to it, suspends it");
+    expect(privacy).toContain("A workspace owner or administrator can request deletion of an uploaded source through the service.");
+  });
+
   it("says a revoke stops sync batches and the API key stops uploads, in the docs and the OpenAPI description", () => {
     const docs = docsText("connections");
     expect(docs).toContain("Revoking stops sync batches; revoke the agent's API key to stop uploads, and documents already uploaded stay in the workspace until a workspace owner or administrator requests their deletion.");
