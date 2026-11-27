@@ -11,6 +11,7 @@ import type { RetrievalProfile } from "./retrieval-profile";
 import {
   findLatestCompletedRun,
   loadStructureCandidates,
+  loadUnitDocumentIds,
   loadUnitsByIds,
   runDenseSearch,
   runLexicalSearch,
@@ -20,6 +21,7 @@ import { rankByStructuralOverlap } from "./structure-search";
 import { applyWorldGate, type WorldGateRejection } from "./world-gate";
 import { checkConnectorSourceAccess } from "./connector-source-access";
 import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "./derived-data-admission";
+import { projectionAdmits, type ProjectionDecision } from "./member-projection";
 import type { AdaptiveRouterDecision } from "./adaptive-router";
 import {
   contentAddressedRetrievalProfileIdentity,
@@ -130,10 +132,22 @@ export type RetrievalPipelineInput = {
   // Retrieve wide, keep narrow (audit §17): ~30-50 candidates into the reranker, ~8-12 out.
   candidateLimit?: number;
   contextLimit?: number;
+  /*
+    WO-PROJ-K2: the viewer's projection (member-projection.ts decideMemberProjection). Only a
+    `partial` decision changes anything: every candidate whose source is not admitted is dropped
+    BEFORE fusion, structure seeding, reranking, entity tiers, the World Gate, the top-K cut and
+    every count in diagnostics, so none of them can be shaped by, or reveal, a hidden source.
+    Absent, null or `all`: the pipeline is the one that ran before this field existed.
+  */
+  projection?: ProjectionDecision | null;
 };
 
 const DEFAULT_CANDIDATE_LIMIT = 50;
 const DEFAULT_CONTEXT_LIMIT = 10;
+// ponytail: a projected query asks each RPC for its maximum (0023 bounds p_limit at 500) and
+// filters by document, so K fills unless fewer than K admitted units rank inside the first 500 of
+// every source. Upgrade: scoped RPCs taking p_document_ids (needs a migration), then this goes.
+const PROJECTED_CANDIDATE_WINDOW = 500;
 
 export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promise<RetrievalPipelineResult> {
   const question = input.question.normalize("NFKC").replace(/\s+/g, " ").trim();
@@ -164,6 +178,8 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   const candidateLimit = input.candidateLimit ?? DEFAULT_CANDIDATE_LIMIT;
   const contextLimit = input.contextLimit ?? DEFAULT_CONTEXT_LIMIT;
   const degradations: string[] = [];
+  const projection = input.projection?.kind === "partial" ? input.projection : null;
+  const fetchLimit = projection ? PROJECTED_CANDIDATE_WINDOW : candidateLimit;
 
   // The compile run pins which units this query may see: the latest COMPLETED run for this
   // exact (collection, active world manifest, profile). A run against a superseded world is
@@ -215,7 +231,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     workspaceKey: input.workspaceKey,
     compileRunId,
     queryTokens,
-    limit: candidateLimit,
+    limit: fetchLimit,
   });
 
   // --- Source 2: dense -----------------------------------------------------------------
@@ -252,7 +268,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
       retrievalProfileId: input.profile.id,
       queryEmbedding,
       metric: input.profile.indexMetric,
-      limit: candidateLimit,
+      limit: fetchLimit,
     });
     if (!dense.ok) {
       degradations.push(`dense retrieval skipped: ${dense.code}`);
@@ -261,12 +277,25 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     return dense.value;
   })();
 
-  const [lexicalResult, denseIds] = await Promise.all([lexicalPromise, densePromise]);
+  const [lexicalResult, denseFetched] = await Promise.all([lexicalPromise, densePromise]);
   // Lexical is the one source whose failure is not a degradation: if the database cannot be
   // read at all, dense and structure could not have been read either, and returning a
   // "successful" answer built from nothing would be worse than an honest error.
   if (!lexicalResult.ok) return { ok: false, code: lexicalResult.code };
-  const lexicalIds = lexicalResult.value;
+  let lexicalIds = lexicalResult.value;
+  let denseIds = denseFetched;
+  if (projection) {
+    // Each source's native rank is per unit (ts_rank_cd, a distance), so dropping hidden units
+    // from a best-first list leaves the order the admitted units would have had on their own.
+    const documentOf = await loadUnitDocumentIds(input.workspaceKey, compileRunId, [...lexicalIds, ...denseIds]);
+    if (!documentOf.ok) return { ok: false, code: documentOf.code };
+    const admitted = (id: string) => {
+      const documentId = documentOf.value.get(id);
+      return documentId !== undefined && projectionAdmits(projection, [documentId]);
+    };
+    lexicalIds = lexicalIds.filter(admitted).slice(0, candidateLimit);
+    denseIds = denseIds.filter(admitted).slice(0, candidateLimit);
+  }
 
   // --- Source 3: structure -------------------------------------------------------------
   // Seeded from the claims/entities the lexical and dense hits already touched, then ranked
@@ -277,10 +306,13 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   let structureCandidateCount = 0;
   if (seedIds.length > 0) {
     const seeds = await loadUnitsByIds(input.workspaceKey, compileRunId, seedIds);
-    const candidates = await loadStructureCandidates(input.workspaceKey, compileRunId, 2000);
+    const candidates = await loadStructureCandidates(input.workspaceKey, compileRunId, 2000, projection !== null);
     if (seeds.ok && candidates.ok) {
-      structureCandidateCount = candidates.value.length;
-      const structureRanked = rankByStructuralOverlap(candidates.value, {
+      const pool = projection
+        ? candidates.value.filter((candidate) => projectionAdmits(projection, candidate.documentId ? [candidate.documentId] : []))
+        : candidates.value;
+      structureCandidateCount = pool.length;
+      const structureRanked = rankByStructuralOverlap(pool, {
         seedClaimIds: [...new Set(seeds.value.flatMap((unit) => unit.claimIds))],
         seedEntityIds: [...new Set(seeds.value.flatMap((unit) => unit.entityIds))],
       });
@@ -339,12 +371,14 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     fusedTop.map((item) => item.id),
   );
   if (!hydrated.ok) return { ok: false, code: hydrated.code };
-  const documentIds = [...new Set(hydrated.value.map(unit => unit.documentId))];
+  // Every id here was admitted above; this is the per-unit rule once more, on the row itself.
+  const units = projection ? hydrated.value.filter((unit) => projectionAdmits(projection, [unit.documentId])) : hydrated.value;
+  const documentIds = [...new Set(units.map(unit => unit.documentId))];
   const sourceAccess = await checkConnectorSourceAccess(input.workspaceKey, documentIds);
   if (!sourceAccess.ok) return sourceAccess;
   // Before any unit text reaches the reranker provider or the caller.
   if (!await admitsDerivedCustomerData(input.workspaceKey, documentIds)) return { ok: false, code: DERIVED_DATA_REFUSED };
-  const unitById = new Map(hydrated.value.map((unit) => [unit.unitId, unit]));
+  const unitById = new Map(units.map((unit) => [unit.unitId, unit]));
 
   // --- Rerank --------------------------------------------------------------------------
   let rerankerApplied = false;
@@ -400,8 +434,8 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
     hydrated (gateCandidates reads unitById), so its tokens exist.
   */
   const terms = questionTerms(question);
-  const tokensOf = new Map(hydrated.value.map(unit => [unit.unitId, new Set(tokens(unit.text))]));
-  const entities = entityTerms(terms, hydrated.value.map(unit => ({ source: unit.documentId, tokens: tokensOf.get(unit.unitId)! })));
+  const tokensOf = new Map(units.map(unit => [unit.unitId, new Set(tokens(unit.text))]));
+  const entities = entityTerms(terms, units.map(unit => ({ source: unit.documentId, tokens: tokensOf.get(unit.unitId)! })));
   const tierOf = new Map(gated.eligible.map(candidate => [candidate.unitId, entityTier(entities, tokensOf.get(candidate.unitId)!)]));
   const eligible = [...gated.eligible].sort((left, right) => tierOf.get(right.unitId)! - tierOf.get(left.unitId)!);
 

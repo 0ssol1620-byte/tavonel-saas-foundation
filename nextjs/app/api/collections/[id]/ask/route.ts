@@ -29,6 +29,9 @@ import { WORKSPACE_ASK_CONCURRENCY } from "@/lib/workspace-cost-guard";
 import { acquireWorkspaceOperation } from "@/lib/workspace-operation-guard";
 import { loadActiveWorldSourceIds } from "@/lib/active-world-source-access";
 import { checkConnectorSourceAccessForViewer } from "@/lib/connector-source-access";
+import {
+  decideMemberProjection, memberProjectionMode, projectionShadowFields, recordProjectionShadow, type ProjectionDecision,
+} from "@/lib/member-projection";
 import { admitsDerivedCustomerData, DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import {
   attemptedRetrievalModelRoles,
@@ -93,7 +96,10 @@ type Answered = { status: number; body: Record<string, unknown> };
  * carries the same idempotency key. Neither is possible while every branch returns from the
  * handler directly. The branches, their codes and their statuses are unchanged.
  */
-async function answerQuestion(workspaceKey: string, id: string, question: string, active: { world: ActiveWorld }, processedSources: number): Promise<Answered> {
+async function answerQuestion(
+  workspaceKey: string, id: string, question: string, active: { world: ActiveWorld }, processedSources: number,
+  projection: ProjectionDecision | null,
+): Promise<Answered> {
 
   const activeWorld = {
     manifestDigest: active.world.manifestDigest,
@@ -131,6 +137,7 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
     } : null,
     embedder: runtime.embedder,
     reranker: runtime.reranker,
+    ...(projection ? { projection } : {}),
   });
 
   if (pipeline.ok) {
@@ -201,6 +208,18 @@ async function answerQuestion(workspaceKey: string, id: string, question: string
       status: pipeline.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503,
       body: { code: pipeline.code },
     };
+  }
+
+  /*
+    WO-PROJ-K2: the fallback answers from every chunk of the artifact, so it cannot be projected.
+    A projected viewer gets what /search gives anyone when no index exists: the index state, no
+    answer. Nothing in it depends on the viewer's scope.
+  */
+  if (projection) {
+    return { status: 409, body: {
+      code: pipeline.code, retrievalPath: "compiled-retrieval-v1",
+      retrievalIndex: indexState, retrievalNotice: retrievalIndexNotice(indexState),
+    } };
   }
 
   // --- Fallback: excerpt concatenation over the promoted artifact ------------------------
@@ -317,13 +336,20 @@ async function ask(request: Request, context: { params: Promise<{ id: string }> 
   if (!active.ok) return NextResponse.json({ code: active.code }, {
     status: active.code === "ACTIVE_WORLD_NOT_FOUND" ? 409 : 503, headers: NO_STORE,
   });
+  // WO-PROJ-K2 (flag off: nothing read here). Enforce: a member with part of this World in scope
+  // is answered from the projection; anyone else takes the whole-World checks below unchanged.
+  const projectionMode = memberProjectionMode();
+  const decision = projectionMode === "off" ? null : await decideMemberProjection(auth.principal, id, active.world.manifestDigest);
+  const projection = projectionMode === "enforce" && decision?.kind === "partial" ? decision : null;
   // A bound request is also keyed by its context identity, so a legacy request reusing the same
-  // idempotency key is never handed a bound answer, nor a bound one a legacy answer.
+  // idempotency key is never handed a bound answer, nor a bound one a legacy answer. A projected
+  // answer is keyed by its projection too (revision + admitted-set digest): a narrowed scope does
+  // not bump authorization_revision, so the revision alone would replay the wider answer.
   const identity = JSON.stringify([auth.principal.kind, auth.principal.userId,
     auth.principal.keyId ?? null, [...auth.principal.scopes].sort(),
     auth.principal.authorizationRevision, id,
     active.world.manifestDigest, active.world.worldStateId, active.world.revision,
-    ...(bound ? [bound.identity] : [])]);
+    ...(bound ? [bound.identity] : []), ...(projection ? [projection.key] : [])]);
   const lease = await acquireWorkspaceOperation("ask", workspaceKey, {
     key: idempotencyKey, identity, body: requestDigest,
   });
@@ -341,8 +367,14 @@ async function ask(request: Request, context: { params: Promise<{ id: string }> 
     if (!sources.ok) return NextResponse.json({ code: sources.code }, {
       status: sources.code === COLLECTION_PACKAGE_TOO_LARGE ? 422 : 503, headers: NO_STORE,
     });
-    documentIds = sources.documentIds;
+    // Projected: every check below, and the answer, cover the admitted sources only.
+    documentIds = projection ? sources.documentIds.filter(documentId => projection.allowedDocumentIds.has(documentId)) : sources.documentIds;
+    // Admitted sources that are not this World's (the decision read another package) fail closed.
+    if (projection && documentIds.length === 0) {
+      return NextResponse.json({ code: "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE" }, { status: 503, headers: NO_STORE });
+    }
     const sourceAccess = await checkConnectorSourceAccessForViewer(workspaceKey, documentIds, auth.principal.userId);
+    if (decision && !projection) recordProjectionShadow(projectionShadowFields("ask", !sourceAccess.ok, decision));
     if (!sourceAccess.ok) return NextResponse.json({ code: sourceAccess.code }, {
       status: sourceAccess.code === "CONNECTOR_SOURCE_ACCESS_DENIED" ? 403 : 503, headers: NO_STORE,
     });
@@ -354,7 +386,7 @@ async function ask(request: Request, context: { params: Promise<{ id: string }> 
       const admitted = await meter.admit(auth.principal);
       if (!admitted.ok) return NextResponse.json({ code: admitted.code }, { status: admitted.status, headers: NO_STORE });
     }
-    answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active, documentIds.length);
+    answered = lease.replay ? lease.value : await answerQuestion(workspaceKey, id, question, active, documentIds.length, projection);
     if (answered.status === 200) {
       const authorizedNow = await revalidateFoundationAuthorization(request, auth.principal, "ask:read", "observer");
       if (!authorizedNow.ok) return NextResponse.json({ code: authorizedNow.code }, {

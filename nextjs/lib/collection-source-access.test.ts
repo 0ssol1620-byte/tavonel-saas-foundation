@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { collectionSourceDocumentIds } from "./collection-source-access";
+import { collectionSourceDocumentGroups, collectionSourceDocumentIds } from "./collection-source-access";
 import type { ReviewableCollectionArtifact } from "./collection-download";
 function artifact(source: unknown, documents: unknown[]): ReviewableCollectionArtifact {
   // Parser fixture only: cryptographic package validation is performed separately by the route.
@@ -124,6 +124,17 @@ it("hands the ACL the blocked upload too, so a suspended twin cannot be read aro
   const suspended = new Set(["doc-2"]);
   expect(ids).toContain("doc-2");
   expect(ids!.some((id) => suspended.has(id)), "a suspended twin blocks the collection").toBe(true);
+});
+
+// WO-PROJ-K2: the same carriers, kept per source, so a projection admits a source only with all of them.
+it("groups every carrier of a source together, one group per source", () => {
+  expect(collectionSourceDocumentGroups(coreArtifact({ sourceDocuments: SAME_BYTES }))).toEqual([["doc-1", "doc-2"]]);
+  expect(collectionSourceDocumentGroups(artifact([{ documentId: "b" }, { documentId: "a" }], [{ documentId: "a" }, { documentId: "b" }])))
+    .toEqual([["a"], ["b"]]);
+  expect(collectionSourceDocumentGroups(coreArtifact({ sourceDocuments: [
+    { documentId: "doc-1", versionKey: VERSION, inputSha256: `sha256:${VERSION}` },
+    { documentId: "doc-1", versionKey: VERSION, inputSha256: `sha256:${VERSION}` },
+  ] }))).toBeNull();
 });
 
 it("refuses more Core sources under a digest than there are documents carrying it", () => {

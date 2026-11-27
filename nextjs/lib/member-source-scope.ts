@@ -1,5 +1,5 @@
 import { validateReviewableCollectionArtifact } from "./collection-download";
-import { collectionSourceDocumentIds } from "./collection-source-access";
+import { collectionSourceDocumentGroups } from "./collection-source-access";
 import { loadPreferredCollectionCandidate } from "./collection-storage";
 import { checkMemberSourceScope, scopeInputValid, VIEWER_ID } from "./connector-source-access";
 import { WORKSPACE_ID_PATTERN } from "./immutable-keys";
@@ -17,8 +17,8 @@ import { getFoundationActiveWorld } from "./world-store";
   unchanged. Any other role -- `member`, or one this file does not know -- asks the database.
 */
 
-type ScopeViewer = { workspaceKey: string; userId: string; workspaceRole: string };
-const readsEverything = (viewer: ScopeViewer) => viewer.workspaceRole === "owner" || viewer.workspaceRole === "admin";
+export type ScopeViewer = { workspaceKey: string; userId: string; workspaceRole: string };
+export const readsEverything = (viewer: ScopeViewer) => viewer.workspaceRole === "owner" || viewer.workspaceRole === "admin";
 
 /**
  * The subset of documentIds a viewer may read, for lists that drop what a member cannot read
@@ -49,8 +49,8 @@ export async function filterMemberReadableDocumentIds(viewer: ScopeViewer, docum
 }
 
 export type MemberScopeRefusal = { code: "MEMBER_SOURCE_SCOPE_DENIED" | "MEMBER_SOURCE_SCOPE_UNAVAILABLE"; status: 403 | 503 };
-const SCOPE_DENIED: MemberScopeRefusal = { code: "MEMBER_SOURCE_SCOPE_DENIED", status: 403 };
-const SCOPE_UNAVAILABLE: MemberScopeRefusal = { code: "MEMBER_SOURCE_SCOPE_UNAVAILABLE", status: 503 };
+export const SCOPE_DENIED: MemberScopeRefusal = { code: "MEMBER_SOURCE_SCOPE_DENIED", status: 403 };
+export const SCOPE_UNAVAILABLE: MemberScopeRefusal = { code: "MEMBER_SOURCE_SCOPE_UNAVAILABLE", status: 503 };
 
 /** A set of sources for a single-item read: null when the viewer may read every one of them. */
 export async function memberSourcesRefusal(viewer: ScopeViewer, documentIds: readonly string[]): Promise<MemberScopeRefusal | null> {
@@ -72,10 +72,10 @@ export async function memberCollectionScopeRefusal(
   viewer: ScopeViewer, collectionId: string, manifestDigest?: string,
 ): Promise<MemberScopeRefusal | null> {
   if (readsEverything(viewer)) return null;
-  const sources = await collectionSourceIds(viewer.workspaceKey, collectionId, manifestDigest);
+  const sources = await collectionSourceGroups(viewer.workspaceKey, collectionId, manifestDigest);
   if (sources === "unavailable") return SCOPE_UNAVAILABLE;
   if (sources === null) return SCOPE_DENIED;
-  return memberSourcesRefusal(viewer, sources);
+  return memberSourcesRefusal(viewer, [...new Set(sources.flat())].sort());
 }
 
 /** A member's scope as the store answers it (get_member_source_scope); never a public DTO. */
@@ -162,7 +162,8 @@ export async function setMemberSourceScope(input: {
   return { ok: true, scope: { userId: input.memberUserId, kind: input.kind, documentCount: documentCount as number, idempotentReplay } };
 }
 
-async function collectionSourceIds(workspaceKey: string, collectionId: string, manifestDigest?: string): Promise<string[] | null | "unavailable"> {
+/** The served version's sources, grouped by carrier (collectionSourceDocumentGroups); null = no readable package. */
+export async function collectionSourceGroups(workspaceKey: string, collectionId: string, manifestDigest?: string): Promise<string[][] | null | "unavailable"> {
   try {
     let digest = manifestDigest;
     if (digest === undefined) {
@@ -175,6 +176,6 @@ async function collectionSourceIds(workspaceKey: string, collectionId: string, m
     const loaded = await loadPreferredCollectionCandidate(signer, workspaceKey, collectionId, digest);
     if (!loaded.ok) return loaded.code === "NOT_FOUND" ? null : "unavailable";
     const artifact = validateReviewableCollectionArtifact(loaded.value.artifact, collectionId);
-    return artifact ? collectionSourceDocumentIds(artifact) : null;
+    return artifact ? collectionSourceDocumentGroups(artifact) : null;
   } catch { return "unavailable"; }
 }

@@ -222,6 +222,17 @@ export function coreCollectionSourceBinding(artifact: unknown): CollectionSource
  * be translated answers `null` rather than falling through to the product-namespace reading.
  */
 export function collectionSourceDocumentIds(artifact: ReviewableCollectionArtifact): string[] | null {
+  const groups = collectionSourceDocumentGroups(artifact);
+  return groups ? [...new Set(groups.flat())].sort() : null;
+}
+
+/**
+ * The same sources as `collectionSourceDocumentIds`, kept grouped: one group per source, holding
+ * every product document that carries its bytes (one id for a non-Core package). WO-PROJ-K2's
+ * per-unit projection admits a source only when its whole group is readable, which is the
+ * whole-World AND above applied one source at a time.
+ */
+export function collectionSourceDocumentGroups(artifact: ReviewableCollectionArtifact): string[][] | null {
   try {
     const manifest = artifact.package.files.find(file => file.path === COLLECTION_SOURCE_MANIFEST);
     const documents = artifact.package.files.find(file => file.path === "rag/documents.jsonl");
@@ -241,7 +252,7 @@ export function collectionSourceDocumentIds(artifact: ReviewableCollectionArtifa
     const sourceIds = ids(sources);
     const documentIds = ids(lines.map(line => JSON.parse(line)));
     if (!sourceIds || !documentIds || !sourceIds.every((id, index) => id === documentIds[index])) return null;
-    if (!isCoreSourceManifest(sources)) return sourceIds;
+    if (!isCoreSourceManifest(sources)) return sourceIds.map(id => [id]);
 
     const binding = coreCollectionSourceBinding(artifact);
     if (!binding) return null;
@@ -255,12 +266,12 @@ export function collectionSourceDocumentIds(artifact: ReviewableCollectionArtifa
       is stable.
     */
     const carriersById = new Map(binding.map(item => [item.documentId, item.productDocumentIds]));
-    const product = new Set<string>();
+    const groups: string[][] = [];
     for (const id of sourceIds) {
       const carriers = carriersById.get(id);
       if (!carriers || carriers.length === 0) return null;
-      for (const carrier of carriers) product.add(carrier);
+      groups.push([...carriers]);
     }
-    return product.size > 0 ? [...product].sort() : null;
+    return groups;
   } catch { return null; }
 }
