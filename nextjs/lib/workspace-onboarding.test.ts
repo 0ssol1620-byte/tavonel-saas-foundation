@@ -279,7 +279,7 @@ describe("attention items", () => {
       compileErrorCode: "COMPILE_CORE_UNAVAILABLE",
     }));
     expect(items.map((item) => item.id)).toEqual(["candidate-review", "operator-review", "refused", "compile-failed"]);
-    expect(items.map((item) => item.label)).toEqual(["Review required", "Operator action", "Refused", "Failed"]);
+    expect(items.map((item) => item.label)).toEqual(["Review required", "Needs a decision", "Refused", "Failed"]);
     expect(items[0].detail).toBe("1 review reason needs a decision.");
     expect(items[1].detail).toBe("2 sources need review before reading can continue.");
     expect(items[3].detail).toContain("COMPILE_CORE_UNAVAILABLE");
@@ -476,5 +476,69 @@ describe("first five minutes, P1", () => {
     const actions = page.slice(page.indexOf("WO-FIRST5-P1 (#18)"));
     expect(actions.slice(0, 500)).toContain('{accessSource === "trial"\n                          ? <Link className="btn" href="/pricing">See plans to add more sources</Link>');
     expect(actions.slice(0, 500)).toContain("Add the source that would answer this");
+  });
+});
+
+/*
+  UI-D (audit D-06, D-01). Home flipped between two verdicts and two actions depending on which
+  response landed last: cold, the run's own state ("This compile needs review." / "View compile runs");
+  after the candidate loaded, "Ready for your review." / "Review & activate". The same data gave both.
+  These hold the fix: while the answer is on its way Home says it is checking and picks neither, and a
+  result the checks held back is never offered as something to review and activate.
+*/
+describe("one verdict, not two (D-06)", () => {
+  const settled = { documentCount: 5, readyDocumentCount: 5, compileJobState: "review_required" as const };
+
+  it("says it is checking, with no verdict and no action, while the result is on its way", () => {
+    const pending = deriveWorkspaceState(input({ ...settled, resultPending: true }));
+    expect(pending.stateTitle).toBe("Checking your latest result.");
+    expect(pending.nextAction).toEqual({ label: "Loading" });
+    expect(pending.nextAction.surface).toBeUndefined();
+    expect(pending.nextAction.intent).toBeUndefined();
+  });
+
+  it("gives the same verdict and action for the same data once it has settled, whichever order it arrived in", () => {
+    // Cold: the run is known, the candidate is not yet loaded. Settled: both. While they differ Home is in
+    // the checking state, so the two verdicts are never on screen one after the other.
+    const cold = deriveWorkspaceState(input({ ...settled, resultPending: true }));
+    const heldInput = { ...settled, hasCandidate: true, candidateNeedsDecision: true, collectionReviewRequired: true, reviewCount: 1 };
+    const loaded = deriveWorkspaceState(input({ ...heldInput, resultPending: false }));
+    expect(cold.stateTitle).not.toBe("This compile needs review.");
+    expect(cold.stateTitle).not.toBe(loaded.stateTitle);
+    expect(loaded.stateTitle).toBe("Your result is on hold.");
+    for (let i = 0; i < 3; i += 1) expect(deriveWorkspaceState(input(heldInput))).toEqual(loaded);
+  });
+
+  it("is checking only for a returning workspace, never an empty or unavailable one", () => {
+    expect(deriveWorkspaceState(input({ resultPending: true })).mode).toBe("new");
+    expect(deriveWorkspaceState(input({ resultPending: true })).stateTitle).not.toBe("Checking your latest result.");
+    expect(deriveWorkspaceState(input({ inventoryState: "unavailable", resultPending: true })).mode).toBe("unavailable");
+  });
+
+  it("treats an absent resultPending as settled, as every earlier caller meant", () => {
+    expect(deriveWorkspaceState(input({ ...settled })).stateTitle).toBe("This compile needs review.");
+  });
+});
+
+describe("a held-back result is not a dead-end CTA (D-01)", () => {
+  const held = input({ documentCount: 5, readyDocumentCount: 5, hasCandidate: true, candidateNeedsDecision: true, collectionReviewRequired: true, reviewCount: 1 });
+
+  it("does not offer Review & activate for a result the promote route would refuse", () => {
+    const state = deriveWorkspaceState(held);
+    expect(state.nextAction.label).not.toMatch(/activate/i);
+    expect(state.stateTitle).not.toBe("Ready for your review.");
+    expect(state.nextAction.surface).toBe("review");
+    expect(state.stateDescription).toContain("Nothing was changed");
+    expect(state.stateDescription).not.toMatch(/contact support/i);
+  });
+
+  it("never presents the held result as active or ready", () => {
+    const state = deriveWorkspaceState(held);
+    expect(`${state.stateTitle} ${state.stateDescription} ${state.nextAction.label}`).not.toMatch(/\bactive\b|ready for AI|published/i);
+  });
+
+  it("keeps Review & activate for a candidate that passed", () => {
+    const passed = deriveWorkspaceState(input({ documentCount: 5, readyDocumentCount: 5, hasCandidate: true, candidateNeedsDecision: true }));
+    expect(passed.nextAction).toEqual({ label: "Review & activate", surface: "review" });
   });
 });

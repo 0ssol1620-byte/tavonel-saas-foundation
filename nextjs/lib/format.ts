@@ -25,6 +25,16 @@ export function formatTimestamp(value: string | number | null | undefined): stri
   return `${DATE.format(date)} UTC`;
 }
 
+const DAY = new Intl.DateTimeFormat("en-GB", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" });
+
+/** A UTC calendar day, identical on every device. Returns null for anything unparseable. */
+export function formatDay(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${DAY.format(date)} UTC`;
+}
+
 /** A count, pinned the same way the landing page pins its figures. */
 export function formatCount(value: number): string {
   return value.toLocaleString("en-US");

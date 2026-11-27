@@ -84,6 +84,12 @@ export type WorkspaceStateInput = {
   hasCandidate: boolean;
   candidateNeedsDecision: boolean;
   collectionReviewRequired: boolean;
+  /**
+   * The answer to "what became of the latest compile" is still on its way (D-06). While it is, the
+   * workspace says it is checking instead of choosing a verdict and an action the next response would
+   * contradict. Absent means settled, which is what every caller before this field meant.
+   */
+  resultPending?: boolean;
   reviewCount: number;
   activeRevision: number | null;
   /** Terminal error code of the last compile job, when it stopped. */
@@ -219,6 +225,15 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     };
   }
 
+  if (mode === "returning" && input.resultPending) {
+    return {
+      mode,
+      stateTitle: "Checking your latest result.",
+      stateDescription: "Looking up what became of your last compile. This takes a moment.",
+      nextAction: { label: "Loading" },
+    };
+  }
+
   if (input.activityCount > 0) {
     return {
       mode,
@@ -226,6 +241,22 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
       stateDescription:
         `${input.activityCount} ${input.activityCount === 1 ? "source is" : "sources are"} being processed. View the latest recorded progress.`,
       nextAction: { label: "View progress", surface: "activity" },
+    };
+  }
+
+  /*
+    D-01. A result the checks held back cannot be activated from the workspace (the promote route takes
+    only a passed, completed candidate), so it is not offered as something to "review and activate": that
+    led to a screen where the only control was disabled. It is said as what it is, with the one place
+    that explains it and shows what can be done now.
+  */
+  if (input.candidateNeedsDecision && input.collectionReviewRequired) {
+    return {
+      mode,
+      stateTitle: "Your result is on hold.",
+      stateDescription:
+        "TAVONEL read your documents and held the result back, so your AI cannot use it yet. Nothing was changed. See why, and what you can do now.",
+      nextAction: { label: "See why it is on hold", surface: "review" },
     };
   }
 
@@ -278,7 +309,7 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
   }
   if (input.compileJobState === "review_required") {
     return { mode, stateTitle: "This compile needs review.",
-      stateDescription: "Processing is paused for a decision. Open the run details to inspect the evidence before continuing.",
+      stateDescription: "TAVONEL held this result back, so your AI cannot use it yet. Open the run details to see why.",
       nextAction: { label: "View compile runs", surface: "runs" } };
   }
   if (input.compileJobState === "cancelled") {
@@ -376,25 +407,25 @@ export function deriveOnboardingSteps(input: WorkspaceStateInput): OnboardingSte
     {
       id: "compile",
       title: "Compile a candidate",
-      detail: "Ready sources compile into one evidence-bound Candidate World.",
+      detail: "Ready sources are compiled into one version of your knowledge, called a World. Every statement in it is tied to the page it came from.",
       done: input.hasCandidate,
     },
     {
       id: "review",
       title: "Review",
-      detail: "Review required, operator action, refused and unresolved states stay visible until you decide.",
+      detail: "Anything that needs a person stays visible until you decide.",
       done: input.hasCandidate && nothingOutstanding,
     },
     {
       id: "activate",
       title: "Activate World",
-      detail: "Activation is explicit. A compile never silently becomes organizational truth.",
+      detail: "Activation is your decision. A compile never becomes what your AI reads on its own.",
       done: input.activeRevision !== null,
     },
     {
       id: "ask",
       title: "Ask a grounded question",
-      detail: "Ask the Active World, then follow each citation back to its exact source region.",
+      detail: "Ask a question, then follow each citation back to the page it came from.",
       done: input.hasGroundedAnswer,
     },
     {
@@ -405,7 +436,7 @@ export function deriveOnboardingSteps(input: WorkspaceStateInput): OnboardingSte
       */
       id: "connect",
       title: "Connect to AI",
-      detail: "Read the World through MCP or the API, or take the signed package to a local agent.",
+      detail: "Let your AI assistant read it through MCP or the API, or take the signed package to a local agent.",
       done: input.hasAiConnection,
     },
   ];
@@ -464,7 +495,7 @@ export function deriveAttentionItems(input: WorkspaceStateInput): AttentionItem[
   if (input.operatorReviewCount > 0) {
     items.push({
       id: "operator-review",
-      label: "Operator action",
+      label: "Needs a decision",
       detail:
         input.operatorReviewCount === 1
           ? "This source needs review before reading can continue."

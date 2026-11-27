@@ -354,14 +354,19 @@ describe("first-run copy", () => {
     expect(workspace).not.toContain("Download and inspect it");
   });
 
-  it("explains a disabled Activate for a version that needs review, with a way to a person", () => {
+  it("says plainly what a version that was held back means, with what to do now and a secondary reference link (UI-D)", () => {
     expect(REVIEW_REQUIRED_ACTIVATION_NOTE).toContain("cannot be activated");
-    expect(REVIEW_REQUIRED_ACTIVATION_NOTE).toContain("contact support");
+    // Contact support is no longer the only exit: the note carries no such instruction.
+    expect(REVIEW_REQUIRED_ACTIVATION_NOTE).not.toMatch(/contact support/i);
     const note = workspace.slice(workspace.indexOf('data-testid="review-required-activation-note"'));
-    expect(note.slice(0, 300)).toContain("{REVIEW_REQUIRED_ACTIVATION_NOTE}");
-    expect(note.slice(0, 300)).toContain('<Link href="/contact">Contact support</Link>');
-    // Shown on exactly the conditions the Activate button and the promote route refuse a candidate for.
-    expect(workspace).toContain('collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" ? (');
+    expect(note.slice(0, 2400)).toContain("{REVIEW_REQUIRED_ACTIVATION_NOTE}");
+    expect(note.slice(0, 2400)).toContain("What you can do now.");
+    expect(note.slice(0, 2400)).toContain("What happens next.");
+    expect(note.slice(0, 2400)).toContain('<Link href="/contact">Send us this reference</Link>');
+    expect(note.slice(0, 2400)).not.toContain("Contact support");
+    // The controls are hidden on exactly the conditions the Activate button and the promote route refuse a candidate for.
+    expect(workspace).toContain('collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed"),');
+    expect(workspace).toContain("{activationClosed ? (");
   });
 
   it("says what a refused free-evaluation start was, with a next step that can change it (review P-2)", () => {

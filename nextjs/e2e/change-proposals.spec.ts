@@ -286,11 +286,11 @@ test("Library keeps an abstained source in Unknown, visible, with no control to 
 
   const unknown = group(library, "unknown");
   await expect(unknown.getByRole("heading", { name: /Unknown/ })).toContainText("1");
-  await expect(unknown.getByText("Source 222222")).toBeVisible();
+  await expect(unknown.getByText("Untitled document (ref 222222)")).toBeVisible();
   await expect(unknown.getByRole("listitem").filter({ hasText: /Type\s+Unknown/ })).toHaveCount(1);
   // Nothing to confirm on a label that was never proposed.
   await expect(unknown.getByRole("button")).toHaveCount(0);
-  await expect(group(library, "proposed").getByText("Source 111111")).toBeVisible();
+  await expect(group(library, "proposed").getByText("Untitled document (ref 111111)")).toBeVisible();
   expect(await overflow(page)).toBeLessThanOrEqual(1);
 });
 
@@ -299,17 +299,17 @@ test("Library: Confirm moves a proposed type to Confirmed and Undo returns it to
   const library = await openLibrary(page, store, [DOC_A]);
 
   const proposed = group(library, "proposed");
-  await expect(proposed.getByText("Source 111111")).toBeVisible();
+  await expect(proposed.getByText("Untitled document (ref 111111)")).toBeVisible();
   await proposed.getByRole("button", { name: "Confirm type invoice" }).click();
 
   const confirmed = group(library, "confirmed");
-  await expect(confirmed.getByText("Source 111111")).toBeVisible();
-  await expect(proposed.getByText("Source 111111")).toHaveCount(0);
+  await expect(confirmed.getByText("Untitled document (ref 111111)")).toBeVisible();
+  await expect(proposed.getByText("Untitled document (ref 111111)")).toHaveCount(0);
   expect(store.lastRequests.at(-1)).toEqual({ decision: "confirmed", sourceVersionId: VERSION });
 
   await confirmed.getByRole("button", { name: "Undo confirming type invoice" }).click();
-  await expect(group(library, "proposed").getByText("Source 111111")).toBeVisible();
-  await expect(group(library, "confirmed").getByText("Source 111111")).toHaveCount(0);
+  await expect(group(library, "proposed").getByText("Untitled document (ref 111111)")).toBeVisible();
+  await expect(group(library, "confirmed").getByText("Untitled document (ref 111111)")).toHaveCount(0);
   expect(store.executions).toEqual(["confirmed", "undo_confirmed"]);
 });
 

@@ -62,7 +62,28 @@ export function rememberDocumentName(documentId: string, filename: string): Docu
   return trimmed;
 }
 
-/** What to print for a document, in order of how much it tells the person reading it. */
+/** The label for a document whose real name is not known on this device. An id is never the label (audit D-03). */
+export const UNTITLED_DOCUMENT = "Untitled document";
+
+/**
+ * What to print for a document, in order of how much it tells the person reading it: the filename
+ * this browser remembers, the one it just chose, and otherwise "Untitled document". The short id is
+ * for a tooltip (`documentReference`), never the label: "Source 224D56" read as a name and was not one.
+ */
 export function displayName(documentId: string, names: DocumentNames, local?: string | null): string {
-  return names[documentId] ?? local ?? shortHandle(documentId);
+  return names[documentId] ?? local ?? UNTITLED_DOCUMENT;
+}
+
+/**
+ * For a list where a person decides about each document and must tell two unnamed ones apart (the Library):
+ * the name, or "Untitled document" with its short reference beside it. Still never the id as the label.
+ */
+export function distinctDocumentName(documentId: string, names: DocumentNames, local?: string | null): string {
+  const reference = documentReference(documentId, names, local);
+  return reference ? `${UNTITLED_DOCUMENT} (${reference.replace(/^Reference /, "ref ")})` : displayName(documentId, names, local);
+}
+
+/** The tooltip for an unnamed document: its short reference. Undefined when the name is known, so no title is set. */
+export function documentReference(documentId: string, names: DocumentNames, local?: string | null): string | undefined {
+  return names[documentId] ?? local ? undefined : `Reference ${shortHandle(documentId).replace(/^Source /, "")}`;
 }

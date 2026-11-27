@@ -3682,6 +3682,11 @@ export const AFFECTED_GROUPS = Object.freeze([
   // copy suite it asserts against. Product UI, so never nativeReuse; the spec runs in 1440 and 390 (run-repair-check).
   affectedGroup('workspace-first-use', /^nextjs\/e2e\/workspace-first-use\.spec\.ts$/,
     { unitFiles: ['lib/workspace-onboarding.test.ts'], browserFiles: ['e2e/workspace-first-use.spec.ts'] }),
+  // UI-D (workspace plain language, audit D-02..D-09 and D-18): the one module that turns engine codes, ids, scopes and events into
+  // customer sentences, the document-name fallback, the pinned date formatters and the compile-stage label, with the suites that hold them.
+  // Unit-only: no browser, database, worker or build lane. Product UI, so never nativeReuse.
+  affectedGroup('workspace-plain-language', /^nextjs\/(?:components\/operations-ultimate\.tsx|lib\/(?:compile-stage-view|document-names|format|plain-language)(?:\.test)?\.ts)$/,
+    { unitFiles: ['lib/plain-language.test.ts', 'lib/document-names.test.ts', 'lib/compile-stage-view.test.ts', 'lib/workspace-onboarding.test.ts', 'lib/review-queue.test.ts'] }),
   affectedGroup('file-intake', /^nextjs\/(?:lib\/workspace-intake(?:\.test)?\.ts|e2e\/upload-entry\.spec\.ts)$/,
     { unitFiles: ['lib/workspace-intake.test.ts'], browserFiles: ['e2e/upload-entry.spec.ts'] }),
   // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useDialogFocus } from "@/components/world-visual/use-dialog-focus";
 import { formatTimestamp } from "@/lib/format";
+import { shortReference } from "@/lib/plain-language";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import type { ActiveWorldSummary } from "@/lib/world-store";
 
@@ -152,7 +153,8 @@ export function askWorldPanel(activeWorld: unknown, state: AskWorldState) {
 
 export function activeWorldOptionLabel(world: ActiveWorldSummary) {
   const activated = formatTimestamp(world.updatedAt);
-  return `${world.collectionId} · revision ${world.revision}${activated ? ` · activated ${activated}` : ""}`;
+  /* D-03: the collection id is a reference, not a name; its short tail tells two Worlds apart. */
+  return `Revision ${world.revision}${activated ? ` · activated ${activated}` : ""} · ref ${shortReference(world.collectionId)}`;
 }
 
 /** Several active Worlds: the person picks one. Nothing is preselected into Ask. */

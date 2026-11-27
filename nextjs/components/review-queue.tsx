@@ -16,6 +16,8 @@ import {
 } from "@/lib/review-queue";
 import { formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
+import { documentReference } from "@/lib/document-names";
+import { describeReviewReason, isReasonCode } from "@/lib/plain-language";
 import { reviewReasonCopy, type PageLocale } from "@/lib/workspace-failure-copy";
 
 /*
@@ -105,13 +107,20 @@ export function reasonFamily(value: string, stopped: boolean): string {
 */
 function ReasonChip({ value, family, locale }: { value: string; family: string; locale: PageLocale }) {
   const copy = reviewReasonCopy(value, locale);
+  /* UI-D (D-02): the headline is a sentence a first-time customer reads; the recorded code is support's, behind a disclosure. */
+  const plain = describeReviewReason(value);
   return (
     <small className="workspace-review-reason">
       <span>{family}</span>
-      {copy ? <>
+      {!isReasonCode(value) ? value : copy ? <>
         <em>{copy.sentence}</em>
-        {copy.reference} <code>{value}</code>
-      </> : /\s/.test(value) ? value : <code>{value}</code>}
+        <details><summary>Technical details</summary>{copy.reference} <code>{value}</code></details>
+      </> : <>
+        <em>{plain.headline}</em>
+        <b>{plain.meaning}</b>
+        <i>{plain.next}</i>
+        <details><summary>Technical details</summary>Reference <code>{value}</code></details>
+      </>}
     </small>
   );
 }
@@ -255,7 +264,7 @@ export default function ReviewQueue({
         {rows.map((row, index) => {
           return (
             <li key={row.documentId} data-review-status={row.status} data-security={row.securityBlocked || undefined}>
-              <strong>{row.name}</strong>
+              <strong title={documentReference(row.documentId, input.names ?? {})}>{row.name}</strong>
               <small>
                 {row.securityBlocked ? "Stopped by a safety check · " : ""}
                 {row.evidenceUnverified ? "read state not known (evidence not loaded)" : REVIEW_QUEUE_STATUS_COPY[row.status]}

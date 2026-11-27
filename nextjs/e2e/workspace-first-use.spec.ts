@@ -227,10 +227,10 @@ test.describe("workspace first use — desktop", () => {
     const attention = page.locator(".workspace-attention");
     await expect(attention).toBeVisible();
     // Named states, not a colour: both blocked kinds are readable at once.
-    await expect(attention.locator("li strong")).toHaveText(["Review required", "Operator action"]);
+    await expect(attention.locator("li strong")).toHaveText(["Review required", "Needs a decision"]);
     await expect(attention).toContainText("1 review reason needs a decision.");
     await expect(attention).toContainText("This source needs review before reading can continue.");
-    await expect(page.getByRole("heading", { name: "Ready for your review." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your result is on hold." })).toBeVisible();
     // §16.2/§16.3: the journey, and only files the export actually writes.
     const guide = page.getByTestId("workspace-ai-use-guide");
     await guide.getByText("Use with AI", { exact: true }).click();
@@ -256,8 +256,10 @@ test.describe("workspace first use — mobile", () => {
     await expect(page.locator(".workspace-intake")).toHaveAttribute("data-mode", "returning");
 
     // §13.2 on a phone: state, next action, needs attention, upload, changes.
-    await expect(page.getByRole("heading", { name: "Ready for your review." })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Review & activate" })).toBeVisible();
+    // UI-D (D-01): a held-back result is not offered as something to review and activate.
+    await expect(page.getByRole("heading", { name: "Your result is on hold." })).toBeVisible();
+    await expect(page.getByRole("button", { name: "See why it is on hold" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review & activate" })).toHaveCount(0);
     await expect(page.locator(".workspace-attention")).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
     // §13.2 "what did I get": one counted line under the state sentence; activation history lives on Changes.
