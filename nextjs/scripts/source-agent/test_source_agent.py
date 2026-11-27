@@ -2284,4 +2284,140 @@ class LocalFolderPolicyTests(SyncFixture, unittest.TestCase):
         self.assertFalse(self.args.state.exists())
         self.assertIsNone(agent.refused_root(self.root.resolve()))
 
+
+class FakeS3:
+    """A boto3 S3 client stand-in: one complete listing and revision-pinned reads, no network."""
+    def __init__(self, objects):
+        self.objects = dict(objects)
+        self.read = []
+
+    @staticmethod
+    def etag(data):
+        return sha(data)[:32]
+
+    def list_objects_v2(self, **request):
+        contents = [{'Key': key, 'Size': len(data), 'ETag': f'"{self.etag(data)}"'} for key, data in sorted(self.objects.items())]
+        return {'Contents': contents, 'IsTruncated': False}
+
+    def get_object(self, Bucket, Key, IfMatch):
+        self.read.append(Key)
+        data = self.objects[Key]
+        return {'ETag': f'"{self.etag(data)}"', 'Body': io.BytesIO(data)}
+
+
+class S3PolicyTests(SyncFixture, unittest.TestCase):
+    """WO-LF-1B: S3/R2/MinIO sync applies the same exclusion policy before any key reaches a batch or is read."""
+    def setUp(self):
+        super().setUp()
+        self.args = agent.parser().parse_args(['--s3-bucket', 'example-bucket', '--connection-id', CONNECTION,
+                                               '--state', str(self.base / 'state.json'),
+                                               '--approve-up-to-credits', '100000', '--allow-unknown-page-count'])
+
+    def cloud(self, objects):
+        self.s3 = FakeS3(objects)
+        client = patch.object(agent, 's3_client', return_value=self.s3)
+        client.start()
+        self.addCleanup(client.stop)
+        return self.s3
+
+    def events(self, body=-1):
+        return [(event['kind'], event['nativeId']) for event in Client.bodies[body]['events']]
+
+    def entry(self, data, key):
+        return {'revision': f'etag:{FakeS3.etag(data)}', 'sizeBytes': len(data), 'contentSha256': sha(data),
+                'mimeType': agent.MIME_BY_SUFFIX.get(Path(key).suffix.lower())}
+
+    def test_only_report_pdf_reaches_events_and_uploads(self):
+        extra = {'Team/.SSH/config.pdf': b'%PDF', 'a/.Git/x.pdf': b'%PDF', 'keys/server.PEM': b'k', 'docs/Client-Secret.docx': b'PK',
+                 'deep/node_modules/y.pdf': b'%PDF', 'archive/.ENV.local': b'X=1', '.aws/credentials': b'k', '.gnupg/k.pdf': b'%PDF',
+                 'id_ed25519.png': b'k', 'vault/aws-credentials.xlsx': b'PK', 'notes.txt': b'text', 'a\\id_rsa.pdf': b'k', 'docs/../up.pdf': b'%PDF'}
+        s3 = self.cloud({**SECRETS, **extra, 'report.pdf': b'%PDF-1.4'})
+        self.assertEqual(list(agent.scan_s3(s3, self.args)), ['report.pdf'])
+        self.assertEqual(s3.read, [])  # listing alone reads nothing
+        result = agent.sync(self.args)
+        self.assertEqual(result['status'], 'applied')
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertEqual([name for name, _ in Client.uploads], ['report.pdf'])
+        self.assertEqual(s3.read, ['report.pdf', 'report.pdf'])  # hashed, then the sealed upload copy
+        sent = agent.canonical(Client.bodies) + self.args.state.read_text()
+        for marker in (*SECRET_MARKERS, 'Secret', 'SSH', '.Git', 'PEM', 'ENV', 'credentials', 'gnupg', 'id_ed25519', 'notes', 'up.pdf'):
+            self.assertNotIn(marker, sent)
+        self.assertEqual(json.loads(self.args.state.read_text())['policyFingerprint'], agent.scope_policy_fingerprint(()))
+
+    def test_empty_and_oversize_objects_are_skipped_with_a_count_and_never_block(self):
+        self.args.max_file_bytes = 16
+        s3 = self.cloud({'empty.pdf': b'', 'big.pdf': b'%PDF' + b'0' * 20, 'report.pdf': b'%PDF-1.4'})
+        result = agent.sync(self.args)
+        self.assertEqual(result['skippedLocally'], {'empty': 1, 'oversize': 1})
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertNotIn('big.pdf', s3.read); self.assertNotIn('empty.pdf', s3.read)
+        # The service ceiling caps a larger --max-file-bytes too.
+        self.args.max_file_bytes = 10**9
+        s3.objects['huge.pdf'] = b'0' * (agent.FOUNDATION_MAX_SOURCE_BYTES + 1)
+        self.assertEqual(agent.sync(self.args)['skippedLocally'], {'empty': 1, 'oversize': 1})
+        self.assertNotIn('huge.pdf', s3.read)
+
+    def test_synced_then_oversize_object_keeps_its_entry_instead_of_a_deletion(self):
+        s3 = self.cloud({'report.pdf': b'%PDF-1.4', 'other.pdf': b'%PDF-1.5'})
+        agent.sync(self.args)
+        s3.objects['report.pdf'] = b'0' * (agent.FOUNDATION_MAX_SOURCE_BYTES + 1)
+        result = agent.sync(self.args)
+        self.assertEqual(result, {'status': 'unchanged', 'eventCount': 0, 'skippedLocally': {'empty': 0, 'oversize': 1}})
+        self.assertEqual(len(Client.bodies), 1)
+
+    def test_legacy_s3_state_narrowed_by_the_policy_is_not_emitted_as_deletions(self):
+        objects = {**SECRETS, 'notes.txt': b'text', 'report.pdf': b'%PDF-1.4'}
+        self.cloud(objects)
+        # What an agent before WO-LF-1B committed for this bucket: every key, and no policy fingerprint.
+        legacy = {key: self.entry(data, key) for key, data in objects.items()}
+        cursor = 'sha256:' + 'a' * 64
+        agent.write_state(self.args.state, self.args.connection_id, legacy, cursor, agent.source_fingerprint(self.args))
+        result = agent.sync(self.args)
+        self.assertEqual(result['policyChange'], {'descopedWithoutDeletion': 5})
+        body = Client.bodies[-1]
+        self.assertEqual(body['events'], [])
+        self.assertEqual(body['previousCursorSha256'], cursor)
+        self.assertEqual(Client.uploads, []); self.assertEqual(self.s3.read, [])
+        saved = json.loads(self.args.state.read_text())
+        self.assertEqual(list(saved['files']), ['report.pdf'])
+        self.assertEqual(saved['policyFingerprint'], agent.scope_policy_fingerprint(()))
+        self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+        self.assertEqual(len(Client.bodies), 1)
+
+    def test_same_policy_s3_state_holding_an_excluded_key_is_refused(self):
+        self.cloud({'report.pdf': b'%PDF-1.4'})
+        agent.sync(self.args)
+        state = json.loads(self.args.state.read_text())
+        state['files']['.ssh/id_rsa'] = self.entry(b'k', '.ssh/id_rsa')
+        self.args.state.write_text(json.dumps(state))
+        with self.assertRaisesRegex(agent.AgentError, 'its own exclusion policy'):
+            agent.sync(self.args)
+        self.assertEqual(len(Client.bodies), 1)
+
+    def test_pending_journal_naming_an_excluded_key_is_refused_before_anything_is_sent(self):
+        self.cloud({'report.pdf': b'%PDF-1.4'})
+        cursor = 'sha256:' + 'a' * 64
+        agent.write_state(self.args.state, self.args.connection_id, {}, cursor, agent.source_fingerprint(self.args))
+        events = [{'kind': 'added', 'nativeId': '.env', 'revision': 'etag:x', 'contentSha256': None, 'sizeBytes': 4,
+                   'mimeType': None, 'documentId': None, 'sourceIdempotencyKey': None}]
+        pending = {'scopeFingerprint': agent.source_fingerprint(self.args), 'connectionId': CONNECTION, 'files': {},
+                   'body': {'batchId': str(uuid.uuid4()), 'previousCursorSha256': cursor, 'nextCursorSha256': 'sha256:' + 'b' * 64,
+                            'manifestSha256': 'sha256:' + agent.sha256(agent.canonical(events)), 'events': events}}
+        self.args.state.with_name('state.json.pending').write_text(json.dumps(pending))
+        with self.assertRaisesRegex(agent.AgentError, 'exclusion policy'):
+            agent.sync(self.args)
+        self.assertEqual(Client.bodies, []); self.assertEqual(self.s3.read, [])
+
+    def test_more_changed_objects_than_one_approval_commit_in_subsets(self):
+        s3 = self.cloud({f'r{index}.pdf': f'%PDF-{index}'.encode() for index in range(5)})
+        with patch.object(agent, 'MAX_APPROVAL_FILES', 3):
+            first = agent.sync(self.args)
+            self.assertEqual(first['remainingChanges'], 2)
+            self.assertEqual(self.events(), [('added', 'r0.pdf'), ('added', 'r1.pdf'), ('added', 'r2.pdf')])
+            second = agent.sync(self.args)
+        self.assertNotIn('remainingChanges', second)
+        self.assertEqual(self.events(), [('added', 'r3.pdf'), ('added', 'r4.pdf')])
+        self.assertEqual(Client.bodies[1]['previousCursorSha256'], Client.bodies[0]['nextCursorSha256'])
+        self.assertEqual(sorted(set(s3.read)), [f'r{index}.pdf' for index in range(5)])
+
 if __name__=='__main__':unittest.main()
