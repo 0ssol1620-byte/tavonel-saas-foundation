@@ -754,11 +754,11 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/next.config.ts', 'nextjs/scripts/gate-surface.test.mjs', 'nextjs/scripts/gate-surface-rules.yaml', 'shared/scopedCustomerDataGate.test.ts', 'shared/customerDataAuthorization.ts', 'nextjs/lib/scoped-customer-data-gate.ts', 'scopedCustomerDataGate.ts', 'nextjs/.gitignore'] },
-  // G1-COPY (phase 4, codex/p4-copy-20261019): six exact paths, seventeen direct suites, two browser suites on existing rows.
+  // G1-COPY (phase 4, codex/p4-copy-20261019): seven exact paths (WO-RELEASE-CONTRACT-1 added the forbidden-public-claims suite), eighteen direct suites, two browser suites on existing rows.
   { group: 'g1-copy-truth', prefix: 'nextjs/', exportedPaths: G1_COPY_TRUTH_AFFECTED_PATHS, exportedSuites: G1_COPY_TRUTH_AFFECTED_UNIT_FILES,
     exportedBrowsers: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES,
-    paths: ['lib/billing-catalog.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'],
-    suites: ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'],
+    paths: ['lib/billing-catalog.ts', 'lib/forbidden-public-claims.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'],
+    suites: ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'],
     browsers: ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'],
     rows: ["['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],", "['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs'] },

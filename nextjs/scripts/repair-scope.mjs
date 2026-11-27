@@ -2364,8 +2364,11 @@ export const GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES = Object.freeze([
 // docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. Every
 // other path this lane changed keeps its existing owner. Product copy and a published asset, so never nativeReuse.
 // lib/operations.ts is also a consent-poster path (PR #163): a change to it selects both owners, the union of their suites.
+// WO-RELEASE-CONTRACT-1 (2026-11-27): the forbidden-public-claims suite, the same kind of public-copy truth guard, joins this owner
+// and selects itself: seven paths, eighteen direct suites. No pin moves.
 export const G1_COPY_TRUTH_AFFECTED_PATHS = Object.freeze([
   'lib/billing-catalog.ts',
+  'lib/forbidden-public-claims.test.ts',
   'lib/g1-copy-truth.test.ts',
   'lib/mcp-server.test.ts',
   'lib/mcp-tools.ts',
@@ -2378,6 +2381,7 @@ export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/copy-trust-guard.test.ts',
   'lib/developer-distribution.test.ts',
   'lib/docs-content.test.ts',
+  'lib/forbidden-public-claims.test.ts',
   'lib/g1-copy-truth.test.ts',
   'lib/guide-content.test.ts',
   'lib/legal-terms-consistency.test.ts',
