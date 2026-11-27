@@ -225,6 +225,8 @@
 
 @media (forced-colors: active) {
   .cta { border: 1px solid ButtonText; }
+  /* The trigger is borderless on screen (blueprint); forced colours drop its background, so it keeps a boundary there. */
+  .trigger { border: 1px solid ButtonText; }
   .trigger:focus-visible,
   .close:focus-visible,
   .brand:focus-visible,
