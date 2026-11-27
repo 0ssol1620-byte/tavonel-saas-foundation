@@ -7,6 +7,7 @@ import {
   formatElapsed,
   REVIEW_DECISION_READ_LIMIT,
   REVIEW_QUEUE_STATUS_COPY,
+  REVIEW_QUEUE_UNVERIFIED_COPY,
   reviewQueueReasons,
   type ReviewLedgerStatus,
   type ReviewQueueInput,
@@ -50,6 +51,13 @@ const UNREAD_LEDGER_COPY: Record<Exclude<ReviewLedgerStatus, "ready">, { notice:
     row: "Review decisions could not be read",
   },
 };
+
+/* What the page was told about the evidence read, in the words of the one state that is not an answer. */
+function evidenceUnknownCopy(read: ReviewQueueInput["evidenceRead"]): string {
+  return read === "loading"
+    ? "The evidence regions for this compile are still loading. Until they have, no source is shown as read or as not read."
+    : "The evidence regions for this compile could not be loaded, so whether each source has evidence bound to it is not known here. This is not a count of zero.";
+}
 
 /*
   One line per document about its review decisions, saying only what the inputs support. A
@@ -133,6 +141,7 @@ export default function ReviewQueue({
 
   const historyTruncated = queue.missing.includes("review_decisions");
   const settledKnown = !queue.missing.includes("compile_settled_at");
+  const evidenceUnknown = queue.missing.includes("world_evidence");
   /* Round 3: when every row would print the same decision line, it is said once above the list instead. */
   const timings = rows.map((row) => reviewTimingCopy(row, queue.decisionsRead, historyTruncated, settledKnown));
   const sharedTiming = queue.decisionsRead === "ready" && timings.length > 1 && timings.every((line) => line === timings[0]) ? timings[0] : null;
@@ -148,9 +157,18 @@ export default function ReviewQueue({
   return (
     <div className="workspace-review-queue">
       <p className="fine">
-        {ORDER.map((status) => `${queue.counts[status]} ${REVIEW_QUEUE_STATUS_COPY[status]}`).join(" · ")}
+        {/* With the evidence regions not loaded, "read and bound to evidence" has no count to give, and "not read" only counts the sources a blocker names; the rest say what they know. */}
+        {[
+          ...ORDER.filter((status) => !(evidenceUnknown && (status === "read" || (status === "unprocessed" && queue.counts.unprocessed === 0)))).map((status) => `${queue.counts[status]} ${REVIEW_QUEUE_STATUS_COPY[status]}`),
+          ...(evidenceUnknown ? [`${queue.unverified} ${REVIEW_QUEUE_UNVERIFIED_COPY}`] : []),
+        ].join(" · ")}
         {" · "}of {queue.total} source{queue.total === 1 ? "" : "s"} in this compile
       </p>
+      {evidenceUnknown ? (
+        <p className="fine" role="status">
+          {evidenceUnknownCopy(input.evidenceRead)}
+        </p>
+      ) : null}
       {/*
         Round 2 (CRITIQUE-R1 #4): the status line above is the one line a reader scans; what limits it -- a
         missing compile-job row, no settled time, a truncated or unread decision ledger -- is the "Why?"
@@ -240,7 +258,7 @@ export default function ReviewQueue({
               <strong>{row.name}</strong>
               <small>
                 {row.securityBlocked ? "Stopped by a safety check · " : ""}
-                {REVIEW_QUEUE_STATUS_COPY[row.status]}
+                {row.evidenceUnverified ? "read state not known (evidence not loaded)" : REVIEW_QUEUE_STATUS_COPY[row.status]}
                 {row.evidenceCount > 0 ? ` · ${row.evidenceCount} evidence region${row.evidenceCount === 1 ? "" : "s"}` : ""}
               </small>
               {row.reasons.map((value, at) => <ReasonChip key={value} value={value} family={reasonFamily(value, row.securityBlocked && at === 0)} locale={locale} />)}

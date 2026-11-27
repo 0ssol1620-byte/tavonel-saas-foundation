@@ -43,7 +43,10 @@ describe("design token contract", () => {
     for (const line of code.split("\n").filter((l) => l.startsWith("@import"))) {
       expect(line, "an @import qualifier the build turns into a dead @media block").not.toMatch(/layer\(|supports\(/);
     }
-    expect(code, "product-polish.css is still imported").toContain('@import "./product-polish.css";');
+    // WO-PERF-4: product-polish.css left the root too (no rule matched on `/`); the routes whose classes it
+    // styles import it, first (lib/landing-v2-tokens.test.ts "route-scoped global sheets" pins the list).
+    // This used to assert the @import; the sheet's layer is still checked below.
+    expect(code, "product-polish.css is back in the root").not.toContain("product-polish.css");
     // WO-CI-16d: the two workspace sheets left the root for the routes that render their classes
     // (lib/landing-v2-tokens.test.ts "route-scoped global sheets" pins where they are imported now).
     for (const sheet of ["workspace-final-polish.css", "workspace-no1.css"]) {

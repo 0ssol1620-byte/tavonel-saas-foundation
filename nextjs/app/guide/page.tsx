@@ -1,3 +1,5 @@
+// WO-PERF-4: product-polish.css is route-scoped (it left globals.css); keep it the first import so it loads before this route's other sheets.
+import "@/app/product-polish.css";
 import type { Metadata } from "next";
 import { GuidePage } from "@/components/guide/guide-page";
 import { pageMetadata } from "@/lib/page-seo";

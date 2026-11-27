@@ -15,6 +15,8 @@ import {
   reviewQueueDecisionInput,
   reviewQueueReasons,
   reviewReasonsShown,
+  worldEvidenceRead,
+  worldReadFailureCode,
   type ReviewLedgerFetch,
   type ReviewLedgerReadState,
   type ReviewQueueInput,
@@ -849,5 +851,84 @@ describe("review reason chip", () => {
     const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...input, reviewReasons: ["GLOBAL_REASON_WITH_NO_DOCUMENT"] } }));
     expect(markup).toContain("<span>Review reason</span><code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
     expect(markup).not.toContain("<em>");
+  });
+});
+
+/*
+  WO-WS-6 (F2), 2026-11-26 live run: "12 not read into this World · 0 read and bound to evidence" printed beside a compile that
+  reported 8 claims and 9 relations, because the World read model had not loaded (or was refused) and the page handed the queue an
+  empty evidence list. An empty list from a read that did not happen is not an observation.
+*/
+describe("evidence regions that were not loaded are not zero (WO-WS-6)", () => {
+  const twelve = Array.from({ length: 12 }, (_, i) => `doc-${String(i).padStart(2, "0")}`);
+  const noEvidence: ReviewQueueInput = {
+    documentIds: twelve, blocked: [], compileSettledAt: SETTLED, reviewReasons: [], evidence: [], decisions: [],
+    documents: twelve.map((documentId) => ({ documentId, hasOcrJson: true, processingState: "ocr_ready" })),
+  };
+
+  it("an evidence read that answered with nothing still says 12 not read, as before", () => {
+    const queue = buildReviewQueue({ ...noEvidence, evidenceRead: "ready" });
+    expect(queue.counts).toEqual({ excluded: 0, under_review: 0, unprocessed: 12, read: 0 });
+    expect(queue.unverified).toBe(0);
+    expect(queue.missing).not.toContain("world_evidence");
+    // An absent flag is the same answer: callers that hand over evidence they already hold are unchanged.
+    expect(buildReviewQueue(noEvidence).counts).toEqual(queue.counts);
+  });
+
+  it.each(["loading", "unavailable"] as const)("an evidence read that is %s counts 12 unverified, and none read or not read", (evidenceRead) => {
+    const queue = buildReviewQueue({ ...noEvidence, evidenceRead });
+    expect(queue.counts).toEqual({ excluded: 0, under_review: 0, unprocessed: 0, read: 0 });
+    expect(queue.unverified).toBe(12);
+    expect(queue.total).toBe(12);
+    expect(queue.missing).toContain("world_evidence");
+    expect(queue.rows.every((row) => row.evidenceUnverified === true)).toBe(true);
+  });
+
+  it("keeps what is still known: a blocker, an operator review and a recorded reason are facts without the evidence", () => {
+    const queue = buildReviewQueue({
+      ...noEvidence,
+      documentIds: ["doc-sec", "doc-in", "doc-op", "doc-why", "doc-plain"],
+      blocked: [{ documentId: "doc-sec", kind: "security", reason: "ARCHIVE_ENCRYPTED" }, { documentId: "doc-in", kind: "input", reason: "READING_DID_NOT_FINISH" }],
+      documents: [{ documentId: "doc-op", hasOcrJson: true, processingState: "operator_review", ocrReviewReasonCode: "OCR_LOW" }],
+      reviewReasons: ["AUTHORITY_CONFLICT doc-why"],
+      evidenceRead: "unavailable",
+    });
+    expect(queue.counts).toEqual({ excluded: 1, under_review: 2, unprocessed: 1, read: 0 });
+    expect(queue.unverified).toBe(1);
+    expect(queue.rows.find((row) => row.documentId === "doc-plain")?.evidenceUnverified).toBe(true);
+    expect(queue.rows.find((row) => row.documentId === "doc-in")?.evidenceUnverified).toBeUndefined();
+  });
+
+  it("a document that does have evidence is read even while the flag says unavailable (the caller held it)", () => {
+    const queue = buildReviewQueue({ ...noEvidence, documentIds: ["doc-a"], evidence: [{ id: "e:1", sourceId: "doc-a" }], evidenceRead: "unavailable" });
+    expect(queue.counts.read).toBe(1);
+    expect(queue.unverified).toBe(0);
+  });
+
+  it("the read state maps to the three answers, and a failure reference must look like one", () => {
+    expect(worldEvidenceRead({ status: "idle" })).toBe("ready");
+    expect(worldEvidenceRead({ status: "ready" })).toBe("ready");
+    expect(worldEvidenceRead({ status: "loading" })).toBe("loading");
+    expect(worldEvidenceRead({ status: "unavailable", code: null, httpStatus: 503 })).toBe("unavailable");
+    expect(worldReadFailureCode({ code: "WORLD_READ_MODEL_INVALID" })).toBe("WORLD_READ_MODEL_INVALID");
+    for (const bad of [{ code: "free text from a response" }, { code: 7 }, {}, null, "x", undefined, { code: "A".repeat(65) }]) {
+      expect(worldReadFailureCode(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
+  it("the real component drops the 'read' count, names the gap and labels each row, with no 'not read into this World' for it", () => {
+    const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...noEvidence, evidenceRead: "unavailable" } }));
+    expect(markup).toContain("12 not checked against evidence");
+    expect(markup).not.toContain("not read into this World");
+    expect(markup).not.toContain("read and bound to evidence");
+    expect(markup).toContain("could not be loaded");
+    expect(markup).toContain("This is not a count of zero.");
+    expect(markup).toContain("(evidence not loaded)");
+    const loading = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...noEvidence, evidenceRead: "loading" } }));
+    expect(loading).toContain("still loading");
+    // The answered case is untouched.
+    const answered = renderToStaticMarkup(createElement(ReviewQueue, { input: noEvidence }));
+    expect(answered).toContain("12 not read into this World");
+    expect(answered).not.toContain("not checked against evidence");
   });
 });

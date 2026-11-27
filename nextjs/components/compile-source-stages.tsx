@@ -1,9 +1,9 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useReducer, useSyncExternalStore } from "react";
 import type { CompileState } from "@/lib/compile-job-store";
 import {
-  readSourceStages, SOURCE_STAGE_LABEL, subscribeSourceStages, type SourceStage,
+  freshSourceStages, readSourceStages, SOURCE_STAGE_LABEL, subscribeSourceStages, type SourceStage,
 } from "@/lib/compile-source-stages";
 
 /*
@@ -12,8 +12,11 @@ import {
   A view only. The stages come from the job's event stream (`sources` frames, read-only on the
   server) and are handed over by the stream reader, so this component starts no request of its
   own. It renders nothing until a frame has arrived and nothing once the sources are all read.
-  "Reader waking up" is a normal first step after a quiet period, not a fault, and is worded and
-  styled as one: no alert role, no warning copy, and no promise about any single source.
+  "Handed to the reader" is a normal first step after a quiet period, not a fault, and is worded
+  and styled as one: no alert role, no warning copy, and no promise about any single source.
+
+  A frame older than SOURCES_STALE_MS is not shown (freshSourceStages), so when the stream stops
+  delivering them the rows disappear rather than keep a stage that nothing confirms any more.
 */
 
 const SHOWN_STATES: readonly CompileState[] = ["uploading", "sanitizing", "reading"];
@@ -29,7 +32,15 @@ export function CompileSourceStages({
   blockedIds?: readonly string[];
 }) {
   const read = () => readSourceStages(jobId);
-  const snapshot = useSyncExternalStore(subscribeSourceStages, read, read);
+  const stored = useSyncExternalStore(subscribeSourceStages, read, read);
+  // Re-check freshness while a frame is held, so an expired one is dropped without waiting for the next frame.
+  const [, recheck] = useReducer((tick: number) => tick + 1, 0);
+  useEffect(() => {
+    if (!stored) return undefined;
+    const timer = setInterval(recheck, 5_000);
+    return () => clearInterval(timer);
+  }, [stored]);
+  const snapshot = freshSourceStages(stored, Date.now());
   if (!SHOWN_STATES.includes(state) || !snapshot || snapshot.stages.length === 0) return null;
   const blocked = new Set(blockedIds);
   const rows = snapshot.stages.map(entry => ({

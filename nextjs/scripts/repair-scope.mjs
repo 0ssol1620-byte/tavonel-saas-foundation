@@ -2717,6 +2717,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/contact/page.tsx",
   "nextjs/app/demo/page.tsx",
   "nextjs/app/enterprise/page.tsx",
+  "nextjs/app/error.tsx",
   "nextjs/app/evaluation/opengraph-image.tsx",
   "nextjs/app/evidence/page.tsx",
   "nextjs/app/explore/page.tsx",
@@ -2746,6 +2747,7 @@ export const PUBLIC_MARKETING_AFFECTED_PATHS = Object.freeze([
   "nextjs/app/solutions/solutions.module.css",
   "nextjs/app/sources/page.tsx",
   "nextjs/app/status/page.tsx",
+  "nextjs/app/terms/page.tsx",
   "nextjs/app/trust/page.tsx",
   "nextjs/app/wanted-sans-korean.css",
   "nextjs/components/evaluation-page.module.css",
@@ -3597,6 +3599,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   'agent-u37-matrix': Object.freeze({
     paths: Object.freeze(['lib/agent-proposals-u37.test.ts', 'scripts/db/agent-u37-db.mjs', 'scripts/db/agent-u37-db.test.mjs']),
     unitFiles: Object.freeze(['lib/agent-proposals-u37.test.ts', 'scripts/db/agent-u37-db.test.mjs']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
+  // workspace-world-picture (WO-WS-5): the workspace draws its active World with the public pages' renderer. workspace-world-picture.test.ts imports
+  // the adapter, and reads the component and the sheet (a World that is not the active one, a sample, a fetch, an animation or a hover outside the gate fails it).
+  'workspace-world-picture': Object.freeze({
+    paths: Object.freeze(['components/workspace/world-picture.module.css', 'components/workspace/world-picture.tsx', 'lib/workspace-world-picture.test.ts', 'lib/workspace-world-picture.ts']),
+    unitFiles: Object.freeze(['lib/workspace-world-picture.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),

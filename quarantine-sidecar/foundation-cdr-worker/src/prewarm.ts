@@ -1,4 +1,4 @@
-import { cdrAuthorization } from "./identity";
+import { cdrAuthorization, CdrIdentityError } from "./identity";
 
 /*
   Best-effort pre-warm of the two scale-to-zero services a document passes through.
@@ -40,9 +40,10 @@ export function resetPrewarmState(): void {
 
 type Target = "cdr" | "ocr";
 
-function record(target: Target, outcome: "answered" | "failed", status: number | null): void {
+/** `stage` is the identity broker step that failed (CdrIdentityError.stage, an enum), so an auth fault is distinguishable from a down service. */
+function record(target: Target, outcome: "answered" | "failed", status: number | null, stage?: string): void {
   prewarmCounts[outcome] += 1;
-  try { console.log(JSON.stringify({ log: "prewarm", target, outcome, status })); } catch { /* logging must not matter */ }
+  try { console.log(JSON.stringify({ log: "prewarm", target, outcome, status, ...(stage ? { stage } : {}) })); } catch { /* logging must not matter */ }
 }
 
 async function touch(
@@ -93,8 +94,8 @@ export async function prewarmServices(
           // The same credential path the health route and the disarm call use.
           const authorization = await cdrAuthorization(env.TAVONEL_CDR_HEALTH_URL, env.FOUNDATION_CDR_IDENTITY_HMAC, fetcher);
           await touch("cdr", env.TAVONEL_CDR_HEALTH_URL, authorization ? { authorization } : {}, s => s >= 200 && s < 300, fetcher);
-        } catch {
-          record("cdr", "failed", null);
+        } catch (error) {
+          record("cdr", "failed", null, error instanceof CdrIdentityError ? error.stage : undefined);
         }
       })());
     }
