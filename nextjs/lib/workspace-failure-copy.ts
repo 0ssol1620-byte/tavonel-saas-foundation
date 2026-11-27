@@ -78,9 +78,13 @@ const FAILURE_COPY: Record<string, string> = {
   */
   SUBSCRIPTION_REQUIRED: "This needs a paid plan. Nothing was changed.",
   STUDIO_SUBSCRIPTION_REQUIRED: "Your current plan does not include this. Nothing was changed.",
-  TRIAL_FILE_LIMIT_EXCEEDED: "Your free evaluation has used all of its files. Nothing was uploaded.",
-  TRIAL_PAGE_LIMIT_EXCEEDED: "These files go past the pages left in your free evaluation. Nothing was uploaded.",
-  TRIAL_FILE_TOO_LARGE: "This file is larger than the free evaluation accepts. Nothing was uploaded.",
+  /*
+    WO-FIRST-5-MIN-1: these are per-file refusals. "Nothing was uploaded" read as the whole batch, so a
+    batch summary said "3 of 5 files uploaded ... Why: ... Nothing was uploaded." about the same run.
+  */
+  TRIAL_FILE_LIMIT_EXCEEDED: "Your free evaluation has used all of its files, so this file was not uploaded.",
+  TRIAL_PAGE_LIMIT_EXCEEDED: "This goes past the pages left in your free evaluation, so it was not uploaded.",
+  TRIAL_FILE_TOO_LARGE: "This file is larger than the free evaluation accepts, so it was not uploaded.",
   TRIAL_ARCHIVE_NOT_INCLUDED: "ZIP archives are not part of the free evaluation. Choose the files inside it instead.",
   TRIAL_FEATURE_NOT_INCLUDED: "This is not part of the free evaluation.",
   TRIAL_WORLD_LIMIT_REACHED: "Your free evaluation has already used its one World.",
@@ -290,6 +294,26 @@ export const NO_ENTITIES_NOTE =
 export function noEntitiesNote(counts: { claims: number; entities: number }): string | null {
   return counts.claims > 0 && counts.entities === 0 ? NO_ENTITIES_NOTE : null;
 }
+
+/*
+  WO-FIRST-5-MIN-1. A compile that settles needing review cannot be activated: the promote route and
+  the Activate button both require a passed, completed candidate (collection-download.ts
+  `validatePromotableCollectionArtifact`). The notice used to name the collection id and say
+  "Download and inspect it", and the Activate button sat disabled with no word about why -- the
+  home screen's "Review & activate" led to a control that could never open. No line here advises
+  splitting the sources (see the review-reason copy above): separate compiles are never compared.
+*/
+export function reviewPackageNotice(reasons: number): string {
+  if (reasons > 0) {
+    return reasons === 1
+      ? "This compile finished with 1 reason that needs review, so nothing is active. Open Review to see it."
+      : `This compile finished with ${reasons} reasons that need review, so nothing is active. Open Review to see them.`;
+  }
+  return "This compile finished and needs review, so nothing is active. Open Review to see why.";
+}
+
+export const REVIEW_REQUIRED_ACTIVATION_NOTE =
+  "A version that needs review cannot be activated from the workspace. Its reasons are in the review queue above. To go further with it, contact support and quote the reference below.";
 
 export function compiledWorldReadyNotice(counts: {
   documents: number; topics?: number | null; entities: number; claims: number; relations: number;

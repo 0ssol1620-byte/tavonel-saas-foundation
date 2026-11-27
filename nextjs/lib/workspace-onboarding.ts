@@ -1,6 +1,7 @@
 import type { WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import type { CompileState } from "./compile-job-store";
 import type { DocumentListPartial } from "./pipeline";
+import { failureSentence } from "./workspace-failure-copy";
 
 /*
   One derivation of "what is true about this workspace, and what should be said about it".
@@ -210,7 +211,8 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     return {
       mode,
       stateTitle: "The last compile stopped.",
-      stateDescription: `It stopped with ${input.compileErrorCode}, and nothing was activated. The run's own record says which sources it had read when it stopped.`,
+      // WO-FIRST-5-MIN-1: the sentence the compile panel shows for the same code, not the bare code.
+      stateDescription: `${failureSentence(input.compileErrorCode, 500)} Nothing was activated. The run's own record says which sources it had read when it stopped.`,
       nextAction: { label: "Open activity", surface: "activity" },
     };
   }
@@ -425,7 +427,7 @@ export function deriveAttentionItems(input: WorkspaceStateInput): AttentionItem[
     items.push({
       id: "compile-failed",
       label: "Failed",
-      detail: `The last compile stopped with ${input.compileErrorCode}. Nothing was activated.`,
+      detail: `The last compile stopped. ${failureSentence(input.compileErrorCode, 500)} Nothing was activated.`,
       action: { label: "Open activity", surface: "activity" },
     });
   }
