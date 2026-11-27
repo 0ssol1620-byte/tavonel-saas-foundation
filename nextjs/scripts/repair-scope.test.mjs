@@ -8621,7 +8621,8 @@ const V34_OWNER_PINS = Object.freeze([
   // Train 2026-11-24 (WO-TRAIN-1): the train lanes' 53 owned paths, in six owners; acting-workspace.spec.ts is Product QA's claim at 390.
   ['acting-workspace', 13, '86d90f197fc018c4', 9, 'f717502531e6e8a0', [], { 'e2e/acting-workspace.spec.ts': v34ProductQa('390') }],
   // WO-TRAIN-2: member-source-scope-routes.test.ts drives the world and run-events handlers (17 -> 18 paths, 10 -> 11 suites).
-  ['member-source-scope', 18, 'fdb1ab49386f4bb8', 11, 'ff7b88ff343634d0', [], {}],
+  // WO-PROJ-K2: the projection module, its two suites and the grouped source list (18 -> 23 paths, 11 -> 14 suites).
+  ['member-source-scope', 23, 'f0ab89257265c551', 14, 'b9f47a954de5deb9', [], {}],
   ['connector-provider-qualification', 17, '6703f379e43e1fc9', 1, '368f502c594389f5', [], {}],
   ['format-census', 2, '069edb130111c258', 1, '68cac7ee81a96597', [], {}],
   // WO-TRAIN-2: the clean-install suite is a registered Node suite and joins developer-channel (3 -> 4 paths, 2 -> 3 suites).
@@ -8630,7 +8631,8 @@ const V34_OWNER_PINS = Object.freeze([
   // WO-TRAIN-2: codex/v34-an-8 merged; its pending owner is a program owner now.
   ['agent-audit-routes', 2, 'b5d75d4e64f713f1', 2, '29971313f2d3e397', [], {}],
   // WO-TRAIN-5: nine owners for the paths the train's later lanes added; the active-World Ask spec is Product QA's claim at 1440.
-  ['ask-verbatim-windows', 6, 'd749e8a356076f00', 11, '586300e12b44a339', [], {}],
+  // WO-PROJ-K2: retrieval-store.ts (the projected unit-to-document read), member-projection.test.ts runs the pipeline (6 -> 7, 11 -> 12).
+  ['ask-verbatim-windows', 7, '85924c5cdf03711d', 12, 'd94e8f75f105fee1', [], {}],
   ['workspace-active-world', 3, '0100582fc90a9d9e', 2, '8175b5631f96fff8', [], { 'e2e/workspace-ask-active-world.spec.ts': v34ProductQa('1440') }],
   ['workspace-product-frame', 5, 'cc0483ce4041a85a', 2, '7c71ecdbeea3234a', ['e2e/workspace-intake-layout.spec.ts', 'e2e/world-lifecycle.spec.ts'], {}],
   ['compile-source-stages', 3, 'bc386d90f7452d1b', 1, '55811b7cc38fcba2', [], {}],

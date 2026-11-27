@@ -1204,13 +1204,14 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     // WO-C-T3's member scope, WO-E-CON-1's provider pages, WO-CEN-1's census, WO-LOC-3/7's developer channel, WO-D19-12's key inventory.
     // WO-TRAIN-2: member-source-scope takes the suite that drives the world and run-events routes (17 -> 18 paths, 10 -> 11 suites);
     // developer-channel takes the clean-install suite, now a registered Node suite (3 -> 4 paths, 2 -> 3 suites).
-    ['acting-workspace', 13, 9, 0, 1], ['member-source-scope', 18, 11, 0, 0], ['connector-provider-qualification', 17, 1, 0, 0],
+    ['acting-workspace', 13, 9, 0, 1], ['member-source-scope', 23, 14, 0, 0], ['connector-provider-qualification', 17, 1, 0, 0],
     ['format-census', 2, 1, 0, 0], ['developer-channel', 4, 3, 0, 0], ['developer-keys-inventory', 1, 1, 0, 0],
     // WO-TRAIN-2: codex/v34-an-8 merged (9a258268), so its pending owner is a program owner now; its suite imports both routes at head.
     ['agent-audit-routes', 2, 2, 0, 0],
     // Train 2026-11-26 (WO-TRAIN-5): nine owners for the paths the train's later lanes added (WO-ASK-0, WO-WS-1/2/4, WO-KS-2/3, WO-BIG-2, WO-RTR-1/2,
     // WO-C-T2, WO-AN-9, the compile stage line); WO-WS-1's spec is a Product QA claim at 1440, the U37 DB-clock suite a registered Node suite.
-    ['ask-verbatim-windows', 6, 11, 0, 0],
+    // WO-PROJ-K2: member-source-scope 18 -> 23 paths, 11 -> 14 suites; ask-verbatim-windows 6 -> 7 paths, 11 -> 12 suites.
+    ['ask-verbatim-windows', 7, 12, 0, 0],
     ['workspace-active-world', 3, 2, 0, 1],
     ['workspace-product-frame', 5, 2, 2, 0],
     ['compile-source-stages', 3, 1, 0, 0],
