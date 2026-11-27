@@ -2113,11 +2113,13 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/
 // D-19 launch canary in processing-workspace-grant.ts, its suite's canary-aware fixture, and the suites that pin it and D-13's launch-approval precedence; P2-37 adds
 // the launch switch itself (activation-policy.ts) with the eight suites that pin its value in public copy and status; the review-B1
 // fix adds the bootstrap route that carries the release stage to a held checkout, and its admission suite. Exactly these
-// twenty-six paths select their twenty-five direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
+// twenty-nine paths select their twenty-seven direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
 // admission suites for the canary, processing-consent-panel for the v1 terms panel, production-posture for the switches) and the login-capability (1440) and self-serve-journey (audit)
 // browser suites. Product billing code, so never nativeReuse.
 export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
   'app/api/access/bootstrap/route.ts',
+  'app/api/compile-jobs/route.test.ts',
+  'app/api/compile-jobs/route.ts',
   'app/api/internal/billing/gate-enforce/route.ts',
   'components/checkout-intent-notice.tsx',
   'e2e/fixtures/paddle-fixture.ts',
@@ -2139,12 +2141,14 @@ export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
   'lib/processing-consent-panel.test.ts',
   'lib/processing-workspace-grant.test.ts',
   'lib/processing-workspace-grant.ts',
+  'lib/self-service-trial-compile-capacity.test.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/self-service-trial.ts',
   'lib/use-checkout.test.ts',
   'lib/use-checkout.ts',
 ]);
 export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
+  'app/api/compile-jobs/route.test.ts',
   'lib/access-bootstrap-admission.test.ts',
   'lib/billing-binding.test.ts',
   'lib/billing-gate-enforce-route.test.ts',
@@ -2167,6 +2171,7 @@ export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/production-posture.test.ts',
   'lib/public-status.test.ts',
   'lib/scoped-admission-boundaries.test.ts',
+  'lib/self-service-trial-compile-capacity.test.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/status-route-contract.test.ts',
   'lib/use-checkout.test.ts',
@@ -3777,7 +3782,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
-  // ux-billing-checkout: the 26 exact paths above select 25 direct suites and 2 browser suites.
+  // ux-billing-checkout: the 29 exact paths above select 27 direct suites and 2 browser suites. WO-TRIAL-P0 added
+  // lib/self-service-trial-compile-capacity.test.ts, the guard of the trial compile bound in lib/self-service-trial.ts, and
+  // the compile-jobs route and its suite, which answer that bound's typed 402 and had no affected-map owner.
   affectedGroup('ux-billing-checkout', new RegExp(`^nextjs/(?:${exactPathAlternation(UX_BILLING_CHECKOUT_AFFECTED_PATHS)})$`),
     { unitFiles: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, browserFiles: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES }),
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.
