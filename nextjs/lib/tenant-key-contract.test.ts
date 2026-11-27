@@ -81,6 +81,8 @@ const WIDE_ALLOWED = new Map<string, string>([
   // previous body); the replacement keeps that width, it does not widen a tenant key. Provisional file
   // name: if the lead renames the migration at merge, rename this entry with it.
   ["supabase/migrations/20261124000100_workspace_payer_for_members.sql", "intake admission body replaced whole, {1,32} since the intake admission contract"],
+  // WO-TRIAL-RELEASE-1: replaces the same body again (the re-arm also clears a refusal); width unchanged.
+  ["supabase/migrations/20261127060000_trial_intake_release_on_refusal.sql", "intake admission body replaced whole, {1,32} since the intake admission contract"],
 ]);
 
 const tsSites = sites(sourceFiles("lib").concat(sourceFiles("app")), TS_PATTERN);
