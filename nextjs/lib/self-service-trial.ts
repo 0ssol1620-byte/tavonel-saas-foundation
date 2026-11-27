@@ -298,7 +298,9 @@ async function settledWithoutWorld(
     import("./r2-objects"), import("./collection-download"),
   ]);
   const loaded = await getWorkspaceCollectionCandidate(signer, workspaceKey, key);
-  if (!loaded.ok) return null;
+  // Review T-1: deleting a source deletes its candidate (migration 20260930010000) and keeps the job row.
+  // A definite absence can never be promoted, so it is a spent attempt (still capped); any other failure refuses.
+  if (!loaded.ok) return loaded.code === "NOT_FOUND" ? true : null;
   return validatePromotableCollectionArtifact(loaded.json, collectionId) === null;
 }
 

@@ -157,10 +157,33 @@ describe("trial compile capacity fails closed: cannot read means refuse", () => 
     ["the active Worlds are a partial page", () => { jobs = [review(1)]; activeWorlds.mockResolvedValueOnce({ ok: true, worlds: [], nextCursor: collection(9) }); }],
     ["no storage signer", () => { jobs = [review(1)]; signer.mockReturnValueOnce(null); }],
     ["the candidate cannot be read", () => { jobs = [review(1)]; candidate.mockResolvedValueOnce({ ok: false, code: "GET_TIMEOUT" }); }],
-    ["the candidate is missing", () => { jobs = [review(1)]; candidate.mockResolvedValueOnce({ ok: false, code: "NOT_FOUND" }); }],
+    ["the candidate read is forbidden", () => { jobs = [review(1)]; candidate.mockResolvedValueOnce({ ok: false, code: "GET_FORBIDDEN" }); }],
   ])("%s", async (_name, arrange) => {
     arrange();
     expect(await check()).toEqual({ ok: false, code: "TRIAL_COMPILE_CHECK_FAILED" });
+  });
+
+  /*
+    Review T-1 (train 3c): deleting a source deletes its review_required candidate (migration 20260930010000)
+    while the job row stays. A definite NOT_FOUND is a spent attempt, not a 503 for ever; the cap still holds.
+  */
+  it("a candidate deleted with its source counts as a spent attempt, not a 503", async () => {
+    jobs = [review(1)];
+    candidate.mockResolvedValueOnce({ ok: false, code: "NOT_FOUND" });
+    expect(await check()).toEqual({ ok: true, allowed: true });
+    expect(promotable).not.toHaveBeenCalled();
+  });
+
+  it("deleted candidates still spend the two attempts: the third compile is refused 402", async () => {
+    jobs = [review(1), review(2)];
+    candidate.mockResolvedValue({ ok: false, code: "NOT_FOUND" });
+    expect(await check()).toEqual({ ok: true, allowed: false, code: "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED" });
+  });
+
+  it("one deleted and one review candidate also exhaust the attempts", async () => {
+    jobs = [review(1), review(2)];
+    candidate.mockResolvedValueOnce({ ok: false, code: "NOT_FOUND" });
+    expect(await check()).toEqual({ ok: true, allowed: false, code: "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED" });
   });
 
   it("an allow read from a full page is not trusted", async () => {
