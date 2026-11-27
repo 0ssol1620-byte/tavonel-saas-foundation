@@ -2284,6 +2284,121 @@ class LocalFolderPolicyTests(SyncFixture, unittest.TestCase):
         self.assertFalse(self.args.state.exists())
         self.assertIsNone(agent.refused_root(self.root.resolve()))
 
+    @unittest.skipUnless(os.name == 'nt', 'extended-length and short names are Windows spellings')
+    def test_extended_length_short_and_case_spellings_of_refused_roots_are_refused(self):
+        # Review r2 B2: \\?\C:\Users\<name> was compared unnormalized and passed the refusal.
+        import ctypes
+        home = Path.home().resolve()
+        prefix = '\\\\?\\'
+        spellings = [prefix + str(home), prefix + str(home.parent), prefix + os.environ['SystemRoot'],
+                     prefix + os.environ['ProgramFiles'].lower() + '\\', str(home).upper() + '\\']
+        buffer = ctypes.create_unicode_buffer(1024)
+        if ctypes.windll.kernel32.GetShortPathNameW(os.environ['ProgramFiles'], buffer, 1024) and buffer.value != os.environ['ProgramFiles']:
+            spellings.append(buffer.value)  # an 8.3 name, where the volume keeps them
+        with patch.object(agent, '_traversal_backend', side_effect=AssertionError('root opened')):
+            for spelling in spellings:
+                with self.subTest(root=spelling):
+                    with self.assertRaisesRegex(agent.AgentError, 'may not be'):
+                        with agent._anchored_root(Path(spelling)):
+                            pass
+        self.assertIsNone(agent.refused_root(Path(prefix + str(self.root.resolve()))))
+
+    def old_agent_journal(self, *, upload_set=True, with_report=True, approval_posted=False):
+        """A pending journal in the exact shape the agent before WO-LF-1 wrote (train-3c `_sync`): every file of the
+        folder in `files` and in the events, unsupported ones with mimeType None, and no policyFingerprint."""
+        datas = dict(SECRETS)
+        if with_report:
+            datas['report.pdf'] = b'%PDF-1.4'
+        for name, data in datas.items():
+            self.write(name, data)
+        files = {name: {'revision': revision(data), 'sizeBytes': len(data), 'contentSha256': sha(data),
+                        'mimeType': agent.MIME_BY_SUFFIX.get(Path(name).suffix.lower())} for name, data in datas.items()}
+        events = [{'kind': 'added', 'nativeId': name, 'revision': files[name]['revision'], 'contentSha256': files[name]['contentSha256'],
+                   'sizeBytes': files[name]['sizeBytes'], 'mimeType': files[name]['mimeType'], 'documentId': None,
+                   'sourceIdempotencyKey': None} for name in sorted(files)]
+        cursor = 'sha256:' + agent.sha256(agent.canonical({'provider': 'file_server', 'files': {
+            name: {key: item[key] for key in ('revision', 'sizeBytes', 'mimeType')} for name, item in files.items()}}))
+        with agent._anchored_root(self.root) as held:
+            identity = held.identity()
+        pending = {'scopeFingerprint': agent.source_fingerprint(self.args, self.root.resolve()), 'connectionId': self.args.connection_id}
+        batch_id = str(uuid.uuid4())
+        if not upload_set:
+            pending.update(files=files, body={'batchId': batch_id, 'previousCursorSha256': None, 'nextCursorSha256': cursor,
+                                              'manifestSha256': 'sha256:' + agent.sha256(agent.canonical(events)), 'events': events})
+        else:
+            attempt = 'att_' + uuid.uuid4().hex
+            entries = {name: agent.intake_manifest_entry(name, files[name]) for name in sorted(files) if files[name]['mimeType']}
+            for event in events:
+                if event['nativeId'] in entries:
+                    event['sourceIdempotencyKey'] = agent.approved_source_idempotency_key(attempt, entries[event['nativeId']]['fileKey'])
+            manifest = sorted(entries.values(), key=lambda entry: entry['fileKey'])
+            intake = {'batchId': batch_id, 'previousCursorSha256': None, 'nextCursorSha256': cursor, 'events': events,
+                      'attemptKey': attempt, 'approveUpToCredits': 1, 'allowUnknownPageCount': True,
+                      'clientManifestDigest': agent.intake_manifest_digest(manifest), 'manifest': manifest,
+                      'members': {entry['fileKey']: {'nativeId': name, 'documentId': None, 'phase': 'planned'} for name, entry in entries.items()},
+                      'quote': None, 'approvalPosted': approval_posted, 'approvalBody': None, 'approval': None}
+            # The usual way such a journal is left behind: quoted above the caller's cap, then stopped for review.
+            intake['quote'] = agent.verify_quote(intake, quote_for({'clientManifestDigest': intake['clientManifestDigest'], 'files': manifest}))
+            pending.update(rootIdentity=identity, files=files, intake=intake)
+        self.pending().write_text(json.dumps(pending))
+        return pending
+
+    def test_an_old_agent_upload_journal_is_replayed_without_its_excluded_files(self):
+        # Review r2 B1: the replay used to upload passwords.xlsx and node_modules/x.pdf and send .env and id_rsa events.
+        journal = self.old_agent_journal()
+        quoted = []
+        real_quote = Client.quote
+        def quote(client, body):
+            quoted.append(body)
+            return real_quote(client, body)
+        with patch.object(Client, 'quote', quote), recorded_scan() as (_, read):
+            result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 2})
+        self.assertEqual([name for name, _ in Client.uploads], ['report.pdf'])
+        self.assertEqual(read, ['report.pdf'])  # the upload snapshot only: nothing excluded is opened
+        body = Client.bodies[-1]
+        self.assertEqual(body['batchId'], journal['intake']['batchId'])
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        saved_key = next(e['sourceIdempotencyKey'] for e in journal['intake']['events'] if e['nativeId'] == 'report.pdf')
+        self.assertEqual(body['events'][0]['sourceIdempotencyKey'], saved_key)  # the same attempt and file key replay
+        self.assertEqual([[entry['originalFilename'] for entry in q['files']] for q in quoted], [['report.pdf']])
+        sent = agent.canonical(Client.bodies) + agent.canonical(quoted) + self.args.state.read_text()
+        for marker in SECRET_MARKERS:
+            self.assertNotIn(marker, sent)
+        saved = json.loads(self.args.state.read_text())
+        self.assertEqual(list(saved['files']), ['report.pdf'])
+        self.assertEqual(saved['policyFingerprint'], agent.scope_policy_fingerprint(()))
+        kept = {'report.pdf': {key: journal['files']['report.pdf'][key] for key in ('revision', 'sizeBytes', 'mimeType')}}
+        self.assertEqual(saved['serverCursorSha256'], 'sha256:' + agent.sha256(agent.canonical({'provider': 'file_server', 'files': kept})))
+        self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+
+    def test_an_old_agent_commit_journal_is_replayed_without_its_excluded_events(self):
+        journal = self.old_agent_journal(upload_set=False)
+        result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 0})
+        body = Client.bodies[-1]
+        self.assertEqual((body['batchId'], body['previousCursorSha256']), (journal['body']['batchId'], None))
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertEqual(body['manifestSha256'], 'sha256:' + agent.sha256(agent.canonical(body['events'])))
+        self.assertEqual(Client.uploads, [])
+        for marker in SECRET_MARKERS:
+            self.assertNotIn(marker, agent.canonical(Client.bodies))
+
+    def test_an_old_agent_journal_whose_every_upload_is_excluded_commits_without_uploads(self):
+        journal = self.old_agent_journal(with_report=False)
+        result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 2})
+        self.assertEqual((Client.bodies[-1]['batchId'], self.events(), Client.uploads), (journal['intake']['batchId'], [], []))
+        self.assertEqual(json.loads(self.args.state.read_text())['files'], {})
+
+    def test_an_old_agent_journal_already_sent_for_approval_with_excluded_files_is_refused(self):
+        self.old_agent_journal(approval_posted=True)
+        before = self.pending().read_bytes()
+        with nothing_requested_or_read():
+            with self.assertRaisesRegex(agent.ReviewRequiredError, 'already sent for approval'):
+                agent.sync(self.args)
+        self.assertEqual(self.pending().read_bytes(), before)
+        self.assertFalse(self.args.state.exists())
 
 class FakeS3:
     """A boto3 S3 client stand-in: one complete listing and revision-pinned reads, no network."""
@@ -2394,19 +2509,58 @@ class S3PolicyTests(SyncFixture, unittest.TestCase):
             agent.sync(self.args)
         self.assertEqual(len(Client.bodies), 1)
 
-    def test_pending_journal_naming_an_excluded_key_is_refused_before_anything_is_sent(self):
-        self.cloud({'report.pdf': b'%PDF-1.4'})
-        cursor = 'sha256:' + 'a' * 64
-        agent.write_state(self.args.state, self.args.connection_id, {}, cursor, agent.source_fingerprint(self.args))
-        events = [{'kind': 'added', 'nativeId': '.env', 'revision': 'etag:x', 'contentSha256': None, 'sizeBytes': 4,
-                   'mimeType': None, 'documentId': None, 'sourceIdempotencyKey': None}]
-        pending = {'scopeFingerprint': agent.source_fingerprint(self.args), 'connectionId': CONNECTION, 'files': {},
-                   'body': {'batchId': str(uuid.uuid4()), 'previousCursorSha256': cursor, 'nextCursorSha256': 'sha256:' + 'b' * 64,
-                            'manifestSha256': 'sha256:' + agent.sha256(agent.canonical(events)), 'events': events}}
+    def old_agent_s3_journal(self, *, upload_set, approval_posted=False):
+        """A pending journal as the agent before WO-LF-1B wrote it for a bucket: every key, unsupported ones with mimeType None."""
+        datas = {**SECRETS, 'report.pdf': b'%PDF-1.4'}
+        self.cloud(datas)
+        files = {key: self.entry(data, key) for key, data in datas.items()}
+        events = [{'kind': 'added', 'nativeId': key, 'revision': files[key]['revision'], 'contentSha256': files[key]['contentSha256'],
+                   'sizeBytes': files[key]['sizeBytes'], 'mimeType': files[key]['mimeType'], 'documentId': None,
+                   'sourceIdempotencyKey': None} for key in sorted(files)]
+        cursor = agent.cursor_sha256(files, 's3')
+        pending = {'scopeFingerprint': agent.source_fingerprint(self.args), 'connectionId': CONNECTION, 'files': files}
+        if not upload_set:
+            pending['body'] = {'batchId': str(uuid.uuid4()), 'previousCursorSha256': None, 'nextCursorSha256': cursor,
+                               'manifestSha256': 'sha256:' + agent.sha256(agent.canonical(events)), 'events': events}
+        else:
+            attempt = 'att_' + uuid.uuid4().hex
+            entries = {key: agent.intake_manifest_entry(key, files[key]) for key in sorted(files) if files[key]['mimeType']}
+            for event in events:
+                if event['nativeId'] in entries:
+                    event['sourceIdempotencyKey'] = agent.approved_source_idempotency_key(attempt, entries[event['nativeId']]['fileKey'])
+            manifest = sorted(entries.values(), key=lambda entry: entry['fileKey'])
+            pending['intake'] = {'batchId': str(uuid.uuid4()), 'previousCursorSha256': None, 'nextCursorSha256': cursor, 'events': events,
+                                 'attemptKey': attempt, 'approveUpToCredits': 100000, 'allowUnknownPageCount': True,
+                                 'clientManifestDigest': agent.intake_manifest_digest(manifest), 'manifest': manifest,
+                                 'members': {entry['fileKey']: {'nativeId': key, 'documentId': None, 'phase': 'planned'} for key, entry in entries.items()},
+                                 'quote': None, 'approvalPosted': approval_posted, 'approvalBody': None, 'approval': None}
         self.args.state.with_name('state.json.pending').write_text(json.dumps(pending))
-        with self.assertRaisesRegex(agent.AgentError, 'exclusion policy'):
+        return pending
+
+    def test_an_old_agent_s3_commit_journal_is_replayed_without_its_excluded_keys(self):
+        journal = self.old_agent_s3_journal(upload_set=False)
+        result = agent.sync(self.args)  # the shared filter_replayed_journal, as mounted sync
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 0})
+        body = Client.bodies[-1]
+        self.assertEqual(body['batchId'], journal['body']['batchId'])
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertEqual(body['nextCursorSha256'], agent.cursor_sha256({'report.pdf': journal['files']['report.pdf']}, 's3'))
+        self.assertEqual((Client.uploads, self.s3.read), ([], []))
+        for marker in SECRET_MARKERS:
+            self.assertNotIn(marker, agent.canonical(Client.bodies) + self.args.state.read_text())
+
+    def test_an_old_agent_s3_upload_journal_drops_excluded_members_or_stops_once_sent_for_approval(self):
+        self.old_agent_s3_journal(upload_set=True)
+        result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 2})
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertEqual([name for name, _ in Client.uploads], ['report.pdf'])
+        self.assertEqual(sorted(set(self.s3.read)), ['report.pdf'])
+        self.args.state.unlink(); Client.bodies = []; Client.uploads = []
+        self.old_agent_s3_journal(upload_set=True, approval_posted=True)
+        with self.assertRaisesRegex(agent.ReviewRequiredError, 'already sent for approval'):
             agent.sync(self.args)
-        self.assertEqual(Client.bodies, []); self.assertEqual(self.s3.read, [])
+        self.assertEqual((Client.bodies, Client.uploads, self.s3.read), ([], [], []))
 
     def test_more_changed_objects_than_one_approval_commit_in_subsets(self):
         s3 = self.cloud({f'r{index}.pdf': f'%PDF-{index}'.encode() for index in range(5)})
