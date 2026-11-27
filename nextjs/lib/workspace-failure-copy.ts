@@ -53,6 +53,9 @@ const FAILURE_COPY: Record<string, string> = {
   BILLING_RESUBSCRIBE_CONTACT: "This workspace's earlier subscription has ended, and a new one is set up with us so nothing is charged twice. Nothing was opened or charged. Write to support@tavonel.com and we will set it up.",
   BILLING_PLAN_CHANGE_REQUIRED: "This workspace already has a plan, so nothing was opened or charged. A different plan waits until the current one ends, or is arranged with us through the contact page.",
   WORKSPACE_HAS_MEMBERS: "This plan is for one person, and this workspace has other members or open invitations, so nothing was opened or charged. Revoke the other members and any open invitations under Members & invitations, then choose the plan again.",
+  /* The checkout counts a workspace's members and invitations before it opens; a count that cannot be read refuses (503), never reads as one person. */
+  WORKSPACE_MEMBERSHIP_READ_FAILED: "This workspace's members could not be read right now, so nothing was opened or charged. Try again in a moment.",
+  WORKSPACE_INVITE_READ_FAILED: "This workspace's invitations could not be read right now, so nothing was opened or charged. Try again in a moment.",
   BILLING_OFFER_CONTACT_REQUIRED: "This plan is arranged with us rather than bought online, so nothing was charged. Use the contact page to set it up.",
   PROCESSING_QUALIFICATION_NOT_BILLABLE: "This workspace's source access covers a processing check, not paid use, so nothing was charged. Request source access for paid use before retrying.",
   PILOT_ACCESS_REQUIRED: "This account is not admitted to a TAVONEL workspace. Access is arranged with us through the contact page.",

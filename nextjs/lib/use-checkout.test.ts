@@ -324,7 +324,7 @@ describe("checkout refusals", () => {
     expect(paddle.opened).toHaveLength(0);
     expect(notices[0]).toContain("Revoke the other members and any open invitations");
     expect(notices[0]).toContain("nothing was opened or charged");
-    expect(links).toEqual([{ href: "/enterprise", label: "Open Members & invitations" }]);
+    expect(links).toEqual([{ href: "/workspace/admin", label: "Open Members & invitations" }]);
   });
 
   it("links nothing on a refusal the terms cannot change", async () => {

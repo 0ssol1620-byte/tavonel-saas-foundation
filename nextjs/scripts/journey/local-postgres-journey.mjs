@@ -100,7 +100,11 @@ try {
     (${quote(outsider)},'outsider@journey.invalid','{}','{}'),
     (${quote(admin)},'admin@journey.invalid','{}','{}');
     insert into public.foundation_workspace_members(workspace_key,user_id,role,state,accepted_at)
-      values(${quote(workspace)},${quote(admin)},'admin','active',now());`);
+      values(${quote(workspace)},${quote(admin)},'admin','active',now());
+    -- A Free workspace has one seat (20261127100000); this journey re-invites its admin through the real RPCs, so the
+    -- owner's workspace is a legacy plan (plan_code null), which is uncapped.
+    insert into public.foundation_billing_accounts(workspace_key,user_id,access_plan,plan_code,subscription_status)
+      values(${quote(workspace)},${quote(owner)},'studio_access',null,'active');`);
   check("signup trigger bootstraps exactly one Foundation owner", sql(`select count(*) from public.foundation_workspace_members where workspace_key=${quote(workspace)} and role='owner' and state='active'`), "1");
   const visible = user => sql(`set role authenticated; set request.jwt.claim.sub=${quote(user)}; select count(*) from public.workspaces`);
   check("owner sees only their real RLS workspace", visible(owner), "1");

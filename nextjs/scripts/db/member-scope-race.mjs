@@ -45,6 +45,8 @@ function setupSql() {
   return [
     "insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at) values " +
       `${user(OWNER, `race-owner-${TAG}@example.invalid`)}, ${user(MEMBER, `race-member-${TAG}@example.invalid`)};`,
+    // A Free workspace has one seat (20261127100000): the owner's workspace is a legacy plan (plan_code null), uncapped.
+    `insert into public.foundation_billing_accounts (workspace_key, user_id, access_plan, plan_code, subscription_status) values ('${WORKSPACE}', '${OWNER}', 'studio_access', null, 'active');`,
     `select public.create_foundation_workspace_invite('${WORKSPACE}', '${OWNER}', 'race-member-${TAG}@example.invalid', 'member', 'sha256:' || md5('${TAG}') || md5('${TAG}#'), 'race_member_idem_${TAG}', now() + interval '1 hour', 'race-invite-0001');`,
     `select public.accept_foundation_workspace_invite('${MEMBER}', 'sha256:' || md5('${TAG}') || md5('${TAG}#'), 'race-accept-${TAG}');`,
   ].join(NL);
