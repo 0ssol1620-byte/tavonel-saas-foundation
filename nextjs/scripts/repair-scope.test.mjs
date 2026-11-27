@@ -8235,9 +8235,9 @@ test('affected trial-to-paid-20261109 owner: 7 exact paths select 27 direct suit
 });
 // legal-semicolons-20261109: one finite owner, restated independently of the exported constants.
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'];
-  const suites = ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'];
+test('affected legal-semicolons-20261109 owner: 7 exact paths select 12 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts', 'public/policy/TAVONEL_DPA_v1_2026-09-11.md', 'public/policy/TAVONEL_DPA_v2_2026-09-23.md'];
+  const suites = ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-page-answers.test.ts', 'lib/trust-provisions.test.ts'];
   assert.deepEqual([[...LEGAL_SEMICOLONS_AFFECTED_PATHS], [...LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths.map(p => `nextjs/${p}`)) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['legal-semicolons-20261109'], path);
