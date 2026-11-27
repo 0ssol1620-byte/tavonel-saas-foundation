@@ -1,16 +1,8 @@
 {
-  "version": "locus-v2",
-  "viewBox": "0 0 24 24",
-  "ground": "#08090A",
-  "ink": "#9AA3A8",
-  "paths": [
-    {
-      "d": "M4.5 3.5H14.5L19.5 7V20.5H4.5Z",
-      "strokeWidth": 2.5
-    },
-    {
-      "d": "M9.5 12V16H15",
-      "strokeWidth": 2
-    }
-  ]
+  "version": "blueprint-v34",
+  "viewBox": "0 0 31 31",
+  "assetViewBox": "-2.9 -2.9 36.8 36.8",
+  "rotate": -12,
+  "tile": { "size": 31, "radius": 10, "fill": "#142b23" },
+  "pill": { "x": 10, "y": 6, "width": 11, "height": 19, "radius": 5, "fill": "#c9f2a5" }
 }

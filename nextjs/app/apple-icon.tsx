@@ -4,10 +4,9 @@ import { OgLogomark } from "@/lib/og-card";
 /**
  * BQ-062. The mark a phone puts on its home screen.
  *
- * There was none, so an iOS reader who saved the site got a screenshot of the page scaled into a
- * rounded square -- the one place a brand is looked at in isolation, and the site had nothing to
- * put there. Drawn from `OgLogomark`, which is decision A-06's geometry, so this is the same mark
- * as the nav, the favicon and every share card rather than a fourth drawing of it.
+ * Drawn from `OgLogomark`, the V34 blueprint mark's geometry (`lib/brand-mark.json`), so it is the
+ * same mark as the nav, the favicon and every share card. iOS fills a transparent icon with black,
+ * so the tile sits on the blueprint's paper, `#f7f8f4`.
  */
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
@@ -22,10 +21,10 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#08090A",
+          background: "#f7f8f4",
         }}
       >
-        <OgLogomark size={124} />
+        <OgLogomark size={110} />
       </div>
     ),
     size,
