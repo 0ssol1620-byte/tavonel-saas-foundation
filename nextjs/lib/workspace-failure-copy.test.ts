@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
 import { CompileJobPanel } from "../components/compile-job-panel";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./workspace-ask-copy";
-import { blockedPanelCopy, FAILURE_COPY_CODES, failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
+import { blockedPanelCopy, compiledWorldReadyNotice, FAILURE_COPY_CODES, failureSentence, isSizeLimitFailure, NO_ENTITIES_NOTE, noEntitiesNote, offersUpgrade, pageLocale, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -286,5 +286,41 @@ describe("failure copy follows the page, not the browser", () => {
       expect(html).toContain("Measured size");
       expect(html).not.toMatch(HANGUL);
     }
+  });
+});
+
+/*
+  WO-ENT-UX-1: the count lines say only what the payload's own counts say.
+*/
+describe("honest count lines for a compiled World", () => {
+  const counts = { documents: 12, topics: null, entities: 0, claims: 16, relations: 20 };
+
+  it("adds the no-entities note only when claims exist and entities are zero", () => {
+    expect(noEntitiesNote({ claims: 16, entities: 0 })).toBe(NO_ENTITIES_NOTE);
+    expect(NO_ENTITIES_NOTE).toBe("No entities were identified in this run; the engine may have found none or its patterns did not match.");
+    // The failure paths of the condition: entities present, or no claims at all, say nothing.
+    expect(noEntitiesNote({ claims: 16, entities: 1 })).toBeNull();
+    expect(noEntitiesNote({ claims: 0, entities: 0 })).toBeNull();
+  });
+
+  it("leaves the topic phrase out when the engine has no topic concept, and never prints 0 topics", () => {
+    const notice = compiledWorldReadyNotice(counts);
+    expect(notice).toBe("Compiled World ready from 12 documents: 0 entities, 16 claims and 20 relations.");
+    expect(notice).not.toMatch(/topics/);
+    expect(compiledWorldReadyNotice({ ...counts, topics: undefined })).not.toMatch(/topics/);
+  });
+
+  it("keeps a real topic count, including a real zero, when the engine reports one", () => {
+    expect(compiledWorldReadyNotice({ ...counts, topics: 3 })).toContain("3 topics, ");
+    expect(compiledWorldReadyNotice({ ...counts, topics: 0 })).toContain("0 topics, ");
+  });
+
+  it("is wired into the workspace page and the explorer without a Number(null) coercion", () => {
+    expect(workspace).toContain("compiledWorldReadyNotice(result.validation.counts)");
+    expect(workspace.split("noEntitiesNote(collectionResult.validation.counts)").length - 1).toBeGreaterThanOrEqual(2);
+    expect(workspace).not.toContain("validation.counts.topics} topics");
+    const explorer = readFileSync(new URL("../components/world-explorer.tsx", import.meta.url), "utf8");
+    expect(explorer).toContain("counts.topics === null ? []");
+    expect(explorer).toContain("not in engine");
   });
 });

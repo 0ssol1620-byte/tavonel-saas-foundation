@@ -30,7 +30,10 @@ describe("existing immutable document compilation", () => {
   it("submits only the selected document ids to the existing compile route", () => {
     expect(source).toContain("const documentIds = [...new Set(selectedDocumentIds)]");
     expect(source).toContain('body: JSON.stringify({ documentIds })');
-    expect(source).toContain("Compiled World ready from");
+    // The sentence moved to compiledWorldReadyNotice (lib/workspace-failure-copy.ts, WO-ENT-UX-1) so a
+    // Core V2 run with no Topic concept never prints "0 topics"; the sentence itself is pinned in
+    // workspace-failure-copy.test.ts and the page must still build its notice from the validation counts.
+    expect(source).toContain("compiledWorldReadyNotice(result.validation.counts)");
     expect(source).not.toContain("candidatePromotion=false");
   });
 });

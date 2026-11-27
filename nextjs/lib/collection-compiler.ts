@@ -262,7 +262,13 @@ export type CollectionCandidateArtifact = {
     reviewReasons?: string[];
     counts: {
       documents: number;
-      topics: number;
+      /*
+        `null` + `topicConcept: "not_in_engine"` is the Core V2 answer: that engine has no Topic
+        object, so a number would claim a search that never happened. The TS fallback always
+        reports a number. Render nothing for null; never coerce it to 0.
+      */
+      topics: number | null;
+      topicConcept?: "not_in_engine";
       entities: number;
       claims: number;
       evidence: number;
@@ -590,7 +596,14 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
   return input as CollectionOcrInput;
 }
 
-export function compileCollectionCandidate(inputs: CollectionOcrInput[]): CollectionCandidateArtifact {
+/**
+ * The TS fallback always runs a topic pass, so its topic count is a number. Only the Core V2
+ * projection reports `null` (no Topic concept); the narrower return type keeps fallback callers
+ * from having to guard for a case this engine cannot produce.
+ */
+export type FallbackCollectionCandidate = CollectionCandidateArtifact & { validation: { counts: { topics: number } } };
+
+export function compileCollectionCandidate(inputs: CollectionOcrInput[]): FallbackCollectionCandidate {
   // One document is a world. The old floor of two was a compiler implementation detail that
   // reached the customer as "upload succeeded, nothing was built". The ceiling is shared with
   // the route and the workspace so a selection cannot pass one check and fail the next.

@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
+import { compiledWorldReadyNotice, failureSentence, isSizeLimitFailure, noEntitiesNote, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -154,7 +154,7 @@ type CollectionResult = {
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   validation: {
     status: "passed" | "review_required";
-    counts: { documents: number; topics: number; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
+    counts: { documents: number; topics: number | null; topicConcept?: "not_in_engine"; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
   };
 };
 
@@ -1708,7 +1708,7 @@ export default function WorkspacePage() {
       if (!result || result.collectionId !== compiled) return result;
       setNotice(result.lifecycle === "review_required"
         ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; nothing is active yet.`
-        : `Compiled World ready from ${result.validation.counts.documents} documents: ${result.validation.counts.topics} topics, ${result.validation.counts.entities} entities, ${result.validation.counts.claims} claims and ${result.validation.counts.relations} relations.`);
+        : compiledWorldReadyNotice(result.validation.counts));
       return result;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3652,6 +3652,7 @@ export default function WorkspacePage() {
               status={worldScreenStatus(activeWorld?.revision ?? null)} bodyClassName="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} relations.</p>
+                {noEntitiesNote(collectionResult.validation.counts) ? <p className="fine" data-testid="no-entities-note">{noEntitiesNote(collectionResult.validation.counts)}</p> : null}
                 {activeWorld ? null : (
                   <p className="fine">
                     Nothing is active until you approve it. Review the evidence, then activate the
@@ -4065,6 +4066,7 @@ export default function WorkspacePage() {
                         <span><b>Validation</b>{collectionResult.validation.status === "passed" ? "Passed" : "Needs review"}</span>
                         <span><b>Current active</b>{activeWorld ? `Revision ${activeWorld.revision}` : "None"}</span>
                       </div>
+                      {noEntitiesNote(collectionResult.validation.counts) ? <p className="fine" data-testid="no-entities-note-review">{noEntitiesNote(collectionResult.validation.counts)}</p> : null}
                       <label htmlFor="review-reason">Human review record</label>
                       <textarea
                         id="review-reason"
