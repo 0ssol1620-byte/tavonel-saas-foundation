@@ -90,11 +90,13 @@ vi.mock("../app/api/v1/collections/[id]/search/route", () => ({
 vi.mock("../app/api/v1/world/[id]/[lens]/route", () => ({
   GET: async (request: Request) => {
     world.routeCalls += 1;
-    const ids = (new URL(request.url).searchParams.get("ids") ?? "").split(",");
+    const wanted = new URL(request.url).searchParams.get("ids");
+    const ids = (wanted ?? "").split(",");
     return Response.json({
       code: "OK",
       world: { manifestDigest: DIGEST },
-      evidence: ids.flatMap((value) => world.evidence.get(value) ?? []),
+      // The route's own semantics: `ids` selects exact row ids, no `ids` is the whole lens (what canonical fetch reads).
+      evidence: wanted === null ? [...world.evidence.values()] : ids.flatMap((value) => world.evidence.get(value) ?? []),
       selection: { requested: ids.length, found: 0, missing: [] },
     });
   },

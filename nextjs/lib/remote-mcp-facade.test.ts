@@ -78,6 +78,7 @@ vi.mock("../app/api/v1/world/[id]/[lens]/route", () => ({
     world.calls.push({ kind: "lens", url: request.url, auth: request.headers.get("authorization") });
     if (!world.active.includes(id)) return Response.json({ code: "WORLD_NOT_FOUND" }, { status: 404 });
     const ids = (url.searchParams.get("ids") ?? "").split(",");
+    const noIds = url.searchParams.get("ids") === null;
     const known = url.searchParams.get("known_at");
     if (world.rows !== null) {
       // The route's own semantics: `ids` selects rows whose id is exactly one of them, no `ids` is the whole lens.
@@ -88,15 +89,20 @@ vi.mock("../app/api/v1/world/[id]/[lens]/route", () => ({
     return Response.json({
       code: "OK",
       world: { manifestDigest: known ? OLD_DIGEST : world.digest },
-      evidence: ids.flatMap((value) => world.evidence.get(value) ?? []),
+      evidence: noIds ? [...world.evidence.values()] : ids.flatMap((value) => world.evidence.get(value) ?? []),
       selection: { requested: ids.length, found: 0, missing: [] },
     });
   },
 }));
 
 import { POST as mcp } from "../app/api/mcp/route";
+import { compileCollectionCandidate, type CollectionOcrInput } from "./collection-compiler";
+import { parseChunks } from "./grounded-ask";
+import { compileSectionViewUnits } from "./retrieval-units";
+import { sealClaims, unsealClaims } from "./sealed-claims";
+import { buildWorldReadModel } from "./world-read-model";
 import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
-import { REMOTE_MCP_CANONICAL_TOOL_SCOPES, REMOTE_MCP_TOOL_SCOPES, remoteMcpCanonicalToolsEnabled, remoteMcpToolLabel } from "./remote-mcp";
+import { REMOTE_MCP_CANONICAL_TOOL_SCOPES, REMOTE_MCP_TOOL_SCOPES, remoteMcpCanonicalToolsEnabled, remoteMcpSealingKey, remoteMcpToolLabel } from "./remote-mcp";
 
 const principals: Record<string, { workspaceKey: string; scopes: string[]; authorizationRevision: number }> = {};
 const principal = (workspaceKey: string, scopes = READ_SCOPES, authorizationRevision = 4) => ({
@@ -305,7 +311,9 @@ describe("fetch", () => {
     expect(outcome.result.isError).toBe(false);
     const body = outcome.result.structuredContent!;
     expect(new URL(calls("lens")[0]!.url).pathname).toBe(`/api/v1/world/${WORLD}/evidence`);
-    expect(new URL(calls("lens")[0]!.url).searchParams.get("ids")).toBe("ev_1");
+    // One read of the lens: a by-id read of a bare evidence id never matches a `<evidence>:<chunk>` row.
+    expect(calls("lens")).toHaveLength(1);
+    expect(new URL(calls("lens")[0]!.url).searchParams.get("ids")).toBeNull();
     expect(body).toMatchObject({
       id: found[0]!.id,
       title: "Source dv_1, page 3",
@@ -366,17 +374,41 @@ describe("fetch", () => {
     // The id namespaces of the real route (lib/world-read-model.ts parseEvidence). A ChatGPT client hit NOT_FOUND here.
     const row = (id: string, excerpt: string, page = 3) => evidence(id, excerpt, page);
 
-    it("returns every chunk of the cited evidence, in the lens's order, and nothing of another evidence", async () => {
-      world.rows = [row("ev_1:chunk_1", "First chunk of one."), row("ev_2:chunk_1", "Other evidence."), row("ev_1:chunk_2", "Second chunk of one.", 4)];
+    it("returns the matched page's chunks of the cited evidence, in the lens's order, and nothing of another evidence or page", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one."), row("ev_2:chunk_1", "Other evidence."), row("ev_1:chunk_2", "Second chunk of one."), row("ev_1:chunk_3", "Next page.", 4)];
       world.items = [item("u1", ["ev_1"])];
       const outcome = await tool("fetch", { id: resultsOf(await search())[0]!.id });
       expect(outcome.result.isError).toBe(false);
       const body = outcome.result.structuredContent!;
-      expect(body.text.indexOf("First chunk of one.")).toBeGreaterThan(-1);
       expect(body.text.indexOf("Second chunk of one.")).toBeGreaterThan(body.text.indexOf("First chunk of one."));
       expect(body.text).not.toContain("Other evidence.");
-      expect(body.metadata).toMatchObject({ evidence_ids: ["ev_1"], pages: [3, 4], untrusted_content: true });
-      expect(calls("lens").map((entry) => new URL(entry.url).searchParams.get("ids"))).toEqual(["ev_1", null]);
+      expect(body.text).not.toContain("Next page.");
+      expect(body.metadata).toMatchObject({ evidence_ids: ["ev_1"], pages: [3, 3], matched_bbox: [10, 20, 300, 40], untrusted_content: true });
+      expect(calls("lens").map((entry) => new URL(entry.url).searchParams.get("ids"))).toEqual([null]);
+    });
+
+    it("an old-style (v1) sealed id keeps today's whole-evidence read", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one."), row("ev_1:chunk_3", "Next page.", 4)];
+      world.items = [item("u1", ["ev_1"])];
+      const claims = unsealClaims("mcp-result", resultsOf(await search())[0]!.id.slice(4), remoteMcpSealingKey()!)!;
+      expect(claims.v).toBe(2);
+      const { p: _p, b: _b, ...rest } = claims;
+      const legacy = `tvr_${sealClaims("mcp-result", { ...rest, v: 1 }, remoteMcpSealingKey()!)}`;
+      const body = (await tool("fetch", { id: legacy })).result.structuredContent!;
+      expect(body.text).toContain("First chunk of one.");
+      expect(body.text).toContain("Next page.");
+      expect(body.metadata).toMatchObject({ pages: [3, 4] });
+      expect(body.metadata.continuation).toBeUndefined();
+    });
+
+    it("refuses a v2 locator that does not parse, and a page the World no longer holds", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one.")];
+      world.items = [item("u1", ["ev_1"])];
+      const claims = unsealClaims("mcp-result", resultsOf(await search())[0]!.id.slice(4), remoteMcpSealingKey()!)!;
+      for (const bad of [{ p: 0 }, { p: "3" }, { p: 1.5 }, { p: null, b: [1, 2, 3, 4] }, { b: [1, 2, 3] }, { p: 9, b: null }]) {
+        const id = `tvr_${sealClaims("mcp-result", { ...claims, ...bad }, remoteMcpSealingKey()!)}`;
+        expect(errorText(await tool("fetch", { id })), JSON.stringify(bad)).toMatch(/^NOT_FOUND: no result /);
+      }
     });
 
     it("keeps the all-or-nothing rule: one cited evidence with no row is NOT_FOUND, not a partial answer", async () => {
@@ -406,7 +438,105 @@ describe("fetch", () => {
       const words = Array.from({ length: 15_000 }, () => "abc").join(" ");
       world.rows = [row("ev_1:chunk_1", words), row("ev_1:chunk_2", words)];
       world.items = [item("u1", ["ev_1"])];
-      expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^FETCH_OVER_BUDGET/);
+      expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^FETCH_OVER_BUDGET: 2 regions on page 3/);
+    });
+
+    it("carries known_at on the one lens read", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one.")];
+      world.items = [item("u1", ["ev_1"])];
+      const at = "2026-11-01T09:30:00Z";
+      await tool("fetch", { id: resultsOf(await search({ known_at: at }))[0]!.id });
+      expect(calls("lens")).toHaveLength(1);
+      expect(new URL(calls("lens")[0]!.url).searchParams.get("known_at")).toBe(at);
+    });
+
+    describe("a long document: one evidence, many pages", () => {
+      const chunk = (page: number, n: number, words: number) => row(`ev_1:p${page}c${n}`, `Page ${page} chunk ${n}${" abc".repeat(words)}`, page);
+      const long = () => [1, 2, 3, 4, 5].flatMap((page) => [chunk(page, 1, 9_000), chunk(page, 2, 100)]);
+      const pageItem = (page: number) => ({ ...item("u1", ["ev_1"]), pageNumber1: page });
+
+      it("is over budget as a whole, yet answers the matched page, with sealed continuation ids that open the neighbours", async () => {
+        world.rows = long();
+        world.items = [pageItem(3)];
+        const outcome = await tool("fetch", { id: resultsOf(await search())[0]!.id });
+        expect(outcome.result.isError).toBe(false);
+        const body = outcome.result.structuredContent!;
+        expect(body.text).toContain("Page 3 chunk 1");
+        expect(body.text).toContain("Page 3 chunk 2");
+        expect(body.text).not.toMatch(/Page [1245] chunk/);
+        const { continuation } = body.metadata as { continuation: Record<string, unknown> };
+        expect(continuation).toMatchObject({ page: 3, page_count: 5, complete: false });
+        expect(String(continuation.next_id)).toMatch(/^tvr_/);
+        const next = (await tool("fetch", { id: continuation.next_id as string })).result.structuredContent!;
+        expect(next.text).toContain("Page 4 chunk 1");
+        expect(next.text).not.toContain("Page 3 chunk");
+        expect(next.metadata).toMatchObject({ pages: [4, 4], continuation: { page: 4, page_count: 5, complete: false } });
+        const back = (await tool("fetch", { id: (next.metadata.continuation as Record<string, string>).previous_id })).result.structuredContent!;
+        expect(back.text).toContain("Page 3 chunk 1");
+        // Neighbour ids carry the same World, digest and clock: a moved World still refuses them.
+        world.digest = NEWER_DIGEST;
+        expect(errorText(await tool("fetch", { id: continuation.next_id as string }))).toBe("RESULT_ID_STALE: search again");
+      });
+
+      it("walking next_id reaches every page exactly once, and the first page has no previous", async () => {
+        world.rows = long();
+        world.items = [pageItem(1)];
+        let id: string | null = resultsOf(await search())[0]!.id;
+        const seen: number[] = [];
+        while (id !== null) {
+          const body: NonNullable<ToolResult["structuredContent"]> = (await tool("fetch", { id })).result.structuredContent!;
+          const continuation = body.metadata.continuation as { next_id: string | null; previous_id: string | null; complete: boolean };
+          if (seen.length === 0) expect(continuation.previous_id).toBeNull();
+          seen.push(...new Set(body.metadata.pages as number[]));
+          expect(continuation.complete).toBe(false);
+          id = continuation.next_id;
+        }
+        expect(seen).toEqual([1, 2, 3, 4, 5]);
+      });
+
+      it("a single-page evidence is complete, with no neighbours", async () => {
+        world.rows = [row("ev_1:chunk_1", "Only chunk.")];
+        world.items = [item("u1", ["ev_1"])];
+        const body = (await tool("fetch", { id: resultsOf(await search())[0]!.id })).result.structuredContent!;
+        expect(body.metadata.continuation).toEqual({ page: 3, page_count: 1, complete: true, previous_id: null, next_id: null });
+      });
+
+      it("keeps FETCH_OVER_BUDGET only for a page that is itself too large, and cuts nothing", async () => {
+        world.rows = [...long(), chunk(6, 1, 15_000), chunk(6, 2, 15_000)];
+        world.items = [pageItem(6)];
+        expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^FETCH_OVER_BUDGET: 2 regions on page 6/);
+        world.items = [pageItem(2)];
+        expect((await tool("fetch", { id: resultsOf(await search())[0]!.id })).result.isError).toBe(false);
+      });
+    });
+
+    it("opens the matched page of a real compiled World: lens rows from buildWorldReadModel, items from compileSectionViewUnits", async () => {
+      const regions = [1, 2, 3].flatMap((page) => [0, 1].map((order) => ({
+        regionId: `doc-p${page}-b${order}`, pageIndex0: page - 1, pageNumber1: page, order, blockType: "paragraph" as const,
+        text: `Clause ${page}.${order} says Payment is due within ${page}${order} days.`, bbox1000: [80, 100 + order * 200, 920, 250 + order * 200] as [number, number, number, number],
+        confidence: 0.99, authority: "contractual" as const,
+      })));
+      const digest = "a".repeat(64);
+      const source: CollectionOcrInput = {
+        documentId: "doc", versionKey: digest, sanitizedKey: `immutable/ws/ws/documents/doc/${digest}/sanitized.pdf`, ocrJsonKey: `immutable/ws/ws/documents/doc/${digest}/ocr.json`,
+        pageCount: 3, text: regions.map((region) => region.text).join("\n"), inputSha256: `sha256:${digest}`, sourceImmutableKey: `immutable/ws/ws/documents/doc/${digest}/sanitized.pdf`, regions,
+      };
+      const compiled = compileCollectionCandidate([source]);
+      // The same completed-Core stamp the change-inbox test gives its compiled World; without it the read model refuses the artifact.
+      const candidate = { ...compiled, coreExecution: { status: "completed" as const, runtime: "tavonel-python-core-v2", worldStateId: "world-state-1", receipt: { requestId: "fetch-2-test", outputSha256: `sha256:${"c".repeat(64)}`, candidatePromotion: false as const } } };
+      const model = buildWorldReadModel(candidate, candidate.collectionId, { origin: "deterministic_sample" })!;
+      const units = compileSectionViewUnits(candidate, parseChunks(candidate));
+      // The compiler gives one evidence id to the whole document version, and one lens row per region under it.
+      expect(new Set(units.map((unit) => unit.evidenceIds[0])).size).toBe(1);
+      expect(model.evidence).toHaveLength(6);
+      world.rows = JSON.parse(JSON.stringify(model.evidence));
+      const target = units.find((unit) => unit.pageNumber1 === 2 && unit.text.includes("2.1"))!;
+      world.items = [{ ...item(target.unitId, target.evidenceIds, target.text), sourceVersionId: target.documentVersionKey, pageNumber1: target.pageNumber1, bbox1000: target.bbox1000 }];
+      const body = (await tool("fetch", { id: resultsOf(await search())[0]!.id })).result.structuredContent!;
+      expect(body.text).toContain("Clause 2.0");
+      expect(body.text).toContain("Clause 2.1");
+      expect(body.text).not.toMatch(/Clause [13]\./);
+      expect(body.metadata).toMatchObject({ pages: [2, 2], matched_bbox: target.bbox1000, continuation: { page: 2, page_count: 3, complete: false } });
     });
 
     it("still answers RESULT_ID_STALE when the World moved, before any row is read", async () => {
@@ -458,7 +588,7 @@ describe("limits, never cut", () => {
 
   it("refuses a fetch whose regions do not fit one tool result", async () => {
     world.evidence.set("ev_1", evidence("ev_1", words(15_000)));
-    world.evidence.set("ev_2", evidence("ev_2", words(15_000)));
+    world.evidence.set("ev_2", evidence("ev_2", words(15_000), 3));
     world.items = [item("u1", ["ev_1", "ev_2"])];
     const id = resultsOf(await search())[0]!.id;
     expect(errorText(await tool("fetch", { id }))).toMatch(/^FETCH_OVER_BUDGET/);

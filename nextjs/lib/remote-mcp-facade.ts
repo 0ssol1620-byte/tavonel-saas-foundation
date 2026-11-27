@@ -115,6 +115,8 @@ const sourceTitle = (sourceVersionId: unknown, page: unknown) =>
 const evidenceUrl = (origin: string, worldId: string, evidenceId: string) =>
   `${origin}/workspace/sources?world=${encodeURIComponent(worldId)}&evidence=${encodeURIComponent(evidenceId)}`;
 
+const isBbox = (value: unknown): value is number[] => Array.isArray(value) && value.length === 4 && value.every((entry) => typeof entry === "number" && Number.isFinite(entry));
+
 const content = (result: Json) => ({ content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result, isError: false });
 
 export function createCanonicalFacade(input: {
@@ -155,9 +157,12 @@ export function createCanonicalFacade(input: {
       if (evidenceIds.length === 0 || typeof item.text !== "string" || typeof item.unitId !== "string") {
         refuse("DELIVERY_ITEM_INVALID: a retrieved region has no text, unit or evidence id to cite");
       }
+      // v2 adds the locator the retrieval unit really carries (page, bbox); a unit without a valid one seals null and fetches the whole evidence, as v1 did.
+      const page = Number.isSafeInteger(item.pageNumber1) && (item.pageNumber1 as number) >= 1 ? item.pageNumber1 as number : null;
       const id = PREFIX + sealClaims(PURPOSE, {
-        v: 1, w: principal!.workspaceKey, c: world, d: digest, e: evidenceIds, u: item.unitId,
+        v: 2, w: principal!.workspaceKey, c: world, d: digest, e: evidenceIds, u: item.unitId,
         a: principal!.authorizationRevision, k: knownAt, exp: now() + TTL_MS,
+        p: page, b: page !== null && isBbox(item.bbox1000) ? item.bbox1000 : null,
       }, key!);
       return { id, title: sourceTitle(item.sourceVersionId, item.pageNumber1), url: evidenceUrl(origin, world!, evidenceIds[0]!), text: item.text };
     });
@@ -183,11 +188,15 @@ export function createCanonicalFacade(input: {
     const notFound = () => refuse(`NOT_FOUND: no result ${String(id).slice(0, 64)}`);
     const claims = String(id).startsWith(PREFIX) ? unsealClaims(PURPOSE, String(id).slice(PREFIX.length), key!) : null;
     if (
-      !claims || claims.v !== 1 || claims.w !== principal!.workspaceKey || typeof claims.c !== "string" || !COLLECTION_ID_PATTERN.test(claims.c) ||
+      !claims || (claims.v !== 1 && claims.v !== 2) || claims.w !== principal!.workspaceKey || typeof claims.c !== "string" || !COLLECTION_ID_PATTERN.test(claims.c) ||
       typeof claims.d !== "string" || !SHA256.test(claims.d) || typeof claims.u !== "string" || !Number.isSafeInteger(claims.a) ||
       !Number.isFinite(claims.exp) || !(claims.k === null || typeof claims.k === "string") ||
       !Array.isArray(claims.e) || claims.e.length === 0 || claims.e.length > EVIDENCE_MAX || !claims.e.every((entry) => typeof entry === "string")
     ) return notFound();
+    // v1 ids carry no locator: they keep the whole-evidence read. A v2 locator that does not parse is not an id this server issued.
+    const page = claims.v === 2 ? claims.p : null;
+    const bbox = claims.v === 2 ? claims.b : null;
+    if (claims.v === 2 && (!(page === null || (Number.isSafeInteger(page) && (page as number) >= 1)) || !(bbox === null || (page !== null && isBbox(bbox))))) return notFound();
     const world = claims.c, digest = claims.d, known = claims.k as string | null, wanted = claims.e as string[];
     if ((claims.exp as number) < now() || claims.a !== principal!.authorizationRevision) refuse("RESULT_ID_STALE: search again");
 
@@ -200,27 +209,31 @@ export function createCanonicalFacade(input: {
       if (obj(payload.world)?.manifestDigest !== digest) refuse("RESULT_ID_STALE: search again");
       return payload.evidence as Json[];
     };
-    const exact = new Map((await readEvidence(new URLSearchParams({ ids: wanted.join(","), ...knownQuery }))).map((entry) => [entry.id, entry]));
     /*
       Search cites the bare evidence id; the World's evidence rows are `<evidenceId>:<chunkId>`, one per
-      chunk, so a by-id read of the bare id never matches a real row. A cited id with no row of its own
-      is resolved to every chunk row under it (prefix on the `:` boundary, so ev_1 never takes ev_10:...),
-      in the lens's own order. A cited id with no row at all is still NOT_FOUND.
-      ponytail: the by-id read has no prefix form, so this reads the whole lens once, as the bridge's
+      chunk, so a by-id read of the bare id can never match a real row and is not made. One read of the
+      evidence lens (same bearer, World, known_at and digest check) is filtered here: a row whose id is the
+      cited id, or `<cited id>:` (the colon boundary, so ev_1 never takes ev_10:...). A cited id with no row
+      is NOT_FOUND, all or nothing.
+      ponytail: the route's by-id read has no prefix form, so this reads the whole lens once, as the bridge's
       get_evidence does; page it (limit/cursor) if a World's evidence lens outgrows one response.
     */
-    let lens: Json[] | null = null;
-    const regionsById = new Map<unknown, Json>();
+    const lens = await readEvidence(new URLSearchParams(knownQuery));
+    const family = new Map<unknown, Json>();
     for (const evidenceId of wanted) {
-      let hits = exact.has(evidenceId) ? [exact.get(evidenceId)!] : [];
-      if (hits.length === 0) {
-        lens ??= await readEvidence(new URLSearchParams(knownQuery));
-        hits = lens.filter((entry) => typeof entry.id === "string" && entry.id.startsWith(`${evidenceId}:`));
-      }
+      const hits = lens.filter((entry) => typeof entry.id === "string" && (entry.id === evidenceId || entry.id.startsWith(`${evidenceId}:`)));
       if (hits.length === 0) return notFound();
-      for (const hit of hits) regionsById.set(hit.id, hit);
+      for (const hit of hits) family.set(hit.id, hit);
     }
-    const regions = [...regionsById.values()];
+    // A v2 id returns the page the search matched, not the document; a page the World no longer holds is NOT_FOUND.
+    const regions = [...family.values()].filter((entry) => page === null || entry.page === page);
+    if (regions.length === 0) return notFound();
+    const pages = [...new Set([...family.values()].map((entry) => entry.page).filter((entry): entry is number => Number.isSafeInteger(entry)))].sort((x, y) => x - y);
+    const around = (offset: number) => {
+      const target = pages[pages.indexOf(page as number) + offset];
+      if (target === undefined) return null;
+      return PREFIX + sealClaims(PURPOSE, { ...claims, p: target, b: null, exp: now() + TTL_MS }, key!);
+    };
 
     const delivery = renderDelivery(
       regions.map((entry) => ({
@@ -236,7 +249,7 @@ export function createCanonicalFacade(input: {
     const files = [delivery.manifest, ...(delivery.indexes ?? []), ...delivery.parts];
     const tokens = files.reduce((sum: number, file: { estTokens: number }) => sum + file.estTokens, 0);
     if (tokens > DELIVERY_PART_BUDGET_TOKENS) {
-      refuse(`FETCH_OVER_BUDGET: ${regions.length} regions are ${tokens} estimated tokens, over the ${DELIVERY_PART_BUDGET_TOKENS} a single tool result is held to`);
+      refuse(`FETCH_OVER_BUDGET: ${regions.length} regions${page !== null ? ` on page ${page}` : ""} are ${tokens} estimated tokens, over the ${DELIVERY_PART_BUDGET_TOKENS} a single tool result is held to`);
     }
     const first = regions[0]!;
     return {
@@ -253,6 +266,11 @@ export function createCanonicalFacade(input: {
         evidence_ids: wanted,
         known_at: known,
         untrusted_content: true,
+        ...(page !== null ? {
+          ...(bbox !== null ? { matched_bbox: bbox } : {}),
+          // Other pages of the same evidence, as ids this caller can fetch. complete is true only when nothing else exists.
+          continuation: { page, page_count: pages.length, complete: pages.length <= 1, previous_id: around(-1), next_id: around(1) },
+        } : {}),
       },
     };
   }
