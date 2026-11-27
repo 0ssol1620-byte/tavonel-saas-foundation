@@ -92,6 +92,13 @@ const FAILURE_COPY: Record<string, string> = {
   TRIAL_COMPILE_ATTEMPTS_EXHAUSTED: "Your free evaluation cannot start another compile: its earlier compiles each need review before they can be used, so nothing new was started. Write to support@tavonel.com and we will look at them with you.",
   TRIAL_LIMIT_REACHED: "Your free evaluation has reached one of its limits.",
   TRIAL_NOT_ACTIVE: "Your free evaluation has ended.",
+  /*
+    WO-FIRST5-P1 review (P-2): the bootstrap refusals a free evaluation can start with. Their status lines
+    said "Wait a minute and try again" (429) and "Sign in again" (403), neither of which changes the answer.
+  */
+  TRIAL_REVIEW_REQUIRED: "Your free evaluation needs a check by a person on our side before it can start, so it will not clear in a few minutes. Write to us through the contact page and we will look at it.",
+  TRIAL_DEVICE_ALREADY_USED: "A free evaluation has already been used on this device, so another one cannot start. Choose a plan to continue, or write to us through the contact page if this is wrong.",
+  TRIAL_DISABLED: "Free evaluations are not open right now, so none was started. Choose a plan to continue, or write to us through the contact page.",
   TRIAL_AI_ACCESS_CHECK_FAILED: "We could not check your free evaluation limits, so nothing ran. Try again in a minute.",
   /* WO-CAT-8: the plan meters. Each says which allowance it was and what changes the answer; no number is stated here. */
   STORAGE_ALLOWANCE_EXHAUSTED: "This workspace has used its plan's storage allowance, so this file was not added. Delete sources the workspace no longer needs to make room.",

@@ -1245,6 +1245,12 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   // One noun per concept: the World is capitalised, so the control reads "Ask the active World".
   await page.getByRole("button", { name: "Ask the active World" }).click();
   await expect(page.getByText("Grounded answer")).toBeVisible();
+  // WO-FIRST5-P1: the citation's box sits in a native disclosure. Its summary is what a reader sees first,
+  // and opening it shows the same page, box and authority as before.
+  const sourceDetails = page.locator(".ask-result li summary", { hasText: "Page 2 · source details" });
+  await expect(sourceDetails).toBeVisible();
+  await expect(page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")).toBeHidden();
+  await sourceDetails.click();
   await expect(
     page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")
   ).toBeVisible();
