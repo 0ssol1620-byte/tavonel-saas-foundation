@@ -19,7 +19,7 @@
 -- source_fingerprints and document_relations (20261104090500).
 
 begin;
-select plan(78);
+select plan(82);
 
 -- ---------------------------------------------------------------------------
 -- 1. Every table in public, in catalog order.
@@ -62,6 +62,8 @@ select table_privs_are('public', 'foundation_connection_inventory_pages', 'servi
 select table_privs_are('public', 'foundation_connection_inventory_scans', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_credit_ledger', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_developer_audit_events', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
+-- Field vitals counters (20261127100000, WO-AN-RUM-1): RPC-only, the server role holds nothing on the table.
+select table_privs_are('public', 'foundation_field_vitals_daily', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_intake_admissions', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_job_events', 'service_role', array['SELECT', 'INSERT']::text[]);
 select table_privs_are('public', 'foundation_jobs', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
@@ -72,6 +74,10 @@ select table_privs_are('public', 'foundation_oauth_authorizations', 'service_rol
 select table_privs_are('public', 'foundation_oauth_connections', 'service_role', array['SELECT', 'INSERT', 'UPDATE']::text[]);
 select table_privs_are('public', 'foundation_oauth_secret_envelopes', 'service_role', array['SELECT', 'INSERT', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_pending_reversals', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
+-- Product measurement (20261127100000, WO-AN-RUM-1): RPC-only, the server role holds nothing on the three tables.
+select table_privs_are('public', 'foundation_product_active_days', 'service_role', array[]::text[]);
+select table_privs_are('public', 'foundation_product_measurement_consents', 'service_role', array[]::text[]);
+select table_privs_are('public', 'foundation_product_milestones', 'service_role', array[]::text[]);
 select table_privs_are('public', 'foundation_retrieval_compile_runs', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_retrieval_embeddings', 'service_role', array['SELECT', 'INSERT', 'DELETE']::text[]);
 select table_privs_are('public', 'foundation_retrieval_profiles', 'service_role', array['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]);

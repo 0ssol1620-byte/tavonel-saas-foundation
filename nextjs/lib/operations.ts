@@ -31,6 +31,13 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
   2026-11-27 (WO-LF-0, orchestrator under the founder's 2026-11-09 delegation): /privacy narrows
   suspension on removal to the connected cloud accounts and says that a file deleted from a
   local-folder agent's folder is not removed or suspended on its own.
+
+  2026-11-27 (WO-AN-RUM-1, lead-approved privacy wording under the founder's 2026-11-09
+  delegation): /privacy adds page-speed reporting behind the existing analytics permission, a
+  new "Optional product measurement" section with its legal-basis row and collected-data line,
+  and a first-touch storage row that now says the campaign name and ad label are sent to us with a
+  product-measurement yes. Same day, so the date does not move; /subprocessors is unchanged (no
+  new provider: both go to our own routes and database).
 */
 export const LEGAL_LAST_UPDATED = "2026-11-27";
 

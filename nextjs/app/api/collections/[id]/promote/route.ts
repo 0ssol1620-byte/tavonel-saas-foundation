@@ -6,6 +6,7 @@ import { assertEquivalenceGate } from "@/lib/equivalence-gate";
 import { resolveActingWorkspace, revalidateActingWorkspace } from "@/lib/acting-workspace";
 import { getRequestUser } from "@/lib/foundation-pilot";
 import { recordServerFunnel } from "@/lib/funnel-events";
+import { recordProductMeasurement } from "@/lib/product-measurement";
 import { authorizeWorldActivation } from "@/lib/trial-ai-access";
 import {
   checkCurrentSourceVersions,
@@ -357,6 +358,9 @@ export async function POST(
   if (expectedCurrentManifest !== null) {
     recordServerFunnel("source_revision_applied", { status: retrievalIndex.status });
   }
+  // WO-AN-RUM-1 (D26): the first verified record (proxy: this activation) and, for a revision, a day
+  // of use -- recorded only if this user said yes to product measurement; the database decides.
+  await recordProductMeasurement(user.id, expectedCurrentManifest !== null ? ["first_verified_record", "active_day"] : ["first_verified_record"]);
   return NextResponse.json(
     { code: "WORLD_ACTIVE", world: promoted.result, retrievalIndex },
     { headers: NO_STORE }

@@ -47,9 +47,15 @@ const LEGAL_BASES: ReadonlyArray<readonly [string, string, string]> = [
     "Required by law, including the Korean commercial and tax retention duties (PIPA Art. 15(1)2)",
   ],
   [
-    "Measure visits on public marketing pages",
+    "Measure visits and page speed on public marketing pages",
     "Consent (Art. 6(1)(a)), withdrawable at any time",
     "Consent to an access-analysis tool (PIPA Art. 15(1)1)",
+  ],
+  // WO-AN-RUM-1 (2026-11-27): the workspace's own product-measurement choice.
+  [
+    "Measure whether new accounts reach a first verified record, a first AI read and a return visit",
+    "Consent (Art. 6(1)(a)), withdrawable at any time",
+    "Consent (PIPA Art. 15(1)1)",
   ],
 ];
 
@@ -87,8 +93,10 @@ const COOKIES: ReadonlyArray<readonly [string, string, string, string]> = [
     storage" keys the site writes itself. Both are sessionStorage and neither is read by anything
     that sends: `tavonel.funnel-log` is `lib/funnel-events.ts` `LOG_KEY` (written by
     `trackFunnel`, read by nothing outside it), and `tavonel.first-touch.v1` is
-    `lib/recipe-intent.ts` `ATTRIBUTION_KEY` (written on /login by `rememberFirstTouch`, read only
-    by `readFirstTouch` in the same file). `lib/legal-terms-consistency.test.ts` (P2-34) holds both facts.
+    `lib/recipe-intent.ts` `ATTRIBUTION_KEY` (written on /login and, since WO-AN-RUM-1, on a listed public
+    page by `rememberFirstTouch`; read by `readFirstTouch`, whose one caller is the workspace
+    product-measurement choice, which sends the campaign name and ad label with a yes only).
+    `lib/legal-terms-consistency.test.ts` (P2-34, WO-AN-RUM-1) holds these facts.
   */
   [
     "tavonel.funnel-log",
@@ -99,7 +107,7 @@ const COOKIES: ReadonlyArray<readonly [string, string, string, string]> = [
   [
     "tavonel.first-touch.v1",
     "Ours, session storage",
-    "The campaign parameters of the sign-in address you arrived on, if it had any. Not sent",
+    "The campaign parameters of the public page or sign-in address you arrived on, if it had any. Only the campaign name and ad label are sent, to us, and only when you allow product measurement in the workspace",
     "Until you close the tab",
   ],
   [
@@ -129,7 +137,7 @@ export default function PrivacyPage() {
       because Paddle sells to the EEA and the UK.
     */}
     <h2>Which laws this notice is written under</h2><p>TAVONEL is operated from the Republic of Korea and this notice is written under the Personal Information Protection Act (PIPA). Where you are in the European Economic Area or the United Kingdom, the GDPR and the UK GDPR also apply to the processing described here, and the table of legal bases below states the basis under each. We are the processor for the personal data inside the documents you upload or connect, and you are the controller of it, under the <a href={processingTerms.processing.path}>processing addendum</a> your workspace owner accepts with the <Link href="/terms">self-service terms</Link>. We are the controller of your account, billing and inquiry data.</p>
-    <h2>What we collect</h2><ul><li>Account identifiers from Google OAuth.</li><li>Workspace and entitlement metadata.</li><li>Source files you deliberately upload.</li><li>Derived OCR, citation and knowledge artifacts.</li><li>Security and operational logs.</li><li>Billing identifiers supplied by Paddle.</li><li>The name, work email, optional company or organization, inquiry type, selected plan when you arrive from Pricing, optional qualification answers, interface language and message you submit through the contact form.</li></ul>
+    <h2>What we collect</h2><ul><li>Account identifiers from Google OAuth.</li><li>Workspace and entitlement metadata.</li><li>Source files you deliberately upload.</li><li>Derived OCR, citation and knowledge artifacts.</li><li>Security and operational logs.</li><li>Product-measurement dates and page-speed counts, only if you allow them (below).</li><li>Billing identifiers supplied by Paddle.</li><li>The name, work email, optional company or organization, inquiry type, selected plan when you arrive from Pricing, optional qualification answers, interface language and message you submit through the contact form.</li></ul>
     <h2>Why we process it</h2><p>We process data to authenticate users, compile and return knowledge packages, secure and operate the service, provide support, prevent abuse, maintain transaction records and comply with law. We do not request sensitive source documents through the public inquiry form.</p>
     <h2>The legal basis for each purpose</h2>
     <div className="table-scroll">
@@ -168,6 +176,10 @@ export default function PrivacyPage() {
     <h2>International processing</h2><p>Supabase is configured in Seoul, and so are the Vercel serverless functions that serve this site. The content-disarm service that rasterizes and scans every source — the first thing to touch your document bytes — runs on Google Cloud Run in Seoul, orchestrated by a Cloudflare worker on Cloudflare&apos;s edge. The GPU OCR that reads the sanitized result runs on a RunPod endpoint with no pinned region, so we do not state one. Cloudflare, RunPod, Resend, Google and Paddle may process limited data through global infrastructure or support systems outside Korea. The exact processor, purpose, data category and region are listed on the subprocessors page. Cloudflare R2 location hints are best-effort and are not a promise of Korean data residency, and no data residency is guaranteed.</p>
     <p>The processing addendum does not execute the European Commission&apos;s Standard Contractual Clauses, the UK International Data Transfer Addendum or a transfer impact assessment for you. Where a transfer of personal data in a customer&apos;s documents requires one of those or another transfer instrument, we agree it with that customer before processing the affected documents, and the self-service terms exclude that data until it is agreed. Ask <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a> to arrange it and for details of the providers relevant to your use.</p>
     <h2>Optional website analytics</h2><p>With your permission, Google Analytics uses first-party cookies to measure visits and selected interactions on public marketing pages. It receives a pseudonymous browser identifier, device information, a public page address without query parameters, and the referring website origin. We do not send document contents, filenames, questions, account identifiers or workspace events to Google Analytics. Advertising personalization and Google signals are disabled. Your choice and analytics cookies expire after 180 days. You can decline without affecting the service, or withdraw permission using Analytics preferences on a public page. Google may process analytics data outside Korea. Vercel Web Analytics, run by our hosting provider, counts page views on public marketing pages without cookies or storage on your device. It stops if you decline analytics. With your permission it also counts the same selected interactions. It receives the page address without query parameters, the referring address, your browser, operating system and device type, and an approximate location derived from the request. Vercel tells visits apart with a hash of the request that it discards after 24 hours. We do not send document contents, filenames, questions, account identifiers or workspace events to Vercel Web Analytics.</p>
+    {/* WO-AN-RUM-1 (2026-11-27): field page speed, behind the same analytics permission. lib/field-vitals.ts, app/api/field-vitals. */}
+    <p>With the same permission, your browser also reports how quickly a public marketing page loaded, how quickly it responded when you clicked or typed, and how much its layout moved: three timing numbers and the page address without query parameters, sent to us rather than to a vendor, once, when you leave the page. We keep them only as daily counts per page and timing range, with no identifier, so they cannot be traced back to a visit.</p>
+    {/* WO-AN-RUM-1 (2026-11-27): the workspace product-measurement choice (D26). lib/product-measurement.ts, migration 20261127100000. */}
+    <h2>Optional product measurement</h2><p>In the workspace you can allow product measurement, and you can turn it off again under Trust &amp; integrity. While it is on, we record three things about your account: the date you first verify a record, the date an AI tool or API key first reads one of your Worlds, and the dates on which you ask a World a question, an AI tool reads it, or you apply a source revision. If you arrived through one of our own campaign links, we also keep that campaign&apos;s name and ad label. We store these ourselves, under a random identifier rather than your name or email, and use them only as totals, for example how many new accounts came back within 7 or 30 days. Nothing is sent to an advertising or analytics vendor, and no document content, file name, question or address is recorded. If you decline, nothing is recorded. Turning it off deletes what was recorded, and deleting your account deletes it too.</p>
     {/* G2-020. The cookie table the analytics paragraph above was standing in for. */}
     <h2>Cookies and similar storage</h2>
     <div className="table-scroll">

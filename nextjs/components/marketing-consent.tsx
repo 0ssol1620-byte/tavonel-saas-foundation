@@ -153,6 +153,13 @@ export default function MarketingConsent() {
   useEffect(() => {
     try { setConsent(readConsent(window.localStorage)); } catch { /* storage denied: no stored answer, so only cookieless page views run, and a decline lasts until the next full load */ }
     setReady(true);
+    // WO-AN-RUM-1: the campaign parameters of the public page a reader arrived on, kept in this tab
+    // only (never overwritten, never sent from here). The workspace sends the campaign name with a
+    // product-measurement yes and nothing without one (components/workspace/product-measurement.tsx).
+    // Fetched only when the address carries a campaign parameter, so no other page pays for it (§22).
+    if (publicPageLocation(window.location.pathname) && window.location.search.includes("utm_")) {
+      import("@/lib/recipe-intent").then((module) => module.rememberFirstTouch(window.location.search)).catch(() => { /* this tab simply has no first touch */ });
+    }
     const sync = () => {
       try { setConsent(readConsent(window.localStorage)); } catch { setConsent(null); }
     };
@@ -246,6 +253,18 @@ export default function MarketingConsent() {
     };
     window.addEventListener("tavonel:funnel", record);
     return () => { disableAnalytics(); window.removeEventListener("tavonel:funnel", record); };
+  }, [consent, location, ready]);
+
+  /*
+    WO-AN-RUM-1: field vitals, fetched and started only after a stored yes on a listed page of the
+    production host, with the analytics switch on -- the same gate as the Google tag. Lazy for the
+    same reason the Vercel collector is (the §22 ratchet): a visitor who has not said yes downloads
+    none of it. It reads the stored choice again before it sends.
+  */
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED !== "1" || !ready || consent !== true || !location
+      || window.location.hostname !== "tavonel.com") return;
+    import("@/lib/field-vitals").then((module) => module.observeFieldVitals()).catch(() => { /* no reporter is the closed state */ });
   }, [consent, location, ready]);
 
   function choose(allowed: boolean) {

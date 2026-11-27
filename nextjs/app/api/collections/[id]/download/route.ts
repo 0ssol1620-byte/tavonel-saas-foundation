@@ -4,6 +4,7 @@ import { buildSignedCollectionZip, collectionPackageSizeRefusal, validateReviewa
 import { DeliveryError } from "@/public/developer/tavonel-mcp.mjs";
 import { readExportSignerEnv } from "@/lib/export-signing";
 import { recordServerFunnel } from "@/lib/funnel-events";
+import { recordProductMeasurement } from "@/lib/product-measurement";
 import { loadPreferredCollectionCandidate } from "@/lib/collection-storage";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { readR2SignerEnv } from "@/lib/r2-synthetic-canary";
@@ -126,6 +127,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   recordServerFunnel("export_package_signed", { sources: String(documentIds.length) });
   if (auth.principal.kind === "api-key") {
     recordServerFunnel("external_consumer_succeeded", { from: "download" });
+    // WO-AN-RUM-1 (D26): an agent's read of this user's World; recorded only with this user's yes.
+    await recordProductMeasurement(auth.principal.userId, ["first_agent_read", "active_day"]);
   }
   return new Response(signed.archive, {
       status: 200,

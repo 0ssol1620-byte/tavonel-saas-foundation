@@ -779,6 +779,23 @@
       ],
       "credential": "oauth:authorization-code+pkce",
       "note": "Remote MCP token endpoint (G11), 404 while off. Mints a developer key holding only the granted read scopes, expiring with the token, through the authorization-revision-checked key RPC."
+    },
+    "app/api/field-vitals/route.ts": {
+      "type": "P-public",
+      "methods": [
+        "POST"
+      ],
+      "credential": "none",
+      "note": "WO-AN-RUM-1 field vitals beacon. Unauthenticated by design and grants nothing: 404 while NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED is not 1; Sec-Fetch-Site same-origin and Origin equal to the request origin when sent; 256-byte cap; a listed public path and three bounded numbers only, added to daily counters with no identifier (record_field_vitals). The body is never logged."
+    },
+    "app/api/product-measurement/route.ts": {
+      "type": "A-bearer",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "credential": "bearer:supabase-jwt",
+      "note": "WO-AN-RUM-1: the caller's own product-measurement choice. 404 while NEXT_PUBLIC_TAVONEL_ANALYTICS_ENABLED is not 1; POST also refuses a cross-site Sec-Fetch-Site and non-JSON bodies, 1 KiB cap."
     }
   },
   "memberScope": {
@@ -854,6 +871,7 @@
       "app/api/enterprise/overview/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
       "app/api/enterprise/policies/route.ts": "Enterprise console (its own membership path, WO-C-B1); no workspace source content.",
       "app/api/export/trust/route.ts": "The public export-signing trust record; no tenant data.",
+      "app/api/field-vitals/route.ts": "Public page-speed counters; no tenant data.",
       "app/api/healthz/route.ts": "Liveness; no tenant data.",
       "app/api/internal/agent-grants/revoke-all/route.ts": "Signed internal service route; no user principal and no response content for a member.",
       "app/api/internal/billing/gate-enforce/route.ts": "Signed internal service route; no user principal and no response content for a member.",
@@ -880,6 +898,7 @@
       "app/api/operations/p0/route.ts": "Operator console; no customer source content.",
       "app/api/operator/status/v1/route.ts": "Operator status; no customer source content.",
       "app/api/paddle/webhook/route.ts": "Payment webhook; no user principal.",
+      "app/api/product-measurement/route.ts": "The caller's own product-measurement choice; no source content.",
       "app/api/proof-pdf/route.ts": "A fixed public sample PDF; no tenant data.",
       "app/api/readyz/route.ts": "Readiness; no tenant data.",
       "app/api/research-updates/route.ts": "Public research updates; no tenant data.",

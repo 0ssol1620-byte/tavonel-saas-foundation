@@ -67,6 +67,7 @@ import DeveloperPanel from "@/components/developer-panel";
 import WorkspaceUltimateShell, { type AccessDetail, type SourcePendingReason, type TrialLimits, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
+import ProductMeasurement from "@/components/workspace/product-measurement";
 import { useTrialAiAccess } from "@/components/workspace/connect-ai-panel";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
 import BillingRefund from "@/components/billing-refund";
@@ -3791,6 +3792,8 @@ export default function WorkspacePage() {
             and every step's state comes from workspace facts (lib/workspace-onboarding.ts).
           */}
           {surface === "home" ? gettingStarted : null}
+          {/* WO-AN-RUM-1: asked once, under the guide; gone after either answer (Trust & integrity keeps the switch). */}
+          {surface === "home" ? <ProductMeasurement getToken={getAuthToken} variant="prompt" /> : null}
           {surface === "sources" ? <>
           {/*
             Knowledge: the compile as it runs, then the per-source board, then the choice of
@@ -4528,6 +4531,7 @@ export default function WorkspacePage() {
             <p className="fine"><ShieldCheck size={15} /> All capability issuance is server-authorized and tenant-scoped.</p>
           </section>
           ) : null}
+          {tab === "integrity" ? <ProductMeasurement getToken={getAuthToken} variant="setting" /> : null}
     </WorkspaceUltimateShell>
   );
 }

@@ -12,6 +12,7 @@ import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { recordServerFunnel } from "@/lib/funnel-events";
+import { recordProductMeasurement } from "@/lib/product-measurement";
 import { COLLECTION_PACKAGE_TOO_LARGE, collectionPackageSizeRefusal, validatePromotableCollectionArtifact } from "@/lib/collection-download";
 import { answerFromContextPacket, answerGroundedQuestion, parseChunks } from "@/lib/grounded-ask";
 import { recordAnswerabilityShadow } from "@/lib/answerability-shadow";
@@ -482,6 +483,9 @@ async function ask(request: Request, context: { params: Promise<{ id: string }> 
     if (auth.principal.kind === "api-key") {
       recordServerFunnel("external_consumer_succeeded", { from: "ask" });
     }
+    // WO-AN-RUM-1 (D26): a day of use, and an agent's first read when a key asked; only with this user's yes.
+    await recordProductMeasurement(auth.principal.userId,
+      auth.principal.kind === "api-key" ? ["first_agent_read", "active_day"] : ["active_day"]);
   }
   /*
     W1-A5: the signed answer receipt, last, over exactly the body about to be released -- a replay

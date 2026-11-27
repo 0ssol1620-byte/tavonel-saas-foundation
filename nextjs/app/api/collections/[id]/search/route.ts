@@ -10,6 +10,7 @@ import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
+import { recordProductMeasurement } from "@/lib/product-measurement";
 import {
   decideMemberProjection, memberProjectionMode, projectionShadowFields, recordProjectionShadow,
 } from "@/lib/member-projection";
@@ -318,6 +319,7 @@ async function search(request: Request, context: { params: Promise<{ id: string 
         { status: authorizedNow.status, headers: NO_STORE },
       );
     }
+    if (auth.principal.kind === "api-key") await recordProductMeasurement(auth.principal.userId, ["first_agent_read", "active_day"]);
     return NextResponse.json(payload, { headers: NO_STORE });
   }
 
@@ -328,5 +330,7 @@ async function search(request: Request, context: { params: Promise<{ id: string 
     served: snapshotOf(activeWorld),
   });
   if (!released.ok) return NextResponse.json({ code: released.code }, { status: released.status, headers: NO_STORE });
+  // WO-AN-RUM-1 (D26): an agent's read (an API key or remote MCP token); recorded only with this user's yes.
+  if (auth.principal.kind === "api-key") await recordProductMeasurement(auth.principal.userId, ["first_agent_read", "active_day"]);
   return NextResponse.json(payload, { headers: { ...released.headers } });
 }

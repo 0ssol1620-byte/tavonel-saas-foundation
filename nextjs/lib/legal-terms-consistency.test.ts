@@ -23,6 +23,14 @@ vi.mock("next/navigation", () => ({
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 const withoutComments = (source: string) =>
   source.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
+/** Every non-test app, lib and component source, as [path relative to nextjs/ with forward slashes, text]. */
+function runtimeSources(): [string, string][] {
+  const base = resolve(import.meta.dirname, "..");
+  return ["app", "lib", "components"].flatMap((root) => readdirSync(join(base, root), { recursive: true })
+    .map((name) => `${root}/${String(name).replace(/\\/g, "/")}`))
+    .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.(test|spec)\.|\/__tests__\//.test(file))
+    .map((file) => [file, read(file)] as [string, string]);
+}
 
 const TERMS = "public/policy/TAVONEL_SELF_SERVICE_TERMS_2026-09-30.md";
 const ADDENDUM = "public/policy/TAVONEL_PROCESSING_ADDENDUM_2026-09-30.md";
@@ -140,7 +148,8 @@ describe("the old drafts are archived everywhere they are reachable", () => {
   it("the in-place notice no longer calls the pages Draft v1 beside a versioned agreement", async () => {
     const { LEGAL_DRAFT_NOTICE, LEGAL_LAST_UPDATED } = await import("./operations");
     // P2-34 (D-21) changed /privacy and /subprocessors on 2026-10-19, GX-03 changed them again on 2026-11-09,
-    // and WO-LF-0 changed /privacy's deletion paragraph (local-folder agent) on 2026-11-27.
+    // and WO-LF-0 changed /privacy's deletion paragraph (local-folder agent) on 2026-11-27, as did
+    // WO-AN-RUM-1 (page speed, product measurement, the first-touch row) the same day.
     expect(LEGAL_LAST_UPDATED).toBe("2026-11-27");
     expect(LEGAL_DRAFT_NOTICE).not.toContain("Draft v1");
     expect(LEGAL_DRAFT_NOTICE).toContain("versioned self-service terms and processing addendum");
@@ -175,7 +184,7 @@ describe("/privacy, /trust and /refunds state the same terms", () => {
     expect(withoutComments(read("app/subprocessors/page.tsx"))).toContain('["Vercel", "Website and serverless application hosting, and cookieless website analytics", "Requests, operational logs, application metadata, public-page views unless a visitor declines analytics, and selected interactions with analytics consent (no workspace events)",');
   });
 
-  it("/privacy lists only session-storage keys the code writes and never sends", () => {
+  it("/privacy lists only session-storage keys the code writes, and sends first-touch only as its row says", () => {
     const privacy = withoutComments(read("app/privacy/page.tsx"));
     expect(privacy.split('"Ours, session storage",')).toHaveLength(3);
     for (const [key, constant, file] of [
@@ -191,11 +200,24 @@ describe("/privacy, /trust and /refunds state the same terms", () => {
       expect(storage, `${constant} is read and written`).toBe(2);
       expect(count(constant), `${constant}: its declaration and sessionStorage calls only`).toBe(storage + 1);
     }
-    // The first-touch record leaves lib/recipe-intent.ts once, to /login, which discards it.
+    // The first touch is written on /login and on a listed public page, never read there.
     const login = read("app/login/login-client.tsx");
     expect(login.split("rememberFirstTouch(")).toHaveLength(2);
     expect(login).toMatch(/^\s*rememberFirstTouch\(window\.location\.search\);\r?$/m);
     expect(login).not.toContain("readFirstTouch");
+    const consent = read("components/marketing-consent.tsx");
+    expect(consent.split("rememberFirstTouch(")).toHaveLength(2);
+    expect(consent).toContain('if (publicPageLocation(window.location.pathname) && window.location.search.includes("utm_")) {');
+    expect(consent).toContain('import("@/lib/recipe-intent").then((module) => module.rememberFirstTouch(window.location.search))');
+    expect(consent).not.toContain("readFirstTouch");
+    // WO-AN-RUM-1: its one reader is the workspace product-measurement choice, which reads it only for a
+    // yes and sends the campaign name and the ad label and nothing else -- the row's "Only ... sent" sentence.
+    const readers = runtimeSources()
+      .filter(([file, text]) => file !== "lib/recipe-intent.ts" && text.includes("readFirstTouch(")).map(([file]) => file);
+    expect(readers).toEqual(["components/workspace/product-measurement.tsx"]);
+    const choice = read("components/workspace/product-measurement.tsx");
+    expect(choice).toContain("const touch = allowed ? readFirstTouch() : null;");
+    expect(new Set(choice.match(/touch\??\.(\w+)/g)?.map((use) => use.replace(/^touch\??\./, "")))).toEqual(new Set(["utm_campaign", "utm_content"]));
   });
 
   it("/refunds pauses renewal on unavailability in both templates and promises no automatic refund", () => {
