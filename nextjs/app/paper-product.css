@@ -108,7 +108,7 @@ html:has(.evaluation-page) { color-scheme: light; }
 }
 
 /* One ruled comparison, with the current-start conditions above every action. */
-/* WO-UI-A1: the lede is the v34 hero's lead now; the page opens centred, so the one boundary note sits in the container's own width. */
+/* WO-UI-A1: the lede is the v34 hero's lead now; the page opens on the split hero, so the one boundary note sits in the container's own width. */
 .pricing-page .scene.doc { padding-top: 0; min-height: 0; }
 .pricing-page .pricing-context { display: block; margin-block: 8px 28px; }
 .pricing-page .pricing-context .paper-purchase-boundary { margin: 0; padding: 0 0 0 20px; border: 0; border-left: 1px solid #88928d; background: transparent; }

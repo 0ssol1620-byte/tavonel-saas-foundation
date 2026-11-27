@@ -132,7 +132,7 @@ describe("every V34 route body", () => {
 
   it("and /pricing, the legacy client, writes one h1 without the brand suffix", () => {
     const source = readFileSync(join(import.meta.dirname, "../../components/pricing-page-client.tsx"), "utf8");
-    // WO-UI-A1: the client's one h1 is the v34 sub-hero's title (components/v34/ui/hero.tsx renders the <h1>); no literal <h1> stays beside it.
+    // WO-UI-A1: the client's one h1 is the v34 split hero's title (components/v34/ui/hero.tsx renders the <h1>); no literal <h1> stays beside it.
     expect(source.match(/<h1\b/g) ?? []).toHaveLength(0);
     const h1s = [...source.matchAll(/<Hero\b[^>]*?\btitle="([^"]*)"/g)].map((m) => m[1]!.trim());
     expect(h1s).toHaveLength(1);

@@ -45,7 +45,7 @@ const V34_TITLE_WEIGHT = "500";
 /**
  * Every V34 registry path whose body is a V34 page; a route that lands on one is held to the V34 roles.
  * /pricing is a registry path whose body is the retained pricing client, but since WO-UI-A1 its H1 is the V34
- * sub-hero's (components/pricing-page-client.tsx renders <Hero variant="sub">), so it is held to the V34 roles
+ * split hero's (components/pricing-page-client.tsx renders <Hero variant="split">), so it is held to the V34 roles
  * like /contact. /evaluation is the one T2 page that is still a retained Display 2 page.
  */
 const V34_PATHS: ReadonlySet<string> = new Set(V34_ROUTE_KEYS.map((key) => v34Route(key).path));

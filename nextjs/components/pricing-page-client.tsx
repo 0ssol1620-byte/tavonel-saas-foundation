@@ -973,12 +973,13 @@ export default function PricingPageClient({
       {header}
       <main id="main">
         {/*
-          WO-UI-A1 (layout only). The H1 and its one-sentence lede are the v34 centred sub-hero every other v34
+          WO-UI-A1 (layout only). The H1 and its one-sentence lede are the v34 split hero (no art: left on the container edge, the one H1 role /contact holds) every other v34
           page opens with (components/v34/ui/hero.tsx), instead of the legacy left-aligned .document-title. Same
           words, same figures: the sentence is the one the pricing-context grid used to carry.
         */}
         <Hero
-          variant="sub"
+          variant="split"
+          surface="paper"
           title="Pages and dollars."
           lead={<>
             {PERSONAL.label} includes {grouped(PERSONAL.includedPages)} standard pages each month, rising to{" "}
