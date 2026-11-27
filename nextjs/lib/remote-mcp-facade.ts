@@ -222,17 +222,18 @@ export function createCanonicalFacade(input: {
     const family = new Map<unknown, Json>();
     for (const evidenceId of wanted) {
       const hits = lens.filter((entry) => typeof entry.id === "string" && (entry.id === evidenceId || entry.id.startsWith(`${evidenceId}:`)));
-      if (hits.length === 0) return notFound();
+      // All or nothing holds after the page filter too: every cited evidence must have a row on the matched page.
+      if (hits.length === 0 || (page !== null && !hits.some((hit) => hit.page === page))) return notFound();
       for (const hit of hits) family.set(hit.id, hit);
     }
     // A v2 id returns the page the search matched, not the document; a page the World no longer holds is NOT_FOUND.
     const regions = [...family.values()].filter((entry) => page === null || entry.page === page);
-    if (regions.length === 0) return notFound();
     const pages = [...new Set([...family.values()].map((entry) => entry.page).filter((entry): entry is number => Number.isSafeInteger(entry)))].sort((x, y) => x - y);
     const around = (offset: number) => {
       const target = pages[pages.indexOf(page as number) + offset];
       if (target === undefined) return null;
-      return PREFIX + sealClaims(PURPOSE, { ...claims, p: target, b: null, exp: now() + TTL_MS }, key!);
+      // Same expiry as the id it came from: walking pages never extends a result id past the 24 h of its search.
+      return PREFIX + sealClaims(PURPOSE, { ...claims, p: target, b: null }, key!);
     };
 
     const delivery = renderDelivery(

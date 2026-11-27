@@ -411,6 +411,36 @@ describe("fetch", () => {
       }
     });
 
+    it("keeps all-or-nothing across every cited evidence of a v2 id: one with no row on the matched page is NOT_FOUND", async () => {
+      world.rows = [row("ev_1:chunk_1", "On page three."), row("ev_2:chunk_1", "Only on page four.", 4)];
+      world.items = [item("u1", ["ev_1"])];
+      const claims = unsealClaims("mcp-result", resultsOf(await search())[0]!.id.slice(4), remoteMcpSealingKey()!)!;
+      const both = `tvr_${sealClaims("mcp-result", { ...claims, e: ["ev_1", "ev_2"] }, remoteMcpSealingKey()!)}`;
+      expect(errorText(await tool("fetch", { id: both }))).toMatch(/^NOT_FOUND: no result /);
+      world.rows = [row("ev_1:chunk_1", "On page three."), row("ev_2:chunk_1", "Also page three.")];
+      const ok = (await tool("fetch", { id: both })).result.structuredContent!;
+      expect(ok.text).toContain("On page three.");
+      expect(ok.text).toContain("Also page three.");
+    });
+
+    it("continuation ids keep the expiry of the id they came from, and an expired parent yields none", async () => {
+      world.rows = [row("ev_1:chunk_1", "Page three.", 3), row("ev_1:chunk_2", "Page four.", 4)];
+      world.items = [item("u1", ["ev_1"])];
+      const start = Date.now();
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(start);
+      const parent = resultsOf(await search())[0]!.id;
+      const parentExp = unsealClaims("mcp-result", parent.slice(4), remoteMcpSealingKey()!)!.exp as number;
+      vi.setSystemTime(start + 23 * 3600 * 1000);
+      const next = ((await tool("fetch", { id: parent })).result.structuredContent!.metadata.continuation as { next_id: string }).next_id;
+      expect(unsealClaims("mcp-result", next.slice(4), remoteMcpSealingKey()!)!.exp).toBe(parentExp);
+      expect((await tool("fetch", { id: next })).result.isError).toBe(false);
+      // Past the original 24 h the neighbour is stale too; walking never extended it.
+      vi.setSystemTime(parentExp + 60_000);
+      expect(errorText(await tool("fetch", { id: next }))).toBe("RESULT_ID_STALE: search again");
+      expect(errorText(await tool("fetch", { id: parent }))).toBe("RESULT_ID_STALE: search again");
+    });
+
     it("keeps the all-or-nothing rule: one cited evidence with no row is NOT_FOUND, not a partial answer", async () => {
       world.rows = [row("ev_1:chunk_1", "First chunk of one.")];
       world.items = [item("u1", ["ev_1", "ev_2"])];
