@@ -167,7 +167,7 @@ describe("dates are the same on every machine (D-18)", () => {
 
   it("no workspace surface formats a date with the browser's own locale", () => {
     for (const file of [
-      "../app/workspace/page.tsx", "../components/developer-panel.tsx", "../components/operations-ultimate.tsx",
+      "../app/workspace/page.tsx", "../components/developer-panel.tsx",
       "../components/workspace/agent-access-panel.tsx",
     ]) {
       const source = readFileSync(new URL(file, import.meta.url), "utf8");

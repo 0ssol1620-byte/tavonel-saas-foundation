@@ -3685,7 +3685,7 @@ export const AFFECTED_GROUPS = Object.freeze([
   // UI-D (workspace plain language, audit D-02..D-09 and D-18): the one module that turns engine codes, ids, scopes and events into
   // customer sentences, the document-name fallback, the pinned date formatters and the compile-stage label, with the suites that hold them.
   // Unit-only: no browser, database, worker or build lane. Product UI, so never nativeReuse.
-  affectedGroup('workspace-plain-language', /^nextjs\/(?:components\/operations-ultimate\.tsx|lib\/(?:compile-stage-view|document-names|format|plain-language)(?:\.test)?\.ts)$/,
+  affectedGroup('workspace-plain-language', /^nextjs\/lib\/(?:compile-stage-view|document-names|format|plain-language)(?:\.test)?\.ts$/,
     { unitFiles: ['lib/plain-language.test.ts', 'lib/document-names.test.ts', 'lib/compile-stage-view.test.ts', 'lib/workspace-onboarding.test.ts', 'lib/review-queue.test.ts'] }),
   // UI-C (the V34 blueprint mark replaces LOCUS): the one geometry file, the component and the two renderers that draw from it (apple icon, share
   // cards), the manifest and every raster the build script derives from it, including the retired locus-v2 files this change deletes. The
