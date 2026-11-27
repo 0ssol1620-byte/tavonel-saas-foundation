@@ -3,7 +3,7 @@ import "@/app/product-polish.css";
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy-layout";
 import BreadcrumbJsonLd from "@/components/breadcrumb-json-ld";
-import { LEGAL_DRAFT_NOTICE, LEGAL_EFFECTIVE_DATE, LEGAL_LAST_UPDATED } from "@/lib/operations";
+import { LEGAL_DRAFT_NOTICE, LEGAL_EFFECTIVE_DATE } from "@/lib/operations";
 export const metadata: Metadata = {
   // Each page declares its own address. Without this every route inherited the root
   // canonical ("/"), so a crawler was told 22 distinct pages were all the homepage.
@@ -55,17 +55,36 @@ const PROCESSORS = [
   ["Vercel", "Website and serverless application hosting, and cookieless website analytics", "Requests, operational logs, application metadata, public-page views unless a visitor declines analytics, and selected interactions with analytics consent (no workspace events)", "Seoul (icn1) for serverless functions, set in deployment configuration. Requests reach it through Vercel's global edge network."],
   ["Cloudflare", "DNS, R2 object storage, and the worker that orchestrates content disarm", "Uploaded source bytes and sanitized derivatives", "The R2 bucket carries an Asia-Pacific location hint, which is best-effort and is not a residency guarantee. The worker runs on Cloudflare's edge network."],
   ["Google Cloud", "Content disarm and reconstruction: the IAM-only PDFium and ClamAV service that rasterizes and scans every source before anything downstream reads it", "Uploaded source bytes and the sanitized PDF produced from them", "Seoul (asia-northeast3), set in the service configuration"],
-  ["RunPod", "Scale-to-zero GPU OCR", "Sanitized document candidates and processing telemetry", "Not pinned. The endpoint is addressed by id and TAVONEL sets no region for it, so we do not state one."],
+  ["RunPod", "Scale-to-zero GPU OCR, and the search models that embed and rerank document passages and questions", "Sanitized document candidates, document text passages, search questions and processing telemetry", "Not pinned. The endpoints are addressed by id and TAVONEL sets no region for them, so we do not state one."],
   ["Paddle", "Merchant-of-record billing when commercial mode is enabled", "Billing identity, checkout and subscription events", "Global infrastructure. Processing may take place outside Korea."],
   ["Resend", "Transactional inquiry delivery", "Inquiry name, work email, optional company, inquiry type, selected plan when arriving from Pricing, optional qualification answers, interface language and message", "Global infrastructure. Processing may take place outside Korea."],
   ["Google", "OAuth identity provider and optional, consent-based public website analytics", "Google account identity and authentication events. With analytics consent, pseudonymous browser identifiers, device information, public-page visits and selected interactions. No customer source contents or workspace events.", "Global infrastructure. Processing may take place outside Korea."],
 ] as const;
-export default function SubprocessorsPage() { return <PolicyLayout title="Every service permitted to process your data." effective={LEGAL_EFFECTIVE_DATE} lastUpdated={LEGAL_LAST_UPDATED} intro={<>A provider appearing here does not mean every feature is live. The status page states the active deployment mode.</>}>
+/*
+  WO-SUBPROC-1, 2026-11-27. The gate-package cross-check found code paths this page did not name.
+  RunPod also serves the retrieval embedder and reranker (`lib/retrieval-runtime-config.ts`), which
+  receive passage text and the question. The three OAuth connectors (`lib/connector-oauth.ts`) are
+  read by TAVONEL only after a customer connects one, so they are listed apart from the services
+  TAVONEL itself chose. `lib/legal-terms-consistency.test.ts` fails when an external origin appears
+  in the code without a row here or a stated reason it receives no customer data.
+*/
+const CONNECTED = [
+  ["Google Drive", "Google"],
+  ["Dropbox", "Dropbox"],
+  ["Microsoft OneDrive and SharePoint", "Microsoft"],
+] as const;
+// This page's own last change; LEGAL_LAST_UPDATED still dates /privacy and /refunds.
+const SUBPROCESSORS_LAST_UPDATED = "2026-11-27";
+export default function SubprocessorsPage() { return <PolicyLayout title="Every service permitted to process your data." effective={LEGAL_EFFECTIVE_DATE} lastUpdated={SUBPROCESSORS_LAST_UPDATED} intro={<>A provider appearing here does not mean every feature is live. The status page states the active deployment mode.</>}>
   <BreadcrumbJsonLd trail={[{ name: "Subprocessors", path: "/subprocessors" }]} />
   <p className="fine">{LEGAL_DRAFT_NOTICE}</p>
   <p>Where each provider processes data, and the basis for any transfer outside Korea. Every region below is the region TAVONEL is configured for. Where nothing is configured, the row says so rather than naming one. A configured region is not a residency guarantee — a provider&apos;s own control plane, support systems and backups sit outside what our configuration decides — and the privacy notice carries the same statement about international processing.</p>
-  <p>The two components that hold your document bytes are named with their regions: the content-disarm service that rasterizes and scans every source runs on Google Cloud Run in Seoul, orchestrated by a Cloudflare worker, and the GPU OCR that reads the sanitized result runs on a RunPod endpoint whose region TAVONEL does not pin.</p>
+  <p>The two components that hold your document bytes are named with their regions: the content-disarm service that rasterizes and scans every source runs on Google Cloud Run in Seoul, orchestrated by a Cloudflare worker, and the GPU OCR that reads the sanitized result runs on a RunPod endpoint whose region TAVONEL does not pin. RunPod also runs the search models that read passages of your documents and the questions you ask.</p>
   <div className="processor-list">{PROCESSORS.map(([name,purpose,data,region]) => <article key={name}><h3>{name}</h3><p><b>Purpose:</b> {purpose}</p><p><b>Data:</b> {data}</p><p><b>Processing region:</b> {region}</p></article>)}</div>
+  <h2>Services you connect yourself</h2>
+  <p>These services already hold your files. TAVONEL contacts one only after someone in your workspace connects it, and disconnecting stops it. You choose the files and folders. TAVONEL asks for read-only access and never changes anything in your account.</p>
+  <div className="processor-list">{CONNECTED.map(([name,provider]) => <article key={name}><h3>{name}</h3><p><b>Provider:</b> {provider}</p><p><b>What it receives from TAVONEL:</b> Requests for the files, folders and sharing settings you chose, made with the access you granted</p><p><b>Region:</b> Wherever your account with {provider} keeps your files</p></article>)}</div>
+  <p>An AI assistant you connect to TAVONEL&apos;s MCP server receives the results it asks for under your sign-in. Your own agreement with that assistant&apos;s provider covers what happens next.</p>
   <h2>Change notice</h2><p>Material processor changes are recorded here before they apply to live customer processing, and a sub-processor addition or replacement is notified 30 days in advance with a right to object. Contact <a href="mailto:privacy@tavonel.com">privacy@tavonel.com</a> for a data-processing review.</p>
   {/*
     The change record, kept on the page rather than in a commit message. The Google Cloud row is
@@ -73,5 +92,5 @@ export default function SubprocessorsPage() { return <PolicyLayout title="Every 
     provider; it is not a new sub-processor beginning to process, which is what the 30 days runs
     against. Saying which of the two it is, is the point of the entry.
   */}
-  <h2>What has changed</h2><p><b>2026-09-16.</b> Google Cloud is listed as its own row. The content-disarm service has always run there — a Cloudflare worker orchestrates it, and the PDFium and ClamAV sanitizer is on Google Cloud Run in Seoul — and this page attributed the whole of it to Cloudflare, which understated what Google Cloud receives. No processing changed and no new provider was added. The disclosure was corrected. Processing regions were narrowed from &ldquo;global infrastructure&rdquo; to the region each service is configured for, or to a statement that none is pinned. Vercel&apos;s purpose gained the cookieless website analytics the privacy notice already described.</p>
+  <h2>What has changed</h2><p><b>2026-11-27.</b> RunPod&apos;s row now names the search models it runs beside OCR, and the passages and questions they receive. No provider was added. Google Drive, Dropbox and Microsoft OneDrive and SharePoint are listed under services you connect yourself.</p><p><b>2026-09-16.</b> Google Cloud is listed as its own row. The content-disarm service has always run there — a Cloudflare worker orchestrates it, and the PDFium and ClamAV sanitizer is on Google Cloud Run in Seoul — and this page attributed the whole of it to Cloudflare, which understated what Google Cloud receives. No processing changed and no new provider was added. The disclosure was corrected. Processing regions were narrowed from &ldquo;global infrastructure&rdquo; to the region each service is configured for, or to a statement that none is pinned. Vercel&apos;s purpose gained the cookieless website analytics the privacy notice already described.</p>
 </PolicyLayout>; }

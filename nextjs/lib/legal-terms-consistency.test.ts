@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import TermsPage from "../app/terms/page";
+import SubprocessorsPage from "../app/subprocessors/page";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/terms",
@@ -201,5 +202,101 @@ describe("/privacy, /trust and /refunds state the same terms", () => {
     expect(refunds.match(/paused rather than charged/g)).toHaveLength(2);
     expect(refunds).toContain("Paddle may charge immediately when a subscription resumes");
     expect(refunds.match(/does not by itself\s+refund a completed payment/g)).toHaveLength(2);
+  });
+});
+
+/*
+  WO-SUBPROC-1. /subprocessors names every provider the code can send customer data to.
+
+  Every external origin written in the Foundation's runtime code and the CDR worker is either a row
+  on the page or carries a reason it receives no customer data. A new provider module therefore
+  fails here until someone decides which it is. Origins read only from environment variables (the
+  OCR and retrieval endpoints, the OAuth secret broker, the operations alert webhook) are invisible
+  to this scan; the first two sit under RunPod hosts that are literal elsewhere in the code.
+*/
+const NOT_A_PROCESSOR = "link, public source or own domain: no customer data is sent";
+const ORIGIN_OWNERS: ReadonlyArray<readonly [suffix: string, owner: string]> = [
+  ["supabase.co", "Supabase"],
+  ["vercel.app", "Vercel"],
+  ["r2.cloudflarestorage.com", "Cloudflare"],
+  ["a.run.app", "Google Cloud"],
+  ["sts.googleapis.com", "Google Cloud"],
+  ["iamcredentials.googleapis.com", "Google Cloud"],
+  ["api.runpod.ai", "RunPod"],
+  ["api.runpod.io", "RunPod"],
+  ["paddle.com", "Paddle"],
+  ["api.resend.com", "Resend"],
+  ["accounts.google.com", "Google"],
+  ["oauth2.googleapis.com", "Google"],
+  ["google-analytics.com", "Google"],
+  ["googletagmanager.com", "Google"],
+  ["www.googleapis.com", "Google Drive"],
+  ["dropboxapi.com", "Dropbox"],
+  ["dropbox.com", "Dropbox"],
+  ["graph.microsoft.com", "Microsoft OneDrive and SharePoint"],
+  ["login.microsoftonline.com", "Microsoft OneDrive and SharePoint"],
+  ...["tavonel.com", "schema.org", "w3.org", "rfc-editor.org", "csrc.nist.gov", "arxiv.org", "doi.org", "github.com",
+    "huggingface.co", "modelcontextprotocol.io", "developers.openai.com", "gutenberg.org", "sec.gov", "census.gov",
+    "eia.gov", "fhfa.gov"].map((suffix) => [suffix, NOT_A_PROCESSOR] as const),
+];
+const ownerOf = (host: string) =>
+  ORIGIN_OWNERS.find(([suffix]) => host === suffix || host.endsWith(`.${suffix}`))?.[1] ?? null;
+
+function runtimeOrigins(): Map<string, string> {
+  const repo = resolve(import.meta.dirname, "..", "..");
+  const roots = ["nextjs/app", "nextjs/lib", "nextjs/components", "nextjs/middleware.ts",
+    "quarantine-sidecar/foundation-cdr-worker/src", "quarantine-sidecar/foundation-cdr-worker/wrangler.jsonc"];
+  const files = roots.flatMap((root) => {
+    const path = join(repo, root);
+    return statSync(path).isFile() ? [path] : readdirSync(path, { recursive: true }).map((name) => join(path, String(name)));
+  }).filter((file) => /\.(ts|tsx|mjs|js|jsonc)$/.test(file) && !/\.(test|spec)\.|[\\/](__tests__|node_modules)[\\/]/.test(file));
+  const hosts = new Map<string, string>();
+  for (const file of files) {
+    for (const match of readFileSync(file, "utf8").matchAll(/https?:\/\/([a-z0-9*.-]+\.[a-z]{2,})/gi)) {
+      const host = match[1].toLowerCase().replace(/^\*\./, "");
+      if (/(^|\.)(localhost|example\.(com|org|net)|[a-z0-9-]+\.(test|invalid|example|local))$/.test(host)) continue;
+      if (!hosts.has(host)) hosts.set(host, file.slice(repo.length + 1));
+    }
+  }
+  return hosts;
+}
+
+describe("/subprocessors names every provider the code can send customer data to", () => {
+  const html = renderToStaticMarkup(SubprocessorsPage());
+  const rows = [...html.matchAll(/<h3>([^<]+)<\/h3>/g)].map((match) => match[1].replace(/&amp;/g, "&"));
+
+  it("lists exactly the providers the code reaches, once each", () => {
+    const owners = new Set(ORIGIN_OWNERS.map(([, owner]) => owner).filter((owner) => owner !== NOT_A_PROCESSOR));
+    expect(new Set(rows).size).toBe(rows.length);
+    expect([...rows].sort()).toEqual([...owners].sort());
+  });
+
+  it("finds no external origin in the runtime code without an owner", () => {
+    const origins = runtimeOrigins();
+    expect(origins.size, "the scan must see the code it guards").toBeGreaterThan(20);
+    expect(origins.has("api.resend.com") && origins.has("cohlugjzf0dk9i.api.runpod.ai")).toBe(true);
+    const unowned = [...origins].filter(([host]) => ownerOf(host) === null).map(([host, file]) => `${host} (${file})`);
+    expect(unowned, "add a /subprocessors row, or a reason it receives no customer data").toEqual([]);
+    // And no row survives the code that reached it.
+    const reached = new Set([...origins.keys()].map(ownerOf));
+    expect(rows.filter((row) => !reached.has(row))).toEqual([]);
+  });
+
+  it("does not let a new provider pass as a known one", () => {
+    for (const host of ["api.openai.com", "api.anthropic.com", "generativelanguage.googleapis.com", "o123.ingest.sentry.io",
+      "notpaddle.com", "runpod.ai.attacker.net"]) {
+      expect(ownerOf(host), host).toBeNull();
+    }
+  });
+
+  it("separates the services a customer connects from the ones TAVONEL chose", () => {
+    const copy = withoutComments(read("app/subprocessors/page.tsx"));
+    expect(copy).toContain("<h2>Services you connect yourself</h2>");
+    expect(copy).toContain("TAVONEL asks for read-only access and never changes anything in your account.");
+    expect(copy).toContain("lastUpdated={SUBPROCESSORS_LAST_UPDATED}");
+    // The scopes the page calls read-only are the ones the authorization request carries.
+    const scopes = read("lib/connector-oauth.ts");
+    for (const scope of ["drive.readonly", "files.content.read", "Files.Read.All", "Sites.Read.All"]) expect(scopes).toContain(scope);
+    expect(scopes).not.toMatch(/auth\/drive"|files\.content\.write|Files\.ReadWrite/);
   });
 });
