@@ -3,9 +3,7 @@ import { NextResponse, after } from "next/server";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { TOOLS, assertReadOnly, createClient, createServer } from "@/public/developer/tavonel-mcp.mjs";
 import {
-  REMOTE_MCP_CANONICAL_TOOL_SCOPES,
   REMOTE_MCP_PROTOCOL_VERSIONS,
-  REMOTE_MCP_TOOL_SCOPES,
   bearerChallenge,
   checkBearer,
   cohortRefusalStatus,
@@ -15,6 +13,8 @@ import {
   toolFailureCode,
   remoteMcpCanonicalToolsEnabled,
   remoteMcpEnabled,
+  remoteMcpListAuthRequired,
+  remoteMcpToolScope,
   remoteMcpSealingKey,
   requestOrigin,
 } from "@/lib/remote-mcp";
@@ -171,11 +171,13 @@ async function answer(request: Request, seen: Seen) {
   if (typeof method !== "string" || id === undefined || id === null) return new NextResponse(null, { status: 202 });
 
   const canonical = remoteMcpCanonicalToolsEnabled();
+  if (method === "tools/list" && bearer.kind === "anonymous" && remoteMcpListAuthRequired()) {
+    return rpcError(401, id, -32001, "AUTH_REQUIRED", { "WWW-Authenticate": bearerChallenge(origin) });
+  }
   if (method === "tools/call") {
     if (bearer.kind === "anonymous") return rpcError(401, id, -32001, "AUTH_REQUIRED", { "WWW-Authenticate": bearerChallenge(origin) });
     const name = typeof rpcParams?.name === "string" ? rpcParams.name : undefined;
-    const scope = name === undefined ? undefined
-      : REMOTE_MCP_TOOL_SCOPES[name] ?? (canonical && Object.hasOwn(REMOTE_MCP_CANONICAL_TOOL_SCOPES, name) ? REMOTE_MCP_CANONICAL_TOOL_SCOPES[name] : undefined);
+    const scope = name === undefined ? undefined : remoteMcpToolScope(name, canonical);
     if (scope && !bearer.scopes.includes(scope)) {
       return rpcError(403, id, -32001, "API_SCOPE_REQUIRED", {
         "WWW-Authenticate": bearerChallenge(origin, { error: "insufficient_scope", description: `This tool needs ${scope}.`, scope }),
@@ -224,7 +226,23 @@ async function answer(request: Request, seen: Seen) {
       later(() => recordFirstMcpAnswerTiming(workspaceKey, world));
     }
   }
+  if (method === "tools/list" && bearer.kind === "principal") answered = listedFor(answered, bearer.scopes, canonical);
   return NextResponse.json(constantToolErrors(method === "initialize" ? negotiated(answered, rpcParams) : answered), { headers: NO_STORE });
+}
+
+/**
+ * WO-MCP-LIST-AUTH: a token sees only the tools its scopes can call; a name in neither scope table
+ * is dropped (fail closed). The list depends on the scopes alone, never on the workspace, so it
+ * names no customer object. With no token the list is the static one, the same for every caller.
+ */
+function listedFor(answered: unknown, scopes: readonly string[], canonical: boolean) {
+  const reply = answered as { result?: { tools?: Array<{ name?: unknown }> } } | null;
+  if (!reply?.result?.tools) return answered;
+  const tools = reply.result.tools.filter((tool) => {
+    const scope = typeof tool.name === "string" ? remoteMcpToolScope(tool.name, canonical) : undefined;
+    return scope !== undefined && scopes.includes(scope);
+  });
+  return { ...reply, result: { ...reply.result, tools } };
 }
 
 /**
