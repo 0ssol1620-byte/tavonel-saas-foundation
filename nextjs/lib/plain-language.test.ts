@@ -6,8 +6,8 @@ import { DEVELOPER_SCOPES } from "./developer-contracts";
 import { displayName, documentReference } from "./document-names";
 import { formatDay, formatTimestamp } from "./format";
 import {
-  describeReviewReason, isOpaqueId, isReasonCode, labelForReference, PLAIN_REASON_CODES, plainEvent, plainScope,
-  shortReference, workspaceDocumentTitle,
+  describeReviewReason, isOpaqueId, isReasonCode, labelForReference, NEUTRAL_BY_POLICY, NEUTRAL_HEADLINE, NEUTRAL_MEANING,
+  PLAIN_REASON_CODES, plainEvent, plainScope, SENTENCE_SOURCES, shortReference, workspaceDocumentTitle,
 } from "./plain-language";
 
 /*
@@ -21,26 +21,66 @@ const validatorCodes = [...validatorSource.matchAll(/code: "([A-Z_]+)"/g)].map((
 
 /** Every code a review reason can start with, from the sources that write them. */
 const knownReasonCodes = [
-  "SEMANTIC_CLAIMS_EMPTY",
   EXTRACTION_BUDGET_REACHED,
   ...Object.values(VALIDATION_CHECK_REVIEW_REASON),
   ...validatorCodes,
   "READING_NEEDS_OPERATOR_REVIEW", "READING_DID_NOT_FINISH", "READING_LISTING_DISAGREEMENT", "SOURCE_VERSION_AMBIGUOUS",
-  "OCR_LOW_TEXT_YIELD", "OCR_SOURCE_EMPTY", "OCR_PAGES_INCOMPLETE", "OCR_TIMEOUT_OR_NETWORK", "OCR_RECOGNITION_CONFLICT:page-1",
+  "OCR_SOURCE_EMPTY", "OCR_PAGES_INCOMPLETE", "OCR_TIMEOUT_OR_NETWORK", "OCR_RECOGNITION_CONFLICT:page-1",
   "CONTRADICTION_CANDIDATE:claim-a:claim-b",
   "CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=216:pairs=23220",
   "CONTRADICTION_PAIR_BUDGET_EXCEEDED:contradiction_group_91a2:claims=40:pairs=780",
 ];
 
 describe("review reasons in plain English (D-02)", () => {
-  it("explains SEMANTIC_CLAIMS_EMPTY as what it means, what TAVONEL did and what to do next", () => {
-    const reason = describeReviewReason("SEMANTIC_CLAIMS_EMPTY");
-    expect(reason.known).toBe(true);
-    expect(reason.headline).toBe("No statements could be taken from these documents.");
-    expect(reason.meaning.length).toBeGreaterThan(20);
-    expect(reason.didWhat).toContain("held this result back");
-    expect(reason.next.length).toBeGreaterThan(20);
-    expect(reason.technical).toBe("SEMANTIC_CLAIMS_EMPTY");
+  it("gives a code no repo source states only the neutral sentence, with the exact code kept as the technical reference", () => {
+    for (const code of [...NEUTRAL_BY_POLICY, "SOMETHING_NEW_AND_UNMAPPED", "SECURITY_STOP:doc-x", "OCR_LOW_TEXT_YIELD doc-y"]) {
+      const reason = describeReviewReason(code);
+      expect(reason.known, code).toBe(false);
+      expect(reason.headline, code).toBe(NEUTRAL_HEADLINE);
+      expect(reason.meaning, code).toBe(NEUTRAL_MEANING);
+      expect(reason.didWhat).toContain("held this result back");
+      expect(reason.technical).toBe(code);
+    }
+    expect(NEUTRAL_HEADLINE).toBe("One of the checks on this result did not pass.");
+    expect(NEUTRAL_MEANING).toBe("The exact check is shown under Technical details.");
+  });
+
+  it("has no row, and so says nothing about a cause, for a code only the Python core or a list of names carries", () => {
+    for (const code of NEUTRAL_BY_POLICY) {
+      expect(PLAIN_REASON_CODES, code).not.toContain(code);
+      expect(SENTENCE_SOURCES[code], code).toBeUndefined();
+    }
+  });
+
+  /*
+    The structural rule. Every sentence other than the neutral one is listed with the file:line that states it,
+    and the cited file must contain the cited code. A new sentence without a citation, or a citation that
+    stopped being true, fails here instead of reaching a customer.
+  */
+  it("cites, for every non-neutral sentence, a file in this repo that contains the code", () => {
+    const root = new URL("../../", import.meta.url);
+    expect(Object.keys(SENTENCE_SOURCES).sort()).toEqual([...PLAIN_REASON_CODES].sort());
+    for (const code of PLAIN_REASON_CODES) {
+      const citations = SENTENCE_SOURCES[code]!;
+      expect(citations.length, code).toBeGreaterThan(0);
+      const found = citations.some((citation) => {
+        const [file, line] = citation.split(/:(?=\d+$)/) as [string, string];
+        const lines = readFileSync(new URL(file, root), "utf8").split(/\r?\n/);
+        const at = Number(line);
+        expect(at, citation).toBeGreaterThan(0);
+        expect(at, citation).toBeLessThanOrEqual(lines.length);
+        return lines.slice(Math.max(0, at - 6), at + 5).some((text) => text.includes(code));
+      });
+      expect(found, `${code}: no cited file:line contains the code`).toBe(true);
+    }
+  });
+
+  it("says nothing of a mechanism or cause in the sentences that have no source", () => {
+    const mechanism = /because|scan|faint|blurr|image|too (large|small)|could not read|tie back|second|twice|repeat|stable|between runs/i;
+    for (const code of [...NEUTRAL_BY_POLICY, "SOMETHING_NEW_AND_UNMAPPED", "SECURITY_STOP:doc-x"]) {
+      const reason = describeReviewReason(code);
+      expect(`${reason.headline} ${reason.meaning}`, code).not.toMatch(mechanism);
+    }
   });
 
   it("has a sentence for every code the review screen can show", () => {
@@ -64,12 +104,12 @@ describe("review reasons in plain English (D-02)", () => {
   it("invents no meaning for a code it has no row for", () => {
     const reason = describeReviewReason("SOMETHING_NEW_AND_UNMAPPED");
     expect(reason.known).toBe(false);
-    expect(reason.meaning).toContain("does not guess");
-    expect(describeReviewReason("SECURITY_STOP:doc-x").headline).toBe("A safety check stopped this document.");
+    expect(reason.meaning).toBe(NEUTRAL_MEANING);
+    expect(describeReviewReason("SECURITY_STOP:doc-x").headline).toBe(NEUTRAL_HEADLINE);
   });
 
   it("reads a code followed by a document id, as the queue records some of them", () => {
-    expect(describeReviewReason("OCR_LOW_TEXT_YIELD doc-y").known).toBe(true);
+    expect(describeReviewReason("OCR_SOURCE_EMPTY doc-y").known).toBe(true);
     expect(isReasonCode("OCR_LOW_TEXT_YIELD doc-y")).toBe(true);
     expect(isReasonCode("The document was refused by an earlier check.")).toBe(false);
   });
@@ -163,8 +203,8 @@ describe("sentences match what the code means (B1)", () => {
   });
 
   it("DETERMINISTIC_MATERIALIZATION_UNPROVEN: the files disagree with their own record, no second check", () => {
-    expect(describeReviewReason("DETERMINISTIC_MATERIALIZATION_UNPROVEN").headline).toBe("The files in this version disagree with their own record.");
-    expect(text("DETERMINISTIC_MATERIALIZATION_UNPROVEN")).not.toMatch(/second time|checked again|repeatable/i);
+    expect(describeReviewReason("DETERMINISTIC_MATERIALIZATION_UNPROVEN").headline).toBe("The files in this version failed the package's own file checks.");
+    expect(text("DETERMINISTIC_MATERIALIZATION_UNPROVEN")).not.toMatch(/second time|checked again|repeatable|disagree with their own record/i);
   });
 
   it("READING_LISTING_DISAGREEMENT: a fault on our side, with no invented advice about uploads", () => {
@@ -181,17 +221,41 @@ describe("sentences match what the code means (B1)", () => {
     expect(text("SIGNATURE_PRESENT")).not.toMatch(/should not have/i);
   });
 
-  it("states a cause only as a possibility where the code names none", () => {
-    expect(describeReviewReason("OCR_LOW_TEXT_YIELD").meaning).toMatch(/\bmay\b/);
-    expect(describeReviewReason("CONTRADICTION_CANDIDATE").meaning).toMatch(/\bmay\b/);
-    expect(describeReviewReason("CONTRADICTION_CANDIDATE").meaning).not.toMatch(/Documents say/);
+  it("PAGE_OUT_OF_RANGE says only what the validator tests: a page number that is not valid", () => {
+    expect(validatorSource).toContain("(pages are 1-based)");
+    expect(validatorSource).not.toMatch(/pageNumber1\s*>\s*\w*(count|total|last)/i);
+    const text = describeReviewReason("PAGE_OUT_OF_RANGE").meaning;
+    expect(text).toBe("A page region has a page number that is not valid.");
+    expect(text).not.toMatch(/last page|past|beyond|document's/i);
+  });
+
+  it("OCR_PAGES_INCOMPLETE says nothing was assembled, never that part of the document is in the result", () => {
+    expect(readFileSync(new URL("../../quarantine-sidecar/foundation-cdr-worker/src/ocr.ts", import.meta.url), "utf8")).toContain("nothing was assembled");
+    const reason = describeReviewReason("OCR_PAGES_INCOMPLETE");
+    expect(reason.meaning).toContain("nothing was assembled");
+    expect(`${reason.headline} ${reason.meaning} ${reason.next}`).not.toMatch(/only part|part of the document|upload it again|clearer/i);
+  });
+
+  it("states no cause, advice or mechanism that no source in this repo gives (review round 3)", () => {
+    const meaning = (code: string) => describeReviewReason(code).meaning;
+    expect(meaning("ID_NOT_STABLE")).not.toMatch(/change between runs|would change/i);
+    expect(meaning("COLLECTION_ID_NOT_STABLE")).not.toMatch(/change between runs|would change/i);
+    expect(meaning("IMMUTABLE_INPUTS_ONLY_UNPROVEN")).not.toMatch(/stored copy|fingerprint did not match/i);
+    expect(meaning("COUNTS_DISAGREE")).not.toMatch(/add up/i);
+    expect(meaning("OCR_RECOGNITION_CONFLICT")).not.toMatch(/read the same page twice/i);
+    expect(describeReviewReason("OCR_TIMEOUT_OR_NETWORK").next).not.toMatch(/upload it again/i);
+    expect(describeReviewReason("SOURCE_VERSION_AMBIGUOUS").next).not.toMatch(/remove the extra copies/i);
+    expect(describeReviewReason("PAGE_OUT_OF_RANGE").next).not.toMatch(/compile again/i);
   });
 });
 
 describe("the review filter names a reason in plain words (B3)", () => {
   it("labels a code-shaped reason by its headline and keeps a written sentence as it was", async () => {
-    const { reasonOptionLabel } = await import("../components/review-queue");
-    expect(reasonOptionLabel("SEMANTIC_CLAIMS_EMPTY")).toBe("No statements could be taken from these documents.");
+    const { reasonOptionLabel, reasonOptionLabels } = await import("../components/review-queue");
+    expect(reasonOptionLabel("SEMANTIC_CLAIMS_EMPTY")).toBe(NEUTRAL_HEADLINE);
+    // Labels that would read the same are numbered, so the options stay distinguishable without printing a code.
+    expect(reasonOptionLabels(["SEMANTIC_CLAIMS_EMPTY", "OCR_LOW_TEXT_YIELD doc-y", "OCR_SOURCE_EMPTY"]))
+      .toEqual([`${NEUTRAL_HEADLINE} (1)`, `${NEUTRAL_HEADLINE} (2)`, "This document is empty."]);
     expect(reasonOptionLabel("CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=216:pairs=23220")).toBe("Many statements on one topic may conflict.");
     expect(reasonOptionLabel("SEMANTIC_CLAIMS_EMPTY")).not.toMatch(/[A-Z]{3,}_[A-Z_]{3,}/);
     expect(reasonOptionLabel("A short sentence someone wrote.")).toBe("A short sentence someone wrote.");
