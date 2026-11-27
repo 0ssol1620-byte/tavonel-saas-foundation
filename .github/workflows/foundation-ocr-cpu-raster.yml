@@ -13,7 +13,7 @@ on:
       - "workers/foundation-ocr-gpu/app.py"
       - ".github/workflows/foundation-ocr-cpu-raster.yml"
   push:
-    branches: [main, "agent/**"]
+    branches: [main]
     paths:
       - "workers/foundation-ocr-cpu-raster/**"
       - "workers/foundation-ocr-gpu/app.py"
@@ -24,8 +24,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: foundation-ocr-cpu-raster-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to the same pull request supersedes its older run. Every other event (a push to main or an
+  # integration branch, a manual or scheduled run) gets a group of its own run id, so no main, release-gate or
+  # dispatched evidence run is ever cancelled or replaced while pending (WO-CI-PARALLEL-1).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:

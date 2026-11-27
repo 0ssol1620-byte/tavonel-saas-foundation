@@ -16,7 +16,7 @@ name: DB rehearsal
 on:
   pull_request:
   push:
-    branches: [main, "agent/**"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -24,8 +24,11 @@ permissions:
   actions: read
 
 concurrency:
-  group: db-rehearsal-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to the same pull request supersedes its older run. Every other event (a push to main or an
+  # integration branch, a manual or scheduled run) gets a group of its own run id, so no main, release-gate or
+  # dispatched evidence run is ever cancelled or replaced while pending (WO-CI-PARALLEL-1).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # The last version production's own migration history records (gap matrix L-2). Fingerprinting

@@ -86,15 +86,34 @@ const mountedExpected = ['review-1440x900', 'review-390x844', 'receipt-1440x900'
 assert(JSON.stringify(mountedPaths.sort()) === JSON.stringify(mountedExpected.sort()), 'upload must include only the four explicit mounted PNG/geometry pairs; no isolated images or reports');
 assert(repair.includes('WORKSPACE_INTAKE_CAPTURE_RESULT: ${{ steps.workspace-intake-captures.outcome }}'), 'mounted capture gate must consume the actual step outcome without a success fallback');
 const assertFullEvents = (workflow, name) => {
-  // main's event set: every PR event (no types filter) and pushes to main and agent/**.
+  // main's event set: every PR event (no types filter), pushes to main and the named integration branches, and manual runs.
+  // WO-CI-PARALLEL-1: no push trigger for agent/** or codex/** globs. A lane branch with a PR ran every job twice on one head
+  // (push + pull_request), and release evidence cites the pull_request run only, so the push run was pure duplicate.
   assert(/\n  pull_request:\n  push:\n/.test(workflow) && !/pull_request:\n\s+types:/.test(workflow), `${name}: full PR run must run on every PR event, not a narrowed types list`);
-  assert(workflow.includes('- "agent/**"'), `${name}: push to agent/** must run the full suite`);
+  assert(!/^\s*-\s*["']?(?:agent|codex)\/\*\*["']?\s*$/m.test(workflow), `${name}: a lane-branch push glob duplicates the pull_request run`);
   assert(workflow.includes('workflow_dispatch:'), `${name}: manual full run is missing`);
   for (const branch of branches) assert(workflow.includes(`- ${branch}`), `${name}: missing actual integration branch ${branch}`);
 };
 
 assertFullEvents(ci, 'CI');
 assertFullEvents(launch, 'Launch QA');
+// WO-CI-PARALLEL-1: one concurrency rule for every workflow that runs on both pull_request and push to main. A newer push to a PR
+// cancels that PR's older run; any other event is grouped by its own run id, so a main, release-gate or dispatched evidence run is
+// never cancelled, and never replaced while pending (a shared `github.ref` group did both: Launch QA on main 42830308895 and
+// 42811449081 were cancelled by the next main push).
+{
+  const block = "\nconcurrency:\n"
+    + "  # A newer push to the same pull request supersedes its older run. Every other event (a push to main or an\n"
+    + "  # integration branch, a manual or scheduled run) gets a group of its own run id, so no main, release-gate or\n"
+    + "  # dispatched evidence run is ever cancelled or replaced while pending (WO-CI-PARALLEL-1).\n"
+    + "  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}\n"
+    + "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n";
+  const read = file => readFileSync(resolve(repo, '.github/workflows', file), 'utf8').replace(/\r\n/g, '\n');
+  for (const [file, text] of [['ci.yml', ci], ['launch-qa.yml', launch], ['db-rehearsal.yml', dbRehearsal], ...['malware-scan-qualification.yml', 'codeql.yml', 'foundation-ocr-cpu-raster.yml'].map(f => [f, read(f)])]) {
+    assert(text.split(block).length === 2 && (text.match(/^concurrency:/gm) ?? []).length === 1, `${file}: concurrency must be exactly the PR-only-cancel block`);
+    assert(!/^\s*-\s*["']?(?:agent|codex)\/\*\*["']?\s*$/m.test(text) && !/branches: \[[^\]]*(?:agent|codex)\/\*\*/.test(text), `${file}: a lane-branch push glob duplicates the pull_request run`);
+  }
+}
 for (const job of ['  root:', '  nextjs:']) assert(ci.includes(job), `CI full job context changed: ${job.trim()}`);
 for (const full of [
   'Browser QA (${{ matrix.browser }})', 'Product QA (widths + reduced motion + audit)',

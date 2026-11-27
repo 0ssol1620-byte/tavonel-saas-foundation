@@ -9,6 +9,12 @@ permissions:
   actions: read
   contents: read
   security-events: write
+concurrency:
+  # A newer push to the same pull request supersedes its older run. Every other event (a push to main or an
+  # integration branch, a manual or scheduled run) gets a group of its own run id, so no main, release-gate or
+  # dispatched evidence run is ever cancelled or replaced while pending (WO-CI-PARALLEL-1).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   analyze:
     runs-on: ubuntu-latest
