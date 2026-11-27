@@ -397,29 +397,26 @@ export default function WorkspacePage() {
   /*
     WO-FIRST5-P1 (#12): the first-call confirmation. Use with AI reads the remote MCP keys' last use from
     the Developers listing this account can already read (owner, paid, or a free evaluation where trial
-    AI access is on) and says when the AI last asked. Absent for anyone else, while the read is out, or
-    when it fails: the line is information, never a claim that nothing was asked.
+    AI access is on) and says when the AI last asked. The read is lazy: it runs only when the customer
+    asks for it on the Connect your AI screen, never on a workspace load or another surface. A failed
+    or unreadable listing says it could not confirm, never that nothing was asked.
   */
   const trialAiAccess = useTrialAiAccess();
-  const [aiLastRequest, setAiLastRequest] = useState<AiLastRequest | null>(null);
-  const [aiRequestCheck, setAiRequestCheck] = useState(0);
-  useEffect(() => {
-    if (surface !== "ask" || !(accessSource === "owner" || accessSource === "paid" || (accessSource === "trial" && trialAiAccess))) {
-      setAiLastRequest(null);
-      return;
-    }
-    let current = true;
-    void (async () => {
+  const aiRequestReadable = accessSource === "owner" || accessSource === "paid" || (accessSource === "trial" && trialAiAccess);
+  const [aiLastRequest, setAiLastRequest] = useState<AiLastRequest | "unconfirmed" | "checking" | null>(null);
+  useEffect(() => { setAiLastRequest(null); }, [surface, accessSource, trialAiAccess]);
+  const checkAiLastRequest = async () => {
+    setAiLastRequest("checking");
+    const read = await (async () => {
       const client = getSupabaseBrowserClient();
       const { data } = client ? await client.auth.getSession() : { data: { session: null } };
       const token = data.session?.access_token;
-      if (!token) return;
+      if (!token) return null;
       const response = await fetch("/api/developer/keys", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-      const read = response.ok ? lastAiRequest(await response.json().catch(() => null)) : null;
-      if (current) setAiLastRequest(read);
-    })().catch(() => undefined);
-    return () => { current = false; };
-  }, [surface, accessSource, trialAiAccess, aiRequestCheck]);
+      return response.ok ? lastAiRequest(await response.json().catch(() => null)) : null;
+    })().catch(() => null);
+    setAiLastRequest(read ?? "unconfirmed");
+  };
   const [busy, setBusy] = useState(false);
   const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
@@ -4223,10 +4220,16 @@ export default function WorkspacePage() {
                   status={AI_SETUP_SCREEN_STATUS} bodyClassName="one-path-ai-options">
                   <WorkspaceUseWithAi open onDownload={collectionResult ? () => void downloadCollection() : undefined}
                     downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} trial={accessSource === "trial"}>
-                    {aiLastRequest ? (
+                    {aiRequestReadable ? (
                       <p className="fine" role="status">
-                        {aiLastRequestSentence(aiLastRequest, (iso) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)))}{" "}
-                        <button type="button" onClick={() => setAiRequestCheck((count) => count + 1)}>Check again</button>
+                        {aiLastRequest === "unconfirmed"
+                          ? "Could not confirm a request from your AI. Finish the steps above, then check again."
+                          : aiLastRequest && aiLastRequest !== "checking"
+                            ? aiLastRequestSentence(aiLastRequest, (iso) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)))
+                            : null}{" "}
+                        <button type="button" disabled={aiLastRequest === "checking"} onClick={() => void checkAiLastRequest()}>
+                          {aiLastRequest === null ? "Check when your AI last asked" : aiLastRequest === "checking" ? "Checking..." : "Check again"}
+                        </button>
                       </p>
                     ) : null}
                   </WorkspaceUseWithAi>
