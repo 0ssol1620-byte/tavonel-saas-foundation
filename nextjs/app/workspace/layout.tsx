@@ -10,7 +10,8 @@ import type { Metadata, Viewport } from "next";
 import { OAuthProviderAvailability } from "@/components/connections-panel";
 import { RemoteMcpAvailability } from "@/components/workspace/connect-ai-panel";
 import { configuredOAuthProviders } from "@/lib/connector-oauth-secrets";
-import { remoteMcpEnabled } from "@/lib/remote-mcp";
+import { REMOTE_MCP_REFRESH_TTL_SECONDS, remoteMcpEnabled, remoteMcpRefreshEnabled } from "@/lib/remote-mcp";
+import { trialAiAccessEnabled } from "@/lib/trial-ai-access";
 
 // WO-WS-2 (2026-11-23): the workspace stands on the V34 paper (--v34-paper), so the browser chrome does too.
 export const viewport: Viewport = { themeColor: "#f7f8f4", colorScheme: "light" };
@@ -29,7 +30,9 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   // W1-A1: the Connect AI panel shows the hosted MCP URL only where this deployment serves it.
   // WO-REL-4: the source choices name an OAuth provider only where this deployment can connect it.
   return (
-    <RemoteMcpAvailability enabled={remoteMcpEnabled()}>
+    // WO-FIRST5-P1: whether a free evaluation may connect and the refresh window, read here on the server, sent as a boolean and a day count.
+    <RemoteMcpAvailability enabled={remoteMcpEnabled()} trialAiAccess={trialAiAccessEnabled()}
+      refreshDays={remoteMcpRefreshEnabled() ? REMOTE_MCP_REFRESH_TTL_SECONDS / 86400 : null}>
       <OAuthProviderAvailability providers={configuredOAuthProviders()}>{children}</OAuthProviderAvailability>
     </RemoteMcpAvailability>
   );

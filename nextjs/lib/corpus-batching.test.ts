@@ -331,7 +331,8 @@ describe("where the corpus path is wired in", () => {
     */
     // The only other condition is a size refusal of this exact set (REVIEW-PR192-R1 MAJOR-2), never a count.
     expect(workspace).toContain("disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok || sizeRefusedSameSet}");
-    expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(");
+    expect(workspace).toContain("const corpusVerdict = judgeCorpusSet(");
+    expect(workspace).toContain(": corpusVerdict;");
     // The approved complete set is compiled only after the server returns every approved member.
     expect(workspace).toContain("await uploadDocuments(files, counts, undefined, approvalLineage);");
     expect(workspace).toContain("const expectedKeys = triageApproval.quote.files.map((entry) => entry.fileKey);");

@@ -153,7 +153,7 @@ export function ProcessingTermsForm({ offer, agreed, submitting, error, onAgreed
       <p>
         Read the <a href={offer.terms.path} target="_blank" rel="noopener noreferrer">Self-Service Terms</a> and
         the <a href={offer.processing.path} target="_blank" rel="noopener noreferrer">Processing Addendum</a> (version {offer.version}).
-        Accepting records your agreement for files you upload to this workspace. File processing opens separately.
+        Accepting records your agreement for files you upload to this workspace. This page then checks file access, and the file drop opens here once processing is released for your workspace.
       </p>
       <label className={styles.agree}>
         <input
@@ -287,7 +287,8 @@ export default function ProcessingConsentPanel({ getToken, onAccepted, children 
             <p>
               <strong>Terms accepted.</strong> Recorded {new Date(receipt.acceptedAt).toLocaleString()}.
             </p>
-            <p>File processing is not active for this workspace yet. The file drop opens here once it is.</p>
+            {/* WO-FIRST5-P1 (#15): what happens next and what to press, not "not active yet". */}
+            <p>The file drop opens on this page once file processing is released for your workspace. Check now to see whether it is.</p>
             <div className={styles.actions}>
               <button type="button" className="btn ghost" onClick={() => void Promise.resolve(onAccepted()).catch(() => undefined)}>
                 Check file access again

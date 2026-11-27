@@ -541,6 +541,8 @@
 .one-path-workspace .connection-list small code,
 .one-path-workspace .board-id small { font-family: var(--f-mono); font-size: 12px; }
 .one-path-workspace .ask-result q { font-family: var(--f-sans); font-size: 14px; line-height: 1.55; color: var(--text-mid); }
+/* WO-FIRST5-P1: a citation's ids, box and scores sit in a native disclosure, one per line when opened. */
+.one-path-workspace .ask-result li details > :not(summary) { display: block; }
 .one-path-workspace .world-actions small,
 .one-path-workspace .workspace-preflight dd { font-family: var(--f-mono); font-size: 12px; }
 .one-path-workspace .workspace-preflight dd { font-size: 16px; }

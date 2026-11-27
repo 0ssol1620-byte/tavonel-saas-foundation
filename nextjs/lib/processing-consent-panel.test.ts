@@ -140,3 +140,14 @@ describe("workspace integration", () => {
     expect(page).not.toContain('sourcePending === "terms_acceptance_required" || sourcePending === "legacy"');
   });
 });
+
+describe("what the terms say happens next (WO-FIRST5-P1 #15)", () => {
+  const panel = readFileSync(new URL("../components/processing-consent-panel.tsx", import.meta.url), "utf8");
+  it("says the file drop opens on this page once processing is released, not that it opens separately", () => {
+    const form = renderToStaticMarkup(createElement(ProcessingTermsForm, { offer, agreed: false, submitting: false, error: null, onAgreedChange() {}, onSubmit() {} }));
+    expect(form).toContain("the file drop opens here once processing is released for your workspace.");
+    expect(form).not.toContain("opens separately");
+    expect(panel).toContain("The file drop opens on this page once file processing is released for your workspace. Check now to see whether it is.");
+    expect(panel).not.toContain("File processing is not active for this workspace yet.");
+  });
+});
