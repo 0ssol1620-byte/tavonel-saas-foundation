@@ -262,7 +262,10 @@ async function search(request: Request, context: { params: Promise<{ id: string 
   }
   const publicRoute = buildPublicRetrievalRoute(attemptedRoles, result.diagnostics.degradations);
 
-  const freshness = await getWorldFreshness(auth.principal.workspaceKey, id);
+  // A projected viewer's observedAt is read over the admitted sources only (WO-PROJ-K2 N2).
+  const freshness = projection
+    ? await getWorldFreshness(auth.principal.workspaceKey, id, { admittedDocumentIds: projection.allowedDocumentIds })
+    : await getWorldFreshness(auth.principal.workspaceKey, id);
   const activeWorld = {
     manifestDigest: active.world.manifestDigest,
     revision: active.world.revision,

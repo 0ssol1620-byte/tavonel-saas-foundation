@@ -108,7 +108,10 @@ async function answerQuestion(
   };
   // Four clocks, and whether a newer version is waiting for a person (audit TM04). Read once
   // here so both paths carry the identical block.
-  const freshness = await getWorldFreshness(workspaceKey, id);
+  // A projected viewer's observedAt is read over the admitted sources only (WO-PROJ-K2 N2).
+  const freshness = projection?.kind === "partial"
+    ? await getWorldFreshness(workspaceKey, id, { admittedDocumentIds: projection.allowedDocumentIds })
+    : await getWorldFreshness(workspaceKey, id);
 
   // --- Preferred path: the compiled retrieval pipeline ----------------------------------
   const indexState = await readRetrievalIndexState({

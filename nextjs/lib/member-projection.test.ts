@@ -22,7 +22,9 @@ import {
   decideMemberProjection, memberProjectionMode, projectionAdmits, projectionShadowFields, projectSourceGroups,
   recordProjectionShadow, type ProjectionDecision,
 } from "./member-projection";
-import { runRetrievalPipeline } from "./retrieval-pipeline";
+import { PROJECTION_WINDOW_EXHAUSTED, runRetrievalPipeline } from "./retrieval-pipeline";
+import { buildPublicRetrievalRoute } from "./model-attempt-receipt";
+import { getWorldFreshness } from "./world-store";
 import { buildBgeM3BaselineProfile } from "./retrieval-profile";
 import type { EmbedderAdapter } from "./embedder-adapter";
 import type { RerankerAdapter } from "./reranker-adapter";
@@ -246,8 +248,11 @@ describe("the retrieval pipeline, projected", () => {
     expect(projected.ok && alone.ok).toBe(true);
     if (!projected.ok || !alone.ok) return;
     expect(projected.packet).toEqual(alone.packet);
-    const { lexicalCandidateCount, denseCandidateCount, structureCandidateCount, fusedCandidateCount } = alone.diagnostics;
-    expect(projected.diagnostics).toMatchObject({ lexicalCandidateCount, denseCandidateCount, structureCandidateCount, fusedCandidateCount });
+    const { lexicalCandidateCount, denseCandidateCount, fusedCandidateCount } = alone.diagnostics;
+    expect(projected.diagnostics).toMatchObject({ lexicalCandidateCount, denseCandidateCount, fusedCandidateCount });
+    // N1: the structure pool is an unordered 2000-row read; a projected viewer gets no count from it.
+    expect(projected.diagnostics.structureCandidateCount).toBeNull();
+    expect(projected.diagnostics.degradations).toEqual(alone.diagnostics.degradations);
     expect(projected.diagnostics.contextCutoff).toEqual(alone.diagnostics.contextCutoff);
     expect(projectedReranker).toEqual(rerankerSaw);
   });
@@ -271,7 +276,7 @@ describe("the retrieval pipeline, projected", () => {
     for (const read of textReads) expect(read.path).not.toMatch(/retrieval-unit-h\d/);
     expect(rerankerSaw.flat().some(text => text.includes("Globex"))).toBe(false);
     expect(JSON.stringify(result)).not.toContain("Globex");
-    expect(result.diagnostics).toMatchObject({ lexicalCandidateCount: 4, denseCandidateCount: 2, structureCandidateCount: 4 });
+    expect(result.diagnostics).toMatchObject({ lexicalCandidateCount: 4, denseCandidateCount: 2, structureCandidateCount: null });
   });
 
   it("fails closed when the unit-to-document map cannot be read", async () => {
@@ -286,5 +291,88 @@ describe("the retrieval pipeline, projected", () => {
     expect(result.packet.items).toEqual([]);
     expect(result.packet.abstentionReasons).toEqual(["no retrieval source returned a candidate for this question"]);
     expect(result.diagnostics).toMatchObject({ lexicalCandidateCount: 0, denseCandidateCount: 0, fusedCandidateCount: 0 });
+    // An unsaturated window is exhaustive: no incompleteness is claimed.
+    expect(result.diagnostics.degradations).not.toContain(PROJECTION_WINDOW_EXHAUSTED);
+  });
+});
+
+/*
+  E1 (review r1): a source that fills its 500-unit window with hidden units may have pushed the
+  member's own units past it. The result must say it may be incomplete -- without a count.
+*/
+describe("a saturated projected window", () => {
+  const many = Array.from({ length: 500 }, (_unused, n) => row(`s${n}`, D2, `Globex notice period termination filler ${n}`));
+  const saturate = (dense: string[]) => {
+    world = { units: [...many, ...VISIBLE], lexical: ids([...many, ...VISIBLE]), dense };
+  };
+
+  it("degrades, and the public route names `access_scope_incomplete`, when admitted units may lie past the window", async () => {
+    saturate(ids([VISIBLE[1]!, VISIBLE[0]!]));
+    const result = await run(partial([D1]));
+    if (!result.ok) throw new Error(result.code);
+    expect(result.packet.items.length).toBeGreaterThan(0);
+    expect(result.diagnostics.degradations).toContain(PROJECTION_WINDOW_EXHAUSTED);
+    expect(buildPublicRetrievalRoute([], result.diagnostics.degradations).degradationClasses).toEqual(["access_scope_incomplete"]);
+    // The id-to-document read was batched (5 x 100 + the rest), and still read no text.
+    expect(calls.filter(call => call.path.includes("select=unit_id,document_id")).length).toBe(6);
+  });
+
+  it("never abstains as if nothing existed: the reason says the result may be incomplete, and no count", async () => {
+    saturate(ids([many[0]!]));
+    const result = await run(partial([D1]));
+    if (!result.ok) throw new Error(result.code);
+    expect(result.packet.items).toEqual([]);
+    expect(result.packet.abstentionReasons).toEqual(["results may be incomplete for this viewer's access"]);
+    expect(JSON.stringify(result.packet)).not.toMatch(/\b500\b|Globex|0000000[12]-/);
+  });
+
+  it("claims nothing when the window held enough admitted units", async () => {
+    // 500 rows, six of them admitted near the top: candidateLimit (6) is met inside the window.
+    world = {
+      units: [...many, ...VISIBLE, row("v5", D1, "Acme notice 5"), row("v6", D1, "Acme notice 6")],
+      lexical: [...ids([...VISIBLE, row("v5", D1, "x"), row("v6", D1, "x")]), ...ids(many)].slice(0, 500),
+      dense: [],
+    };
+    const result = await run(partial([D1]));
+    if (!result.ok) throw new Error(result.code);
+    expect(result.diagnostics.degradations).not.toContain(PROJECTION_WINDOW_EXHAUSTED);
+  });
+
+  it("is never claimed without a projection, however full the window", async () => {
+    saturate(ids([VISIBLE[1]!]));
+    const result = await run();
+    if (!result.ok) throw new Error(result.code);
+    expect(result.diagnostics.degradations).not.toContain(PROJECTION_WINDOW_EXHAUSTED);
+  });
+});
+
+/* N2 (review r1): the World's `observedAt` is read over the admitted sources only. */
+describe("freshness for a projected viewer", () => {
+  const JOB = [{ settled_at: "2026-11-20T00:00:00.000Z", blocked_resolved_at: null, document_ids: [D1, D2], candidate_manifest_digest: null }];
+  beforeEach(() => {
+    vi.stubGlobal("fetch", async (input: string | URL) => {
+      const url = new URL(String(input));
+      calls.push({ path: decodeURIComponent(url.pathname + url.search), body: null });
+      if (url.pathname.endsWith("/foundation_compile_jobs")) return json(JOB);
+      if (url.pathname.endsWith("/source_versions")) {
+        const asked = /^in\.\((.*)\)$/.exec(url.searchParams.get("source_id") ?? "")?.[1]?.split(",") ?? [];
+        const times: Record<string, string> = { [D1]: "2026-11-01T00:00:00.000Z", [D2]: "2026-11-19T00:00:00.000Z" };
+        return json(asked.map(id => times[id]).filter(Boolean).sort().reverse().slice(0, 1).map(observed_at => ({ observed_at })));
+      }
+      return json([]);
+    });
+  });
+
+  it("reads observedAt over every source without a projection, as before", async () => {
+    await expect(getWorldFreshness(WS, COLLECTION)).resolves.toMatchObject({ observedAt: "2026-11-19T00:00:00.000Z" });
+  });
+
+  it("reads observedAt over the admitted sources only, and none when none of the job's sources is admitted", async () => {
+    await expect(getWorldFreshness(WS, COLLECTION, { admittedDocumentIds: new Set([D1]) }))
+      .resolves.toMatchObject({ observedAt: "2026-11-01T00:00:00.000Z" });
+    calls = [];
+    await expect(getWorldFreshness(WS, COLLECTION, { admittedDocumentIds: new Set([D3]) }))
+      .resolves.toMatchObject({ observedAt: null });
+    expect(calls.some(call => call.path.includes("/source_versions"))).toBe(false);
   });
 });

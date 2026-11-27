@@ -85,7 +85,8 @@ export type RetrievalDiagnostics = {
   queryTokens: string[];
   lexicalCandidateCount: number;
   denseCandidateCount: number;
-  structureCandidateCount: number;
+  /** Null for a partial projection: the 2000-row structure read is unordered, so an admitted count there would vary with hidden rows. */
+  structureCandidateCount: number | null;
   fusedCandidateCount: number;
   rerankerApplied: boolean;
   gateRejections: WorldGateRejection[];
@@ -148,6 +149,14 @@ const DEFAULT_CONTEXT_LIMIT = 10;
 // filters by document, so K fills unless fewer than K admitted units rank inside the first 500 of
 // every source. Upgrade: scoped RPCs taking p_document_ids (needs a migration), then this goes.
 const PROJECTED_CANDIDATE_WINDOW = 500;
+/*
+  WO-PROJ-K2 E1: a source that returned its whole window and still left fewer than candidateLimit
+  admitted units may have ranked admitted units past the window. The result is then not known to
+  be complete, and says so (model-attempt-receipt.ts maps this to `access_scope_incomplete`). The
+  wording names no count and no source. Unsaturated windows are exhaustive, and add nothing.
+*/
+export const PROJECTION_WINDOW_EXHAUSTED = "projected retrieval incomplete: candidate window exhausted";
+const PROJECTION_INCOMPLETE_REASON = "results may be incomplete for this viewer's access";
 
 export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promise<RetrievalPipelineResult> {
   const question = input.question.normalize("NFKC").replace(/\s+/g, " ").trim();
@@ -284,6 +293,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   if (!lexicalResult.ok) return { ok: false, code: lexicalResult.code };
   let lexicalIds = lexicalResult.value;
   let denseIds = denseFetched;
+  let windowExhausted = false;
   if (projection) {
     // Each source's native rank is per unit (ts_rank_cd, a distance), so dropping hidden units
     // from a best-first list leaves the order the admitted units would have had on their own.
@@ -293,8 +303,13 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
       const documentId = documentOf.value.get(id);
       return documentId !== undefined && projectionAdmits(projection, [documentId]);
     };
-    lexicalIds = lexicalIds.filter(admitted).slice(0, candidateLimit);
-    denseIds = denseIds.filter(admitted).slice(0, candidateLimit);
+    const lexicalAdmitted = lexicalIds.filter(admitted);
+    const denseAdmitted = denseIds.filter(admitted);
+    windowExhausted = (lexicalIds.length >= PROJECTED_CANDIDATE_WINDOW && lexicalAdmitted.length < candidateLimit)
+      || (denseIds.length >= PROJECTED_CANDIDATE_WINDOW && denseAdmitted.length < candidateLimit);
+    if (windowExhausted) degradations.push(PROJECTION_WINDOW_EXHAUSTED);
+    lexicalIds = lexicalAdmitted.slice(0, candidateLimit);
+    denseIds = denseAdmitted.slice(0, candidateLimit);
   }
 
   // --- Source 3: structure -------------------------------------------------------------
@@ -303,7 +318,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   // new model: deterministic and explainable, composing with the others purely through RRF.
   const seedIds = [...new Set([...lexicalIds, ...denseIds])].slice(0, candidateLimit);
   let structureIds: string[] = [];
-  let structureCandidateCount = 0;
+  let structureCandidateCount: number | null = 0;
   if (seedIds.length > 0) {
     const seeds = await loadUnitsByIds(input.workspaceKey, compileRunId, seedIds);
     const candidates = await loadStructureCandidates(input.workspaceKey, compileRunId, 2000, projection !== null);
@@ -311,7 +326,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
       const pool = projection
         ? candidates.value.filter((candidate) => projectionAdmits(projection, candidate.documentId ? [candidate.documentId] : []))
         : candidates.value;
-      structureCandidateCount = pool.length;
+      structureCandidateCount = projection ? null : pool.length;
       const structureRanked = rankByStructuralOverlap(pool, {
         seedClaimIds: [...new Set(seeds.value.flatMap((unit) => unit.claimIds))],
         seedEntityIds: [...new Set(seeds.value.flatMap((unit) => unit.entityIds))],
@@ -341,7 +356,7 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
         worldVersion: input.worldStateId,
         retrievalProfile: input.profile.id,
         question,
-        abstentionReasons: ["no retrieval source returned a candidate for this question"],
+        abstentionReasons: [windowExhausted ? PROJECTION_INCOMPLETE_REASON : "no retrieval source returned a candidate for this question"],
       }),
       diagnostics: {
         compileRunId,
@@ -486,7 +501,8 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   const abstentionReasons: string[] = [];
   if (ranked.length === 0) {
     abstentionReasons.push(
-      gated.rejected.length > 0
+      windowExhausted ? PROJECTION_INCOMPLETE_REASON
+      : gated.rejected.length > 0
         ? "every retrieved candidate was rejected by the World Gate"
         : "no candidate survived retrieval for this question",
     );
