@@ -8581,7 +8581,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['compile-pipeline', 15, 'c0dcca37df08a4b6', 12, 'd73d2c163da39980', [], { 'e2e/compile-job-states-mobile.spec.ts': v34ProductQa('390'), 'e2e/compile-resume.spec.ts': v34ProductQa('audit') }],
   ['world-temporal-lens', 13, 'fdef27c6e8765cd3', 6, '2c6da671f58ed78b', [], { 'e2e/world-graph-scale.spec.ts': v34ProductQa('1440'), 'e2e/world-lens.spec.ts': v34ProductQa('1440') }],
   ['control-plane', 5, '69fb7d773a115e09', 3, '0252f55e061df2fc', [], {}],
-  ['developer-surface', 10, '3e2063aec635d535', 8, '0c3198c499d7bbb0', [], {}],
+  // WO-MCP-LISTING-2: the OpenAI domain-verification route and its suite join developer-surface (10 -> 12 paths, 8 -> 9 Node suites).
+  ['developer-surface', 12, 'c601bfc1d28ecda0', 9, 'd88396fa5a66c2e3', [], {}],
   ['tenant-isolation', 6, 'd41829069c62cb31', 5, '26b862fea9f1ef7b', [], {}],
   ['billing-reconciliation', 12, 'd98a2e522659cc4b', 7, '00d0f2f362aa3ea7', [], { 'scripts/billing/paddle-reconcile.test.mjs': V34_CI_VITEST }],
   ['v34-home', 2, '15569343b96c4a82', 1, '70918323898e7ed4', ['e2e/home-v34.spec.ts', 'e2e/upload-entry.spec.ts'], {}],

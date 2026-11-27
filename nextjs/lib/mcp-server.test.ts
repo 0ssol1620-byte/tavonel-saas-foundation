@@ -91,11 +91,14 @@ describe("the constraint from masterplan 22.2", () => {
   it("declares every tool read-only to the client as well", async () => {
     const { handle } = server({});
     const listed = resultOf(await handle({ jsonrpc: "2.0", id: 1, method: "tools/list" })) as unknown as {
-      tools: Array<{ name: string; annotations: { readOnlyHint: boolean; destructiveHint: boolean } }>;
+      tools: Array<{ name: string; title: unknown; annotations: { readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean } }>;
     };
     for (const tool of listed.tools) {
       expect(tool.annotations.readOnlyHint, tool.name).toBe(true);
       expect(tool.annotations.destructiveHint, tool.name).toBe(false);
+      // Every tool reads only the caller's own workspace, a bounded private set.
+      expect(tool.annotations.openWorldHint, tool.name).toBe(false);
+      expect(typeof tool.title === "string" && tool.title.trim().length > 0, tool.name).toBe(true);
     }
   });
 });
