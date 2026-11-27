@@ -509,3 +509,53 @@ describe("refresh flag on, against the real reads (PostgREST stand-in)", () => {
     }, 120_000);
   }
 });
+
+/*
+  WO-MCP-REFRESH-2: what the registration answer and the consent page say follows the same flag as
+  the token endpoint, so a client is never told it can refresh when it cannot, nor that it cannot when it can.
+*/
+describe("registration and consent follow the refresh flag", () => {
+  const registered = async () => {
+    const response = await register(new Request(`${ORIGIN}/api/mcp/oauth/register`, {
+      method: "POST",
+      body: JSON.stringify({ client_name: "Host agent", redirect_uris: [REDIRECT], token_endpoint_auth_method: "none" }),
+    }));
+    return await response.json() as { client_id: string; grant_types: string[] };
+  };
+  const described = async (clientId: string) => await (await authorizeRoute(new Request(`${ORIGIN}/api/mcp/oauth/authorize`, {
+    method: "POST",
+    body: JSON.stringify({
+      decision: "describe",
+      request: { response_type: "code", client_id: clientId, redirect_uri: REDIRECT, code_challenge: CHALLENGE, code_challenge_method: "S256", state: "s", resource: `${ORIGIN}/api/mcp` },
+    }),
+  }))).json() as { lifetime: string };
+
+  it("flag off: registers authorization_code only and keeps the one-hour sentence verbatim", async () => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "");
+    const registration = await registered();
+    expect(registration.grant_types).toEqual(["authorization_code"]);
+    expect((await described(registration.client_id)).lifetime).toBe(
+      "The token is bound to this workspace and expires after an hour. Revoke it under Workspace › Developers.",
+    );
+  });
+
+  it("flag on: registers refresh_token too and says it renews, for the real refresh window", async () => {
+    const registration = await registered();
+    expect(registration.grant_types).toEqual(["authorization_code", "refresh_token"]);
+    const { lifetime } = await described(registration.client_id);
+    expect(lifetime).toContain("renews automatically while it is used");
+    expect(lifetime).toContain(`up to ${developerStore.REMOTE_MCP_REFRESH_TTL_SECONDS / 86400} days without use`);
+    expect(lifetime).toContain("revoked at any time under Workspace › Developers");
+    expect(lifetime).not.toContain("expires after an hour");
+  });
+
+  it("a client registered with the flag off can still refresh once it is on: the token endpoint never reads registered grant types", async () => {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "");
+    const registration = await registered();
+    expect(registration.grant_types).toEqual(["authorization_code"]);
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "true");
+    const first = await connect(registration.client_id);
+    expect(first.refresh_token).toBeTruthy();
+    expect((await json(await refresh(registration.client_id, first.refresh_token!))).access_token).toBeTruthy();
+  });
+});
