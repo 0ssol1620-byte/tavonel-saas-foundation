@@ -165,12 +165,13 @@ select throws_ok($$select pg_temp.admit('pilot-rck04', 'e4e4e4e4-0000-4000-8000-
 reset role;
 
 -- 19-20: the installed bodies are the ones the rollback draft guards on, and the grants are kept.
--- 20261123120000 (WO-C-T2) redefined the inner function; its rollback restores the 20261117160200
+-- 20261127030000 (WO-TRIAL-RELEASE-1) redefined the inner function last (968fafde...); its rollback restores
+-- 1bd2c9f6..., the 20261123120000 body. 20261123120000 (WO-C-T2) redefined it before; its rollback restores the 20261117160200
 -- body (240678b7...) that supabase/drafts/rollback-20261117160200-*.sql guards on.
 select is(md5(pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)'::regprocedure))
     || ' ' || md5(pg_get_functiondef('public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text, jsonb)'::regprocedure)),
-  '1bd2c9f6d4c8e2fb64fa6d846ae69185 5c2fd1f532fd30259819b8fafe421532',
-  'the inner function is the 20261123120000 body receipts/WO-C-T2/rollback.sql expects; the wrapper is unchanged');
+  '968fafded557158da2e898281a35527b 5c2fd1f532fd30259819b8fafe421532',
+  'the inner function is the 20261127030000 body its rollback draft expects; the wrapper is unchanged');
 select ok(not has_function_privilege('service_role', 'public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)', 'EXECUTE')
     and has_function_privilege('service_role', 'public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text, jsonb)', 'EXECUTE')

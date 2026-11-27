@@ -4,7 +4,7 @@ import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
 import { reserveFoundationCompute, reserveFoundationIntakeApprovedFile, readFoundationIntakeApproval } from "@/lib/compute-reservation";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
-import { reserveFoundationIntake } from "@/lib/intake-admission";
+import { releaseFoundationIntake, reserveFoundationIntake } from "@/lib/intake-admission";
 import { validateQualifiedDocumentInput } from "@/lib/qualified-input";
 import {
   FOUNDATION_INTAKE_MAX_BYTES,
@@ -335,6 +335,11 @@ async function legacyCapability(request: Request, input: {
     estimatedPages: reservationPages,
   });
   if (!compute.ok) {
+    // No upload URL is issued, so an admission not yet confirmed would only hold a trial file slot
+    // until its window ends (audit #20). Released before answering; a failed release keeps the old answer.
+    if (admission.result.confirmed === false) {
+      await releaseFoundationIntake({ workspaceKey: workspaceId, documentId, reasonCode: compute.code });
+    }
     const paymentRequired = [
       "STUDIO_SUBSCRIPTION_REQUIRED",
       "GPU_CREDITS_REQUIRED",
