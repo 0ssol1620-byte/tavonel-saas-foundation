@@ -40,11 +40,14 @@ function rpcError(status: number, id: unknown, code: number, message: string, he
 /** The WWW-Authenticate header for a refused authorization, or none (issuer off, or a refusal no sign-in fixes). */
 function challenge(origin: string, status: number, code: string, scope: string | undefined): Record<string, string> {
   if (!remoteMcpEnabled()) return {};
-  if (status === 401) {
+  // A revoked grant or a membership revision that moved is a 403 (status unchanged), but only a new sign-in fixes it: invalid_token.
+  if (status === 401 || code === "API_KEY_AUTHORIZATION_REVOKED") {
     return { "WWW-Authenticate": agentBearerChallenge(origin, code === "AUTH_REQUIRED" ? undefined : { error: "invalid_token", description: code }) };
   }
+  // Step-up names every scope the new consent needs: the authorization step refuses a request without agent:read.
   if (code === "API_SCOPE_REQUIRED" && scope) {
-    return { "WWW-Authenticate": agentBearerChallenge(origin, { error: "insufficient_scope", description: `This tool needs ${scope}.`, scope }) };
+    const needed = scope === "agent:read" ? "agent:read" : `agent:read ${scope}`;
+    return { "WWW-Authenticate": agentBearerChallenge(origin, { error: "insufficient_scope", description: `This tool needs ${scope}.`, scope: needed }) };
   }
   return {};
 }

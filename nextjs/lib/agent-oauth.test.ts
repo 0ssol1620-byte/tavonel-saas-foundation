@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   grants: [] as Array<{ grantId: string; clientLabel: string; scopes: string[]; token: string; expiresAt: string; revokedAt: string | null }>,
   createGrant: vi.fn(),
   expired: new Set<string>(),
+  truncated: false,
+  openProposals: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -64,7 +66,7 @@ vi.mock("@/lib/developer-store", async (importOriginal) => ({
 vi.mock("@/lib/agent-grants", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./agent-grants")>()),
   createAgentGrant: mocks.createGrant,
-  listAgentGrants: async () => ({ ok: true, grants: mocks.grants.map(({ token: _t, scopes: _s, ...grant }) => ({ ...grant, createdAt: "2026-11-27T00:00:00.000Z", lastUsedAt: null })), truncated: false }),
+  listAgentGrants: async () => ({ ok: true, grants: mocks.grants.map(({ token: _t, scopes: _s, ...grant }) => ({ ...grant, createdAt: "2026-11-27T00:00:00.000Z", lastUsedAt: null })), truncated: mocks.truncated }),
   readAgentGrant: async (_ws: string, grantId: string) => {
     const grant = mocks.grants.find((entry) => entry.grantId === grantId);
     return { ok: true, grant: grant ? { grantId, authorizationRevision: 4, createdAt: "2026-11-27T00:00:00.000Z", revokedAt: grant.revokedAt } : null };
@@ -75,6 +77,11 @@ vi.mock("@/lib/agent-grants", async (importOriginal) => ({
     grant.revokedAt = new Date().toISOString();
     return { ok: true, revokedAt: grant.revokedAt, keysRevoked: 1, proposalsWithdrawn: 0 };
   },
+}));
+
+vi.mock("@/lib/change-proposals", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./change-proposals")>()),
+  grantHasOpenProposals: mocks.openProposals,
 }));
 
 import { insideAgentMcpDispatch } from "./agent-mcp-dispatch";
@@ -154,6 +161,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.grants.length = 0;
   mocks.expired.clear();
+  mocks.truncated = false;
+  mocks.openProposals.mockResolvedValue({ ok: true, open: false });
   vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "true");
   vi.stubEnv("TAVONEL_REMOTE_MCP_SIGNING_SECRET", "agent-oauth-unit-test-sealing-secret-value");
   vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", WS);
@@ -227,13 +236,21 @@ describe("WO-AGENT-OAUTH-1: the whole dance against the route handlers", () => {
     expect((await initialized.json()).result.serverInfo.name).toBe("tavonel-agent");
     const listed = await agentRpc(LIST, tokenAnswer.access_token);
     expect(listed.status).toBe(200);
-    expect(((await listed.json()).result.tools as Array<{ name: string }>).map((tool) => tool.name)).toContain("propose_compile");
+    const tools = (await listed.json()).result.tools as Array<{ name: string; annotations: { readOnlyHint?: boolean } }>;
+    expect(tools.map((tool) => tool.name)).toContain("propose_compile");
+    // GPT Q1: a tool that saves a proposal is a write tool, never readOnlyHint:true.
+    for (const tool of tools) expect(tool.annotations.readOnlyHint, tool.name).toBe(!tool.name.startsWith("propose_"));
     // 6. A read-only grant cannot propose: 403 with the insufficient_scope challenge, before any tool runs.
     const propose = await agentRpc(PROPOSE, tokenAnswer.access_token);
     expect(propose.status).toBe(403);
     expect((await propose.json()).error.message).toBe("API_SCOPE_REQUIRED");
     expect(propose.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
-    expect(propose.headers.get("www-authenticate")).toContain('scope="agent:propose"');
+    expect(propose.headers.get("www-authenticate")).toContain('scope="agent:read agent:propose"');
+    // 7. Step-up with exactly the challenged scope is a valid request, and a ticked consent grants it.
+    const stepUp = await consent("describe", authRequest(clientId, { scope: "agent:read agent:propose" }));
+    expect(stepUp.body).toMatchObject({ code: "AUTHORIZATION_REQUEST_VALID", scopes: ["agent:propose", "agent:read"] });
+    const upgraded = await exchange(codeGrant(clientId, await approvedCode(clientId, { allowPropose: true }, { scope: "agent:read agent:propose" })));
+    expect((await upgraded.json() as TokenAnswer).scope).toBe("agent:propose agent:read");
   });
 
   it("agent:propose is granted only when the person ticked its own line", async () => {
@@ -394,6 +411,61 @@ describe("WO-AGENT-OAUTH-1: code replay, expiry, cohort at issue", () => {
     const response = await exchange(codeGrant(clientId, code));
     expect(response.status).toBe(402);
     expect(mocks.createGrant).not.toHaveBeenCalled();
+  });
+
+  it("review N3: a grant list cut at its cap is unknown, so the exchange is refused (503) and nothing is minted", async () => {
+    const clientId = await registeredClient();
+    const code = await approvedCode(clientId);
+    mocks.truncated = true;
+    const response = await exchange(codeGrant(clientId, code));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "temporarily_unavailable", error_description: "AGENT_GRANT_LIST_TRUNCATED" });
+    expect(mocks.createGrant).not.toHaveBeenCalled();
+  });
+
+  it("review N1: a membership revision that moved is 403 with an invalid_token challenge, so the connector signs in again", async () => {
+    const clientId = await registeredClient();
+    const { access_token: bearer } = await agentToken(clientId);
+    mocks.membership.mockResolvedValue({ ok: true, membership: { state: "active", authorizationRevision: 5, role: "owner" } });
+    const response = await agentRpc(LIST, bearer);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.message).toBe("API_KEY_AUTHORIZATION_REVOKED");
+    expect(response.headers.get("www-authenticate")).toContain('error="invalid_token", error_description="API_KEY_AUTHORIZATION_REVOKED"');
+  });
+});
+
+describe("WO-AGENT-OAUTH-1 review P1: ended OAuth grants do not pile up in the Agent access list", () => {
+  const past = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const seed = (clientLabel: string, expiresAt: string) => {
+    const grant: Grant = { grantId: `10000000-0000-4000-8000-${String(mocks.grants.length + 1).padStart(12, "0")}`, clientLabel, scopes: ["agent:read"],
+      token: `tvnl_agt_seed${String(mocks.grants.length).padStart(8, "0")}_${"s".repeat(43)}`, expiresAt, revokedAt: null };
+    mocks.grants.push(grant);
+    return grant;
+  };
+
+  it("a new token revokes the person's expired OAuth grants that have no open proposal, and nothing else", async () => {
+    const ended = seed("ChatGPT #AAAAAAAAAAAA", past(10 * 60_000));
+    const withOpen = seed("ChatGPT #BBBBBBBBBBBB", past(10 * 60_000));
+    const inGrace = seed("ChatGPT #CCCCCCCCCCCC", past(30_000));
+    const panelExpired = seed("Claude Desktop", past(10 * 60_000));
+    const panelLive = seed("My agent", new Date(Date.now() + 86_400_000).toISOString());
+    mocks.openProposals.mockImplementation(async (_ws: string, grantId: string) => ({ ok: true, open: grantId === withOpen.grantId }));
+    const clientId = await registeredClient();
+    await agentToken(clientId);
+    expect([ended, withOpen, inGrace, panelExpired, panelLive].map((grant) => grant.revokedAt !== null)).toEqual([true, false, false, false, false]);
+    expect(mocks.openProposals.mock.calls.map((call) => call[1])).toEqual([ended.grantId, withOpen.grantId]);
+    // The grant just issued is live and untouched.
+    expect(mocks.grants.at(-1)!.revokedAt).toBeNull();
+  });
+
+  it("a proposal check that fails, or throws, leaves the grant alone and never fails the token", async () => {
+    const ended = seed("ChatGPT #DDDDDDDDDDDD", past(10 * 60_000));
+    mocks.openProposals.mockResolvedValueOnce({ ok: false, code: "PROPOSAL_STORE_RESPONSE_INVALID", status: 503 });
+    const clientId = await registeredClient();
+    expect((await agentToken(clientId)).token_type).toBe("Bearer");
+    mocks.openProposals.mockRejectedValueOnce(new Error("boom"));
+    expect((await agentToken(clientId)).token_type).toBe("Bearer");
+    expect(ended.revokedAt).toBeNull();
   });
 });
 

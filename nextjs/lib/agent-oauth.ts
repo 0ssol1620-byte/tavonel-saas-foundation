@@ -7,7 +7,8 @@ import {
   agentProposalsEnabled,
   type AgentScope,
 } from "./agent-access";
-import { AGENT_GRANT_STATUS, createAgentGrant, listAgentGrants, normalizeClientLabel, revokeAgentGrant } from "./agent-grants";
+import { AGENT_GRANT_STATUS, createAgentGrant, listAgentGrants, normalizeClientLabel, revokeAgentGrant, type AgentGrant } from "./agent-grants";
+import { grantHasOpenProposals } from "./change-proposals";
 import { requireFoundationSession } from "./developer-auth";
 import {
   PKCE_VERIFIER,
@@ -178,7 +179,7 @@ export async function answerAgentAuthorization(
   }
   if (body.decision === "describe") return NextResponse.json({ code: "AUTHORIZATION_REQUEST_VALID", ...checked.view }, { headers: NO_STORE });
   if (body.decision === "deny") {
-    audit("agent_oauth_consent", { decision: "deny" });
+    audit("agent_oauth_consent", { decision: "deny", requested: checked.request.scopes, redirectOrigin: checked.view.client.redirectOrigin });
     const redirectTo = redirectWith(checked.request.redirectUri, origin, { error: "access_denied", error_description: "The workspace member declined.", state: checked.request.state });
     return NextResponse.json({ code: "AUTHORIZATION_DENIED", redirectTo }, { headers: NO_STORE });
   }
@@ -194,7 +195,7 @@ export async function answerAgentAuthorization(
   if (auth.principal.accessSource === "trial") return NextResponse.json({ code: "TRIAL_FEATURE_NOT_INCLUDED" }, { status: 402, headers: NO_STORE });
   if (agentProposalsCohortRefusal(auth.principal.workspaceKey) !== null) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404, headers: NO_STORE });
   const scopes = body.allowPropose === true ? checked.request.scopes : checked.request.scopes.filter((scope) => scope !== "agent:propose");
-  audit("agent_oauth_consent", { decision: "approve", scopes });
+  audit("agent_oauth_consent", { decision: "approve", requested: checked.request.scopes, granted: scopes, redirectOrigin: checked.view.client.redirectOrigin });
   return NextResponse.json({
     code: "AUTHORIZATION_GRANTED",
     redirectTo: issueAgentCode(checked.request, scopes, auth.principal, key, origin),
@@ -245,6 +246,33 @@ export function checkAgentTokenRequest(form: URLSearchParams, key: Buffer, origi
 
 /** The grant's label: the client's self-chosen name and the code's marker, by which a second redemption is recognised. */
 const codeMarker = (codeId: string) => ` #${codeId.slice(0, 12)}`;
+const OAUTH_LABEL = / #[A-Za-z0-9_-]{12}$/;
+
+/** An expired OAuth grant is swept only this long after its key expired: twice the agent route's maxDuration, so no call it authorized is still running. */
+export const AGENT_OAUTH_SWEEP_GRACE_MS = 120_000;
+/** Grants swept per issuance. Start value, uncalibrated. */
+export const AGENT_OAUTH_SWEEP_MAX = 10;
+
+/**
+ * Review P1 (r1): without refresh every re-consent adds a grant, and an expired-but-unrevoked grant sorts with the live ones in
+ * the Agent access list (cap 100), so enough of them could push a live panel credential out of the list that revokes it.
+ * After a new token is issued, the person's OAuth-made grants whose credential expired (past the grace) are revoked -- but only
+ * those with no open proposal, because revoking a grant withdraws its open proposals and a reconnect must never do that.
+ * A revoked row sorts after every live one, so it can no longer hide one. Best effort: a failure here never fails the token.
+ * ponytail: a grant whose proposals stay open stays listed until they are decided; the complete fix is the list RPC ordering
+ * live credentials first (receipts/WO-AGENT-OAUTH-1/DRAFT-list-live-agent-grants-first.sql, not applied).
+ */
+async function sweepEndedOAuthGrants(grant: AgentGrantClaims, grants: readonly AgentGrant[], now = Date.now()): Promise<number> {
+  const ended = grants.filter((entry) => entry.revokedAt === null && entry.expiresAt !== null && OAUTH_LABEL.test(entry.clientLabel)
+    && Date.parse(entry.expiresAt) + AGENT_OAUTH_SWEEP_GRACE_MS <= now).slice(0, AGENT_OAUTH_SWEEP_MAX);
+  let swept = 0;
+  for (const entry of ended) {
+    const open = await grantHasOpenProposals(grant.workspaceKey, entry.grantId);
+    if (!open.ok || open.open) continue;
+    if ((await revokeAgentGrant(grant.workspaceKey, grant.userId, entry.grantId)).ok) swept += 1;
+  }
+  return swept;
+}
 function grantLabel(grant: AgentGrantClaims) {
   const name = [...(normalizeClientLabel(grant.clientName) ?? "MCP client")].slice(0, 30).join("").trim();
   return `${name}${codeMarker(grant.codeId)}`;
@@ -274,6 +302,8 @@ export async function answerAgentToken(form: URLSearchParams, key: Buffer, origi
   // ponytail: list-then-create, as the read-only MCP's token step; two simultaneous redemptions by the PKCE holder can both mint.
   const listed = await listAgentGrants(grant.workspaceKey, grant.userId);
   if (!listed.ok) return oauthError(503, "temporarily_unavailable", listed.code);
+  // A list cut at its cap cannot prove the code unused (a revoked first grant sorts past the cap): unknown, so refused.
+  if (listed.truncated) return oauthError(503, "temporarily_unavailable", "AGENT_GRANT_LIST_TRUNCATED");
   const marker = codeMarker(grant.codeId);
   const replayed = listed.grants.filter((entry) => entry.clientLabel.endsWith(marker));
   if (replayed.length > 0) {
@@ -295,7 +325,7 @@ export async function answerAgentToken(form: URLSearchParams, key: Buffer, origi
     const status = AGENT_GRANT_STATUS[created.code];
     return oauthError(status, status >= 500 ? "temporarily_unavailable" : "access_denied", created.code, created.code);
   }
-  audit("agent_oauth_token_issued", { scopes: grant.scopes });
+  audit("agent_oauth_token_issued", { scopes: grant.scopes, swept: await sweepEndedOAuthGrants(grant, listed.grants).catch(() => -1) });
   const response: RemoteMcpTokenResponse = {
     access_token: created.token,
     token_type: "Bearer",
