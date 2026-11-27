@@ -369,3 +369,16 @@ describe("first-run copy", () => {
     expect(workspace).toContain("Its file and page allowance is shown at the top of this workspace");
   });
 });
+describe("WO-TRIAL-P0: a free evaluation out of compile attempts", () => {
+  it("says what happened and who to write to, in plain words, without a plan link", () => {
+    const sentence = failureSentence("TRIAL_COMPILE_ATTEMPTS_EXHAUSTED", 402);
+    expect(FAILURE_COPY_CODES).toContain("TRIAL_COMPILE_ATTEMPTS_EXHAUSTED");
+    expect(sentence).toContain("need review");
+    expect(sentence).toContain("nothing new was started");
+    expect(sentence).toContain("support@tavonel.com");
+    expect(sentence).not.toMatch(/Reference|TRIAL_|\d/);
+    expect(sentence).not.toBe(failureSentence("TRIAL_WORLD_LIMIT_REACHED", 402));
+    // The next step is a person: a plan does not make a version that needs review activatable.
+    expect(offersUpgrade(sentence)).toBe(false);
+  });
+});

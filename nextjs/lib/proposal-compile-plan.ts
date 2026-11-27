@@ -250,7 +250,7 @@ export const compilePlanExecutor: ProposalExecutor<CompilePlanInput> = failClose
     if (actor.accessSource === "trial") {
       const capacity = await checkTrialCompileCapacity(actor.workspaceKey, actor.userId, compileIdempotencyKey(actor.workspaceKey, documentIds));
       if (!capacity.ok) return failure(capacity.code, 503);
-      if (!capacity.allowed) return failure("TRIAL_WORLD_LIMIT_REACHED", 402);
+      if (!capacity.allowed) return failure(capacity.code, 402);
     }
     const quoted = await quoteCompileRecharge(actor.workspaceKey, documentIds);
     if (!quoted.ok) return quoted;

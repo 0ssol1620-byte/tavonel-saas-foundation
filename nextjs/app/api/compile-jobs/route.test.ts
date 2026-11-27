@@ -151,3 +151,39 @@ describe("compile job enqueue actor binding", () => {
     });
   }
 });
+
+describe("WO-TRIAL-P0: the free evaluation's compile bound", () => {
+  const trialPrincipal = { ...authPrincipal("session"), accessSource: "trial" };
+
+  it("never asks a paid account's compile about the evaluation", async () => {
+    authorize.mockResolvedValueOnce({ ok: true, principal: authPrincipal("session") });
+    const response = await POST(request([documentIds[0]], "session"));
+    expect(response.status).toBe(202);
+    expect(checkTrialCapacity).not.toHaveBeenCalled();
+  });
+
+  it.each(["TRIAL_WORLD_LIMIT_REACHED", "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED"])("answers %s with 402 and enqueues nothing", async (code) => {
+    authorize.mockResolvedValueOnce({ ok: true, principal: trialPrincipal });
+    checkTrialCapacity.mockResolvedValueOnce({ ok: true, allowed: false, code });
+    const response = await POST(request([documentIds[0]], "session"));
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code });
+    expect(enqueueSingle).not.toHaveBeenCalled();
+  });
+
+  it("refuses with 503 when the bound cannot be read", async () => {
+    authorize.mockResolvedValueOnce({ ok: true, principal: trialPrincipal });
+    checkTrialCapacity.mockResolvedValueOnce({ ok: false, code: "TRIAL_COMPILE_CHECK_FAILED" });
+    const response = await POST(request([documentIds[0]], "session"));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: "TRIAL_COMPILE_CHECK_FAILED" });
+    expect(enqueueSingle).not.toHaveBeenCalled();
+  });
+
+  it("enqueues the evaluation's compile when the bound allows it", async () => {
+    authorize.mockResolvedValueOnce({ ok: true, principal: trialPrincipal });
+    const response = await POST(request([documentIds[0]], "session"));
+    expect(response.status).toBe(202);
+    expect(checkTrialCapacity).toHaveBeenCalledWith(workspaceKey, trialPrincipal.userId, "idempotency-test-key");
+  });
+});

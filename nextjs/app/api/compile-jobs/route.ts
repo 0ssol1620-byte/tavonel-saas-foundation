@@ -111,7 +111,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ code: capacity.code }, { status: 503, headers: HEADERS });
     }
     if (!capacity.allowed) {
-      return NextResponse.json({ code: "TRIAL_WORLD_LIMIT_REACHED" }, { status: 402, headers: HEADERS });
+      // TRIAL_WORLD_LIMIT_REACHED, or TRIAL_COMPILE_ATTEMPTS_EXHAUSTED once its compiles nobody can activate are spent.
+      return NextResponse.json({ code: capacity.code }, { status: 402, headers: HEADERS });
     }
   }
 
