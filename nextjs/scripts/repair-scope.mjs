@@ -3687,6 +3687,13 @@ export const AFFECTED_GROUPS = Object.freeze([
   // Unit-only: no browser, database, worker or build lane. Product UI, so never nativeReuse.
   affectedGroup('workspace-plain-language', /^nextjs\/(?:components\/operations-ultimate\.tsx|lib\/(?:compile-stage-view|document-names|format|plain-language)(?:\.test)?\.ts)$/,
     { unitFiles: ['lib/plain-language.test.ts', 'lib/document-names.test.ts', 'lib/compile-stage-view.test.ts', 'lib/workspace-onboarding.test.ts', 'lib/review-queue.test.ts'] }),
+  // UI-C (the V34 blueprint mark replaces LOCUS): the one geometry file, the component and the two renderers that draw from it (apple icon, share
+  // cards), the manifest and every raster the build script derives from it, including the retired locus-v2 files this change deletes. The
+  // suites that hold them: brand-marks pins the geometry, the derived assets, the chrome colours and the single favicon source; og-card-frame
+  // renders a real card; retained-shell renders the header and footer that carry the mark. Unit-only: no browser, database, worker or build
+  // lane (brand:verify runs in `pnpm check`). Product UI, so never nativeReuse.
+  affectedGroup('brand-mark', /^nextjs\/(?:app\/(?:apple-icon\.tsx|manifest\.ts)|components\/logomark\.tsx|lib\/(?:brand-mark\.json|brand-marks\.test\.ts|og-card\.tsx)|public\/(?:favicon\.ico|icon\.svg|brand\/(?:blueprint-v34(?:-(?:32|192|512)\.png|\.ico|\.svg)|locus-v2(?:-32\.png|\.ico|\.svg)))|scripts\/build-brand-assets\.mjs)$/,
+    { unitFiles: ['lib/brand-marks.test.ts', 'lib/og-card-frame.test.ts', 'lib/v34/retained-shell.test.ts'] }),
   affectedGroup('file-intake', /^nextjs\/(?:lib\/workspace-intake(?:\.test)?\.ts|e2e\/upload-entry\.spec\.ts)$/,
     { unitFiles: ['lib/workspace-intake.test.ts'], browserFiles: ['e2e/upload-entry.spec.ts'] }),
   // Ordinary Home landing: the thirty exact paths above select ten direct suites and one browser suite, which runs only in
