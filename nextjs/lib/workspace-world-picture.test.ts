@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   adaptWorldForPicture,
   fallbackGraphics,
@@ -7,8 +7,11 @@ import {
   pictureAriaLabel,
   PICTURE_LIVE_MIN_WIDTH,
   PICTURE_LIVE_QUERY,
+  homeWorldKey,
+  pickHomeWorld,
   pictureBranch,
   pictureScreenStatus,
+  readHomeWorldModel,
   showingLine,
 } from "./workspace-world-picture";
 import { KIND_COLORS, layoutWorld } from "./v34/world-geometry";
@@ -216,5 +219,74 @@ describe("the page and the component stay on real data", () => {
     expect(css).not.toMatch(/\boutline(-\w+)?\s*:/);
     expect(css).not.toContain(":hover");
     expect(css).toMatch(/@media \(max-width: 899px\) \{ \.stage \{ display: none; \} \}/);
+  });
+});
+
+/*
+  WO-WS-5c: Home draws the active World on a fresh visit, from the listing Ask reads and the review flow's own request.
+*/
+describe("Home reads one active World, by the listing's own order", () => {
+  const w = (n: number) => ({ collectionId: `collection-${String(n).repeat(32)}`, manifestDigest: `sha256:${String(n).repeat(64)}`, revision: n, updatedAt: "2026-11-01T00:00:00Z" });
+  it("picks the only World, and the first of several (most recently activated first)", () => {
+    expect(pickHomeWorld({ kind: "one", world: w(1) })).toEqual(w(1));
+    expect(pickHomeWorld({ kind: "several", worlds: [w(2), w(1), w(3)] })).toEqual(w(2));
+  });
+  it("picks nothing while checking, with none, or after a failed listing", () => {
+    expect(pickHomeWorld("checking")).toBeNull();
+    expect(pickHomeWorld({ kind: "none" })).toBeNull();
+    expect(pickHomeWorld({ kind: "failed", code: null, status: 503 })).toBeNull();
+    expect(pickHomeWorld({ kind: "several", worlds: [] })).toBeNull();
+    expect(homeWorldKey(null)).toBe("");
+    expect(homeWorldKey(w(1))).toBe(`${w(1).collectionId}@${w(1).manifestDigest}`);
+  });
+});
+
+describe("readHomeWorldModel: one request, the review flow's own, fail closed", () => {
+  const world = { collectionId: "collection-" + "a".repeat(32), manifestDigest: "sha256:" + "b".repeat(64), revision: 2, updatedAt: "2026-11-01T00:00:00Z" };
+  const own = { world: { id: world.collectionId, manifestDigest: world.manifestDigest }, objects: [], relations: [], evidence: [] };
+  const reply = (status: number, body: unknown) => vi.fn(async (_input: string, _init: RequestInit) => new Response(JSON.stringify(body), { status }));
+  const signal = () => new AbortController().signal;
+
+  it("asks /api/v1/world/<id>?manifest=<digest> once, with the session token, and returns the model", async () => {
+    const fetchImpl = reply(200, { model: own });
+    const read = await readHomeWorldModel("tok", world, signal(), fetchImpl);
+    expect(read).toEqual({ status: "ready", model: own });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe(`/api/v1/world/${world.collectionId}?manifest=${encodeURIComponent(world.manifestDigest)}`);
+    expect(init.headers).toEqual({ authorization: "Bearer tok" });
+    expect(init.cache).toBe("no-store");
+  });
+  it("a refusal keeps its code and status and yields no model", async () => {
+    expect(await readHomeWorldModel("tok", world, signal(), reply(403, { code: "WORKSPACE_MEMBER_SCOPE_FORBIDDEN" }))).toEqual({ status: "failed", code: "WORKSPACE_MEMBER_SCOPE_FORBIDDEN", httpStatus: 403 });
+    expect(await readHomeWorldModel("tok", world, signal(), reply(500, "not json"))).toEqual({ status: "failed", code: null, httpStatus: 500 });
+  });
+  it("a thrown fetch, a body without a model and a model for another World or manifest are all failed", async () => {
+    expect(await readHomeWorldModel("tok", world, signal(), vi.fn(async () => { throw new Error("offline"); }))).toEqual({ status: "failed", code: null, httpStatus: null });
+    expect(await readHomeWorldModel("tok", world, signal(), reply(200, { model: null }))).toMatchObject({ status: "failed", code: "WORLD_READ_MODEL_MISMATCH" });
+    expect(await readHomeWorldModel("tok", world, signal(), reply(200, {}))).toMatchObject({ status: "failed" });
+    expect(await readHomeWorldModel("tok", world, signal(), reply(200, { model: { ...own, world: { ...own.world, manifestDigest: "sha256:" + "c".repeat(64) } } }))).toMatchObject({ status: "failed", code: "WORLD_READ_MODEL_MISMATCH" });
+    expect(await readHomeWorldModel("tok", world, signal(), reply(200, { model: { ...own, world: { ...own.world, id: "collection-" + "d".repeat(32) } } }))).toMatchObject({ status: "failed", code: "WORLD_READ_MODEL_MISMATCH" });
+  });
+  it("an aborted read returns null so the page drops it", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    expect(await readHomeWorldModel("tok", world, controller.signal, vi.fn(async () => { throw new DOMException("x", "AbortError"); }))).toBeNull();
+  });
+});
+
+describe("the page wires Home's read without touching the open-collection picture", () => {
+  const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8").split(String.fromCharCode(13)).join("");
+  it("reads only with no collection open, on Home overview, once the listing and start-up are ready, and draws only its own key", () => {
+    expect(page).toContain('const homeWorld = !activeWorld && !collectionResult && surface === "home" && tab === "overview" ? pickHomeWorld(workspaceWorlds) : null;');
+    expect(page).toContain('if (!homeWorld || session !== "signed-in" || !workspaceStartupReady) return;');
+    expect(page).toContain("homeWorld && homeKey === homeWorldRead.key");
+    expect(page).toContain("pictureScreenStatus(homeWorldRead.read.model, homeWorld)");
+  });
+  it("a failed read says the World could not be opened and draws nothing", () => {
+    expect(page).toContain("The active World could not be opened.</strong> {failureSentence(homeWorldRead.read.code");
+  });
+  it("makes no new endpoint: the picture's request is the review flow's", () => {
+    expect(page).toContain("/api/v1/world/${encodeURIComponent(collectionId)}?manifest=");
   });
 });
