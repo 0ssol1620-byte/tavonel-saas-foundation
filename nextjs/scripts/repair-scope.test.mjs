@@ -8593,7 +8593,8 @@ const V34_OWNER_PINS = Object.freeze([
     { 'e2e/v34-matrix.spec.ts': v34MatrixJob('v34-chromium'), 'e2e/v34-support.selftest.spec.ts': v34MatrixJob('v34-selftest') }],
   // Round 8: WO-CAT-8's plan-allowance race joins (15 -> 17 paths, 7 -> 8 Node suites).
   // WO-TRAIN-2: WO-C-T3's member-scope race joins (17 -> 19 paths, 8 -> 9 Node suites).
-  ['db-harness', 19, '7a111122556a7503', 9, '78282f0c350c0f3c', [], {}],
+  // WO-MIG-GUARD-1: the migration redefinition guard, its allowlist and its suite join (19 -> 22 paths, 9 -> 10 Node suites).
+  ['db-harness', 22, '2efe2732a479b621', 10, '065d93bd34532522', [], {}],
   ['agent-proposals', 5, '3169e14af02855ea', 2, '777d8d8269835876', [], {}],
   ['proposals-decision-path', 3, 'db1504de4a1b9f29', 6, 'a26a71baeb81f76d', [], {}],
   ['agent-grants', 6, 'ff6e8a683eb77229', 5, '281a9e72832c855e', [], {}],
@@ -8647,7 +8648,7 @@ const V34_PAGE_METER_PATHS = ['lib/billing-ledger-replay.db.test.ts', 'lib/billi
 const v34AllPaths = () => [...Object.values(V34_PROGRAM_AFFECTED_OWNERS).flatMap(owner => owner.paths), ...V34_PAGE_METER_PATHS].map(p => `nextjs/${p}`);
 const v34Executed = map => map.unitFiles.length + map.browserFiles.length + map.databaseTests.length;
 const DB_HARNESS_SUITES = ['scripts/db/agent-grant-race.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs',
-  'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
+  'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/migration-redefinition-guard.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs'];
 test('affected v34 program owners: every owner keeps its exact paths, at least one executed suite and its external claims', () => {
   assert.deepEqual(Object.keys(V34_PROGRAM_AFFECTED_OWNERS), V34_OWNER_PINS.map(([group]) => group));
   for (const [group, pathCount, pathDigest, unitCount, unitDigest, browsers, external] of V34_OWNER_PINS) {

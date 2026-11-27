@@ -28,7 +28,7 @@ const asyncRouteUnitTestPath = 'app/api/compile-jobs/route.test.ts';
 // developer channel's clean-install suite (Node built-ins, a 127.0.0.1 server, no skip where a POSIX sh exists) joins. A skipped case
 // fails validateNodeTapReport, so neither can pass by skipping.
 // WO-TRAIN-5: the U37 DB-clock subset's pure checks (nine tests, no connection, no skip) join as the fourteenth.
-const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'public/developer/channel-install.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/agent-u37-db.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
+const nodeUnitTestPaths = new Set(['lib/acl-refresh-core.test.mjs', 'lib/collection-compile-source-observations.test.mjs', 'lib/repair-node-evidence.test.mjs', 'public/developer/channel-install.test.mjs', 'scripts/db/agent-grant-race.test.mjs', 'scripts/db/agent-u37-db.test.mjs', 'scripts/db/connector-acl-race.test.mjs', 'scripts/db/database-restore-drill.test.mjs', 'scripts/db/job-lease-race.test.mjs', 'scripts/db/local-cluster.test.mjs', 'scripts/db/member-scope-race.test.mjs', 'scripts/db/migration-redefinition-guard.test.mjs', 'scripts/db/plan-allowance-race.test.mjs', 'scripts/db/run-sql-tests.test.mjs', 'scripts/db/world-transition-race.test.mjs']);
 
 export function isInsideWorkspace(rootPath, targetPath) {
   const rel = relative(rootPath, targetPath);
