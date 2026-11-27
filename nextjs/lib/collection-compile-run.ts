@@ -28,6 +28,7 @@ import {
   PRODUCT_CORE_RESPONSE_SCHEMA,
   type ProductCoreV2CompileRequest,
 } from "./core-runtime-v2";
+import { coreV2LossReport, extractionLossReportEnabled, logExtractionLossReport } from "./extraction-loss-report";
 import { readCustomerSourceAuthorization, type SourceAuthorizationResult } from "./customer-data-admission";
 import { readCustomerSourceScope } from "./customer-source-scope";
 import { appendServiceAuditEvent } from "./enterprise-store";
@@ -526,6 +527,10 @@ async function compileOnce(
   const projected = projectProductCoreV2Candidate(compiled.result, verifiedInputs, revisionCompileEnabled(), workspaceId);
   if (!projected) return { ok: false, status: 502, code: "CORE_V2_PROJECTION_INVALID", payload: {} };
   const artifact: CollectionCandidateArtifact = projected;
+  // Operator log only, default off; never in the artifact, the response or the job payload.
+  if (extractionLossReportEnabled()) {
+    logExtractionLossReport(artifact.collectionId, coreV2LossReport(verifiedInputs, artifact.validation.counts));
+  }
   const coreExecution: CollectionCompileSuccess["coreExecution"] = {
     status: compiled.result.status,
     runtime: compiled.result.runtime,

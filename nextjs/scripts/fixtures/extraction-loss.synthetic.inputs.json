@@ -1,0 +1,90 @@
+[
+  {
+    "documentId": "synthetic-memo-a",
+    "versionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sanitizedKey": "immutable/synthetic/synthetic/synthetic-memo-a/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/sanitized.pdf",
+    "ocrJsonKey": "immutable/synthetic/synthetic/synthetic-memo-a/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ocr.json",
+    "pageCount": 2,
+    "text": "Acme Holdings Ltd. The Northwind Traders contract renews in March and the board approved the renewal terms.\nThe board approved the renewal terms. Delta Logistics Group reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, then closed the item.",
+    "inputSha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceImmutableKey": "immutable/synthetic/synthetic/synthetic-memo-a/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/sanitized.pdf",
+    "regions": [
+      {
+        "regionId": "native-p0001",
+        "pageIndex0": 0,
+        "pageNumber1": 1,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "Acme Holdings Ltd. The Northwind Traders contract renews in March and the board approved the renewal terms.",
+        "bbox1000": [
+          100,
+          100,
+          900,
+          200
+        ],
+        "confidence": 1,
+        "authority": "informal"
+      },
+      {
+        "regionId": "native-p0002",
+        "pageIndex0": 1,
+        "pageNumber1": 2,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "The board approved the renewal terms. Delta Logistics Group reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, reviewed the shipment schedule and recorded every delay without changing the plan, then closed the item.",
+        "bbox1000": [
+          100,
+          100,
+          900,
+          200
+        ],
+        "confidence": 1,
+        "authority": "informal"
+      }
+    ]
+  },
+  {
+    "documentId": "synthetic-memo-b",
+    "versionKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sanitizedKey": "immutable/synthetic/synthetic/synthetic-memo-b/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/sanitized.pdf",
+    "ocrJsonKey": "immutable/synthetic/synthetic/synthetic-memo-b/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/ocr.json",
+    "pageCount": 2,
+    "text": "Northwind Traders confirmed the March renewal in writing. Contoso Freight also confirmed the March renewal.\nOK. Q3. See Appendix.",
+    "inputSha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceImmutableKey": "immutable/synthetic/synthetic/synthetic-memo-b/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/sanitized.pdf",
+    "regions": [
+      {
+        "regionId": "native-p0001",
+        "pageIndex0": 0,
+        "pageNumber1": 1,
+        "order": 0,
+        "blockType": "paragraph",
+        "text": "Northwind Traders confirmed the March renewal in writing. Contoso Freight also confirmed the March renewal.",
+        "bbox1000": [
+          100,
+          100,
+          900,
+          200
+        ],
+        "confidence": 1,
+        "authority": "informal"
+      },
+      {
+        "regionId": "native-p0002",
+        "pageIndex0": 1,
+        "pageNumber1": 2,
+        "order": 1,
+        "blockType": "paragraph",
+        "text": "OK. Q3. See Appendix.",
+        "bbox1000": [
+          100,
+          100,
+          900,
+          200
+        ],
+        "confidence": 1,
+        "authority": "informal"
+      }
+    ]
+  }
+]

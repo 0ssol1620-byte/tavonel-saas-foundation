@@ -8,6 +8,13 @@ import {
 import { validateCompiledWorldPackage } from "../scripts/compiled-world/validate.mjs";
 import { judgeCompileSet } from "./compile-limits";
 import { csvCell } from "./csv-cell";
+import {
+  bump,
+  createExtractionLossCollector,
+  fallbackLossReport,
+  type ExtractionLossCollector,
+  type ExtractionLossReport,
+} from "./extraction-loss-report";
 
 export const COLLECTION_CANDIDATE_SCHEMA = "tavonel.collection_candidate.v1" as const;
 export const GENERIC_MIXED_CORPUS_BLUEPRINT = {
@@ -360,18 +367,48 @@ function topicsFor(text: string) {
   return matched.length > 0 ? matched : ["General"];
 }
 
+const ENTITY_MAX_CHARS = 80;
+const CLAIM_MIN_CHARS = 20;
+const CLAIM_MAX_CHARS = 500;
+
+function entityMatches(text: string) {
+  return (text.match(/\b[A-Z][A-Za-z0-9&.-]{2,}(?:\s+[A-Z][A-Za-z0-9&.-]{2,}){0,3}\b/g) ?? []).map((item) => item.trim());
+}
+
 function entitiesFor(text: string) {
-  const values = text.match(/\b[A-Z][A-Za-z0-9&.-]{2,}(?:\s+[A-Z][A-Za-z0-9&.-]{2,}){0,3}\b/g) ?? [];
-  return [...new Set(values.map((item) => item.trim()).filter((item) => item.length <= 80))];
+  return [...new Set(entityMatches(text).filter((item) => item.length <= ENTITY_MAX_CHARS))];
+}
+
+function claimPieces(text: string) {
+  return text.split(/(?<=[.!?。])\s+/).map((item) => item.trim());
 }
 
 function claimsFor(text: string) {
-  return [...new Set(
-    text
-      .split(/(?<=[.!?。])\s+/)
-      .map((item) => item.trim())
-      .filter((item) => item.length >= 20 && item.length <= 500),
-  )];
+  return [...new Set(claimPieces(text).filter((item) => item.length >= CLAIM_MIN_CHARS && item.length <= CLAIM_MAX_CHARS))];
+}
+
+/*
+  Tally one region for the loss report. Called only when a collector was passed, and it only
+  counts: it reads the same pieces and matches the extractors above read and changes nothing.
+*/
+function tallyRegion(loss: ExtractionLossCollector, regionText: string) {
+  const pieces = claimPieces(regionText);
+  loss.piecesSplit += pieces.length;
+  const allowed = pieces.filter((item) => item.length >= CLAIM_MIN_CHARS && item.length <= CLAIM_MAX_CHARS);
+  loss.claimsAllowed += allowed.length;
+  loss.claimDuplicateInDocument += allowed.length - new Set(allowed).size;
+  for (const piece of pieces) {
+    if (piece.length >= CLAIM_MIN_CHARS && piece.length <= CLAIM_MAX_CHARS) continue;
+    const reason = piece.length === 0 ? "empty_piece" : piece.length < CLAIM_MIN_CHARS ? "below_min_length" : "above_max_length";
+    if (reason === "empty_piece") loss.piecesFailed += 1;
+    bump(loss.claimReasons, reason);
+    loss.mentionsInExcludedPieces += entityMatches(piece).length;
+  }
+  const matches = entityMatches(regionText);
+  const tooLong = matches.filter((item) => item.length > ENTITY_MAX_CHARS).length;
+  loss.mentionCandidates += matches.length;
+  bump(loss.mentionExcluded, "above_max_length", tooLong);
+  loss.entityDuplicateInRegion += matches.length - tooLong - entitiesFor(regionText).length;
 }
 
 function mediaType(path: string) {
@@ -603,7 +640,15 @@ export function validateCollectionOcrInput(value: unknown): CollectionOcrInput |
  */
 export type FallbackCollectionCandidate = CollectionCandidateArtifact & { validation: { counts: { topics: number } } };
 
-export function compileCollectionCandidate(inputs: CollectionOcrInput[]): FallbackCollectionCandidate {
+/**
+ * `options.loss` is a write-only tally for the operator's extraction loss report. Omit it and
+ * nothing is counted; pass it and the returned artifact is still byte-identical.
+ */
+export function compileCollectionCandidate(
+  inputs: CollectionOcrInput[],
+  options: { loss?: ExtractionLossCollector } = {},
+): FallbackCollectionCandidate {
+  const loss = options.loss;
   // One document is a world. The old floor of two was a compiler implementation detail that
   // reached the customer as "upload succeeded, nothing was built". The ceiling is shared with
   // the route and the workspace so a selection cannot pass one check and fail the next.
@@ -726,10 +771,17 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Fallba
     const emittedClaims = new Set<string>();
     const regionClaims = new Map<string, string[]>();
     const regionEntities = new Map<string, Array<{ id: string; text: string }>>();
+    if (loss && regionsOrNone(input).length === 0) loss.documentsWithoutRegions += 1;
     for (const region of regionsOrNone(input)) {
       const regionText = normalizeText(region.text);
       const entitiesHere: Array<{ id: string; text: string }> = [];
       const claimsHere: string[] = [];
+      if (loss) {
+        loss.regionsRead += 1;
+        loss.regionsByBlockType[region.blockType] = (loss.regionsByBlockType[region.blockType] ?? 0) + 1;
+        if (regionText.trim().length === 0) loss.regionsWithEmptyText += 1;
+        tallyRegion(loss, regionText);
+      }
       for (const entity of entitiesFor(regionText)) {
         // Stable entity ids are intentionally case-insensitive. The lookup and per-document
         // dedupe must use the same normalized key: otherwise `Part` and `PART` create two nodes
@@ -737,11 +789,17 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Fallba
         const entityKey = entity.toLowerCase();
         let entityId = entityIds.get(entityKey);
         if (entityId === undefined) {
-          if (!admitCandidate()) continue;
+          if (!admitCandidate()) {
+            if (loss) loss.entityDroppedByBudget += 1;
+            continue;
+          }
           entityId = stableId("entity", entityKey);
           entityIds.set(entityKey, entityId);
           nodes.push({ id: entityId, kind: "Entity", label: entity, evidenceIds: [evidenceId] });
           directoryPlan.push({ path: `Entities/${entityId}.md`, kind: "entity", sourceIds: [input.documentId] });
+          if (loss) loss.entityNew += 1;
+        } else if (loss) {
+          loss.entityMerged += 1;
         }
         if (!seenEntities.has(entityKey)) {
           seenEntities.add(entityKey);
@@ -757,9 +815,15 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Fallba
       }
       for (const claim of claimsFor(regionText)) {
         const claimId = stableId("claim", input.documentId, claim);
-        if (!seenClaims.has(claimId)) {
+        if (seenClaims.has(claimId)) {
+          if (loss) loss.claimDuplicateInDocument += 1;
+        } else {
           seenClaims.add(claimId);
-          if (!admitCandidate()) continue;
+          if (loss) loss.claimsDistinct += 1;
+          if (!admitCandidate()) {
+            if (loss) loss.claimDroppedByBudget += 1;
+            continue;
+          }
           emittedClaims.add(claimId);
           nodes.push({ id: claimId, kind: "Claim", label: claim, documentId: input.documentId, evidenceIds: [evidenceId] });
           directoryPlan.push({ path: `Claims/${claimId}.md`, kind: "claim", sourceIds: [input.documentId] });
@@ -772,7 +836,12 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Fallba
           });
         }
         // A claim the budget refused is not in the model, so no chunk may cite it.
-        if (emittedClaims.has(claimId)) claimsHere.push(claimId);
+        if (emittedClaims.has(claimId)) {
+          claimsHere.push(claimId);
+          if (loss) loss.claimsCited += 1;
+        } else if (loss) {
+          loss.claimsNotEmitted += 1;
+        }
       }
       regionEntities.set(region.regionId, entitiesHere);
       regionClaims.set(region.regionId, claimsHere);
@@ -785,6 +854,7 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Fallba
     for (const region of regionsOrNone(input)) {
       const regionClaimIds = regionClaims.get(region.regionId) ?? [];
       const regionEntityRefs = regionEntities.get(region.regionId) ?? [];
+      if (loss) loss.regionsAnchored += 1;
       groundedChunks.push({
         chunkId: stableId("chunk", input.documentId, input.versionKey, region.regionId),
         logicalId: stableId("chunk-logical", input.documentId, region.regionId),
@@ -945,4 +1015,14 @@ export function compileCollectionCandidate(inputs: CollectionOcrInput[]): Fallba
     manifestDigest: `sha256:${sha256(canonicalize(withoutDigest))}`,
     reviewReasons,
   };
+}
+
+/** The fallback artifact plus its operator-only loss report. The artifact is the same bytes as `compileCollectionCandidate(inputs)`. */
+export function compileCollectionCandidateWithLossReport(inputs: CollectionOcrInput[]): {
+  artifact: FallbackCollectionCandidate;
+  report: ExtractionLossReport;
+} {
+  const loss = createExtractionLossCollector();
+  const artifact = compileCollectionCandidate(inputs, { loss });
+  return { artifact, report: fallbackLossReport(loss, artifact.validation.counts) };
 }
