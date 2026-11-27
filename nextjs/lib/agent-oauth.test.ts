@@ -35,6 +35,9 @@ const mocks = vi.hoisted(() => ({
   expired: new Set<string>(),
   truncated: false,
   openProposals: vi.fn(),
+  keyOutlivesGrant: new Set<string>(),
+  createKey: vi.fn(),
+  revokeKey: vi.fn(),
 }));
 
 vi.mock("@/lib/developer-auth", async (importOriginal) => ({
@@ -62,6 +65,8 @@ vi.mock("@/lib/developer-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./developer-store")>()),
   authenticateDeveloperApiKey: mocks.authenticate,
   consumeDeveloperApiRateLimit: mocks.rate,
+  createDeveloperApiKey: mocks.createKey,
+  revokeDeveloperApiKey: mocks.revokeKey,
 }));
 vi.mock("@/lib/agent-grants", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./agent-grants")>()),
@@ -162,6 +167,7 @@ beforeEach(() => {
   mocks.grants.length = 0;
   mocks.expired.clear();
   mocks.truncated = false;
+  mocks.keyOutlivesGrant.clear();
   mocks.openProposals.mockResolvedValue({ ok: true, open: false });
   vi.stubEnv("TAVONEL_REMOTE_MCP_ENABLED", "true");
   vi.stubEnv("TAVONEL_REMOTE_MCP_SIGNING_SECRET", "agent-oauth-unit-test-sealing-secret-value");
@@ -190,7 +196,7 @@ beforeEach(() => {
     if (bearer.startsWith("tvnl_agt_")) {
       if (!insideAgentMcpDispatch()) return { ok: false, code: "API_KEY_AUDIENCE_INVALID" };
       const grant = mocks.grants.find((entry) => entry.token === bearer);
-      if (!grant || grant.revokedAt) return { ok: false, code: "API_KEY_INVALID" };
+      if (!grant || (grant.revokedAt && !mocks.keyOutlivesGrant.has(bearer))) return { ok: false, code: "API_KEY_INVALID" };
       if (mocks.expired.has(bearer)) return { ok: false, code: "API_KEY_EXPIRED" };
       return { ok: true, principal: { kind: "api-key", audience: "agent", keyId: `key-${grant.grantId}`, workspaceKey: WS, userId: USER,
         scopes: [], agent: { grantId: grant.grantId, scopes: grant.scopes }, authorizationRevision: 4 } };
@@ -394,13 +400,13 @@ describe("WO-AGENT-OAUTH-1: code replay, expiry, cohort at issue", () => {
     expect(mocks.createGrant).not.toHaveBeenCalled();
   });
 
-  it("a workspace removed from the cohort between consent and exchange gets nothing", async () => {
+  it("a workspace removed from the cohort between consent and exchange gets nothing, told as a resource that does not exist", async () => {
     const clientId = await registeredClient();
     const code = await approvedCode(clientId);
     vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", "pilot-beta");
     const response = await exchange(codeGrant(clientId, code));
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ error: "access_denied", code: "AGENT_COHORT_EXCLUDED" });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_target", error_description: "The resource is not this server's agent MCP endpoint." });
     expect(mocks.createGrant).not.toHaveBeenCalled();
   });
 
@@ -434,8 +440,96 @@ describe("WO-AGENT-OAUTH-1: code replay, expiry, cohort at issue", () => {
   });
 });
 
+/*
+  403 classification (FOUNDER-DECISIONS-20261127-GPT-CRITICAL-PATH Q3; receipts/WO-COMMON/ACCEPTANCE.md item 5): a dead credential
+  is challenged so the connector signs in again; a policy denial is not, because a new consent cannot restore it.
+*/
+describe("WO-AGENT-OAUTH-1: which refusals invite a new sign-in", () => {
+  it("a revoked grant whose key still reads back is 403 with an invalid_token challenge (the credential is dead)", async () => {
+    const clientId = await registeredClient();
+    const { access_token: bearer } = await agentToken(clientId);
+    mocks.keyOutlivesGrant.add(bearer!);
+    mocks.grants[0]!.revokedAt = new Date().toISOString();
+    const response = await agentRpc(LIST, bearer);
+    expect(response.status).toBe(403);
+    expect(response.headers.get("www-authenticate")).toContain('error="invalid_token"');
+  });
+
+  it("a member whose role was reduced: the token is refused with no challenge, and re-consent is refused with no code", async () => {
+    const clientId = await registeredClient();
+    const { access_token: bearer } = await agentToken(clientId, { allowPropose: true });
+    // The demotion moves the authorization revision (atomic world activation trigger) and the role.
+    mocks.membership.mockResolvedValue({ ok: true, membership: { state: "active", authorizationRevision: 5, role: "member" } });
+    const refused = await agentRpc(LIST, bearer);
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).error.message).toBe("API_KEY_AUTHORIZATION_REVOKED");
+    expect(refused.headers.get("www-authenticate")).toBeNull();
+    // A new consent rechecks the CURRENT role and refuses: a denial, not a challenge, and no code is issued.
+    mocks.session.mockResolvedValueOnce(sessionPrincipal({ workspaceRole: "member", authorizationRevision: 5 }));
+    const again = await consent("approve", authRequest(clientId), { allowPropose: true }, "supabase-session");
+    expect(again).toEqual({ status: 403, body: { code: "AGENT_MCP_MEMBER_UNAVAILABLE" } });
+    expect(mocks.createGrant).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a membership that ended", { ok: true, membership: { state: "removed", authorizationRevision: 4, role: "owner" } }, 403, "WORKSPACE_MEMBERSHIP_REQUIRED"],
+    ["a membership store that cannot answer", { ok: false, code: "WORKSPACE_MEMBERSHIP_STORE_NOT_CONFIGURED", status: 503 }, 503, "WORKSPACE_MEMBERSHIP_STORE_NOT_CONFIGURED"],
+  ])("%s is a denial with no challenge", async (_name, membership, status, code) => {
+    const clientId = await registeredClient();
+    const { access_token: bearer } = await agentToken(clientId);
+    mocks.membership.mockResolvedValue(membership);
+    const response = await agentRpc(LIST, bearer);
+    expect(response.status).toBe(status);
+    expect((await response.json()).error.message).toBe(code);
+    expect(response.headers.get("www-authenticate")).toBeNull();
+  });
+
+  it("a workspace taken out of the cohort: a bare 404, the same as no such endpoint, with no challenge", async () => {
+    const clientId = await registeredClient();
+    const { access_token: bearer } = await agentToken(clientId);
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_COHORT", "pilot-beta");
+    const response = await agentRpc(LIST, bearer);
+    expect([response.status, await response.text(), response.headers.get("www-authenticate")]).toEqual([404, "", null]);
+  });
+});
+
+describe("WO-AGENT-OAUTH-1: a failed step-up never takes away the existing read connection", () => {
+  it("deny, a refused exchange and a grant that cannot be made all leave the read-only grant working and untouched", async () => {
+    const clientId = await registeredClient();
+    const { access_token: readToken } = await agentToken(clientId);
+    const stepUp = { scope: "agent:read agent:propose" };
+    // 1. The person declines the step-up.
+    expect((await consent("deny", authRequest(clientId, stepUp))).body.code).toBe("AUTHORIZATION_DENIED");
+    // 2. The step-up code is exchanged with a wrong verifier.
+    const code = await approvedCode(clientId, { allowPropose: true }, stepUp);
+    expect((await exchange(codeGrant(clientId, code, { code_verifier: `${VERIFIER}x` }))).status).toBe(400);
+    // 3. The step-up grant cannot be created (key cap).
+    mocks.createGrant.mockResolvedValueOnce({ ok: false, code: "AGENT_GRANT_LIMIT_REACHED" });
+    const capped = await exchange(codeGrant(clientId, await approvedCode(clientId, { allowPropose: true }, stepUp)));
+    expect(capped.status).toBe(409);
+    expect(await capped.json()).toEqual({ error: "access_denied", error_description: "AGENT_GRANT_LIMIT_REACHED", code: "AGENT_GRANT_LIMIT_REACHED" });
+    expect(mocks.grants).toHaveLength(1);
+    expect(mocks.grants[0]!.revokedAt).toBeNull();
+    expect((await agentRpc(LIST, readToken)).status).toBe(200);
+    // The read-only MCP's keys are never touched by the agent flow.
+    expect(mocks.createKey).not.toHaveBeenCalled();
+    expect(mocks.revokeKey).not.toHaveBeenCalled();
+  });
+
+  it("a successful step-up adds a grant and leaves the read-only one live (never widened, never revoked)", async () => {
+    const clientId = await registeredClient();
+    const { access_token: readToken } = await agentToken(clientId);
+    const upgraded = await exchange(codeGrant(clientId, await approvedCode(clientId, { allowPropose: true }, { scope: "agent:read agent:propose" })));
+    expect((await upgraded.json() as TokenAnswer).scope).toBe("agent:propose agent:read");
+    expect(mocks.grants.map((grant) => [grant.scopes, grant.revokedAt])).toEqual([[["agent:read"], null], [["agent:propose", "agent:read"], null]]);
+    expect((await agentRpc(LIST, readToken)).status).toBe(200);
+  });
+});
+
 describe("WO-AGENT-OAUTH-1 review P1: ended OAuth grants do not pile up in the Agent access list", () => {
   const past = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const issuedLines = () => vi.mocked(console.info).mock.calls
+    .map((call) => JSON.parse(String(call[0])) as Record<string, unknown>).filter((entry) => entry.event === "agent_oauth_token_issued");
   const seed = (clientLabel: string, expiresAt: string) => {
     const grant: Grant = { grantId: `10000000-0000-4000-8000-${String(mocks.grants.length + 1).padStart(12, "0")}`, clientLabel, scopes: ["agent:read"],
       token: `tvnl_agt_seed${String(mocks.grants.length).padStart(8, "0")}_${"s".repeat(43)}`, expiresAt, revokedAt: null };
@@ -454,6 +548,8 @@ describe("WO-AGENT-OAUTH-1 review P1: ended OAuth grants do not pile up in the A
     await agentToken(clientId);
     expect([ended, withOpen, inGrace, panelExpired, panelLive].map((grant) => grant.revokedAt !== null)).toEqual([true, false, false, false, false]);
     expect(mocks.openProposals.mock.calls.map((call) => call[1])).toEqual([ended.grantId, withOpen.grantId]);
+    // The log line keeps its identity: candidates = swept + keptOpen + unknown + deferred.
+    expect(issuedLines()[0]?.sweep).toEqual({ candidates: 2, swept: 1, keptOpen: 1, unknown: 0, deferred: 0 });
     // The grant just issued is live and untouched.
     expect(mocks.grants.at(-1)!.revokedAt).toBeNull();
   });
@@ -466,6 +562,16 @@ describe("WO-AGENT-OAUTH-1 review P1: ended OAuth grants do not pile up in the A
     mocks.openProposals.mockRejectedValueOnce(new Error("boom"));
     expect((await agentToken(clientId)).token_type).toBe("Bearer");
     expect(ended.revokedAt).toBeNull();
+    // Not measured is null, never 0: the failed check is "unknown", the throw is no count at all.
+    expect(issuedLines().map((entry) => entry.sweep)).toEqual([{ candidates: 1, swept: 0, keptOpen: 0, unknown: 1, deferred: 0 }, null]);
+  });
+
+  it("past the per-issuance cap the rest is counted as deferred, not dropped", async () => {
+    for (let i = 0; i < 12; i += 1) seed(`ChatGPT #${String(i).padStart(12, "E")}`, past(10 * 60_000));
+    const clientId = await registeredClient();
+    await agentToken(clientId);
+    expect(mocks.openProposals).toHaveBeenCalledTimes(10);
+    expect(issuedLines()[0]?.sweep).toEqual({ candidates: 12, swept: 10, keptOpen: 0, unknown: 0, deferred: 2 });
   });
 });
 
@@ -495,6 +601,28 @@ describe("WO-AGENT-OAUTH-1: flag off changes nothing", () => {
     const response = await agentRpc(INITIALIZE);
     expect(response.status).toBe(401);
     expect(response.headers.get("www-authenticate")).toBeNull();
+  });
+});
+
+describe("WO-AGENT-OAUTH-1: OFF is OFF (ACCEPTANCE item 4)", () => {
+  it.each(["TRUE", "true ", "1", "yes"])("flag value %j is off: agent metadata 404, agent resource refused as the read-only MCP refuses it", async (value) => {
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", value);
+    const prm = await protectedResource(new Request(`${ORIGIN}/.well-known/oauth-protected-resource/api/agent-mcp`), { params: Promise.resolve({ resource: ["api", "agent-mcp"] }) });
+    expect(prm.status).toBe(404);
+    const clientId = await registeredClient();
+    expect((await consent("describe", authRequest(clientId))).body).toMatchObject({ code: "AUTHORIZATION_REQUEST_REJECTED", error: "invalid_target" });
+  });
+
+  it("the issuer's metadata and the read-only resource metadata are byte-identical with the agent flag on and off", async () => {
+    const snapshot = async () => [
+      await (await authorizationServer(new Request(`${ORIGIN}/.well-known/oauth-authorization-server`))).text(),
+      await (await protectedResource(new Request(`${ORIGIN}/.well-known/oauth-protected-resource/api/mcp`), { params: Promise.resolve({ resource: ["api", "mcp"] }) })).text(),
+      await (await protectedResource(new Request(`${ORIGIN}/.well-known/oauth-protected-resource`), { params: Promise.resolve({}) })).text(),
+    ];
+    const on = await snapshot();
+    vi.stubEnv("TAVONEL_AGENT_PROPOSALS_ENABLED", "");
+    expect(await snapshot()).toEqual(on);
+    expect(on.join("")).not.toContain("agent");
   });
 });
 

@@ -37,11 +37,16 @@ function rpcError(status: number, id: unknown, code: number, message: string, he
   return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status, headers: { ...NO_STORE, ...headers } });
 }
 
-/** The WWW-Authenticate header for a refused authorization, or none (issuer off, or a refusal no sign-in fixes). */
-function challenge(origin: string, status: number, code: string, scope: string | undefined): Record<string, string> {
+/**
+ * The WWW-Authenticate header for a refused authorization, or none: issuer off, or a refusal no sign-in fixes (a policy
+ * denial -- membership gone, role reduced, outside the pilot or cohort, product access -- or a store failure, 503).
+ * 401 (no, expired, revoked or wrong-audience token): the challenge. 403 API_KEY_AUTHORIZATION_REVOKED: the challenge only
+ * when authorizeAgentRequest says a new consent could help (`reauthorizable`: a revoked grant, or a revision that moved for
+ * a current owner/admin); a member whose role was reduced gets the bare denial, and re-consent refuses them as well.
+ */
+function challenge(origin: string, status: number, code: string, scope: string | undefined, reauthorizable: boolean): Record<string, string> {
   if (!remoteMcpEnabled()) return {};
-  // A revoked grant or a membership revision that moved is a 403 (status unchanged), but only a new sign-in fixes it: invalid_token.
-  if (status === 401 || code === "API_KEY_AUTHORIZATION_REVOKED") {
+  if (status === 401 || (code === "API_KEY_AUTHORIZATION_REVOKED" && reauthorizable)) {
     return { "WWW-Authenticate": agentBearerChallenge(origin, code === "AUTH_REQUIRED" ? undefined : { error: "invalid_token", description: code }) };
   }
   // Step-up names every scope the new consent needs: the authorization step refuses a request without agent:read.
@@ -119,7 +124,7 @@ async function answer(request: Request): Promise<Response> {
   if (!auth.ok) {
     const code = auth.code === "API_RATE_LIMITED" ? "RATE_LIMITED" : auth.code;
     if (calling) telemetry(toolLabel, code);
-    return rpcError(auth.status, id, -32001, code, challenge(origin, auth.status, auth.code, scope));
+    return rpcError(auth.status, id, -32001, code, challenge(origin, auth.status, auth.code, scope, "reauthorizable" in auth && auth.reauthorizable === true));
   }
   // The cohort is re-read on every call, so removing a workspace stops its credentials at once.
   if (agentProposalsCohortRefusal(auth.principal.workspaceKey) !== null) return notFound();

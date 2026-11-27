@@ -416,9 +416,9 @@ describe("authorizeAgentRequest (workorders/agent-native.md §2.3)", () => {
 
   it("a revoked grant is API_KEY_AUTHORIZATION_REVOKED, and so is a grant that does not read back", async () => {
     readAgentGrant.mockResolvedValue({ ok: true, grant: { grantId: AGENT_GRANT, authorizationRevision: 7, createdAt: "2026-11-17T00:00:00Z", revokedAt: "2026-11-17T01:00:00Z" } });
-    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403, reauthorizable: true });
     readAgentGrant.mockResolvedValue({ ok: true, grant: null });
-    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403, reauthorizable: true });
     expect(consumeDeveloperApiRateLimit).not.toHaveBeenCalled();
     expect(authorizeFoundationProduct).not.toHaveBeenCalled();
   });
@@ -431,10 +431,10 @@ describe("authorizeAgentRequest (workorders/agent-native.md §2.3)", () => {
 
   it("a membership revision changed since the key or the grant was made is API_KEY_AUTHORIZATION_REVOKED", async () => {
     getWorkspaceMembership.mockResolvedValue({ ok: true, membership: { state: "active", role: "editor", authorizationRevision: 8 } });
-    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403, reauthorizable: false });
     getWorkspaceMembership.mockResolvedValue({ ok: true, membership: { state: "active", role: "editor", authorizationRevision: 7 } });
     readAgentGrant.mockResolvedValue({ ok: true, grant: { grantId: AGENT_GRANT, authorizationRevision: 6, createdAt: "2026-11-17T00:00:00Z", revokedAt: null } });
-    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 });
+    expect(await authorizeAgentRequest(agentRequest(), "agent:read")).toEqual({ ok: false, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403, reauthorizable: false });
     expect(consumeDeveloperApiRateLimit).not.toHaveBeenCalled();
   });
 

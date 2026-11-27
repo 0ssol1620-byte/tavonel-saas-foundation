@@ -262,16 +262,21 @@ export const AGENT_OAUTH_SWEEP_MAX = 10;
  * ponytail: a grant whose proposals stay open stays listed until they are decided; the complete fix is the list RPC ordering
  * live credentials first (receipts/WO-AGENT-OAUTH-1/DRAFT-list-live-agent-grants-first.sql, not applied).
  */
-async function sweepEndedOAuthGrants(grant: AgentGrantClaims, grants: readonly AgentGrant[], now = Date.now()): Promise<number> {
+/** What one sweep did. Identity: candidates = swept + keptOpen + unknown + deferred (deferred = past the per-issuance cap). */
+export type AgentOAuthSweep = { candidates: number; swept: number; keptOpen: number; unknown: number; deferred: number };
+
+async function sweepEndedOAuthGrants(grant: AgentGrantClaims, grants: readonly AgentGrant[], now = Date.now()): Promise<AgentOAuthSweep> {
   const ended = grants.filter((entry) => entry.revokedAt === null && entry.expiresAt !== null && OAUTH_LABEL.test(entry.clientLabel)
-    && Date.parse(entry.expiresAt) + AGENT_OAUTH_SWEEP_GRACE_MS <= now).slice(0, AGENT_OAUTH_SWEEP_MAX);
-  let swept = 0;
-  for (const entry of ended) {
+    && Date.parse(entry.expiresAt) + AGENT_OAUTH_SWEEP_GRACE_MS <= now);
+  const result: AgentOAuthSweep = { candidates: ended.length, swept: 0, keptOpen: 0, unknown: 0, deferred: Math.max(0, ended.length - AGENT_OAUTH_SWEEP_MAX) };
+  for (const entry of ended.slice(0, AGENT_OAUTH_SWEEP_MAX)) {
     const open = await grantHasOpenProposals(grant.workspaceKey, entry.grantId);
-    if (!open.ok || open.open) continue;
-    if ((await revokeAgentGrant(grant.workspaceKey, grant.userId, entry.grantId)).ok) swept += 1;
+    if (!open.ok) result.unknown += 1;
+    else if (open.open) result.keptOpen += 1;
+    else if ((await revokeAgentGrant(grant.workspaceKey, grant.userId, entry.grantId)).ok) result.swept += 1;
+    else result.unknown += 1;
   }
-  return swept;
+  return result;
 }
 function grantLabel(grant: AgentGrantClaims) {
   const name = [...(normalizeClientLabel(grant.clientName) ?? "MCP client")].slice(0, 30).join("").trim();
@@ -293,7 +298,8 @@ export async function answerAgentToken(form: URLSearchParams, key: Buffer, origi
   if (!checked.ok) return oauthError(checked.status, checked.error, checked.error_description);
   const { grant } = checked;
   const cohort = agentProposalsCohortRefusal(grant.workspaceKey);
-  if (cohort) return oauthError(403, "access_denied", cohort, cohort);
+  // Outside the cohort (or a cohort that admits nobody now) reads exactly like a resource this server does not have.
+  if (cohort) return oauthError(400, "invalid_target", "The resource is not this server's agent MCP endpoint.");
   const product = await authorizeFoundationSessionProduct(grant.workspaceKey, grant.userId, "observer");
   if (!product.ok) return oauthError(product.status, product.status >= 500 ? "temporarily_unavailable" : "access_denied", product.code, product.code);
   if (product.access.source === "trial") return oauthError(402, "access_denied", "TRIAL_FEATURE_NOT_INCLUDED", "TRIAL_FEATURE_NOT_INCLUDED");
@@ -325,7 +331,7 @@ export async function answerAgentToken(form: URLSearchParams, key: Buffer, origi
     const status = AGENT_GRANT_STATUS[created.code];
     return oauthError(status, status >= 500 ? "temporarily_unavailable" : "access_denied", created.code, created.code);
   }
-  audit("agent_oauth_token_issued", { scopes: grant.scopes, swept: await sweepEndedOAuthGrants(grant, listed.grants).catch(() => -1) });
+  audit("agent_oauth_token_issued", { scopes: grant.scopes, sweep: await sweepEndedOAuthGrants(grant, listed.grants).catch(() => null) });
   const response: RemoteMcpTokenResponse = {
     access_token: created.token,
     token_type: "Bearer",
