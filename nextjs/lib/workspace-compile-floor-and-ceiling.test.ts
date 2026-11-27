@@ -39,7 +39,9 @@ describe("workspace compile floor and ceiling", () => {
   });
 
   it("refuses an over-ceiling selection before anything is uploaded", () => {
-    expect(workspace).toContain("const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);");
+    // WO-FIRST5-P1: the corpus verdict, then a free evaluation's allowance on top of it -- never instead of it.
+    expect(workspace).toContain("const corpusVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);");
+    expect(workspace).toContain("const stagedVerdict = corpusVerdict.ok && trialRefusal ? { ok: false as const, message: trialRefusal } : corpusVerdict;");
     // The button cannot start an upload the compile step would refuse...
     expect(workspace).toContain("disabled={busy || !stagedPageCounts || !stagedQuote || !stagedVerdict.ok || !intakeOpen}");
     expect(workspace).toContain("if (!verdict.ok) { setNotice(verdict.message); return; }");

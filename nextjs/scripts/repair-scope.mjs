@@ -2113,11 +2113,13 @@ export const PR141_MAIN_MERGE_BCBA_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/
 // D-19 launch canary in processing-workspace-grant.ts, its suite's canary-aware fixture, and the suites that pin it and D-13's launch-approval precedence; P2-37 adds
 // the launch switch itself (activation-policy.ts) with the eight suites that pin its value in public copy and status; the review-B1
 // fix adds the bootstrap route that carries the release stage to a held checkout, and its admission suite. Exactly these
-// twenty-six paths select their twenty-five direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
+// twenty-nine paths select their twenty-seven direct suites (checkout-policy and billing-gate-enforce-route for the gate, the four gate-v2
 // admission suites for the canary, processing-consent-panel for the v1 terms panel, production-posture for the switches) and the login-capability (1440) and self-serve-journey (audit)
 // browser suites. Product billing code, so never nativeReuse.
 export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
   'app/api/access/bootstrap/route.ts',
+  'app/api/compile-jobs/route.test.ts',
+  'app/api/compile-jobs/route.ts',
   'app/api/internal/billing/gate-enforce/route.ts',
   'components/checkout-intent-notice.tsx',
   'e2e/fixtures/paddle-fixture.ts',
@@ -2139,12 +2141,14 @@ export const UX_BILLING_CHECKOUT_AFFECTED_PATHS = Object.freeze([
   'lib/processing-consent-panel.test.ts',
   'lib/processing-workspace-grant.test.ts',
   'lib/processing-workspace-grant.ts',
+  'lib/self-service-trial-compile-capacity.test.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/self-service-trial.ts',
   'lib/use-checkout.test.ts',
   'lib/use-checkout.ts',
 ]);
 export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
+  'app/api/compile-jobs/route.test.ts',
   'lib/access-bootstrap-admission.test.ts',
   'lib/billing-binding.test.ts',
   'lib/billing-gate-enforce-route.test.ts',
@@ -2167,6 +2171,7 @@ export const UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/production-posture.test.ts',
   'lib/public-status.test.ts',
   'lib/scoped-admission-boundaries.test.ts',
+  'lib/self-service-trial-compile-capacity.test.ts',
   'lib/self-service-trial-device-rotation.test.ts',
   'lib/status-route-contract.test.ts',
   'lib/use-checkout.test.ts',
@@ -3347,10 +3352,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     }),
   }),
   // agent-mcp-route (WO-AN-5, merged): the agent MCP route, its nine tools, the agent proposal DTO and the security suite, with the route
-  // matrices every new API route enters.
+  // matrices every new API route enters. WO-AGENT-OAUTH-1: the agent resource's OAuth module and its dance suite join (6 -> 8 paths, 7 -> 8 suites).
   'agent-mcp-route': Object.freeze({
-    paths: Object.freeze(['app/api/agent-mcp/route.ts', 'lib/agent-mcp-tools.test.ts', 'lib/agent-mcp-tools.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposal-view.ts', 'lib/agent-proposals-security.test.ts']),
-    unitFiles: Object.freeze(['lib/agent-mcp-tools.test.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposals-security.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']),
+    paths: Object.freeze(['app/api/agent-mcp/route.ts', 'lib/agent-mcp-tools.test.ts', 'lib/agent-mcp-tools.ts', 'lib/agent-oauth.test.ts', 'lib/agent-oauth.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposal-view.ts', 'lib/agent-proposals-security.test.ts']),
+    unitFiles: Object.freeze(['lib/agent-mcp-tools.test.ts', 'lib/agent-oauth.test.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposals-security.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3484,9 +3489,12 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // world-discovery-routes imports manifest-status; route-classification checks every route's memberScope mechanism in its file, which is
   // a check that reads collections/[id]/world and v1/runs/[runId]/events. WO-TRAIN-2: member-source-scope-routes.test.ts drives both
   // through their handlers (a member without scope is refused MEMBER_SOURCE_SCOPE_DENIED). The race harness is db-harness's.
+  // WO-PROJ-K2: the per-member projection (member-projection.ts) and the grouped source list it reads (collection-source-access.ts);
+  // member-projection.test.ts runs both, member-projection-routes.test.ts drives /search and /ask, collection-source-access.test.ts the groups.
+  // Review r1: world-store.ts (observedAt over admitted sources), run by world-freshness and world-store suites.
   'member-source-scope': Object.freeze({
-    paths: Object.freeze(['app/api/collections/[id]/world/route.ts', 'app/api/compile-jobs/[jobId]/blockers/route.ts', 'app/api/compile-jobs/[jobId]/cancel/route.ts', 'app/api/compile-jobs/[jobId]/route.ts', 'app/api/compile-jobs/corpus/[corpusId]/route.ts', 'app/api/v1/collections/route.ts', 'app/api/v1/reviews/route.ts', 'app/api/v1/runs/[runId]/events/route.ts', 'app/api/v1/world/[id]/manifest-status/route.ts', 'app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/member-source-scope.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts']),
-    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/corpus-batching.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-discovery-routes.test.ts']),
+    paths: Object.freeze(['app/api/collections/[id]/world/route.ts', 'app/api/compile-jobs/[jobId]/blockers/route.ts', 'app/api/compile-jobs/[jobId]/cancel/route.ts', 'app/api/compile-jobs/[jobId]/route.ts', 'app/api/compile-jobs/corpus/[corpusId]/route.ts', 'app/api/v1/collections/route.ts', 'app/api/v1/reviews/route.ts', 'app/api/v1/runs/[runId]/events/route.ts', 'app/api/v1/world/[id]/manifest-status/route.ts', 'app/api/workspaces/[workspaceKey]/members/[userId]/sources/route.ts', 'lib/collection-source-access.test.ts', 'lib/collection-source-access.ts', 'lib/member-projection-routes.test.ts', 'lib/member-projection.test.ts', 'lib/member-projection.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/member-source-scope.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-store.ts']),
+    unitFiles: Object.freeze(['lib/adversarial-acl-negatives.test.ts', 'lib/collection-source-access.test.ts', 'lib/corpus-batching.test.ts', 'lib/durable-compile-orchestration.test.ts', 'lib/member-projection-routes.test.ts', 'lib/member-projection.test.ts', 'lib/member-source-scope-routes.test.ts', 'lib/member-source-scope.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/review-route.test.ts', 'lib/route-classification.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/tenant-isolation-negative.test.ts', 'lib/world-discovery-routes.test.ts', 'lib/world-freshness.test.ts', 'lib/world-store.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3535,8 +3543,8 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // module; retrieval-pipeline.test.ts and ask-synthetic.test.ts import the pipeline and the synthetic statement World fixture; the other
   // suites import retrieval-pipeline.ts itself (a suite that only mocks it is not listed).
   'ask-verbatim-windows': Object.freeze({
-    paths: Object.freeze(['lib/__fixtures__/ask-synthetic/statement-world.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-evidence-window.ts', 'lib/ask-synthetic.test.ts', 'lib/retrieval-pipeline.test.ts', 'lib/retrieval-pipeline.ts']),
-    unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-route-limits.test.ts', 'lib/ask-synthetic.test.ts', 'lib/derived-data-admission.test.ts', 'lib/explore-sample.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/retrieval-pipeline.test.ts']),
+    paths: Object.freeze(['lib/__fixtures__/ask-synthetic/statement-world.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-evidence-window.ts', 'lib/ask-synthetic.test.ts', 'lib/model-attempt-receipt.ts', 'lib/retrieval-pipeline.test.ts', 'lib/retrieval-pipeline.ts', 'lib/retrieval-store.ts']),
+    unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-route-limits.test.ts', 'lib/ask-synthetic.test.ts', 'lib/derived-data-admission.test.ts', 'lib/explore-sample.test.ts', 'lib/member-projection.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/retrieval-pipeline.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3777,7 +3785,9 @@ export const AFFECTED_GROUPS = Object.freeze([
   // EN-0c benchmarks path mask: the four exact paths above select seven direct suites and no browser suite.
   affectedGroup('benchmarks-path-mask', new RegExp(`^nextjs/(?:${exactPathAlternation(BENCHMARKS_PATH_MASK_AFFECTED_PATHS)})$`),
     { unitFiles: BENCHMARKS_PATH_MASK_AFFECTED_UNIT_FILES }),
-  // ux-billing-checkout: the 26 exact paths above select 25 direct suites and 2 browser suites.
+  // ux-billing-checkout: the 29 exact paths above select 27 direct suites and 2 browser suites. WO-TRIAL-P0 added
+  // lib/self-service-trial-compile-capacity.test.ts, the guard of the trial compile bound in lib/self-service-trial.ts, and
+  // the compile-jobs route and its suite, which answer that bound's typed 402 and had no affected-map owner.
   affectedGroup('ux-billing-checkout', new RegExp(`^nextjs/(?:${exactPathAlternation(UX_BILLING_CHECKOUT_AFFECTED_PATHS)})$`),
     { unitFiles: UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, browserFiles: UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES }),
   // table-read-intake-ceiling: the 6 exact paths above select 8 direct suites and no browser suite.

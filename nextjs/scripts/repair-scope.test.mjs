@@ -7435,10 +7435,10 @@ test('affected benchmarks path mask owner: nine exact paths select eight direct 
 // B-01 (2026-10-19): the UX program's four finite owners, each restated independently of the exported constants.
 import { REMOTE_MCP_AFFECTED_PATHS, REMOTE_MCP_AFFECTED_UNIT_FILES, REMOTE_MCP_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
 import { UX_BILLING_CHECKOUT_AFFECTED_PATHS, UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES, UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES, TABLE_READ_INTAKE_CEILING_AFFECTED_PATHS, TABLE_READ_INTAKE_CEILING_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_PATHS, SPECIMEN_STRIP_AFFECTED_UNIT_FILES, SPECIMEN_STRIP_AFFECTED_BROWSER_FILES, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_PATHS, LAUNCH_QA_RELEASE_SCRIPTS_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_PATHS, G1_COPY_TRUTH_AFFECTED_UNIT_FILES, G1_COPY_TRUTH_AFFECTED_BROWSER_FILES } from './repair-scope.mjs';
-test('affected ux-billing-checkout owner: 26 exact paths select 25 direct suites and 2 browser suites; neighbours stay unmapped', () => {
-  const suites = ['lib/access-bootstrap-admission.test.ts', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/entitlement-wait.test.ts', 'lib/landing-v2-use.test.ts', 'lib/operations.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/page-seo.test.ts', 'lib/pilot-evaluation-worksheet.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/production-posture.test.ts', 'lib/public-status.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/status-route-contract.test.ts', 'lib/use-checkout.test.ts'];
+test('affected ux-billing-checkout owner: 29 exact paths select 27 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['app/api/compile-jobs/route.test.ts', 'lib/access-bootstrap-admission.test.ts', 'lib/billing-binding.test.ts', 'lib/billing-gate-enforce-route.test.ts', 'lib/brand-copy.test.ts', 'lib/checkout-customer-data-gate.test.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-policy.test.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/customer-data-live-path.test.ts', 'lib/entitlement-wait.test.ts', 'lib/landing-v2-use.test.ts', 'lib/operations.test.ts', 'lib/paddle-billing-event.test.ts', 'lib/page-seo.test.ts', 'lib/pilot-evaluation-worksheet.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/production-posture.test.ts', 'lib/public-status.test.ts', 'lib/scoped-admission-boundaries.test.ts', 'lib/self-service-trial-compile-capacity.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/status-route-contract.test.ts', 'lib/use-checkout.test.ts'];
   const browsers = ['e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts'];
-  assert.deepEqual([[...UX_BILLING_CHECKOUT_AFFECTED_PATHS], [...UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES], [...UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES]], [['app/api/access/bootstrap/route.ts', 'app/api/internal/billing/gate-enforce/route.ts', 'components/checkout-intent-notice.tsx', 'e2e/fixtures/paddle-fixture.ts', 'e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts', 'lib/access-bootstrap-admission.test.ts', 'lib/activation-policy.ts', 'lib/billing-binding.test.ts', 'lib/billing-binding.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-intent.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/entitlement-wait.test.ts', 'lib/entitlement-wait.ts', 'lib/paddle-billing-event.test.ts', 'lib/paddle-billing-event.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/processing-workspace-grant.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/self-service-trial.ts', 'lib/use-checkout.test.ts', 'lib/use-checkout.ts'], suites, browsers]);
+  assert.deepEqual([[...UX_BILLING_CHECKOUT_AFFECTED_PATHS], [...UX_BILLING_CHECKOUT_AFFECTED_UNIT_FILES], [...UX_BILLING_CHECKOUT_AFFECTED_BROWSER_FILES]], [['app/api/access/bootstrap/route.ts', 'app/api/compile-jobs/route.test.ts', 'app/api/compile-jobs/route.ts', 'app/api/internal/billing/gate-enforce/route.ts', 'components/checkout-intent-notice.tsx', 'e2e/fixtures/paddle-fixture.ts', 'e2e/login-capability.spec.ts', 'e2e/self-serve-journey.spec.ts', 'lib/access-bootstrap-admission.test.ts', 'lib/activation-policy.ts', 'lib/billing-binding.test.ts', 'lib/billing-binding.ts', 'lib/checkout-intent.test.ts', 'lib/checkout-intent.ts', 'lib/commercial-state.test.ts', 'lib/cta-truth.test.ts', 'lib/customer-data-admission.test.ts', 'lib/entitlement-wait.test.ts', 'lib/entitlement-wait.ts', 'lib/paddle-billing-event.test.ts', 'lib/paddle-billing-event.ts', 'lib/processing-consent-panel.test.ts', 'lib/processing-workspace-grant.test.ts', 'lib/processing-workspace-grant.ts', 'lib/self-service-trial-compile-capacity.test.ts', 'lib/self-service-trial-device-rotation.test.ts', 'lib/self-service-trial.ts', 'lib/use-checkout.test.ts', 'lib/use-checkout.ts'], suites, browsers]);
   for (const path of UX_BILLING_CHECKOUT_AFFECTED_PATHS) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test('nextjs/' + path)).map(o => o.group), ['ux-billing-checkout'], path);
     const map = affectedMap([affectedRecord('M', ['nextjs/' + path])]);
@@ -8601,7 +8601,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['proposal-executors', 5, '49bb709f8731907a', 4, 'd8543cc900774bb7', [], {}],
   ['agent-access-panel', 3, '4f48a3d2fbf28eb5', 1, '1cf09607117c4dbb', [], { 'e2e/change-proposals.spec.ts': V34_CHANGE_PROPOSALS_CLAIM }],
   // Round 5: WO-AN-5 and WO-CI-6B merged, so their owners left the pending list unchanged.
-  ['agent-mcp-route', 6, '7de747c49dbec65c', 7, 'a9a732c5350f063a', [], {}],
+  // WO-AGENT-OAUTH-1: lib/agent-oauth.ts and its suite join agent-mcp-route (6 -> 8 paths, 7 -> 8 suites).
+  ['agent-mcp-route', 8, '8c9e27796cb09e22', 8, '2224fb7d162374ce', [], {}],
   // Round 6: WO-CI-6C merged; its key guard spec joined WO-CI-6B's group as Product QA's claim at 1440 (the only project its skip allows).
   ['v34-retained-shell', 2, '923aa0f0cdd019c2', 1, '96c34fcc763756a6', [], { 'e2e/explore-shell-keys.spec.ts': v34ProductQa('1440') }],
   // Round 8: the release head's 28 unowned paths (e9364899), in eight owners; one-path.spec.ts is Product QA's claim on its four width
@@ -8621,7 +8622,9 @@ const V34_OWNER_PINS = Object.freeze([
   // Train 2026-11-24 (WO-TRAIN-1): the train lanes' 53 owned paths, in six owners; acting-workspace.spec.ts is Product QA's claim at 390.
   ['acting-workspace', 13, '86d90f197fc018c4', 9, 'f717502531e6e8a0', [], { 'e2e/acting-workspace.spec.ts': v34ProductQa('390') }],
   // WO-TRAIN-2: member-source-scope-routes.test.ts drives the world and run-events handlers (17 -> 18 paths, 10 -> 11 suites).
-  ['member-source-scope', 18, 'fdb1ab49386f4bb8', 11, 'ff7b88ff343634d0', [], {}],
+  // WO-PROJ-K2: the projection module, its two suites and the grouped source list (18 -> 23 paths, 11 -> 14 suites).
+  // WO-PROJ-K2 review r1: 23 -> 24 paths, 14 -> 16 suites.
+  ['member-source-scope', 24, 'df204592e0493914', 16, '70f500f8b9793681', [], {}],
   ['connector-provider-qualification', 17, '6703f379e43e1fc9', 1, '368f502c594389f5', [], {}],
   ['format-census', 2, '069edb130111c258', 1, '68cac7ee81a96597', [], {}],
   // WO-TRAIN-2: the clean-install suite is a registered Node suite and joins developer-channel (3 -> 4 paths, 2 -> 3 suites).
@@ -8630,7 +8633,9 @@ const V34_OWNER_PINS = Object.freeze([
   // WO-TRAIN-2: codex/v34-an-8 merged; its pending owner is a program owner now.
   ['agent-audit-routes', 2, 'b5d75d4e64f713f1', 2, '29971313f2d3e397', [], {}],
   // WO-TRAIN-5: nine owners for the paths the train's later lanes added; the active-World Ask spec is Product QA's claim at 1440.
-  ['ask-verbatim-windows', 6, 'd749e8a356076f00', 11, '586300e12b44a339', [], {}],
+  // WO-PROJ-K2: retrieval-store.ts (the projected unit-to-document read), member-projection.test.ts runs the pipeline (6 -> 7, 11 -> 12).
+  // WO-PROJ-K2 review r1: 7 -> 8 paths, 12 -> 13 suites.
+  ['ask-verbatim-windows', 8, '19effffc7593a443', 13, 'd520be24f780d216', [], {}],
   ['workspace-active-world', 3, '0100582fc90a9d9e', 2, '8175b5631f96fff8', [], { 'e2e/workspace-ask-active-world.spec.ts': v34ProductQa('1440') }],
   ['workspace-product-frame', 5, 'cc0483ce4041a85a', 2, '7c71ecdbeea3234a', ['e2e/workspace-intake-layout.spec.ts', 'e2e/world-lifecycle.spec.ts'], {}],
   ['compile-source-stages', 3, 'bc386d90f7452d1b', 1, '55811b7cc38fcba2', [], {}],

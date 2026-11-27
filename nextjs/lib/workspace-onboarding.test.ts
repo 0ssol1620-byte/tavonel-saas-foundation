@@ -1,11 +1,18 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { PER_FILE_LIMIT_SENTENCE } from "./compile-limits";
 import {
+  aiLastRequestSentence,
   deriveAttentionItems,
   deriveOnboardingSteps,
   deriveWorkspaceMode,
   deriveWorkspaceState,
+  judgeTrialSelection,
+  lastAiRequest,
+  trialAllowanceLine,
   type WorkspaceStateInput,
 } from "./workspace-onboarding";
+import { failureSentence } from "./workspace-failure-copy";
 
 const base: WorkspaceStateInput = {
   customerDataAccess: "open",
@@ -168,6 +175,19 @@ describe("workspace state", () => {
     // ready yet", which describes a symptom of it.
     expect(deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_TIMEOUT" })).stateTitle)
       .toBe("The last compile stopped.");
+  });
+
+  it("says a known compile stop in the compile panel's sentence, not as a bare code (WO-FIRST-5-MIN-1)", () => {
+    const known = input({ documentCount: 4, compileErrorCode: "CORE_OUTPUT_TOO_LARGE" });
+    const state = deriveWorkspaceState(known);
+    expect(state.stateDescription).toContain(failureSentence("CORE_OUTPUT_TOO_LARGE", 500));
+    expect(state.stateDescription).not.toContain("CORE_OUTPUT_TOO_LARGE");
+    const item = deriveAttentionItems(known).find((entry) => entry.id === "compile-failed");
+    expect(item?.detail).toContain(failureSentence("CORE_OUTPUT_TOO_LARGE", 500));
+    expect(item?.detail).not.toContain("CORE_OUTPUT_TOO_LARGE");
+    // An unmapped code still reaches the screen, as a reference.
+    expect(deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_TIMEOUT" })).stateDescription)
+      .toContain("Reference COMPILE_TIMEOUT.");
   });
 
   it("keeps newer news above a run that already ended", () => {
@@ -356,5 +376,105 @@ describe("the empty workspace's example run capture", () => {
       expect(page.indexOf(`width={${entry.pixelWidth}} height={${entry.pixelHeight}}`, at), file).toBeGreaterThan(at);
     }
     expect(page).not.toContain("@/components/landing-v2/product-capture");
+  });
+});
+
+/*
+  WO-FIRST5-P1: the free evaluation's allowance before upload (#6, #4), a refused access check (#9),
+  the first-call confirmation (#12), citation details (#17) and the trial abstention (#18).
+*/
+describe("first five minutes, P1", () => {
+  const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const shell = readFileSync(new URL("../components/workspace-ultimate-shell.tsx", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const limits = { files: 3, pages: 50, worlds: 1 };
+
+  it("states the free evaluation's allowance instead of the corpus and archive line", () => {
+    const line = trialAllowanceLine(limits);
+    expect(line).toContain("Your free evaluation covers 3 files and 50 pages in total, compiled into 1 World.");
+    expect(line).toContain(PER_FILE_LIMIT_SENTENCE);
+    expect(line).not.toMatch(/128|sources per run|ZIP|Connect a source/);
+    expect(trialAllowanceLine({ files: 1, pages: 1, worlds: 2 })).toContain("1 file and 1 page in total, compiled into 2 Worlds.");
+  });
+
+  it("refuses a selection past the files or the counted pages, and nothing inside them", () => {
+    expect(judgeTrialSelection(limits, 3, 50)).toBeNull();
+    expect(judgeTrialSelection(limits, 1, 0)).toBeNull();
+    expect(judgeTrialSelection(limits, 5, 10)).toBe("You chose 5 files, and your free evaluation covers 3 files in total. Remove 2, then upload.");
+    expect(judgeTrialSelection(limits, 2, 64)).toBe("These files have 64 pages, and your free evaluation covers 50 pages in total. Remove a file, then upload.");
+  });
+
+  it("wires the allowance into the drop, the preflight verdict and the upload guard, for a free evaluation only", () => {
+    expect(shell).toContain("{ limits: body.access.limits ?? null, failure: null }");
+    expect(page).toContain('setTrialLimits(source === "trial" ? detail?.limits ?? null : null);');
+    expect(page).toContain("judgeTrialSelection(trialLimits, stagedSelection?.files.length ?? 0, stagedPages)");
+    expect(page).toContain("const stagedVerdict = corpusVerdict.ok && trialRefusal ? { ok: false as const, message: trialRefusal } : corpusVerdict;");
+    expect(page).toContain('const intakeLimits = accessSource === "trial" && trialLimits ? trialAllowanceLine(trialLimits) : compileLimits;');
+    expect(page).toContain('<small className="workspace-intake-limits">{intakeLimits}');
+    expect(page).toContain('<p className="fine">{intakeLimits}</p>');
+    // The upload handler refuses it too, from the same judgement, so the contract does not depend on the disabled prop.
+    const guard = page.slice(page.indexOf("const startStagedCompile = async"));
+    expect(guard.slice(0, 900)).toContain("if (trialRefusal) { setNotice(trialRefusal); return; }");
+  });
+
+  it("says what a refused access check was and offers a person instead of a refresh", () => {
+    const sentence = failureSentence("TRIAL_RISK_GATE_NOT_CONFIGURED", 503);
+    const view = deriveWorkspaceState(input({ customerDataAccess: "unavailable", accessFailureSentence: sentence }));
+    expect(view.stateDescription).toBe(`${sentence} Your saved work remains available.`);
+    expect(view.nextAction).toEqual({ label: "Contact support", intent: "contact" });
+    // No code (a network failure) or an expired session: unchanged.
+    const plain = deriveWorkspaceState(input({ customerDataAccess: "unavailable" }));
+    expect(plain.nextAction).toEqual({ label: "Access unavailable" });
+    expect(plain.stateDescription).toBe("Your saved work remains available. Sign in again before processing files.");
+    // The shell keeps the code it was refused with; the page turns it into the sentence.
+    expect(shell).toContain('failure: { code: typeof body?.code === "string" ? body.code : null, status: response.status }');
+    expect(page).toContain("setAccessFailure(failure?.code && failure.status !== 401 ? failureSentence(failure.code, failure.status) : null);");
+    expect(page).toContain(': accessFailure ?? "Source access could not be verified. Refresh before choosing files.";');
+    const contact = page.slice(page.indexOf('customerDataAccess === "unavailable" && accessFailure ? ('));
+    expect(contact.slice(0, 300)).toContain('<Link className="btn" href="/contact">Contact support</Link>');
+    expect(page).toContain('if (intent === "contact") window.location.assign("/contact");');
+  });
+
+  it("reads the AI's last request from the remote MCP keys, and says nothing it cannot know", () => {
+    const listing = (remoteMcpKeys: unknown, truncated: unknown = { keys: false, remoteMcpKeys: false }) => ({ code: "OK", keys: [], remoteMcpKeys, truncated });
+    expect(lastAiRequest(listing([{ lastUsedAt: "2026-11-27T09:00:00Z" }, { lastUsedAt: "2026-11-27T10:30:00Z" }, { lastUsedAt: null }])))
+      .toEqual({ lastUsedAt: "2026-11-27T10:30:00Z" });
+    expect(lastAiRequest(listing([{ lastUsedAt: null }]))).toEqual({ lastUsedAt: null });
+    // No connection, a cut-short listing, a missing truncation marker, a refusal body or garbage: nothing.
+    expect(lastAiRequest(listing([]))).toBeNull();
+    expect(lastAiRequest(listing([{ lastUsedAt: "2026-11-27T10:30:00Z" }], { keys: false, remoteMcpKeys: true }))).toBeNull();
+    expect(lastAiRequest(listing([{ lastUsedAt: "2026-11-27T10:30:00Z" }], null))).toBeNull();
+    expect(lastAiRequest({ code: "TRIAL_FEATURE_NOT_INCLUDED" })).toBeNull();
+    expect(lastAiRequest(null)).toBeNull();
+    expect(lastAiRequest(listing([{ lastUsedAt: "not a date" }]))).toEqual({ lastUsedAt: null });
+    const format = (iso: string) => `<${iso}>`;
+    expect(aiLastRequestSentence({ lastUsedAt: "2026-11-27T10:30:00Z" }, format)).toBe("Last request from your AI: <2026-11-27T10:30:00Z>.");
+    expect(aiLastRequestSentence({ lastUsedAt: null }, format)).toBe("Your AI is connected and has not made a request yet.");
+    // Only by an account the listing answers, and never left over from another surface.
+    expect(page).toContain('const aiRequestReadable = accessSource === "owner" || accessSource === "paid" || (accessSource === "trial" && trialAiAccess);');
+    expect(page).toContain("useEffect(() => { setAiLastRequest(null); }, [surface, accessSource, trialAiAccess]);");
+    expect(page).toContain('return response.ok ? lastAiRequest(await response.json().catch(() => null)) : null;');
+    // Lazy: the page's one key-listing read lives in the check, and the check runs only from its button,
+    // so no workspace load or surface (Ask included) reads the listing before the customer asks.
+    expect(page.split('fetch("/api/developer/keys"')).toHaveLength(2);
+    const check = page.slice(page.indexOf("const checkAiLastRequest = async () => {"));
+    expect(check.indexOf('fetch("/api/developer/keys"')).toBeLessThan(check.indexOf("\n  };\n"));
+    expect(page.match(/checkAiLastRequest\(/g)).toEqual(["checkAiLastRequest("]);
+    expect(page).toContain("onClick={() => void checkAiLastRequest()}");
+  });
+
+  it("keeps citation ids, the box and the scores under a native disclosure, the excerpt first", () => {
+    const item = page.slice(page.indexOf("<li key={`${index}-${citation.evidenceId}`}>"));
+    const at = (text: string) => item.indexOf(text);
+    expect(at("<q>{citation.excerpt}</q>")).toBeGreaterThan(-1);
+    expect(at("<q>{citation.excerpt}</q>")).toBeLessThan(at("<details>"));
+    expect(at("<details>")).toBeLessThan(at("<b>{citation.evidenceId}</b>"));
+    expect(at("score {citation.relevance.toFixed(3)}")).toBeLessThan(at("</details>"));
+    expect(at("bbox {citation.bbox1000")).toBeLessThan(at("</details>"));
+  });
+
+  it("does not send a free evaluation to add a source its one World cannot take", () => {
+    const actions = page.slice(page.indexOf("WO-FIRST5-P1 (#18)"));
+    expect(actions.slice(0, 500)).toContain('{accessSource === "trial"\n                          ? <Link className="btn" href="/pricing">See plans to add more sources</Link>');
+    expect(actions.slice(0, 500)).toContain("Add the source that would answer this");
   });
 });

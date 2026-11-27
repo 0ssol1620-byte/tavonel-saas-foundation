@@ -1196,6 +1196,9 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   const browserErrors: string[] = [];
   const unauthorizedUrls: string[] = [];
   page.on("response", response => { if (response.status() === 401) unauthorizedUrls.push(response.url()); });
+  // WO-FIRST5-P1: the AI last-request read is lazy, so neither Review nor Ask reads the key listing on load.
+  const keyListReads: string[] = [];
+  page.on("request", request => { if (new URL(request.url()).pathname === "/api/developer/keys") keyListReads.push(request.url()); });
   page.on("console", message => {
     if (message.type() === "error") browserErrors.push(message.text());
   });
@@ -1245,6 +1248,12 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   // One noun per concept: the World is capitalised, so the control reads "Ask the active World".
   await page.getByRole("button", { name: "Ask the active World" }).click();
   await expect(page.getByText("Grounded answer")).toBeVisible();
+  // WO-FIRST5-P1: the citation's box sits in a native disclosure. Its summary is what a reader sees first,
+  // and opening it shows the same page, box and authority as before.
+  const sourceDetails = page.locator(".ask-result li summary", { hasText: "Page 2 · source details" });
+  await expect(sourceDetails).toBeVisible();
+  await expect(page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")).toBeHidden();
+  await sourceDetails.click();
   await expect(
     page.getByText("Page 2 · bbox [100, 200, 900, 300] · official")
   ).toBeVisible();
@@ -1257,6 +1266,12 @@ test("renders governed promotion, retained rollback and region-grounded Ask", as
   );
   expect(overflow).toBeLessThanOrEqual(1);
   expect(unauthorizedUrls).toEqual([]);
+  expect(keyListReads).toEqual([]);
+  // Asked for, it reads the listing once and says what it found.
+  await page.route("**/api/developer/keys", route => route.fulfill({ json: { code: "OK", keys: [], remoteMcpKeys: [{ lastUsedAt: null }], truncated: { keys: false, remoteMcpKeys: false } } }));
+  await page.getByRole("button", { name: "Check when your AI last asked" }).click();
+  await expect(page.getByText("Your AI is connected and has not made a request yet.")).toBeVisible();
+  expect(keyListReads).toHaveLength(1);
   expect(browserErrors).toEqual([]);
   await testInfo.attach("world-lifecycle", {
     body: await page.screenshot({ fullPage: true }),

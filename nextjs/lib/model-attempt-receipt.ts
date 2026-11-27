@@ -12,7 +12,7 @@ export const RETRIEVAL_ROUTE_POLICY_VERSION = "retrieval-route-policy/v1" as con
 export type PublicRetrievalRoute = {
   routeClass: "full_model" | "partial_model" | "deterministic";
   degradationClasses: Array<
-    "dense_unavailable" | "reranker_unavailable" | "structure_unavailable"
+    "dense_unavailable" | "reranker_unavailable" | "structure_unavailable" | "access_scope_incomplete"
   >;
 };
 
@@ -35,6 +35,8 @@ function degradationClasses(values: readonly string[]): PublicRetrievalRoute["de
     if (value.startsWith("dense retrieval skipped:")) classes.add("dense_unavailable");
     else if (value.startsWith("reranker not applied:")) classes.add("reranker_unavailable");
     else if (value.startsWith("structure retrieval skipped:")) classes.add("structure_unavailable");
+    // WO-PROJ-K2: a projected result that may be missing admitted units (retrieval-pipeline.ts). No count, no source.
+    else if (value.startsWith("projected retrieval incomplete:")) classes.add("access_scope_incomplete");
   }
   return [...classes];
 }

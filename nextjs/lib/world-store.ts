@@ -743,7 +743,11 @@ function firstTimestamp(rows: Array<Record<string, unknown>> | null, column: str
 export async function getWorldFreshness(
   workspaceKey: string,
   collectionId: string,
-  options: { candidateManifestDigest?: string | null } = {},
+  options: {
+    candidateManifestDigest?: string | null;
+    /** WO-PROJ-K2: a partial projection's admitted documents; `observedAt` then reads only these. */
+    admittedDocumentIds?: ReadonlySet<string>;
+  } = {},
 ): Promise<WorldFreshness> {
   if (!WORKSPACE_ID_PATTERN.test(workspaceKey) || !COLLECTION_ID_PATTERN.test(collectionId)) {
     return { ...EMPTY_WORLD_FRESHNESS };
@@ -806,6 +810,7 @@ export async function getWorldFreshness(
   const documentIds = Array.isArray(jobRows?.[0]?.document_ids)
     ? (jobRows[0].document_ids as unknown[])
         .filter((id): id is string => typeof id === "string" && DOCUMENT_ID_PATTERN.test(id))
+        .filter((id) => !options.admittedDocumentIds || options.admittedDocumentIds.has(id))
         .slice(0, 200)
     : [];
   const sourceRows =

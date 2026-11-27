@@ -64,11 +64,41 @@ describe("the read-only MCP route imports no agent module (source test)", () => 
     expect(filesUnder(resolve(NEXTJS, "app/api/mcp")).length).toBeGreaterThan(0);
   });
 
-  it("no file under app/api/mcp imports lib/agent-*", () => {
+  /*
+    WO-AGENT-OAUTH-1 (FOUNDER-DECISIONS-20261127 §C, "shared TAVONEL OAuth issuer + separate protected resource"):
+    the issuer's authorize and token routes hand a request naming the agent resource to lib/agent-oauth.ts, and
+    import that one module and nothing else of the agent's. Every other file under app/api/mcp -- the read-only
+    MCP endpoint itself, registration -- still imports no agent module, and lib/remote-mcp.ts imports none either.
+  */
+  const ISSUER_ROUTES = new Set(["app/api/mcp/oauth/authorize/route.ts", "app/api/mcp/oauth/token/route.ts"]);
+  // Every agent-module reference in a file, across lines (the pattern's \s* spans a newline), not line by line.
+  const agentImports = (source: string) => [...source.matchAll(new RegExp(IMPORTS_AGENT_MODULE.source, "g"))].map((match) => match[0]);
+  const AGENT_OAUTH_SPECIFIER = /^from\s*"@\/lib\/agent-oauth"$/;
+
+  it("no file under app/api/mcp but the issuer's two routes imports lib/agent-* (whole-file check, as before)", () => {
     const offenders = filesUnder(resolve(NEXTJS, "app/api/mcp"))
+      .filter((file) => !ISSUER_ROUTES.has(relative(NEXTJS, file).replaceAll("\\", "/")))
       .filter((file) => IMPORTS_AGENT_MODULE.test(readFileSync(file, "utf8")))
       .map((file) => relative(NEXTJS, file));
     expect(offenders).toEqual([]);
+  });
+
+  it("the read-only MCP endpoint and its library modules import no agent module at all", () => {
+    for (const file of ["app/api/mcp/route.ts", "lib/remote-mcp.ts", "lib/remote-mcp-dispatch.ts", "lib/remote-mcp-facade.ts"]) {
+      expect(IMPORTS_AGENT_MODULE.test(readFileSync(resolve(NEXTJS, file), "utf8")), file).toBe(false);
+    }
+  });
+
+  it("the issuer's two routes reference exactly one agent module, lib/agent-oauth, once each (whole file, any line split)", () => {
+    for (const path of ISSUER_ROUTES) {
+      const found = agentImports(readFileSync(resolve(NEXTJS, path), "utf8"));
+      expect(found.length, path).toBe(1);
+      expect(AGENT_OAUTH_SPECIFIER.test(found[0]!), path).toBe(true);
+    }
+  });
+
+  it("the whole-file matcher sees an import whose specifier sits on the next line", () => {
+    expect(agentImports('import { x } from\n  "@/lib/agent-access";\nimport { y } from "@/lib/agent-oauth";')).toHaveLength(2);
   });
 
   it("the import pattern catches each import form", () => {

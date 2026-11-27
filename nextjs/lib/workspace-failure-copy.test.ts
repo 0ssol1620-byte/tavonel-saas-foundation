@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import AuthCallbackPage from "../app/auth/callback/page";
 import { CompileJobPanel } from "../components/compile-job-panel";
 import { askAbstentionCopy, askSourceCopy, EVIDENCE_EXCEEDS_ANSWER_LIMIT } from "./workspace-ask-copy";
-import { blockedPanelCopy, compiledWorldReadyNotice, FAILURE_COPY_CODES, failureSentence, isSizeLimitFailure, NO_ENTITIES_NOTE, noEntitiesNote, offersUpgrade, pageLocale, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
+import { blockedPanelCopy, compiledWorldReadyNotice, FAILURE_COPY_CODES, failureSentence, isSizeLimitFailure, NO_ENTITIES_NOTE, noEntitiesNote, offersUpgrade, pageLocale, REVIEW_REQUIRED_ACTIVATION_NOTE, reviewPackageNotice, reviewReasonCopy, SIZE_LIMIT_FAILURE_CODES, sizeLimitFailureCopy } from "./workspace-failure-copy";
 
 const workspace = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
 const connections = readFileSync(new URL("../components/connections-panel.tsx", import.meta.url), "utf8");
@@ -330,5 +330,72 @@ describe("honest count lines for a compiled World", () => {
     const explorer = readFileSync(new URL("../components/world-explorer.tsx", import.meta.url), "utf8");
     expect(explorer).toContain("counts.topics === null ? []");
     expect(explorer).toContain("not in engine");
+  });
+});
+
+/* WO-FIRST-5-MIN-1: the first five minutes of a brand-new free workspace. */
+describe("first-run copy", () => {
+  it("says a per-file free-evaluation refusal about that file, so a batch summary cannot contradict it", () => {
+    for (const code of ["TRIAL_FILE_LIMIT_EXCEEDED", "TRIAL_PAGE_LIMIT_EXCEEDED", "TRIAL_FILE_TOO_LARGE"]) {
+      const sentence = failureSentence(code, 402);
+      expect(sentence, code).not.toContain("Nothing was uploaded");
+      expect(sentence, code).toMatch(/was not uploaded\.$/);
+    }
+  });
+
+  it("says a review-required compile is not active and points at Review, without an id, a download or a split", () => {
+    expect(reviewPackageNotice(1)).toBe("This compile finished with 1 reason that needs review, so nothing is active. Open Review to see it.");
+    expect(reviewPackageNotice(3)).toBe("This compile finished with 3 reasons that need review, so nothing is active. Open Review to see them.");
+    expect(reviewPackageNotice(0)).toBe("This compile finished and needs review, so nothing is active. Open Review to see why.");
+    for (const line of [reviewPackageNotice(0), reviewPackageNotice(2), REVIEW_REQUIRED_ACTIVATION_NOTE]) {
+      expect(line).not.toMatch(/collection-|download|split|smaller/i);
+    }
+    expect(workspace).toContain("reviewPackageNotice(result.reviewReasons?.length ?? 0)");
+    expect(workspace).not.toContain("Download and inspect it");
+  });
+
+  it("explains a disabled Activate for a version that needs review, with a way to a person", () => {
+    expect(REVIEW_REQUIRED_ACTIVATION_NOTE).toContain("cannot be activated");
+    expect(REVIEW_REQUIRED_ACTIVATION_NOTE).toContain("contact support");
+    const note = workspace.slice(workspace.indexOf('data-testid="review-required-activation-note"'));
+    expect(note.slice(0, 300)).toContain("{REVIEW_REQUIRED_ACTIVATION_NOTE}");
+    expect(note.slice(0, 300)).toContain('<Link href="/contact">Contact support</Link>');
+    // Shown on exactly the conditions the Activate button and the promote route refuse a candidate for.
+    expect(workspace).toContain('collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" ? (');
+  });
+
+  it("says what a refused free-evaluation start was, with a next step that can change it (review P-2)", () => {
+    // The statuses bootstrap answers them with; the status-only lines advised a retry or a sign-in that never helps.
+    const refusals = { TRIAL_REVIEW_REQUIRED: 429, TRIAL_DEVICE_ALREADY_USED: 403, TRIAL_DISABLED: 403 } as const;
+    for (const [code, status] of Object.entries(refusals)) {
+      const sentence = failureSentence(code, status);
+      expect(FAILURE_COPY_CODES, code).toContain(code);
+      expect(sentence, code).not.toContain("Reference");
+      expect(sentence, code).not.toMatch(/Wait a minute|Sign in again|try again/i);
+      expect(sentence, code).toContain("contact page");
+      expect(sentence, code).not.toMatch(/[A-Z]{3,}_[A-Z]/);
+    }
+    expect(failureSentence("TRIAL_REVIEW_REQUIRED", 429)).toContain("needs a check by a person");
+    expect(failureSentence("TRIAL_REVIEW_REQUIRED", 429)).toContain("will not clear in a few minutes");
+    expect(failureSentence("TRIAL_DEVICE_ALREADY_USED", 403)).toContain("Choose a plan");
+    expect(failureSentence("TRIAL_DISABLED", 403)).toContain("Choose a plan");
+  });
+
+  it("does not tell a free evaluation that any selection is covered", () => {
+    expect(workspace).not.toContain("Your free evaluation covers this within its file and page limits");
+    expect(workspace).toContain("Its file and page allowance is shown at the top of this workspace");
+  });
+});
+describe("WO-TRIAL-P0: a free evaluation out of compile attempts", () => {
+  it("says what happened and who to write to, in plain words, without a plan link", () => {
+    const sentence = failureSentence("TRIAL_COMPILE_ATTEMPTS_EXHAUSTED", 402);
+    expect(FAILURE_COPY_CODES).toContain("TRIAL_COMPILE_ATTEMPTS_EXHAUSTED");
+    expect(sentence).toContain("need review");
+    expect(sentence).toContain("nothing new was started");
+    expect(sentence).toContain("support@tavonel.com");
+    expect(sentence).not.toMatch(/Reference|TRIAL_|\d/);
+    expect(sentence).not.toBe(failureSentence("TRIAL_WORLD_LIMIT_REACHED", 402));
+    // The next step is a person: a plan does not make a version that needs review activatable.
+    expect(offersUpgrade(sentence)).toBe(false);
   });
 });

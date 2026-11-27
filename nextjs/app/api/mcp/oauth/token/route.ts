@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordServerFunnel } from "@/lib/funnel-events";
+import { answerAgentToken, isAgentTokenRequest } from "@/lib/agent-oauth";
 import { createDeveloperApiKey, getRemoteMcpKey, listRecentRemoteMcpKeys, revokeDeveloperApiKey } from "@/lib/developer-store";
 import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
 import { trialAiAccessEnabled, trialMcpTokenAccess } from "@/lib/trial-ai-access";
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
   const text = await request.text();
   if (text.length > 16_384) return oauthError(400, "invalid_request", "The token request is too large.");
   const form = new URLSearchParams(text);
+  // WO-AGENT-OAUTH-1: an agent code (its own prefix and sealing purpose) is exchanged in lib/agent-oauth.ts. Flag off, it
+  // falls through and the read-only check below cannot open it (invalid_grant).
+  if (isAgentTokenRequest(form)) return answerAgentToken(form, key, requestOrigin(request));
   const refreshing = remoteMcpRefreshEnabled() && form.get("grant_type") === "refresh_token";
   const checked = refreshing ? checkRefreshRequest(form, key) : checkTokenRequest(form, key, requestOrigin(request));
   if (!checked.ok) return oauthError(checked.status, checked.error, checked.error_description);

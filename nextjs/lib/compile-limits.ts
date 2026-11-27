@@ -81,9 +81,12 @@ export function judgeCompileSet(count: number): CompileSetVerdict {
   on /pricing and in the refusal, so a folder of device manuals was chosen, uploaded and refused
   file by file (founder, 2026-11-10: 12 of 18 manuals over 80 pages, after upload).
 */
+/** The per-file ceiling on its own, for the free evaluation's line (WO-FIRST5-P1), which drops the corpus and archive parts. */
+export const PER_FILE_LIMIT_SENTENCE = `Each file up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages; ` +
+  "a longer file is refused, never cut short.";
+
 export function compileLimitsNotice(archiveMb: number) {
-  return `Each file up to ${PROCESSING_CEILING_MIB} MB and ${PROCESSING_CEILING.maxSourcePages} pages; ` +
-    "a longer file is refused, never cut short. " +
+  return `${PER_FILE_LIMIT_SENTENCE} ` +
     `Up to ${CORPUS_MAX_DOCUMENTS} sources per run, compiled in parts of ${COMPILE_MAX_DOCUMENTS}. ` +
     `ZIP archives up to ${archiveMb} MB. Larger corpus? Connect a source or talk to us.`;
 }

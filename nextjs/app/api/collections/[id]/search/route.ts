@@ -10,6 +10,9 @@ import { spendTrialSessionQuery } from "@/lib/trial-ai-access";
 import { meterKnowledgeQuery, type KquMeter } from "@/lib/kqu-meter";
 import { COLLECTION_ID_PATTERN } from "@/lib/immutable-keys";
 import { memberCollectionScopeRefusal } from "@/lib/member-source-scope";
+import {
+  decideMemberProjection, memberProjectionMode, projectionShadowFields, recordProjectionShadow,
+} from "@/lib/member-projection";
 import { runRetrievalPipeline } from "@/lib/retrieval-pipeline";
 import { DERIVED_DATA_REFUSED } from "@/lib/derived-data-admission";
 import {
@@ -153,8 +156,17 @@ async function search(request: Request, context: { params: Promise<{ id: string 
   // The allowance, before the index read and retrieval.
   const served = historical ?? active.world;
   // A member searches a World only when every source behind the served version is in their scope.
-  const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, served.manifestDigest);
-  if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
+  // WO-PROJ-K2, flag off: exactly that, nothing else read. Shadow: the projection is decided too
+  // and compared, counts only, while this gate still decides. Enforce: a member with part of the
+  // World in scope is served the projection, filtered inside the pipeline before ranking.
+  const projectionMode = memberProjectionMode();
+  const decision = projectionMode === "off" ? null : await decideMemberProjection(auth.principal, id, served.manifestDigest);
+  const projection = projectionMode === "enforce" && decision?.kind === "partial" ? decision : null;
+  if (!projection) {
+    const scopeRefusal = await memberCollectionScopeRefusal(auth.principal, id, served.manifestDigest);
+    if (decision) recordProjectionShadow(projectionShadowFields("search", scopeRefusal !== null, decision));
+    if (scopeRefusal) return NextResponse.json({ code: scopeRefusal.code }, { status: scopeRefusal.status, headers: NO_STORE });
+  }
   const admitted = await meter.admit(auth.principal);
   if (!admitted.ok) return NextResponse.json({ code: admitted.code }, { status: admitted.status, headers: NO_STORE });
   const indexStateAtAdmission = await readRetrievalIndexState({
@@ -187,6 +199,7 @@ async function search(request: Request, context: { params: Promise<{ id: string 
     embedder: runtime.embedder,
     reranker: runtime.reranker,
     contextLimit: requestedLimit,
+    ...(projection ? { projection } : {}),
   });
 
   if (!result.ok) {
@@ -249,7 +262,10 @@ async function search(request: Request, context: { params: Promise<{ id: string 
   }
   const publicRoute = buildPublicRetrievalRoute(attemptedRoles, result.diagnostics.degradations);
 
-  const freshness = await getWorldFreshness(auth.principal.workspaceKey, id);
+  // A projected viewer's observedAt is read over the admitted sources only (WO-PROJ-K2 N2).
+  const freshness = projection
+    ? await getWorldFreshness(auth.principal.workspaceKey, id, { admittedDocumentIds: projection.allowedDocumentIds })
+    : await getWorldFreshness(auth.principal.workspaceKey, id);
   const activeWorld = {
     manifestDigest: active.world.manifestDigest,
     revision: active.world.revision,

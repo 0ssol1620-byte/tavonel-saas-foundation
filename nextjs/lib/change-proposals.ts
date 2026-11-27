@@ -186,6 +186,28 @@ async function rpcRows(name: string, body: Record<string, unknown>, withGrant: b
   return rows && rows.every((row) => row !== null) ? { ok: true, rows: rows as ProposalRow[] } : failure("PROPOSAL_STORE_RESPONSE_INVALID", 503);
 }
 
+/**
+ * WO-AGENT-OAUTH-1: whether a grant still has a proposal in state `proposed` (the rows revoking it would withdraw), read
+ * from the store unfiltered, since a viewer filter could hide one. At most AGENT_ACL_SCAN_PAGES pages; a grant with more
+ * rows than that reads as open, so a caller deciding whether to revoke never withdraws what it did not see.
+ */
+export async function grantHasOpenProposals(workspaceKey: string, grantId: string): Promise<{ ok: true; open: boolean } | Failure> {
+  if (!UUID.test(grantId)) return failure("PROPOSAL_REQUEST_INVALID", 400);
+  let before: { createdAt: string; id: string } | null = null;
+  for (let page = 0; page < AGENT_ACL_SCAN_PAGES; page += 1) {
+    const listed = await rpcRows("list_world_change_proposals_page", {
+      p_workspace_key: workspaceKey, p_agent_grant_id: grantId,
+      p_before_created_at: before?.createdAt ?? null, p_before_id: before?.id ?? null, p_limit: LIST_LIMIT,
+    }, true);
+    if (!listed.ok) return listed;
+    if (listed.rows.some((row) => row.state === "proposed")) return { ok: true, open: true };
+    if (listed.rows.length < LIST_LIMIT) return { ok: true, open: false };
+    const last = listed.rows[listed.rows.length - 1]!;
+    before = { createdAt: last.created_at, id: last.proposal_id };
+  }
+  return { ok: true, open: true };
+}
+
 /** The proposal by id inside the workspace (§5.5): absent, foreign and malformed ids are the same 404. */
 export async function getProposal(workspaceKey: string, proposalId: string): Promise<{ ok: true; row: ProposalRow } | Failure> {
   if (!UUID.test(proposalId)) return failure("PROPOSAL_NOT_FOUND", 404);

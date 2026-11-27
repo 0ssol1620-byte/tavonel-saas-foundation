@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { compiledWorldReadyNotice, failureSentence, isSizeLimitFailure, noEntitiesNote, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
+import { compiledWorldReadyNotice, failureSentence, isSizeLimitFailure, noEntitiesNote, offersUpgrade, pageLocale, REVIEW_REQUIRED_ACTIVATION_NOTE, reviewPackageNotice } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -64,9 +64,10 @@ import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components
 import { activeWorldOpenOutcome, ActiveWorldPicker, askWorldPanel, ConfirmDialog, discoverActiveWorlds, discoveryFailureCopy, discoveryOutcome, requestConfirm, type ActiveWorldDiscovery, type AskWorldState, type ConfirmRequest } from "@/components/workspace/in-page-choices";
 import type { ActiveWorldSummary } from "@/lib/world-store";
 import DeveloperPanel from "@/components/developer-panel";
-import WorkspaceUltimateShell, { type SourcePendingReason, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import WorkspaceUltimateShell, { type AccessDetail, type SourcePendingReason, type TrialLimits, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
+import { useTrialAiAccess } from "@/components/workspace/connect-ai-panel";
 import ProcessingConsentPanel from "@/components/processing-consent-panel";
 import BillingRefund from "@/components/billing-refund";
 import IntakeTriageReview from "@/components/intake-triage-review";
@@ -75,6 +76,11 @@ import {
   deriveAttentionItems,
   deriveOnboardingSteps,
   deriveWorkspaceState,
+  aiLastRequestSentence,
+  judgeTrialSelection,
+  lastAiRequest,
+  trialAllowanceLine,
+  type AiLastRequest,
   type WorkspaceIntent,
   type WorkspaceStateInput,
 } from "@/lib/workspace-onboarding";
@@ -317,12 +323,16 @@ export default function WorkspacePage() {
   const [sourcePending, setSourcePending] = useState<SourcePendingReason | "legacy">("legacy");
   const [accessRecheck, setAccessRecheck] = useState<"idle" | "checking" | "done">("idle");
   const [accessEpoch, setAccessEpoch] = useState(0);
+  /* WO-FIRST5-P1 (#6): a free evaluation's allowance, as bootstrap sent it; null for any other access. */
+  const [trialLimits, setTrialLimits] = useState<TrialLimits | null>(null);
+  /* WO-FIRST5-P1 (#9): the sentence for the code a refused bootstrap answered with; null for a network failure or an expired session. */
+  const [accessFailure, setAccessFailure] = useState<string | null>(null);
   const intakeOpen = customerDataAccess === "open";
   const intakeClosedCopy = customerDataAccess === "closed"
     ? "Source processing is not active for this workspace yet. Your files stay on your device."
     : customerDataAccess === "checking"
       ? "Checking source access before choosing files."
-      : "Source access could not be verified. Refresh before choosing files.";
+      : accessFailure ?? "Source access could not be verified. Refresh before choosing files.";
   /*
     Journey A4 (D-04): the bounded wait after checkout.completed puts the account it last read on
     the billing card, and an arrival makes the shell read bootstrap again -- no reload, no hunting
@@ -384,6 +394,29 @@ export default function WorkspacePage() {
     window.addEventListener("popstate", applyLocation);
     return () => window.removeEventListener("popstate", applyLocation);
   }, []);
+  /*
+    WO-FIRST5-P1 (#12): the first-call confirmation. Use with AI reads the remote MCP keys' last use from
+    the Developers listing this account can already read (owner, paid, or a free evaluation where trial
+    AI access is on) and says when the AI last asked. The read is lazy: it runs only when the customer
+    asks for it on the Connect your AI screen, never on a workspace load or another surface. A failed
+    or unreadable listing says it could not confirm, never that nothing was asked.
+  */
+  const trialAiAccess = useTrialAiAccess();
+  const aiRequestReadable = accessSource === "owner" || accessSource === "paid" || (accessSource === "trial" && trialAiAccess);
+  const [aiLastRequest, setAiLastRequest] = useState<AiLastRequest | "unconfirmed" | "checking" | null>(null);
+  useEffect(() => { setAiLastRequest(null); }, [surface, accessSource, trialAiAccess]);
+  const checkAiLastRequest = async () => {
+    setAiLastRequest("checking");
+    const read = await (async () => {
+      const client = getSupabaseBrowserClient();
+      const { data } = client ? await client.auth.getSession() : { data: { session: null } };
+      const token = data.session?.access_token;
+      if (!token) return null;
+      const response = await fetch("/api/developer/keys", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
+      return response.ok ? lastAiRequest(await response.json().catch(() => null)) : null;
+    })().catch(() => null);
+    setAiLastRequest(read ?? "unconfirmed");
+  };
   const [busy, setBusy] = useState(false);
   const corpusFollowRef = useRef<AbortController | null>(null);
   const [compileJob, setCompileJob] = useState<CompileJobView | null>(null);
@@ -905,8 +938,11 @@ export default function WorkspacePage() {
     effect (journey defect D-14). The page never reads bootstrap itself -- after an acceptance, or
     when the owner asks to check again, it bumps accessEpoch and the shell reads once more.
   */
-  const applyAccess = (source: typeof accessSource, enabled: boolean | null, reason: SourcePendingReason | null, resume: ResumeAccess | null) => {
+  const applyAccess = (source: typeof accessSource, enabled: boolean | null, reason: SourcePendingReason | null, resume: ResumeAccess | null, detail?: AccessDetail) => {
     setAccessSource(source);
+    setTrialLimits(source === "trial" ? detail?.limits ?? null : null);
+    const failure = detail?.failure;
+    setAccessFailure(failure?.code && failure.status !== 401 ? failureSentence(failure.code, failure.status) : null);
     setCustomerDataAccess(enabled === null ? "unavailable" : enabled ? "open" : "closed");
     setSourcePending(reason ?? "legacy");
     setResumeAccess(resume);
@@ -1707,7 +1743,7 @@ export default function WorkspacePage() {
     setCollectionResult((result) => {
       if (!result || result.collectionId !== compiled) return result;
       setNotice(result.lifecycle === "review_required"
-        ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; nothing is active yet.`
+        ? reviewPackageNotice(result.reviewReasons?.length ?? 0)
         : compiledWorldReadyNotice(result.validation.counts));
       return result;
     });
@@ -2560,7 +2596,14 @@ export default function WorkspacePage() {
     window.scrollTo({ top: 0 });
   }, [collectionResult]);
 
-  const stagedVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
+  const corpusVerdict = judgeCorpusSet(stagedSelection?.files.length ?? 0);
+  // WO-FIRST5-P1 (#6): a free evaluation is also judged against its own allowance, before a byte is uploaded.
+  const trialRefusal = accessSource === "trial" && trialLimits
+    ? judgeTrialSelection(trialLimits, stagedSelection?.files.length ?? 0, stagedPages)
+    : null;
+  const stagedVerdict = corpusVerdict.ok && trialRefusal ? { ok: false as const, message: trialRefusal } : corpusVerdict;
+  // For a free evaluation the drop and the preflight state its allowance, not the corpus ceiling it can never use.
+  const intakeLimits = accessSource === "trial" && trialLimits ? trialAllowanceLine(trialLimits) : compileLimits;
 
   // `approvalLineage` is the server's answer to the triage availability check (stage route).
   const startStagedCompile = async (approvalLineage = INTAKE_APPROVAL_ROLLOUT_ENABLED) => {
@@ -2570,6 +2613,8 @@ export default function WorkspacePage() {
     // rather than a styling choice: nothing uploads a set the compile step will refuse.
     const verdict = judgeCorpusSet(stagedSelection.files.length);
     if (!verdict.ok) { setNotice(verdict.message); return; }
+    // WO-FIRST5-P1 (#6): nor a set past a free evaluation's allowance, which the upload would refuse file by file.
+    if (trialRefusal) { setNotice(trialRefusal); return; }
     const files = stagedSelection.files.map((entry) => entry.file);
     // The counts the accepted quote was formed from. Clearing the selection resets the state.
     const counts = stagedPageCounts;
@@ -3055,6 +3100,7 @@ export default function WorkspacePage() {
     blockedSourceCount: compileJob?.blocked.length ?? 0,
     hasGroundedAnswer: askResult?.status === "grounded",
     hasAiConnection: aiConnectionTaken,
+    accessFailureSentence: accessFailure,
   };
   const workspaceState = deriveWorkspaceState(workspaceStateInput);
   const onboardingSteps = deriveOnboardingSteps(workspaceStateInput);
@@ -3068,6 +3114,7 @@ export default function WorkspacePage() {
       return;
     }
     if (intent === "refresh") void loadDocuments();
+    if (intent === "contact") window.location.assign("/contact");
   };
   const { stateTitle, stateDescription } = workspaceState;
   const nextAction: { label: string; surface?: WorkspaceSurface; run?: () => void } = {
@@ -3308,7 +3355,14 @@ export default function WorkspacePage() {
                             : accessSource === "unentitled"
                               ? "Your account is ready. File processing is not active for this workspace yet. Start with a finished public example."
                               : "Your workspace is ready. File processing is not active for this workspace yet."
-                      : "Source access could not be verified. Refresh before choosing files."}</p>
+                      : intakeClosedCopy}</p>
+                  {/* WO-FIRST5-P1 (#9): a refusal with a code fails the same way on every refresh, so a person is one link away. */}
+                  {customerDataAccess === "unavailable" && accessFailure ? (
+                    <div className="workspace-intake-gated-actions">
+                      <Link className="btn" href="/contact">Contact support</Link>
+                      <Link className="btn ghost" href="/explore">Explore a compiled World</Link>
+                    </div>
+                  ) : null}
                   {customerDataAccess === "closed" && sourcePending !== "terms_acceptance_required" ? (
                     <div className="workspace-example-path" aria-label="Example knowledge path">
                       <span><b>01</b> Files</span><span><b>02</b> Read</span>
@@ -3325,9 +3379,13 @@ export default function WorkspacePage() {
                       <div className="workspace-intake-gated-actions">
                         <Link className="btn" href="/explore">Explore a compiled World</Link>
                         {sourcePending === "release_pending" ? (
-                          <button type="button" className="btn ghost" disabled={accessRecheck === "checking"} onClick={recheckFileAccess}>
-                            {accessRecheck === "checking" ? "Checking file access…" : "Check file access again"}
-                          </button>
+                          <>
+                            <button type="button" className="btn ghost" disabled={accessRecheck === "checking"} onClick={recheckFileAccess}>
+                              {accessRecheck === "checking" ? "Checking file access…" : "Check file access again"}
+                            </button>
+                            {/* WO-FIRST-5-MIN-1: the wait has no time the customer can read, so a person is one link away. */}
+                            <Link className="btn ghost" href="/contact">Contact support</Link>
+                          </>
                         ) : sourcePending === "workspace_refused" ? (
                           <Link className="btn ghost" href="/contact">Contact support</Link>
                         ) : null}
@@ -3386,7 +3444,7 @@ export default function WorkspacePage() {
                   who knows the ceiling can select within it; someone who does not finds out by
                   losing a batch.
                 */}
-                <small className="workspace-intake-limits">{compileLimits}</small>
+                <small className="workspace-intake-limits">{intakeLimits}{intakeLimits === compileLimits ? null : <> <Link href="/pricing">See plans</Link></>}</small>
                 {/*
                   The availability line under each name is WORKSPACE_SOURCE_CHOICES verbatim.
                   Nothing here states a support level the capability manifest does not; the
@@ -3446,7 +3504,9 @@ export default function WorkspacePage() {
                       : stagedCounted.length === 0
                         ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
                         : accessSource === "trial"
-                          ? "Your free evaluation covers this within its file and page limits. No card is needed."
+                          /* WO-FIRST-5-MIN-1: this said "covers this" for any selection, also one past the
+                             evaluation's file allowance, which the upload then refused file by file. */
+                          ? "Nothing is charged on your free evaluation. Its file and page allowance is shown at the top of this workspace; a file past it is refused, never charged."
                         : stagedConfidence === "verified"
                           ? "Page counts were counted from the documents themselves. You will never be charged above the maximum shown."
                           : "Some files state their own page count rather than being counted — Word records the number it last saved, which can be out of date. The billed page count is confirmed once the documents are processed, and never exceeds the maximum shown."}
@@ -3485,7 +3545,7 @@ export default function WorkspacePage() {
                       </ul>
                     </>
                   ) : null}
-                  <p className="fine">{compileLimits}</p>
+                  <p className="fine">{intakeLimits}</p>
                   {stagedVerdict.ok ? null : (
                     <p className="fine workspace-preflight-blocked" role="alert">{stagedVerdict.message}</p>
                   )}
@@ -4071,7 +4131,7 @@ export default function WorkspacePage() {
                       <textarea
                         id="review-reason"
                         maxLength={500}
-                        placeholder="Record what you verified in the directory, ontology, graph, evidence links and validation receipt."
+                        placeholder="For example: I checked two answers against their source pages."
                         value={reviewReason}
                         onChange={(event) => setReviewReason(event.target.value)}
                       />
@@ -4084,6 +4144,11 @@ export default function WorkspacePage() {
                           {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision…" : "Activate reviewed candidate"}
                         </button>
                       </div>
+                      {collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" ? (
+                        <p className="fine" role="status" data-testid="review-required-activation-note">
+                          {REVIEW_REQUIRED_ACTIVATION_NOTE} <Link href="/contact">Contact support</Link> · Reference {collectionResult.collectionId}
+                        </p>
+                      ) : null}
                       <p className="fine">Activation uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
                     </div>
                     <div className="version-panel">
@@ -4154,7 +4219,20 @@ export default function WorkspacePage() {
                 <Screen title="Connect your AI" titleId="workspace-ai-setup-title" aria-labelledby="workspace-ai-setup-title"
                   status={AI_SETUP_SCREEN_STATUS} bodyClassName="one-path-ai-options">
                   <WorkspaceUseWithAi open onDownload={collectionResult ? () => void downloadCollection() : undefined}
-                    downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} />
+                    downloading={downloading} onOpen={() => trackFunnel("workspace_ai_connect_opened")} trial={accessSource === "trial"}>
+                    {aiRequestReadable ? (
+                      <p className="fine" role="status">
+                        {aiLastRequest === "unconfirmed"
+                          ? "Could not confirm a request from your AI. Finish the steps above, then check again."
+                          : aiLastRequest && aiLastRequest !== "checking"
+                            ? aiLastRequestSentence(aiLastRequest, (iso) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)))
+                            : null}{" "}
+                        <button type="button" disabled={aiLastRequest === "checking"} onClick={() => void checkAiLastRequest()}>
+                          {aiLastRequest === null ? "Check when your AI last asked" : aiLastRequest === "checking" ? "Checking..." : "Check again"}
+                        </button>
+                      </p>
+                    ) : null}
+                  </WorkspaceUseWithAi>
                 </Screen>
                 <Screen title="Ask" status={askScreenStatus(activeWorld?.revision ?? null, askPanel)} aria-labelledby="ask-title">
                 <div>
@@ -4211,17 +4289,21 @@ export default function WorkspacePage() {
                           const sourceCopy = askSourceCopy(pageLocale());
                           return (
                           <li key={`${index}-${citation.evidenceId}`}>
-                            <b>{citation.evidenceId}</b>
-                            <span>
-                              Page {citation.pageNumber1 ?? sourceCopy.missing} · bbox {citation.bbox1000 ? `[${citation.bbox1000.join(", ")}]` : sourceCopy.missing} · {citation.authorityTier ?? citation.authority}
-                              {citation.claimIds?.length ? ` · ${citation.claimIds.length} claim${citation.claimIds.length === 1 ? "" : "s"}` : ""}
-                            </span>
-                            {citation.relevanceBreakdown && citation.relevance !== undefined ? (
-                              <span>
-                                score {citation.relevance.toFixed(3)} · lexical {citation.relevanceBreakdown.lexical.toFixed(2)} · graph {citation.relevanceBreakdown.graph.toFixed(2)} · time {citation.relevanceBreakdown.temporal.toFixed(2)} · authority {citation.relevanceBreakdown.authority.toFixed(2)}
-                              </span>
-                            ) : null}
                             <q>{citation.excerpt}</q>
+                            {/* WO-FIRST5-P1 (#17): the ids, the box and the score breakdown are for checking, not for reading first. */}
+                            <details>
+                              <summary>Page {citation.pageNumber1 ?? sourceCopy.missing} · source details</summary>
+                              <b>{citation.evidenceId}</b>
+                              <span>
+                                Page {citation.pageNumber1 ?? sourceCopy.missing} · bbox {citation.bbox1000 ? `[${citation.bbox1000.join(", ")}]` : sourceCopy.missing} · {citation.authorityTier ?? citation.authority}
+                                {citation.claimIds?.length ? ` · ${citation.claimIds.length} claim${citation.claimIds.length === 1 ? "" : "s"}` : ""}
+                              </span>
+                              {citation.relevanceBreakdown && citation.relevance !== undefined ? (
+                                <span>
+                                  score {citation.relevance.toFixed(3)} · lexical {citation.relevanceBreakdown.lexical.toFixed(2)} · graph {citation.relevanceBreakdown.graph.toFixed(2)} · time {citation.relevanceBreakdown.temporal.toFixed(2)} · authority {citation.relevanceBreakdown.authority.toFixed(2)}
+                                </span>
+                              ) : null}
+                            </details>
                             <button
                               type="button"
                               onClick={() => { if (regionId !== null) setAskEvidenceId(regionId); }}
@@ -4245,7 +4327,10 @@ export default function WorkspacePage() {
                       null
                     ) : askResult.status === "abstained" ? (
                       <div className="workspace-intake-actions">
-                        <button type="button" onClick={() => navigateSurface("sources")}>Add the source that would answer this</button>
+                        {/* WO-FIRST5-P1 (#18): a free evaluation compiles one World, so a new source is a plan's to add. */}
+                        {accessSource === "trial"
+                          ? <Link className="btn" href="/pricing">See plans to add more sources</Link>
+                          : <button type="button" onClick={() => navigateSurface("sources")}>Add the source that would answer this</button>}
                         <button type="button" onClick={() => navigateSurface("review")}>Check what is waiting for review</button>
                       </div>
                     ) : null}

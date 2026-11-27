@@ -1,6 +1,55 @@
-import type { WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import type { TrialLimits, WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import { PER_FILE_LIMIT_SENTENCE } from "./compile-limits";
 import type { CompileState } from "./compile-job-store";
 import type { DocumentListPartial } from "./pipeline";
+import { failureSentence } from "./workspace-failure-copy";
+
+/*
+  WO-FIRST5-P1 (#6, #4). A free evaluation was shown "Up to 128 sources per run" under the drop and
+  could stage any number of files; the upload then refused the ones past its allowance, file by file.
+  Bootstrap sends the allowance as totals for the evaluation (not what is left), so the drop states
+  those totals and the preflight refuses a selection that alone is past them -- which the server would
+  refuse too. What is already spent is not sent to the page, so nothing here claims to know it.
+*/
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/*
+  WO-FIRST5-P1 (#12). What the Developers listing (GET /api/developer/keys) says about the remote MCP
+  keys, the connection an assistant makes: the latest `lastUsedAt` across them. Null -- say nothing --
+  when there is no connection, the body is not the listing, or the listing was cut short, because the
+  latest use could be in the rows it did not return.
+*/
+export type AiLastRequest = { lastUsedAt: string | null };
+
+export function lastAiRequest(body: unknown): AiLastRequest | null {
+  const listing = body as { remoteMcpKeys?: unknown; truncated?: { remoteMcpKeys?: unknown } } | null;
+  if (!listing || !Array.isArray(listing.remoteMcpKeys) || listing.truncated?.remoteMcpKeys !== false) return null;
+  if (listing.remoteMcpKeys.length === 0) return null;
+  const used = listing.remoteMcpKeys
+    .map((key) => (key as { lastUsedAt?: unknown } | null)?.lastUsedAt)
+    .filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)));
+  return { lastUsedAt: used.length ? used.reduce((latest, value) => Date.parse(value) > Date.parse(latest) ? value : latest) : null };
+}
+
+export function aiLastRequestSentence(read: AiLastRequest, format: (iso: string) => string): string {
+  return read.lastUsedAt ? `Last request from your AI: ${format(read.lastUsedAt)}.` : "Your AI is connected and has not made a request yet.";
+}
+
+/** The drop-zone line for a free evaluation, in place of the corpus and archive line. */
+export function trialAllowanceLine(limits: TrialLimits): string {
+  return `${PER_FILE_LIMIT_SENTENCE} Your free evaluation covers ${plural(limits.files, "file")} and ${plural(limits.pages, "page")} in total, compiled into ${plural(limits.worlds, "World")}.`;
+}
+
+/** Why a staged selection is past the free evaluation's allowance, or null when it is not. `countedPages` holds counted files only. */
+export function judgeTrialSelection(limits: TrialLimits, files: number, countedPages: number): string | null {
+  if (files > limits.files) {
+    return `You chose ${plural(files, "file")}, and your free evaluation covers ${plural(limits.files, "file")} in total. Remove ${files - limits.files}, then upload.`;
+  }
+  if (countedPages > limits.pages) {
+    return `These files have ${plural(countedPages, "page")}, and your free evaluation covers ${plural(limits.pages, "page")} in total. Remove a file, then upload.`;
+  }
+  return null;
+}
 
 /*
   One derivation of "what is true about this workspace, and what should be said about it".
@@ -53,10 +102,15 @@ export type WorkspaceStateInput = {
    * active revision and consumer request, never from a locally remembered click.
    */
   hasAiConnection: boolean;
+  /**
+   * WO-FIRST5-P1 (#9): the sentence for the code a refused access check answered with. Null when it
+   * answered none (a network failure) or an expired session, where "sign in again" is the next step.
+   */
+  accessFailureSentence?: string | null;
 };
 
 /** An action the page has to run itself; anything else is a surface navigation. */
-export type WorkspaceIntent = "upload" | "refresh";
+export type WorkspaceIntent = "upload" | "refresh" | "contact";
 
 export type WorkspaceNextAction = {
   label: string;
@@ -210,7 +264,8 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
     return {
       mode,
       stateTitle: "The last compile stopped.",
-      stateDescription: `It stopped with ${input.compileErrorCode}, and nothing was activated. The run's own record says which sources it had read when it stopped.`,
+      // WO-FIRST-5-MIN-1: the sentence the compile panel shows for the same code, not the bare code.
+      stateDescription: `${failureSentence(input.compileErrorCode, 500)} Nothing was activated. The run's own record says which sources it had read when it stopped.`,
       nextAction: { label: "Open activity", surface: "activity" },
     };
   }
@@ -252,6 +307,12 @@ export function deriveWorkspaceState(input: WorkspaceStateInput): WorkspaceState
         nextAction: { label: "Checking access" } };
     }
     if (input.customerDataAccess === "unavailable") {
+      // A server that answered with a code fails the same way on every refresh, so a person is the next step.
+      if (input.accessFailureSentence) {
+        return { mode, stateTitle: "Source access could not be verified.",
+          stateDescription: `${input.accessFailureSentence} Your saved work remains available.`,
+          nextAction: { label: "Contact support", intent: "contact" } };
+      }
       return { mode, stateTitle: "Source access could not be verified.",
         stateDescription: "Your saved work remains available. Sign in again before processing files.",
         nextAction: { label: "Access unavailable" } };
@@ -425,7 +486,7 @@ export function deriveAttentionItems(input: WorkspaceStateInput): AttentionItem[
     items.push({
       id: "compile-failed",
       label: "Failed",
-      detail: `The last compile stopped with ${input.compileErrorCode}. Nothing was activated.`,
+      detail: `The last compile stopped. ${failureSentence(input.compileErrorCode, 500)} Nothing was activated.`,
       action: { label: "Open activity", surface: "activity" },
     });
   }

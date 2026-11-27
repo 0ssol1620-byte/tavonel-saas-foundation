@@ -129,6 +129,26 @@ describe("createAgentGrant (I-24, TS half)", () => {
     expect(calls).toEqual([]);
   });
 
+  it("WO-AGENT-OAUTH-1: sends the consented scopes and the short TTL when given, and refuses bad ones before the store", async () => {
+    store(createRpc);
+    const result = await createAgentGrant({ workspaceKey: WS, userId: USER, authorizationRevision: 7, clientLabel: "ChatGPT #abc", grantorEmail: null,
+      scopes: ["agent:read"], ttlSeconds: 900, now: NOW });
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.body).toMatchObject({ p_scopes: ["agent:read"], p_expires_at: new Date(NOW.getTime() + 900_000).toISOString() });
+    calls.length = 0;
+    for (const extra of [
+      { scopes: [] }, { scopes: ["agent:read", "agent:read"] }, { scopes: ["worlds:read"] }, { ttlSeconds: 0 }, { ttlSeconds: 1.5 },
+    ]) {
+      expect(await createAgentGrant({ workspaceKey: WS, userId: USER, authorizationRevision: 7, clientLabel: "Agent", grantorEmail: null, ...extra } as Parameters<typeof createAgentGrant>[0]))
+        .toEqual({ ok: false, code: "AGENT_GRANT_INPUT_INVALID" });
+    }
+    expect(calls).toEqual([]);
+    // A store answer echoing other scopes than the ones sent is a binding failure, not a grant.
+    store((_n, body) => Response.json({ grantId: GRANT, keyId: KEY, keyPrefix: body.p_key_prefix, scopes: ["agent:read", "agent:propose"], createdAt: NOW.toISOString(), expiresAt: body.p_expires_at }));
+    expect(await createAgentGrant({ workspaceKey: WS, userId: USER, authorizationRevision: 7, clientLabel: "Agent", grantorEmail: null, scopes: ["agent:read"], ttlSeconds: 900 }))
+      .toEqual({ ok: false, code: "DEVELOPER_STORE_BINDING_INVALID" });
+  });
+
   it("drops a grantor address the store would refuse instead of failing the grant", async () => {
     store(createRpc);
     await createAgentGrant({ workspaceKey: WS, userId: USER, authorizationRevision: 7, clientLabel: "Agent", grantorEmail: `${"a".repeat(320)}@x.io` });

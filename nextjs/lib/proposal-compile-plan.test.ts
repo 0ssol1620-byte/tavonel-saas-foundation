@@ -258,8 +258,10 @@ describe("prepare: the creation dry-run", () => {
   it("customer-data admission and trial capacity refuse as the web compile does", async () => {
     canAdmit.mockResolvedValueOnce(false);
     expect(await prepare([DOC_A])).toEqual({ ok: false, code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE", status: 403 });
-    trialCapacity.mockResolvedValueOnce({ ok: true, allowed: false });
+    trialCapacity.mockResolvedValueOnce({ ok: true, allowed: false, code: "TRIAL_WORLD_LIMIT_REACHED" });
     expect(await prepare([DOC_A], { ...agent, accessSource: "trial" })).toEqual({ ok: false, code: "TRIAL_WORLD_LIMIT_REACHED", status: 402 });
+    trialCapacity.mockResolvedValueOnce({ ok: true, allowed: false, code: "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED" });
+    expect(await prepare([DOC_A], { ...agent, accessSource: "trial" })).toEqual({ ok: false, code: "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED", status: 402 });
     vi.stubEnv("TAVONEL_CUSTOMER_DATA_GATE_VERSION", "v2");
     readScope.mockResolvedValueOnce({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE" });
     expect(await prepare([DOC_A])).toEqual({ ok: false, code: "CUSTOMER_SOURCE_SCOPE_UNAVAILABLE", status: 503 });

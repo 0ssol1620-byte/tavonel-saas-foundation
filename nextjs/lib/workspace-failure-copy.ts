@@ -78,14 +78,27 @@ const FAILURE_COPY: Record<string, string> = {
   */
   SUBSCRIPTION_REQUIRED: "This needs a paid plan. Nothing was changed.",
   STUDIO_SUBSCRIPTION_REQUIRED: "Your current plan does not include this. Nothing was changed.",
-  TRIAL_FILE_LIMIT_EXCEEDED: "Your free evaluation has used all of its files. Nothing was uploaded.",
-  TRIAL_PAGE_LIMIT_EXCEEDED: "These files go past the pages left in your free evaluation. Nothing was uploaded.",
-  TRIAL_FILE_TOO_LARGE: "This file is larger than the free evaluation accepts. Nothing was uploaded.",
+  /*
+    WO-FIRST-5-MIN-1: these are per-file refusals. "Nothing was uploaded" read as the whole batch, so a
+    batch summary said "3 of 5 files uploaded ... Why: ... Nothing was uploaded." about the same run.
+  */
+  TRIAL_FILE_LIMIT_EXCEEDED: "Your free evaluation has used all of its files, so this file was not uploaded.",
+  TRIAL_PAGE_LIMIT_EXCEEDED: "This goes past the pages left in your free evaluation, so it was not uploaded.",
+  TRIAL_FILE_TOO_LARGE: "This file is larger than the free evaluation accepts, so it was not uploaded.",
   TRIAL_ARCHIVE_NOT_INCLUDED: "ZIP archives are not part of the free evaluation. Choose the files inside it instead.",
   TRIAL_FEATURE_NOT_INCLUDED: "This is not part of the free evaluation.",
   TRIAL_WORLD_LIMIT_REACHED: "Your free evaluation has already used its one World.",
+  /* WO-TRIAL-P0: earlier compiles each ended in a version that needs review, which cannot be activated. A person is the next step, not a plan. */
+  TRIAL_COMPILE_ATTEMPTS_EXHAUSTED: "Your free evaluation cannot start another compile: its earlier compiles each need review before they can be used, so nothing new was started. Write to support@tavonel.com and we will look at them with you.",
   TRIAL_LIMIT_REACHED: "Your free evaluation has reached one of its limits.",
   TRIAL_NOT_ACTIVE: "Your free evaluation has ended.",
+  /*
+    WO-FIRST5-P1 review (P-2): the bootstrap refusals a free evaluation can start with. Their status lines
+    said "Wait a minute and try again" (429) and "Sign in again" (403), neither of which changes the answer.
+  */
+  TRIAL_REVIEW_REQUIRED: "Your free evaluation needs a check by a person on our side before it can start, so it will not clear in a few minutes. Write to us through the contact page and we will look at it.",
+  TRIAL_DEVICE_ALREADY_USED: "A free evaluation has already been used on this device, so another one cannot start. Choose a plan to continue, or write to us through the contact page if this is wrong.",
+  TRIAL_DISABLED: "Free evaluations are not open right now, so none was started. Choose a plan to continue, or write to us through the contact page.",
   TRIAL_AI_ACCESS_CHECK_FAILED: "We could not check your free evaluation limits, so nothing ran. Try again in a minute.",
   /* WO-CAT-8: the plan meters. Each says which allowance it was and what changes the answer; no number is stated here. */
   STORAGE_ALLOWANCE_EXHAUSTED: "This workspace has used its plan's storage allowance, so this file was not added. Delete sources the workspace no longer needs to make room.",
@@ -290,6 +303,26 @@ export const NO_ENTITIES_NOTE =
 export function noEntitiesNote(counts: { claims: number; entities: number }): string | null {
   return counts.claims > 0 && counts.entities === 0 ? NO_ENTITIES_NOTE : null;
 }
+
+/*
+  WO-FIRST-5-MIN-1. A compile that settles needing review cannot be activated: the promote route and
+  the Activate button both require a passed, completed candidate (collection-download.ts
+  `validatePromotableCollectionArtifact`). The notice used to name the collection id and say
+  "Download and inspect it", and the Activate button sat disabled with no word about why -- the
+  home screen's "Review & activate" led to a control that could never open. No line here advises
+  splitting the sources (see the review-reason copy above): separate compiles are never compared.
+*/
+export function reviewPackageNotice(reasons: number): string {
+  if (reasons > 0) {
+    return reasons === 1
+      ? "This compile finished with 1 reason that needs review, so nothing is active. Open Review to see it."
+      : `This compile finished with ${reasons} reasons that need review, so nothing is active. Open Review to see them.`;
+  }
+  return "This compile finished and needs review, so nothing is active. Open Review to see why.";
+}
+
+export const REVIEW_REQUIRED_ACTIVATION_NOTE =
+  "A version that needs review cannot be activated from the workspace. Its reasons are in the review queue above. To go further with it, contact support and quote the reference below.";
 
 export function compiledWorldReadyNotice(counts: {
   documents: number; topics?: number | null; entities: number; claims: number; relations: number;

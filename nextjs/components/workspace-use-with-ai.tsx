@@ -13,8 +13,12 @@ const DESTINATIONS = [
 type Destination = typeof DESTINATIONS[number]["id"];
 
 /** Choosing a destination is setup intent, never a verified external connection. */
-export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, downloading = false }: {
+export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, downloading = false, trial = false, children }: {
   open?: boolean;
+  /** WO-FIRST5-P1: a free evaluation, so the Connect AI panel can say whether it may connect. */
+  trial?: boolean;
+  /** WO-FIRST5-P1 (#12): what the page knows about the AI's last request, shown under the connect steps. */
+  children?: React.ReactNode;
   onDownload?: () => void;
   onOpen?: () => void;
   downloading?: boolean;
@@ -50,7 +54,8 @@ export default function WorkspaceUseWithAi({ open = false, onDownload, onOpen, d
         </div>
         <div className="one-path-ai-destination" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${destination}`} tabIndex={0}>
           {destination === "assistant" ? <>
-            <ConnectAiPanel headingLevel={Heading} />
+            <ConnectAiPanel headingLevel={Heading} trial={trial} />
+            {children}
             <p>Live answers need an activated version. For a local agent with an API key instead, use the MCP bridge.</p>
             <Link className="btn btn-ghost" href="/docs/mcp">Open assistant setup</Link>
           </> : destination === "application" ? <>
