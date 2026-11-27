@@ -3234,7 +3234,7 @@ test('affected owner groups select the initial task checks for every product own
   assert.deepEqual([docs.groups,docs.unitFiles,docs.browserFiles],[['docs'],['lib/docs-content.test.ts','lib/docs-navigation.test.ts','lib/retrieval-docs-parity.test.ts'],['e2e/docs-reading-layout.spec.ts']]);
   const lifecycle=select('nextjs/components/world-graph-canvas.tsx');
   assert.deepEqual([lifecycle.groups,lifecycle.browserFiles],[['workspace-lifecycle'],['e2e/world-lifecycle.spec.ts']]);
-  assert.deepEqual(lifecycle.unitFiles,['lib/visual-world-model.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
+  assert.deepEqual(lifecycle.unitFiles,['lib/visual-world-model.test.ts','lib/workspace-existing-compile.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
   const ocr=select('quarantine-sidecar/foundation-cdr-worker/src/ocr.ts');
   assert.deepEqual([ocr.groups,ocr.unitFiles,ocr.browserFiles,ocr.runCdrWorkerChecks],[['ocr-worker'],[],[],true]);
   // The worker's deployed vars (FOUNDATION_OCR_PAGE_RANGE_SIZE) change what ocr.ts does, so they run the same suite.
@@ -3722,7 +3722,7 @@ const AFFECTED_ASK_PATHS=Object.freeze(['nextjs/lib/grounded-ask.ts','nextjs/lib
 const AFFECTED_ASK_SUITES=Object.freeze(['lib/ask-route-limits.test.ts','lib/context-packet.test.ts','lib/grounded-ask-packet.test.ts','lib/grounded-ask.test.ts','lib/workspace-ask-copy.test.ts']);
 const AFFECTED_ASK_OVERLAPS=Object.freeze({'nextjs/lib/ask-route-limits.test.ts':['acl'],'nextjs/app/workspace/page.tsx':['review-queue','workspace-lifecycle']});
 const AFFECTED_ACL_UNITS=Object.freeze(['lib/acl-refresh-core.test.mjs','lib/ask-route-limits.test.ts','lib/connector-source-access.test.ts','lib/google-drive-acl-capture.test.ts','lib/pgtap-fixtures.test.ts','lib/source-acl-admission-migration.test.ts']);
-const AFFECTED_LIFECYCLE_UNITS=Object.freeze(['lib/visual-world-model.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
+const AFFECTED_LIFECYCLE_UNITS=Object.freeze(['lib/visual-world-model.test.ts','lib/workspace-existing-compile.test.ts','lib/workspace-failure-copy.test.ts','lib/world-directory-and-ontology.test.ts','lib/world-graph-layout.test.ts']);
 const affectedUnion=(...lists)=>[...new Set(lists.flat())].sort();
 const affectedAskPlan=map=>affectedCollector.affectedPlan(affectedCumulativeStandIn(affectedHeadSha,'b'.repeat(40)),affectedGpuProof(map));
 test('affected grounded-ask admission: exactly eight owner paths select exactly five Ask suites, no unrelated flags and fresh native debt', () => {
@@ -3766,7 +3766,7 @@ test('affected grounded-ask admission: workspace page overlaps workspace-lifecyc
     affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/e2e/world-lifecycle.spec.ts'])];
   const map=affectedMap(delta);
   assert.deepEqual([map.failures,map.groups,map.changedPaths.length],[[],['acl','grounded-ask','review-queue','workspace-lifecycle'],8]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,15);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,16);
   assert.deepEqual(map.browserFiles,['e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite})=>({group,suite})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts'}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -3875,7 +3875,7 @@ test('affected Explore admission: mixed changes keep the Ask, ACL, workspace and
     affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
   const map=affectedMap(records);
   assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','ocr-gpu-worker','review-queue','workspace-lifecycle']]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,19);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,20);
   assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,'e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -4194,7 +4194,7 @@ test('affected Home admission: mixed changes union and dedupe with the Explore, 
     affectedRecord('M',['nextjs/lib/ask-route-limits.test.ts']),affectedRecord('M',['nextjs/app/workspace/page.tsx']),affectedRecord('M',[AFFECTED_GPU_PATHS[0]])];
   const map=affectedMap(records);
   assert.deepEqual([map.failures,map.groups],[[],['acl','explore-answer','grounded-ask','home-landing','ocr-gpu-worker','review-queue','workspace-lifecycle']]);
-  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,29);
+  assert.deepEqual(map.unitFiles,affectedUnion(AFFECTED_ACL_UNITS,AFFECTED_LIFECYCLE_UNITS,AFFECTED_ASK_SUITES,AFFECTED_EXPLORE_SUITES,AFFECTED_HOME_SUITES,REVIEW_QUEUE_AFFECTED_UNIT_FILES));assert.equal(map.unitFiles.length,30);
   assert.deepEqual(map.browserFiles,[AFFECTED_EXPLORE_SPEC,AFFECTED_HOME_SPEC,'e2e/world-lifecycle.spec.ts']);
   assert.deepEqual(map.fixtureContracts.map(({group,suite,declaredCases})=>({group,suite,declaredCases})),[{group:'acl',suite:'lib/pgtap-fixtures.test.ts',declaredCases:24}]);
   assert.deepEqual([map.runCdrWorkerChecks,map.runSelectorContracts,map.databaseChanged,map.databaseTests],[false,false,false,[]]);
@@ -5044,7 +5044,7 @@ test('affected review queue admission: each exact path selects review-queue and 
   const delta=affectedMap(records);
   assert.deepEqual([delta.failures,delta.unmappedPaths,delta.groups,delta.changedPaths,delta.unitFiles,delta.browserFiles],
     [[],[],['grounded-ask','review-queue','workspace-lifecycle'],[...AFFECTED_REVIEW_PATHS].sort(),AFFECTED_REVIEW_PAGE_UNITS,['e2e/world-lifecycle.spec.ts']]);
-  assert.equal(delta.unitFiles.length,10);
+  assert.equal(delta.unitFiles.length,11);
   assert.deepEqual(delta.entries.map(entry=>[entry.status,entry.groups]),AFFECTED_REVIEW_PATHS.map(path=>['M',path===AFFECTED_REVIEW_PAGE?['grounded-ask','review-queue','workspace-lifecycle']:['review-queue']]));
   assert.deepEqual(delta.nativeEvidence.invalidatingPaths,[...AFFECTED_REVIEW_PATHS].sort());
   // A rename inside the owner keeps one selection and maps both endpoints.
@@ -6667,7 +6667,7 @@ test('affected ontology name preview admission: absent reports, a missing new su
     assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-3\.json/);
     write(pw(3),playwright('reduced-motion'));
     const result=readAffectedExecution(root,plan);
-    assert.deepEqual(result.units,{files:5,passed:5,skipped:0,failed:0});
+    assert.deepEqual(result.units,{files:6,passed:6,skipped:0,failed:0});
     assert.deepEqual(result.browsers.map(b=>[b.project,b.files,b.passed,b.skipped,b.flaky,b.failed]),AFFECTED_ONTOLOGY_RUNS.map(run=>[run.project,1,1,0,0,0]));
     const rejected=[
       ...AFFECTED_ONTOLOGY_OLD_UNITS.map(file=>[vitestPath,vitest(AFFECTED_ONTOLOGY_OLD_UNITS.filter(other=>other!==file)),new RegExp(`Vitest report omitted selected file\\(s\\): ${literal(file)}$`)]),
@@ -6685,7 +6685,7 @@ test('affected ontology name preview admission: absent reports, a missing new su
     }
     rmSync(pw(2),{force:true});
     assert.throws(()=>readAffectedExecution(root,plan),/Playwright report is missing: .*playwright-2\.json/);
-    restore();assert.equal(readAffectedExecution(root,plan).units.passed,5,'the restored actual reports qualify again');
+    restore();assert.equal(readAffectedExecution(root,plan).units.passed,6,'the restored actual reports qualify again');
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
 test('affected ontology name preview admission: the combined prior preflight, membership, customer lifecycle (UX16), consumer, world diff, UX08 ledger, workspace page/Ask, source-agent/cloud, connector, docs, Home and representative ACL/billing delta keeps every prior owner and shared flag and adds only the new owner and its one suite', () => {
@@ -7092,7 +7092,7 @@ test('affected directory pagination shared helper retains its original owner and
   const headSha = 'f'.repeat(40); // Explicit synthetic owner-map input, not a published execution head.
   const select = (path, headHasFile = () => true) => buildAffectedMap({ headSha, records: [record(path)], headHasFile });
   const helper = 'nextjs/lib/world-explorer-navigation.ts';
-  const dependentUnits = ['lib/visual-world-model.test.ts', 'lib/workspace-failure-copy.test.ts',
+  const dependentUnits = ['lib/visual-world-model.test.ts', 'lib/workspace-existing-compile.test.ts', 'lib/workspace-failure-copy.test.ts',
     'lib/world-directory-and-ontology.test.ts', 'lib/world-graph-layout.test.ts', 'lib/world-explorer-navigation.test.ts'].sort();
   const dependency = select(helper);
   assert.deepEqual(dependency.failures, []);
