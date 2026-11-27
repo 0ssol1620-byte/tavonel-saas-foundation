@@ -364,6 +364,23 @@ describe("first-run copy", () => {
     expect(workspace).toContain('collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" ? (');
   });
 
+  it("says what a refused free-evaluation start was, with a next step that can change it (review P-2)", () => {
+    // The statuses bootstrap answers them with; the status-only lines advised a retry or a sign-in that never helps.
+    const refusals = { TRIAL_REVIEW_REQUIRED: 429, TRIAL_DEVICE_ALREADY_USED: 403, TRIAL_DISABLED: 403 } as const;
+    for (const [code, status] of Object.entries(refusals)) {
+      const sentence = failureSentence(code, status);
+      expect(FAILURE_COPY_CODES, code).toContain(code);
+      expect(sentence, code).not.toContain("Reference");
+      expect(sentence, code).not.toMatch(/Wait a minute|Sign in again|try again/i);
+      expect(sentence, code).toContain("contact page");
+      expect(sentence, code).not.toMatch(/[A-Z]{3,}_[A-Z]/);
+    }
+    expect(failureSentence("TRIAL_REVIEW_REQUIRED", 429)).toContain("needs a check by a person");
+    expect(failureSentence("TRIAL_REVIEW_REQUIRED", 429)).toContain("will not clear in a few minutes");
+    expect(failureSentence("TRIAL_DEVICE_ALREADY_USED", 403)).toContain("Choose a plan");
+    expect(failureSentence("TRIAL_DISABLED", 403)).toContain("Choose a plan");
+  });
+
   it("does not tell a free evaluation that any selection is covered", () => {
     expect(workspace).not.toContain("Your free evaluation covers this within its file and page limits");
     expect(workspace).toContain("Its file and page allowance is shown at the top of this workspace");
