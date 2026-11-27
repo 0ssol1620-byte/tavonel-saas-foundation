@@ -8,7 +8,7 @@
 --   pilot-d2d2d2d2d2d24d2d  B, another tenant
 --   pilot-d3d3d3d3d3d34d3d  C, an enterprise assignment without a policy (legal hold unreadable)
 begin;
-select plan(62);
+select plan(66);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,

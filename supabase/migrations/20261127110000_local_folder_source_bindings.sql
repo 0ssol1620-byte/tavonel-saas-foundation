@@ -216,7 +216,8 @@ begin
   insert into public.connector_source_suspensions (source_id, workspace_key, reason)
   values (p_source_id, p_workspace_key, 'removed_or_inaccessible')
   on conflict (source_id) do nothing;
-  if not p_request_deletion then return 'suspended'; end if;
+  -- Only an explicit true asks for deletion; null (no marker) is a suspension.
+  if p_request_deletion is not true then return 'suspended'; end if;
 
   v_hold := public.source_legal_hold_state(p_workspace_key);
   v_grace := public.source_deletion_grace_days(p_workspace_key);
@@ -603,7 +604,7 @@ begin
         -- Nothing was ever bound for this path, or it is already suspended: nothing to do.
         if v_source.source_id is null or v_suspended then continue; end if;
         v_removal_status := public.record_connection_source_removal(
-          p_workspace_key, v_source.source_id, v_event->>'removal' = 'deleted');
+          p_workspace_key, v_source.source_id, coalesce(v_event->>'removal' = 'deleted', false));
         case v_removal_status
           when 'suspended' then v_suspended_only := v_suspended_only + 1;
           when 'recorded' then v_recorded := v_recorded + 1;
