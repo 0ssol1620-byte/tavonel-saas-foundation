@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { displayName, documentReference, elideKey, recallDocumentNames, rememberDocumentName, shortHandle } from "./document-names";
+import { displayName, distinctDocumentName, documentReference, elideKey, recallDocumentNames, rememberDocumentName, shortHandle } from "./document-names";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -30,6 +30,9 @@ describe("what a document is called", () => {
     expect(displayName(ID, {})).toBe("Untitled document");
     expect(documentReference(ID, {})).toBe("Reference 10FC3C");
     expect(documentReference(ID, { [ID]: "a.pdf" })).toBeUndefined();
+    // A list a person decides in tells two unnamed documents apart without making the id the label.
+    expect(distinctDocumentName(ID, {})).toBe("Untitled document (ref 10FC3C)");
+    expect(distinctDocumentName(ID, { [ID]: "a.pdf" })).toBe("a.pdf");
   });
 
   it("survives the reload that lost it before", () => {

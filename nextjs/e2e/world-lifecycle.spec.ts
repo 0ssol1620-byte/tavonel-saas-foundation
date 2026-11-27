@@ -572,13 +572,13 @@ for (const locale of ["en-US", "ko-KR"] as const) {
 
       // World Studio opens on the bottom region, not the top one on the same page.
       await expect(inspector.getByRole("heading", { name: "Selected evidence", exact: true })).toBeVisible();
-      await expect(inspector.locator(":scope > strong")).toHaveText("doc-a");
-      await expect(inspector.locator("dd")).toHaveText(["version-1", "2", "[100, 600, 900, 700]"]);
+      await expect(inspector.locator(":scope > strong")).toHaveText("Untitled document");
+      await expect(inspector.locator("dd")).toHaveText([/^ending VERSION1$/, "2", "[100, 600, 900, 700]"]);
       await expect(inspector.locator("blockquote")).toHaveText("Bottom region of page two.");
       await expect(page.getByRole("button", { name: /Bottom region of page two/ })).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByRole("button", { name: /Top region of page two/ })).toHaveAttribute("aria-pressed", "false");
       // Through the existing authorized source read, for that region's own document and version.
-      await expect(inspector.getByRole("group", { name: "Source doc-a, page 2, exact evidence region", exact: true })).toHaveAttribute("data-state", "ready");
+      await expect(inspector.getByRole("group", { name: "Untitled document, page 2, exact evidence region", exact: true })).toHaveAttribute("data-state", "ready");
       await expect(inspector.locator('[data-state="ready"] canvas')).toBeVisible();
       expect(reads).toHaveLength(1);
       const read = new URL(reads[0]);
@@ -876,7 +876,7 @@ test("an object selected after evidence replaces it, and empty or missing refs n
   await selectListedObject(page, "Annual filing");
   await expectNoBorrowedEvidence();
   await expect(inspector).toContainText("Annual filing");
-  await expect(inspector.getByRole("button", { name: "Open evidence evidence-1, doc-a page 2", exact: true })).toBeVisible();
+  await expect(inspector.getByRole("button", { name: "Open evidence evidence-1, Untitled document page 2", exact: true })).toBeVisible();
 
   // A -> an object with no refs.
   await selectA();
@@ -922,15 +922,18 @@ test("every evidence ref bound to an object opens that exact record from the key
     const evidence = boundEvidenceModel.evidence.find(item => item.id === ref)!;
     await selectListedObject(page, claim.label);
     const control = inspector.getByRole("group", { name: "Evidence bound to this object" })
-      .getByRole("button", { name: `Open evidence ${ref}, ${evidence.sourceId} page ${evidence.page}`, exact: true });
+      .getByRole("button", { name: `Open evidence ${ref}, Untitled document page ${evidence.page}`, exact: true });
     await control.focus();
     await page.keyboard.press("Enter");
     // The control just pressed leaves the DOM; focus lands on the evidence it opened, not on the body.
     await expect(inspector.getByRole("heading", { name: "Selected evidence", exact: true })).toBeFocused();
-    await expect(inspector.locator(":scope > strong")).toHaveText(evidence.sourceId);
-    await expect(inspector.locator("dd")).toHaveText([evidence.sourceVersionId, String(evidence.page), `[${evidence.bbox.join(", ")}]`]);
+    // UI-D (D-03): the reader names the document ("Untitled document" when this browser does not know its name), never its id.
+    await expect(inspector.locator(":scope > strong")).toHaveText("Untitled document");
+    await expect(inspector.locator(":scope > strong")).toHaveAttribute("title", /^Reference [0-9A-Z]+$/);
+    await expect(inspector.locator("dd")).toHaveText([/^ending [0-9A-Z-]+$/, String(evidence.page), `[${evidence.bbox.join(", ")}]`]);
+    await expect(inspector.locator("dd").first()).toHaveAttribute("title", evidence.sourceVersionId);
     await expect(inspector.locator("blockquote")).toHaveText(evidence.excerpt);
-    await expect(inspector.getByRole("group", { name: `Source ${evidence.sourceId}, page ${evidence.page}, exact evidence region`, exact: true })).toHaveAttribute("data-state", "ready");
+    await expect(inspector.getByRole("group", { name: `Untitled document, page ${evidence.page}, exact evidence region`, exact: true })).toHaveAttribute("data-state", "ready");
     const read = new URL(reads[reads.length - 1]);
     expect(read.pathname).toBe(`/api/documents/${evidence.sourceId}/source`);
     expect(read.searchParams.get("version")).toBe(evidence.sourceVersionId);

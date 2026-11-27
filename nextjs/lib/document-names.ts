@@ -74,6 +74,15 @@ export function displayName(documentId: string, names: DocumentNames, local?: st
   return names[documentId] ?? local ?? UNTITLED_DOCUMENT;
 }
 
+/**
+ * For a list where a person decides about each document and must tell two unnamed ones apart (the Library):
+ * the name, or "Untitled document" with its short reference beside it. Still never the id as the label.
+ */
+export function distinctDocumentName(documentId: string, names: DocumentNames, local?: string | null): string {
+  const reference = documentReference(documentId, names, local);
+  return reference ? `${UNTITLED_DOCUMENT} (${reference.replace(/^Reference /, "ref ")})` : displayName(documentId, names, local);
+}
+
 /** The tooltip for an unnamed document: its short reference. Undefined when the name is known, so no title is set. */
 export function documentReference(documentId: string, names: DocumentNames, local?: string | null): string | undefined {
   return names[documentId] ?? local ? undefined : `Reference ${shortHandle(documentId).replace(/^Source /, "")}`;

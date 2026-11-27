@@ -110,7 +110,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   if (rows.length === 0) return null;
   const effectiveFilter: Filter = filter === "attention" && counts.attention === 0 ? (counts.failed > 0 ? "failed" : "all") : filter;
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = rows.filter((row) => (effectiveFilter === "all" || statusOf(row) === effectiveFilter) && (!normalizedQuery || displayName(row.id, names, row.filename).toLowerCase().includes(normalizedQuery)));
+  const filtered = rows.filter((row) => (effectiveFilter === "all" || statusOf(row) === effectiveFilter) && (!normalizedQuery || displayName(row.id, names, row.filename).toLowerCase().includes(normalizedQuery) || (documentReference(row.id, names, row.filename) ?? "").toLowerCase().includes(normalizedQuery)));
   const visible = filtered.slice(0, visibleCount);
   const selectFilter = (next: Filter) => { setFilter(next); setVisibleCount(12); setExpandedId(next === "failed" ? firstFailed?.id ?? null : null); trackFunnel("source_filter_changed", { filter: next }); };
   const failedDetail = firstFailed?.stages.find((stage) => stage.state === "failed")?.detail ?? "";
