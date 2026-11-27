@@ -14,10 +14,10 @@ export const WORKSPACE_SOURCE_CHOICES = [
   { name: "Google Drive", availability: "Read-only", provider: "google_drive" },
   { name: "Dropbox", availability: "Read-only", provider: "dropbox" },
   { name: "OneDrive", availability: "Read-only", provider: "microsoft_graph" },
-  { name: "Local folder", availability: "Assisted setup", provider: null },
-  { name: "Amazon S3", availability: "Assisted setup", provider: null },
-  { name: "Cloudflare R2", availability: "Assisted setup", provider: null },
-  { name: "MinIO", availability: "Assisted setup", provider: null },
+  { name: "Local folder", availability: "Command-line agent", provider: null },
+  { name: "Amazon S3", availability: "Command-line agent", provider: null },
+  { name: "Cloudflare R2", availability: "Command-line agent", provider: null },
+  { name: "MinIO", availability: "Command-line agent", provider: null },
 ] as const;
 
 export type WorkspaceAccessSource = "owner" | "paid" | "trial" | "unentitled" | null;

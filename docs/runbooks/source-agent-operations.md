@@ -64,9 +64,9 @@ The process prints one JSON result per completed cycle and sanitized retry/failu
 
 A permission error in a mounted-directory walk aborts reconciliation rather than turning unlisted files into deletions. Symbolic links are skipped, paths outside the selected root are refused, and file metadata is checked during hashing. Repeated/missing S3 continuation tokens abort the inventory.
 
-An empty inventory following a nonempty one is refused by default, protecting against an unavailable mount or unexpected listing. `--allow-empty-snapshot` permits this deletion/suspension batch only after the source is verified. It remains an operator decision, not automatic confirmation that every original file was deleted. The agent never deletes the customer's original files.
+An empty inventory following a nonempty one is refused by default, protecting against an unavailable mount or unexpected listing. `--allow-empty-snapshot` permits this batch of deletions only after the source is verified. It remains an operator decision, not automatic confirmation that every original file was deleted. The agent never deletes the customer's original files.
 
-The server decides how deleted sources are suspended. This change alone does not prove cache invalidation, derived-data deletion, backup erasure or instantaneous ACL revocation. S3 listing uses ETags as provider revision markers, not byte hashes; content is hashed after download. Offline and provider-delayed changes cannot be reflected instantly.
+A file deleted from the folder, or an object removed from the bucket, is recorded as deleted, but the document already uploaded is not removed or suspended yet: to remove it, a workspace owner or administrator requests its deletion, as the privacy notice at https://tavonel.com/privacy describes. An edited file is uploaded as a new document, and the earlier one stays until it is deleted the same way. This change alone does not prove cache invalidation, derived-data deletion, backup erasure or instantaneous ACL revocation. S3 listing uses ETags as provider revision markers, not byte hashes; content is hashed after download. Offline and provider-delayed changes cannot be reflected instantly.
 
 ## Offline verification
 

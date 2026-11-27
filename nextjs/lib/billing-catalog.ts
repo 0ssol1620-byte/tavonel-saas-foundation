@@ -24,6 +24,16 @@ import { readPageMeterCohort } from "./page-meter-cohort";
 /** The price book every plan below belongs to. A price id, a quote and a receipt name it. */
 export const PRICE_BOOK_VERSION = "PB-2026-11-V22";
 
+/*
+  WO-LF-0: what the local-folder bullet below means, in one sentence the pricing row and the
+  workspace gate both render. True today: the agent runs on Windows (local NTFS/ReFS) or Linux,
+  reads one chosen folder and uploads its new and changed documents on each run. Deleted files
+  are not reflected and macOS is refused (public/developer/source-agent-operations.md), so the
+  sentence names neither "sync" nor a platform the agent refuses.
+*/
+export const LOCAL_FOLDER_AGENT_SENTENCE =
+  "Every paid plan includes the local-folder upload agent: a command-line tool you run on Windows or Linux that uploads the documents in one folder you choose, then the new and changed ones each time it runs.";
+
 /** What a plan line can depend on. A capability enters DELIVERED only in the release commit that proves it (WO-CAT-7). */
 export type Capability =
   | "pcu_accepted_meter" | "kqu_meter" | "storage_meter" | "seat_cap"
@@ -68,7 +78,7 @@ export const BILLING_OFFERS = {
       "Compile your own worlds",
       "Evidence, Ask and signed export",
       "API and MCP access",
-      "Local-folder connections",
+      "Local-folder upload agent (Windows, Linux)",
     ],
     notYetSold: [],
   },
@@ -90,7 +100,7 @@ export const BILLING_OFFERS = {
       "Compile your own worlds",
       "Evidence, Ask and signed export",
       "API and MCP access",
-      "Local-folder connections",
+      "Local-folder upload agent (Windows, Linux)",
     ],
     notYetSold: [],
   },
@@ -110,7 +120,7 @@ export const BILLING_OFFERS = {
     features: [
       "3,000 standard pages",
       "Everything in Developer",
-      "Local-folder connections",
+      "Local-folder upload agent (Windows, Linux)",
     ],
     notYetSold: ["Per-member source permissions"],
   },
@@ -133,7 +143,7 @@ export const BILLING_OFFERS = {
     features: [
       "12,000 standard pages",
       "Everything in Team",
-      "Local-folder connections",
+      "Local-folder upload agent (Windows, Linux)",
     ],
     notYetSold: ["Per-member source permissions", "Organization policy and audit"],
   },
@@ -163,7 +173,7 @@ export const BILLING_OFFERS = {
       "Evidence, Ask and signed export",
       "API and MCP access",
       // 2026-11-10: the `connections` level. Only providers with a production OAuth app are named.
-      "Local-folder connections",
+      "Local-folder upload agent (Windows, Linux)",
     ],
     notYetSold: [],
   },
@@ -212,7 +222,7 @@ export const BILLING_OFFERS = {
       "2,500 standard pages",
       "Everything in Developer (2026-09 plan)",
       "Review queue and version history",
-      "Local-folder connections",
+      "Local-folder upload agent (Windows, Linux)",
     ],
     // Kept as main has it: `lib/v34/routes.test.ts` holds /teams exactly while this lists shared members.
     notYetSold: ["Shared members and roles", "Per-member source permissions"],

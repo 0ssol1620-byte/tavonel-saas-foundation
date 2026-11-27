@@ -36,7 +36,7 @@ describe("workspace source tiles", () => {
       const names = rendered.map(([name]) => name);
       for (const name of OAUTH_NAMES) expect(names).not.toContain(name);
       expect(names).toContain("Local folder");
-      expect(rendered.find(([name]) => name === "Local folder")![1]).toBe("Assisted setup");
+      expect(rendered.find(([name]) => name === "Local folder")![1]).toBe("Command-line agent");
     }
   });
 
