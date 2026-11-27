@@ -88,6 +88,8 @@ const FAILURE_COPY: Record<string, string> = {
   TRIAL_ARCHIVE_NOT_INCLUDED: "ZIP archives are not part of the free evaluation. Choose the files inside it instead.",
   TRIAL_FEATURE_NOT_INCLUDED: "This is not part of the free evaluation.",
   TRIAL_WORLD_LIMIT_REACHED: "Your free evaluation has already used its one World.",
+  /* WO-TRIAL-P0: earlier compiles each ended in a version that needs review, which cannot be activated. A person is the next step, not a plan. */
+  TRIAL_COMPILE_ATTEMPTS_EXHAUSTED: "Your free evaluation cannot start another compile: its earlier compiles each need review before they can be used, so nothing new was started. Write to support@tavonel.com and we will look at them with you.",
   TRIAL_LIMIT_REACHED: "Your free evaluation has reached one of its limits.",
   TRIAL_NOT_ACTIVE: "Your free evaluation has ended.",
   TRIAL_AI_ACCESS_CHECK_FAILED: "We could not check your free evaluation limits, so nothing ran. Try again in a minute.",

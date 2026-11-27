@@ -10,7 +10,10 @@ import {
   type ProductAccessLevel,
 } from "./billing-product-access";
 import { readAccessMode } from "./foundation-pilot";
+import { collectionCandidateKey } from "./immutable-keys";
+import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin";
+import { ACTIVE_WORLD_PAGE_MAX, listFoundationActiveWorlds } from "./world-store";
 
 const DEVICE_COOKIE = "tvnl_device";
 const DEVICE_ID = /^[a-f0-9]{32}$/;
@@ -249,11 +252,61 @@ export function trialFeatureBlocked(scope: string) {
   return scope.startsWith("connections:");
 }
 
+/*
+  WO-TRIAL-P0 (2026-11-27). A free evaluation whose compile settled `review_required` could never
+  activate it -- promote refuses it with `validatePromotableCollectionArtifact` -- and could not
+  compile again either, because this check counted that job as the evaluation's one World. The
+  customer was left with no World and no way forward.
+
+  A settled `review_required` job whose own candidate fails the promote route's predicate, and
+  whose collection has no active World, is therefore not a World. It is a spent attempt instead,
+  and attempts are bounded: compute is spent on each one. Everything else still counts as before
+  (`ready`, and every unfinished state, because an unfinished job may still become the World).
+  Owner decision (founder delegation): the owner may not override the review reasons.
+*/
+/** Compiles of one free evaluation that may end in a version nobody can activate. The third is refused. */
+export const TRIAL_NON_PROMOTABLE_COMPILE_LIMIT = 2;
+/** Rows read per check. A full page is not a complete answer, so it never allows. */
+const TRIAL_COMPILE_SCAN = 20;
+
+export type TrialCompileCapacity =
+  | { ok: false; code: string }
+  | { ok: true; allowed: true }
+  | { ok: true; allowed: false; code: "TRIAL_WORLD_LIMIT_REACHED" | "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED" };
+
+type TrialJobRow = { state?: unknown; collection_id?: unknown; candidate_manifest_digest?: unknown };
+
+/** true: this job's candidate can never be activated. false: count it as a World. null: could not read. */
+async function settledWithoutWorld(
+  workspaceKey: string,
+  row: TrialJobRow,
+  activeCollections: () => Promise<Set<string> | null>,
+): Promise<boolean | null> {
+  const collectionId = typeof row.collection_id === "string" ? row.collection_id : "";
+  const digest = typeof row.candidate_manifest_digest === "string" ? row.candidate_manifest_digest : "";
+  const key = digest.startsWith("sha256:") ? collectionCandidateKey(workspaceKey, collectionId, digest.slice(7)) : "";
+  // Nothing to read the verdict from: it keeps counting, which is the old answer.
+  if (!key) return false;
+  const active = await activeCollections();
+  if (!active) return null;
+  if (active.has(collectionId)) return false;
+  const signer = readR2SignerEnv();
+  if (!signer) return null;
+  // Loaded only here: every route that authorizes through developer-auth imports this module, and
+  // none of them needs the compiler's validator in its graph.
+  const [{ getWorkspaceCollectionCandidate }, { validatePromotableCollectionArtifact }] = await Promise.all([
+    import("./r2-objects"), import("./collection-download"),
+  ]);
+  const loaded = await getWorkspaceCollectionCandidate(signer, workspaceKey, key);
+  if (!loaded.ok) return null;
+  return validatePromotableCollectionArtifact(loaded.json, collectionId) === null;
+}
+
 export async function checkTrialCompileCapacity(
   workspaceKey: string,
   userId: string,
   idempotencyKey?: string,
-) {
+): Promise<TrialCompileCapacity> {
   const trialResult = await getFoundationSelfServiceTrial(workspaceKey, userId);
   if (!trialResult.ok) return { ok: false as const, code: trialResult.code };
   if (!trialResult.trial || trialResult.trial.status !== "trialing") return { ok: true as const, allowed: true };
@@ -280,14 +333,40 @@ export async function checkTrialCompileCapacity(
   const policyRows = await policyResponse.json().catch(() => []) as Array<{ world_limit?: unknown }>;
   const limit = Number(policyRows[0]?.world_limit ?? 1);
 
+  const worldLimit = Math.max(1, limit);
+
   const jobs = new URLSearchParams({
-    select: "job_id,state",
+    select: "job_id,state,collection_id,candidate_manifest_digest",
     workspace_key: `eq.${workspaceKey}`,
-    limit: "20",
+    state: "not.in.(failed,cancelled)",
+    order: "created_at.asc",
+    limit: String(TRIAL_COMPILE_SCAN),
   });
   const response = await supabaseAdminRequest(config, `/rest/v1/foundation_compile_jobs?${jobs}`, { signal: AbortSignal.timeout(5_000) });
   if (!response.ok) return { ok: false as const, code: "TRIAL_COMPILE_CHECK_FAILED" };
-  const rows = await response.json().catch(() => []) as Array<{ state?: unknown }>;
-  const worldBearing = rows.filter((row) => !["failed", "cancelled"].includes(String(row.state ?? ""))).length;
-  return { ok: true as const, allowed: worldBearing < Math.max(1, limit) };
+  const rows = await response.json().catch(() => null) as TrialJobRow[] | null;
+  if (!Array.isArray(rows)) return { ok: false as const, code: "TRIAL_COMPILE_CHECK_FAILED" };
+
+  const review = rows.filter((row) => row?.state === "review_required");
+  let worldBearing = rows.length - review.length;
+  let spentAttempts = 0;
+  if (worldBearing >= worldLimit) return { ok: true as const, allowed: false, code: "TRIAL_WORLD_LIMIT_REACHED" };
+
+  let active: Promise<Set<string> | null> | null = null;
+  const activeCollections = () => active ??= listFoundationActiveWorlds(workspaceKey, { limit: ACTIVE_WORLD_PAGE_MAX })
+    .then((read) => read.ok && read.nextCursor === null ? new Set(read.worlds.map((world) => world.collectionId)) : null);
+  // At most worldLimit + TRIAL_NON_PROMOTABLE_COMPILE_LIMIT candidate reads: every row moves one counter.
+  for (const row of review) {
+    const dead = await settledWithoutWorld(workspaceKey, row, activeCollections);
+    if (dead === null) return { ok: false as const, code: "TRIAL_COMPILE_CHECK_FAILED" };
+    if (dead) spentAttempts += 1;
+    else worldBearing += 1;
+    if (worldBearing >= worldLimit) return { ok: true as const, allowed: false, code: "TRIAL_WORLD_LIMIT_REACHED" };
+    if (spentAttempts >= TRIAL_NON_PROMOTABLE_COMPILE_LIMIT) {
+      return { ok: true as const, allowed: false, code: "TRIAL_COMPILE_ATTEMPTS_EXHAUSTED" };
+    }
+  }
+  // Every refusal above only grows with more rows; an allow read from a full page may be wrong.
+  if (rows.length >= TRIAL_COMPILE_SCAN) return { ok: false as const, code: "TRIAL_COMPILE_CHECK_FAILED" };
+  return { ok: true as const, allowed: true };
 }
