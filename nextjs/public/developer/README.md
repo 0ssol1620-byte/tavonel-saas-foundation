@@ -34,26 +34,13 @@ foreach ($asset in $channel.assets.PSObject.Properties.Value) {
 "pinned version: $($channel.version)"
 ```
 
-**Verify the signature.** `channel.json` is signed: `channel.json.sig` is an
-Ed25519 signature over it, and `channel-trust.json` publishes the channel key.
-`tavonel-cli.mjs` carries that key's fingerprint compiled in, so check a new
-download with the CLI you already hold, not with the one you just fetched:
-
-```bash
-mkdir download && cd download
-curl -fsS -O https://tavonel.com/developer/channel.json \
-  -O https://tavonel.com/developer/channel.json.sig \
-  -O https://tavonel.com/developer/channel-trust.json
-jq -r '.assets[].url' channel.json | xargs -n1 curl -fsS -O
-node ../tavonel-cli.mjs verify-channel .
-```
-
-It checks the signature, then every file's SHA-256, reads no network and
-prints `CHANNEL_VERIFIED`. Any other outcome exits non-zero with a reason
-(`CHANNEL_SIGNATURE_INVALID`, `CHANNEL_KEY_UNKNOWN`, `CHANNEL_ASSET_MISMATCH`,
-...): keep the files you have and do not run the download. A first install has
-no earlier CLI to check with; the digest check above is its check, and every
-update after it is checked by the CLI you kept.
+**Check the download.** This channel is not signed yet: there is no `channel.json.sig`
+and no `channel-trust.json`, and `tavonel-cli.mjs` pins no channel key, so
+`node tavonel-cli.mjs verify-channel` stops with `CHANNEL_TRUST_NOT_PINNED`. The check
+you have today is the digest check above: `channel.json` lists the SHA-256 of every
+file, and the commands above refuse a file that does not match. Keep the files you
+have and do not run a download that fails that check. Signature verification will be
+added when a channel key is published; until then do not treat a download as signed.
 
 **Pin.** `node tavonel-cli.mjs --version` prints the distribution version
 compiled into the file you hold; keep the file and its digest and you are

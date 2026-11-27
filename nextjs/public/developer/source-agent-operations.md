@@ -24,7 +24,10 @@ Mounted sync applies the same exclusion policy the dry-run plan reports, before 
 
 The same policy is applied to a pending journal before it is replayed. An entry saved by an earlier agent version that the policy now excludes is dropped before anything is read or sent, and the result counts the dropped entries under `journalFiltered`; the rest of the saved set replays as it was saved. If such a file is in an upload set that was already sent for approval, the cycle stops for review instead and tells you to delete the journal and rerun.
 
-This applies to mounted folders. Sync from an S3-compatible bucket does not filter by these names yet.
+This applies to mounted folders and to S3-compatible buckets alike. For a bucket the policy is applied to every
+`/`-separated part of the object key, in any letter case, before the object is listed as an event or read. Folder names
+such as `.env/`, `passwords/` and `secrets/` are not excluded by name, and a bucket has no `.tavonelignore`; keep such
+objects out of the prefix you point the agent at.
 
 The inventory holds only supported document and image types. A supported file that is empty or larger than 5,242,880 bytes is skipped on this machine: the cycle result counts it under `skippedLocally` and carries on. A file that was synced before and is now empty or too large keeps its synced version; it is not reported as deleted.
 
