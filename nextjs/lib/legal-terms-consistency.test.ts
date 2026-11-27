@@ -139,8 +139,9 @@ describe("the old drafts are archived everywhere they are reachable", () => {
 
   it("the in-place notice no longer calls the pages Draft v1 beside a versioned agreement", async () => {
     const { LEGAL_DRAFT_NOTICE, LEGAL_LAST_UPDATED } = await import("./operations");
-    // P2-34 (D-21) changed /privacy and /subprocessors on 2026-10-19, and GX-03 changed them again on 2026-11-09.
-    expect(LEGAL_LAST_UPDATED).toBe("2026-11-09");
+    // P2-34 (D-21) changed /privacy and /subprocessors on 2026-10-19, GX-03 changed them again on 2026-11-09,
+    // and WO-LF-0 changed /privacy's deletion paragraph (local-folder agent) on 2026-11-27.
+    expect(LEGAL_LAST_UPDATED).toBe("2026-11-27");
     expect(LEGAL_DRAFT_NOTICE).not.toContain("Draft v1");
     expect(LEGAL_DRAFT_NOTICE).toContain("versioned self-service terms and processing addendum");
   });
