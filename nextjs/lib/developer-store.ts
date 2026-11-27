@@ -588,6 +588,45 @@ export async function revokeFoundationConnection(workspaceKey: string, connectio
   }
 }
 
+const SOURCE_BINDING_ERRORS: ReadonlyArray<readonly [string, string]> = [
+  ["connection_batch_contract_invalid", "CONNECTION_BATCH_INVALID"],
+  ["connection_batch_source_unadmitted", "CONNECTION_SOURCE_NOT_ADMITTED"],
+  ["connection_batch_source_invalid", "CONNECTION_SOURCE_MISMATCH"],
+  ["connection_batch_source_unavailable", "CONNECTION_SOURCE_UNAVAILABLE"],
+  ["connection_batch_source_conflict", "CONNECTION_SOURCE_CONFLICT"],
+];
+
+const CONNECTION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * The upload capability and confirm refusal for a connection's agent (WO-LF-2): null admits.
+ * An absent `connectionId` is today's upload, unchanged. A present one is read on every call: revoked
+ * or paused is 423, and a connection of another workspace or a missing one answers exactly the same.
+ */
+export async function uploadConnectionRefusal(workspaceKey: string, connectionId: unknown): Promise<
+  { status: 400 | 423 | 503; code: "CONNECTION_ID_INVALID" | "CONNECTION_NOT_SYNCABLE" | "CONNECTION_STATE_UNAVAILABLE" } | null
+> {
+  if (connectionId === undefined) return null;
+  if (typeof connectionId !== "string" || !CONNECTION_UUID.test(connectionId)) return { status: 400, code: "CONNECTION_ID_INVALID" };
+  const config = readSupabaseAdminConfig();
+  if (!config) return { status: 503, code: "CONNECTION_STATE_UNAVAILABLE" };
+  const query = new URLSearchParams({
+    select: "status", connection_id: `eq.${connectionId.toLowerCase()}`, workspace_key: `eq.${workspaceKey}`, limit: "1",
+  });
+  try {
+    const response = await supabaseAdminRequest(config, `/rest/v1/foundation_connections?${query}`);
+    if (!response.ok) return { status: 503, code: "CONNECTION_STATE_UNAVAILABLE" };
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows) || rows.length > 1) return { status: 503, code: "CONNECTION_STATE_UNAVAILABLE" };
+    // The batch's own rule: revoked and paused are not syncable; pending (before the first batch) is.
+    const status = (rows[0] as { status?: unknown } | undefined)?.status;
+    if (status === "pending" || status === "active" || status === "error") return null;
+    return { status: 423, code: "CONNECTION_NOT_SYNCABLE" };
+  } catch {
+    return { status: 503, code: "CONNECTION_STATE_UNAVAILABLE" };
+  }
+}
+
 export async function applyFoundationConnectionBatch(workspaceKey: string, connectionId: string, actor: { userId?: string; keyId?: string }, batch: ConnectionBatchInput) {
   const config = readSupabaseAdminConfig();
   if (!config) return { ok: false as const, code: "DEVELOPER_STORE_NOT_CONFIGURED" };
@@ -616,6 +655,8 @@ export async function applyFoundationConnectionBatch(workspaceKey: string, conne
       if (message.includes("connection_batch_approved_source_invalid") || message.includes("connection_batch_approved_source_unavailable")) {
         return { ok: false as const, code: "CONNECTION_BATCH_CONFLICT" };
       }
+      // 20261127110000: a local document is bound only as a confirmed upload of this workspace.
+      for (const [needle, code] of SOURCE_BINDING_ERRORS) if (message.includes(needle)) return { ok: false as const, code };
       return { ok: false as const, code: "CONNECTION_BATCH_FAILED" };
     }
     return { ok: true as const, result: await response.json() as Record<string, unknown> };

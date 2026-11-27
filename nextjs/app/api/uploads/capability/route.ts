@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { activationPolicy } from "@/lib/activation-policy";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { uploadConnectionRefusal } from "@/lib/developer-store";
 import { reserveFoundationCompute, reserveFoundationIntakeApprovedFile, readFoundationIntakeApproval } from "@/lib/compute-reservation";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { reserveFoundationIntake } from "@/lib/intake-admission";
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
   const body = parsed.value as {
     originalFilename?: unknown; declaredMimeType?: unknown; requestedBytes?: unknown; estimatedPages?: unknown;
     attemptKey?: unknown; scopeDigest?: unknown; pricingFingerprint?: unknown; fileKey?: unknown; contentSha256?: unknown;
+    connectionId?: unknown;
   };
 
   const originalFilename = typeof body.originalFilename === "string" ? body.originalFilename : "";
@@ -90,6 +92,10 @@ export async function POST(request: Request) {
   if (!await canAdmitCustomerSource(workspaceId, "direct_upload")) {
     return NextResponse.json({ code: "CUSTOMER_DATA_NOT_ENABLED_FOR_WORKSPACE" }, { status: 403, headers: NO_STORE });
   }
+  // A connection's agent names its connection; once it is revoked or paused nothing more is admitted
+  // through it. No connectionId is today's upload, unchanged.
+  const connection = await uploadConnectionRefusal(workspaceId, body.connectionId);
+  if (connection) return NextResponse.json({ code: connection.code }, { status: connection.status, headers: NO_STORE });
   if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) {
     return legacyCapability(request, {
       workspaceId, userId: auth.principal.userId, requestedBytes, estimatedPages: body.estimatedPages,

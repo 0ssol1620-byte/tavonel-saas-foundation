@@ -75,7 +75,8 @@ export type CustomerSourceDeletionStatus = {
   deletionId: string;
   workspaceKey: string;
   documentId: string;
-  reason: "customer_requested" | "retention_expired";
+  // source_removed: the file left a local-folder connection (20261127110000).
+  reason: "customer_requested" | "retention_expired" | "source_removed";
   requestedAt: string;
   eligibleAt: string;
   requestManifestSha256: string | null;
@@ -153,7 +154,7 @@ function deletionStatus(value: unknown, workspaceKey: string, documentId: string
   const optionalSha = (v: unknown) => v === null || (typeof v === "string" && SHA256.test(v));
   if (!SHA256.test(row.deletionId ?? "") || row.workspaceKey !== workspaceKey
     || String(row.documentId).toLowerCase() !== documentId.toLowerCase()
-    || (row.reason !== "customer_requested" && row.reason !== "retention_expired")
+    || (row.reason !== "customer_requested" && row.reason !== "retention_expired" && row.reason !== "source_removed")
     || !Number.isFinite(Date.parse(row.requestedAt)) || !Number.isFinite(Date.parse(row.eligibleAt))
     || !SHA256.test(row.tombstoneReceiptId ?? "") || !optionalSha(row.requestManifestSha256)
     || !optionalSha(row.inventoryManifestSha256)

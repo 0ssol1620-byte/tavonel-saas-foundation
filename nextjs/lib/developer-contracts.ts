@@ -48,6 +48,14 @@ export type ConnectionEvent = {
   mimeType: string | null;
   documentId: string | null;
   sourceIdempotencyKey: string | null;
+  /**
+   * Deleted events only, optional. "deleted": the file is gone from the folder -- the server suspends
+   * access and records legal-hold-gated deletion receipts. "out_of_scope": the file still exists but
+   * the client's scope no longer covers it -- access is suspended, bytes are kept. Absent (every
+   * client before LF-1): treated as "out_of_scope". Present only when sent, so the manifest of a
+   * batch without it is byte-identical to before.
+   */
+  removal?: "deleted" | "out_of_scope";
 };
 
 export type ConnectionBatchInput = {
@@ -124,6 +132,7 @@ export async function parseConnectionBatchInput(value: unknown, workspaceKey?: s
   if (!SHA256.test(String(value.nextCursorSha256 ?? "")) || !SHA256.test(String(value.manifestSha256 ?? ""))) return null;
   if (!Array.isArray(value.events) || value.events.length > 5_000 || JSON.stringify(value.events).length > 1_048_576) return null;
   const events: ConnectionEvent[] = [];
+  const nativeIds = new Set<string>();
   for (const raw of value.events) {
     if (!isPlainObject(raw) || !(["added", "changed", "deleted"] as unknown[]).includes(raw.kind)) return null;
     const nativeId = typeof raw.nativeId === "string" ? raw.nativeId : "";
@@ -144,7 +153,15 @@ export async function parseConnectionBatchInput(value: unknown, workspaceKey?: s
       if (await deterministicSourceDocumentId(workspaceKey, sourceIdempotencyKey!) !== documentId) return null;
     }
     if (raw.kind === "deleted" && (contentSha256 !== null || sizeBytes !== null || mimeType !== null || documentId !== null || sourceIdempotencyKey !== null)) return null;
-    events.push({ kind: raw.kind, nativeId, revision, contentSha256, sizeBytes, mimeType, documentId, sourceIdempotencyKey } as ConnectionEvent);
+    // One event per source per batch: the server applies them in order and a repeat would be ambiguous.
+    if (nativeIds.has(nativeId)) return null;
+    nativeIds.add(nativeId);
+    const event = { kind: raw.kind, nativeId, revision, contentSha256, sizeBytes, mimeType, documentId, sourceIdempotencyKey } as ConnectionEvent;
+    if ("removal" in raw) {
+      if (raw.kind !== "deleted" || (raw.removal !== "deleted" && raw.removal !== "out_of_scope")) return null;
+      event.removal = raw.removal;
+    }
+    events.push(event);
   }
   const manifestSha256 = String(value.manifestSha256);
   if (await sha256Prefixed(canonicalJson(events)) !== manifestSha256) return null;
