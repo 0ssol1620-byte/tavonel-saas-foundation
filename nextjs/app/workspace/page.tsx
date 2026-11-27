@@ -15,7 +15,7 @@ import { billingCardHeading, type BillingStatusAccount, type EntitlementWaitResu
 import { formatCount, formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
-import { BILLING_OFFERS, type BillingOfferCode } from "@/lib/billing-catalog";
+import { BILLING_OFFERS, LOCAL_FOLDER_AGENT_SENTENCE, type BillingOfferCode } from "@/lib/billing-catalog";
 import { parsePublicStatusV2 } from "@/lib/public-status-contract";
 import { putWithProgress } from "@/lib/upload-transfer";
 import {
@@ -4476,8 +4476,8 @@ export default function WorkspacePage() {
                 : customerDataAccess === "closed"
                 ? `Your account is ready, but source processing is closed. ${closedGate.sentence}`
                 : accessSource === "trial"
-                ? "Local-folder connections are included in every paid plan. The free evaluation works with files you upload directly."
-                : "Local-folder connections are included in every paid plan. This workspace has no active plan."}</p>
+                ? `${LOCAL_FOLDER_AGENT_SENTENCE} The free evaluation works with files you upload directly.`
+                : `${LOCAL_FOLDER_AGENT_SENTENCE} This workspace has no active plan.`}</p>
               <div className="billing-actions">{accessSource === null
                 ? <button className="btn" type="button" onClick={() => window.location.reload()}>Refresh access</button>
                 : customerDataAccess === "closed"

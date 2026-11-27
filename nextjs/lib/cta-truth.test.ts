@@ -521,7 +521,9 @@ describe("catalog v2: /pricing buys only what the server computed as purchasable
     const n = (value: number) => value.toLocaleString("en-US");
     for (const prices of ["both", "none"] as const) {
       const html = decode(await pricingHtml({ delivered: true, prices }));
-      const row = /What differs by plan\s*([^\n]*?Every paid plan includes local-folder connections\.)/.exec(html)?.[1];
+      // WO-LF-0: the row ends on the local-folder agent sentence (Windows, Linux; new and changed documents), not "connections".
+      const row = /What differs by plan\s*([^\n]*?Every paid plan includes the local-folder upload agent: a command-line tool you run on Windows or Linux that uploads the documents in one folder you choose, then the new and changed ones each time it runs\.)/.exec(html)?.[1];
+      expect(html).not.toContain("local-folder connections");
       expect(row, `${prices}: the row is rendered`).toBeDefined();
       expect(row).toContain(`${developer.label} differs from ${personal.label} in its monthly knowledge queries: ${n(developer.included.kqu)} KQU against ${n(personal.included.kqu)}.`);
       expect(row).toContain(`${n(team.includedPages)} and ${n(business.includedPages)} pages, ${n(team.included.seats)} and ${n(business.included.seats)} seats`);

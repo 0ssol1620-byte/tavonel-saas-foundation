@@ -14,6 +14,7 @@ import { ProcessingTermsDialog } from "@/components/processing-consent-panel";
 import { ENTITLEMENT_PENDING_SENTENCE, type EntitlementWaitResult } from "@/lib/entitlement-wait";
 import {
   BILLING_OFFERS,
+  LOCAL_FOLDER_AGENT_SENTENCE,
   METER_RATES_USD,
   PRICE_BOOK_EXTRA,
   REFUND_MAX_CONSUMED_FRACTION,
@@ -337,7 +338,7 @@ function glanceRows(planCapabilities: readonly PlanCapabilityRow[], selfServiceE
     // catalog's; connections are a paid-plan level (a trial is refused with TRIAL_FEATURE_NOT_INCLUDED).
     [
       "What differs by plan",
-      `${DEVELOPER.label} differs from ${PERSONAL.label} in its monthly knowledge queries: ${grouped(DEVELOPER.included.kqu)} KQU against ${grouped(PERSONAL.included.kqu)}. ${TEAM.label} and ${BUSINESS.label} add included pages and seats: ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} pages, ${grouped(TEAM.included.seats)} and ${grouped(BUSINESS.included.seats)} seats. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. Every paid plan includes local-folder connections.`,
+      `${DEVELOPER.label} differs from ${PERSONAL.label} in its monthly knowledge queries: ${grouped(DEVELOPER.included.kqu)} KQU against ${grouped(PERSONAL.included.kqu)}. ${TEAM.label} and ${BUSINESS.label} add included pages and seats: ${grouped(TEAM.includedPages)} and ${grouped(BUSINESS.includedPages)} pages, ${grouped(TEAM.included.seats)} and ${grouped(BUSINESS.included.seats)} seats. ${inWords(activationPlans)} reach World activation — activating a candidate and rolling one back — as the workspace owner. ${LOCAL_FOLDER_AGENT_SENTENCE}`,
     ],
     [
       "What does not consume pages",
