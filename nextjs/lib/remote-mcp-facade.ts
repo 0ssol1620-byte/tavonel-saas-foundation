@@ -103,6 +103,20 @@ const FETCH_OUTPUT_SCHEMA = {
         evidence_ids: STRING_LIST,
         known_at: { type: ["string", "null"] },
         untrusted_content: { type: "boolean", const: true },
+        // Present only when the id names one page of a longer evidence (WO-MCP-FETCH-2).
+        matched_bbox: { type: "array", items: { type: "number" }, minItems: 4, maxItems: 4 },
+        continuation: {
+          type: "object",
+          properties: {
+            page: { type: "integer", minimum: 1 },
+            page_count: { type: "integer", minimum: 1 },
+            complete: { type: "boolean" },
+            previous_id: { type: ["string", "null"], pattern: "^tvr_[A-Za-z0-9_-]+$" },
+            next_id: { type: ["string", "null"], pattern: "^tvr_[A-Za-z0-9_-]+$" },
+          },
+          required: ["page", "page_count", "complete", "previous_id", "next_id"],
+          additionalProperties: false,
+        },
       },
       required: ["world_id", "manifest_digest", "source_version_ids", "pages", "bboxes", "evidence_ids", "known_at", "untrusted_content"],
       additionalProperties: false,
