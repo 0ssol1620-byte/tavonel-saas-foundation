@@ -178,7 +178,10 @@ test("empty workspace does not render an empty processing panel", async ({ page 
   await page.route("**/api/billing/status", route => route.fulfill({ json: { account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", creditBalance: 0, lifetimeCreditsPurchased: 0, lifetimeCreditsReversed: 0, billingHold: false, paddleCustomerId: null, subscriptionCancelAt: null, updatedAt: null } } }));
   await page.goto("/workspace");
   await expect(page.locator(".board")).toHaveCount(0);
-  await expect(page.getByText("Free evaluation")).toBeVisible();
+  // The access strip names the evaluation; the drop zone states its allowance (WO-FIRST5-P1), which also
+  // says "free evaluation", so the strip is matched exactly and the allowance line on its own.
+  await expect(page.getByText("Free evaluation", { exact: true })).toBeVisible();
+  await expect(page.locator(".workspace-intake-limits")).toContainText("Your free evaluation covers 3 files and 50 pages in total, compiled into 1 World.");
   await expect(page.getByText(/3 files · 50 pages · 1 World/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Connections" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Developer" })).toHaveCount(0);

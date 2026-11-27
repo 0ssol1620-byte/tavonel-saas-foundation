@@ -449,9 +449,17 @@ describe("first five minutes, P1", () => {
     const format = (iso: string) => `<${iso}>`;
     expect(aiLastRequestSentence({ lastUsedAt: "2026-11-27T10:30:00Z" }, format)).toBe("Last request from your AI: <2026-11-27T10:30:00Z>.");
     expect(aiLastRequestSentence({ lastUsedAt: null }, format)).toBe("Your AI is connected and has not made a request yet.");
-    // Read on Use with AI, only by an account the listing answers, and never left over from another surface.
-    expect(page).toContain('if (surface !== "ask" || !(accessSource === "owner" || accessSource === "paid" || (accessSource === "trial" && trialAiAccess))) {');
-    expect(page).toContain("const read = response.ok ? lastAiRequest(await response.json().catch(() => null)) : null;");
+    // Only by an account the listing answers, and never left over from another surface.
+    expect(page).toContain('const aiRequestReadable = accessSource === "owner" || accessSource === "paid" || (accessSource === "trial" && trialAiAccess);');
+    expect(page).toContain("useEffect(() => { setAiLastRequest(null); }, [surface, accessSource, trialAiAccess]);");
+    expect(page).toContain('return response.ok ? lastAiRequest(await response.json().catch(() => null)) : null;');
+    // Lazy: the page's one key-listing read lives in the check, and the check runs only from its button,
+    // so no workspace load or surface (Ask included) reads the listing before the customer asks.
+    expect(page.split('fetch("/api/developer/keys"')).toHaveLength(2);
+    const check = page.slice(page.indexOf("const checkAiLastRequest = async () => {"));
+    expect(check.indexOf('fetch("/api/developer/keys"')).toBeLessThan(check.indexOf("\n  };\n"));
+    expect(page.match(/checkAiLastRequest\(/g)).toEqual(["checkAiLastRequest("]);
+    expect(page).toContain("onClick={() => void checkAiLastRequest()}");
   });
 
   it("keeps citation ids, the box and the scores under a native disclosure, the excerpt first", () => {
