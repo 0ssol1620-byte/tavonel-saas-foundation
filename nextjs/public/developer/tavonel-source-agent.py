@@ -1490,12 +1490,29 @@ class _HeldRoot:
 _SYSTEM_TREES_POSIX = ("/bin", "/boot", "/dev", "/etc", "/lib", "/lib32", "/lib64", "/libx32", "/proc", "/run", "/sbin", "/snap", "/sys", "/usr", "/var")
 
 
+def _comparable_path(path: Path | str) -> Path:
+    r"""One spelling per directory: no \\?\ or \\?\UNC\ prefix, long names for 8.3 short names, no trailing separator."""
+    text = os.fspath(path)
+    if os.name == "nt":
+        if text[:8].upper() == "\\\\?\\UNC\\":
+            text = "\\\\" + text[8:]
+        elif text.startswith(("\\\\?\\", "\\\\.\\")):
+            text = text[4:]
+        # realpath follows the final path the volume reports, which expands short names.
+        text = os.path.realpath(text)
+        if text.startswith("\\\\?\\") and text[5:7] == ":\\":
+            text = text[4:]
+    return Path(text)
+
+
 def refused_root(path: Path) -> str | None:
     """Why a resolved directory is never a sync root: a whole volume, the home directory itself, or a system tree."""
+    # The same directory may be named with an extended-length prefix or a short name; compare one spelling.
+    path = _comparable_path(path)
     if path.parent == path or os.path.ismount(path):
         return "a volume root"
     try:
-        home = Path.home().resolve()
+        home = _comparable_path(Path.home().resolve())
     except (RuntimeError, KeyError, OSError) as error:
         raise AgentError("the home directory can't be determined, so --root can't be checked; nothing was listed or read") from error
     if path == home or path == home.parent:
@@ -1505,7 +1522,7 @@ def refused_root(path: Path) -> str | None:
     else:
         trees = list(_SYSTEM_TREES_POSIX)
     for tree in filter(None, trees):
-        if path.is_relative_to(Path(tree)):
+        if path.is_relative_to(_comparable_path(tree)):
             return "a system directory"
     return None
 
@@ -2379,6 +2396,89 @@ def run_cloud_plan(args: argparse.Namespace, *, emit=print) -> int:
     return 0 if plan["scanComplete"] else 2
 
 
+def cursor_sha256(files: dict[str, Any], provider: str) -> str:
+    """The cursor is a hash of what the server sees of each file; local hashing metadata is not part of it."""
+    return "sha256:" + sha256(canonical({"provider": provider, "files": {
+        native_id: {"revision": item["revision"], "sizeBytes": item["sizeBytes"], "mimeType": item["mimeType"]}
+        for native_id, item in files.items()
+    }}))
+
+
+def _root_ignore(root: _HeldRoot) -> tuple[str, ...]:
+    """The root's .tavonelignore patterns, read the way the walk reads them, for a cycle that replays instead of walking."""
+    try:
+        os.lstat(root.path / IGNORE_FILE_NAME)
+    except FileNotFoundError:
+        return ()
+    except OSError as error:
+        raise AgentError(f"{IGNORE_FILE_NAME} could not be checked; nothing was read or sent") from error
+    return _read_ignore_file(root.backend, root.handle)
+
+
+def filter_replayed_journal(pending_path: Path, pending: dict[str, Any], root: _HeldRoot) -> dict[str, object]:
+    """Apply the current policy to a pending journal before any of it is replayed (WO-LF-1 r2).
+
+    A journal saved by an older agent (or under an older .tavonelignore) can name files the
+    policy now excludes. They are dropped before any request, open or hash; everything else
+    replays with its saved batch, attempt, file keys and document identities, and the cursor is
+    recomputed over what is kept. An excluded file already in a posted or saved approval can't be
+    dropped from that approval, so that set is refused for review and nothing is read or sent.
+    """
+    ignore = _root_ignore(root)
+    fingerprint = scope_policy_fingerprint(ignore)
+    files = pending["files"]
+    body = pending.get("body")
+    intake = pending.get("intake")
+    batch = body if isinstance(body, dict) else intake
+
+    def excluded(native_id: object) -> bool:
+        return isinstance(native_id, str) and out_of_scope(native_id, ignore) is not None
+
+    dropped_files = {native_id for native_id in files if excluded(native_id)}
+    kept_events = [event for event in batch["events"] if not (isinstance(event, dict) and excluded(event.get("nativeId")))]
+    dropped_members: list[str] = []
+    if body is None:
+        dropped_members = [key for key, member in intake["members"].items() if excluded(member.get("nativeId"))]
+        posted = (intake["approvalPosted"] and not intake.get("perFile")) or intake["approval"] is not None
+        if dropped_members and posted:
+            raise ReviewRequiredError(
+                f"the saved upload set holds {len(dropped_members)} file(s) this agent's exclusion policy excludes, and "
+                f"the set was already sent for approval; nothing was read or uploaded. {DISCARD_HINT}"
+            )
+    dropped_events = len(batch["events"]) - len(kept_events)
+    if not (dropped_files or dropped_events or dropped_members):
+        if pending.get("policyFingerprint") != fingerprint:
+            pending["policyFingerprint"] = fingerprint
+            write_journal(pending_path, pending)
+        return {}
+    kept_files = {native_id: item for native_id, item in files.items() if native_id not in dropped_files}
+    pending["files"] = kept_files
+    pending["policyFingerprint"] = fingerprint
+    batch["events"] = kept_events
+    batch["nextCursorSha256"] = cursor_sha256(kept_files, "file_server")
+    if body is not None:
+        body["manifestSha256"] = "sha256:" + sha256(canonical(kept_events))
+    elif dropped_members:
+        for key in dropped_members:
+            del intake["members"][key]
+        intake["manifest"] = [entry for entry in intake["manifest"] if entry["fileKey"] in intake["members"]]
+        intake["clientManifestDigest"] = intake_manifest_digest(intake["manifest"])
+        # The saved quote priced the old set; the kept set is quoted again under the same attempt.
+        intake["quote"] = None
+        if not intake["manifest"]:
+            pending["body"] = {
+                "batchId": intake["batchId"],
+                "previousCursorSha256": intake["previousCursorSha256"],
+                "nextCursorSha256": intake["nextCursorSha256"],
+                "manifestSha256": "sha256:" + sha256(canonical(kept_events)),
+                "events": kept_events,
+            }
+            del pending["intake"]
+    # Durable before the first request, so a retry replays the filtered journal, never the original.
+    write_journal(pending_path, pending)
+    return {"journalFiltered": {"droppedEvents": dropped_events, "droppedUploads": len(dropped_members)}}
+
+
 def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]:
     state = read_state(args.state, args.connection_id)
     previous = state["files"]
@@ -2403,6 +2503,7 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
             raise AgentError("pending journal scope binding is invalid")
         body = pending.get("body")
         files = pending.get("files")
+        replay_notes: dict[str, object] = {}
         if body is None and isinstance(pending.get("intake"), dict) and isinstance(files, dict):
             # An upload set that is not committed yet resumes under its saved attempt; nothing is rescanned.
             check_intake(pending["intake"], files)
@@ -2416,7 +2517,12 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
                     "the mounted root is not the object this pending upload set was quoted from; nothing was "
                     f"read, quoted or uploaded. Restore the original root, or {DISCARD_HINT}"
                 )
-            return approve_and_upload(args, client, pending_path, pending, resumed=True, root=root)
+            if root is not None:
+                replay_notes = filter_replayed_journal(pending_path, pending, root)
+                if pending.get("body") is not None:
+                    # Every upload member was excluded: what is left is a batch without uploads.
+                    return {**commit_pending(args, client, pending_path, pending), **replay_notes}
+            return {**approve_and_upload(args, client, pending_path, pending, resumed=True, root=root), **replay_notes}
         if not isinstance(body, dict) or not isinstance(files, dict) or not isinstance(body.get("events"), list):
             raise AgentError("pending journal contract is invalid")
         if body.get("manifestSha256") != "sha256:" + sha256(canonical(body["events"])):
@@ -2426,7 +2532,9 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
         elif state["serverCursorSha256"] != body.get("previousCursorSha256"):
             raise AgentError("pending journal cursor is not the current state")
         else:
-            return commit_pending(args, client, pending_path, pending)
+            if root is not None:
+                replay_notes = filter_replayed_journal(pending_path, pending, root)
+            return {**commit_pending(args, client, pending_path, pending), **replay_notes}
     cloud = None if root else s3_client(args)
     now = int(time.time())
     rehash_at = state.get("fullRehashAt")
@@ -2495,17 +2603,7 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
     committed.update({key: previous[key] for key in deferred if key in previous})
     if deferred:
         notes["remainingChanges"] = len(deferred)
-    cursor_files = {
-        native_id: {
-            "revision": item["revision"],
-            "sizeBytes": item["sizeBytes"],
-            "mimeType": item["mimeType"],
-        }
-        for native_id, item in committed.items()
-    }
-    next_cursor = "sha256:" + sha256(
-        canonical({"provider": "file_server" if root else "s3", "files": cursor_files})
-    )
+    next_cursor = cursor_sha256(committed, "file_server" if root else "s3")
     if uploads:
         # Every gate that needs no network runs before anything is quoted, held or read for upload.
         require_upload_approval(args, [(str(current[key]["mimeType"]), int(current[key]["sizeBytes"])) for key in uploads])

@@ -13,7 +13,9 @@ describe("source-agent offline durability and bounded watch", () => {
     // suite, measured 44.6-173.8 s on this machine, past vitest's 60 s worker RPC window, and the run then exits 1
     // on `[vitest-worker]: Timeout calling "onTaskUpdate"` with every test green. Same child, cap and assertion;
     // a non-zero exit or the cap still rejects and fails the test.
-    const child = promisify(execFile)(python, ["-m", "unittest", "discover", "-s", fileURLToPath(new URL("../scripts/source-agent", import.meta.url)), "-p", "test_*.py", "-v"], { encoding: "utf8", timeout: 240_000 });
+    // -B: no __pycache__ beside the published agent, which developer-distribution.test.ts would read as an
+    // unpinned asset (eol: unspecified) when both run in one vitest invocation (review TRAIN-3D r2 2-N8).
+    const child = promisify(execFile)(python, ["-B", "-m", "unittest", "discover", "-s", fileURLToPath(new URL("../scripts/source-agent", import.meta.url)), "-p", "test_*.py", "-v"], { encoding: "utf8", timeout: 240_000 });
     child.child.stdin?.end(); // stdin closed, as stdio "ignore" had it
     const { stdout: output } = await child;
     expect(output).not.toContain("FAILED");

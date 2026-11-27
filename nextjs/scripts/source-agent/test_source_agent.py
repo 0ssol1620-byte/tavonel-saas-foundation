@@ -2284,4 +2284,120 @@ class LocalFolderPolicyTests(SyncFixture, unittest.TestCase):
         self.assertFalse(self.args.state.exists())
         self.assertIsNone(agent.refused_root(self.root.resolve()))
 
+    @unittest.skipUnless(os.name == 'nt', 'extended-length and short names are Windows spellings')
+    def test_extended_length_short_and_case_spellings_of_refused_roots_are_refused(self):
+        # Review r2 B2: \\?\C:\Users\<name> was compared unnormalized and passed the refusal.
+        import ctypes
+        home = Path.home().resolve()
+        prefix = '\\\\?\\'
+        spellings = [prefix + str(home), prefix + str(home.parent), prefix + os.environ['SystemRoot'],
+                     prefix + os.environ['ProgramFiles'].lower() + '\\', str(home).upper() + '\\']
+        buffer = ctypes.create_unicode_buffer(1024)
+        if ctypes.windll.kernel32.GetShortPathNameW(os.environ['ProgramFiles'], buffer, 1024) and buffer.value != os.environ['ProgramFiles']:
+            spellings.append(buffer.value)  # an 8.3 name, where the volume keeps them
+        with patch.object(agent, '_traversal_backend', side_effect=AssertionError('root opened')):
+            for spelling in spellings:
+                with self.subTest(root=spelling):
+                    with self.assertRaisesRegex(agent.AgentError, 'may not be'):
+                        with agent._anchored_root(Path(spelling)):
+                            pass
+        self.assertIsNone(agent.refused_root(Path(prefix + str(self.root.resolve()))))
+
+    def old_agent_journal(self, *, upload_set=True, with_report=True, approval_posted=False):
+        """A pending journal in the exact shape the agent before WO-LF-1 wrote (train-3c `_sync`): every file of the
+        folder in `files` and in the events, unsupported ones with mimeType None, and no policyFingerprint."""
+        datas = dict(SECRETS)
+        if with_report:
+            datas['report.pdf'] = b'%PDF-1.4'
+        for name, data in datas.items():
+            self.write(name, data)
+        files = {name: {'revision': revision(data), 'sizeBytes': len(data), 'contentSha256': sha(data),
+                        'mimeType': agent.MIME_BY_SUFFIX.get(Path(name).suffix.lower())} for name, data in datas.items()}
+        events = [{'kind': 'added', 'nativeId': name, 'revision': files[name]['revision'], 'contentSha256': files[name]['contentSha256'],
+                   'sizeBytes': files[name]['sizeBytes'], 'mimeType': files[name]['mimeType'], 'documentId': None,
+                   'sourceIdempotencyKey': None} for name in sorted(files)]
+        cursor = 'sha256:' + agent.sha256(agent.canonical({'provider': 'file_server', 'files': {
+            name: {key: item[key] for key in ('revision', 'sizeBytes', 'mimeType')} for name, item in files.items()}}))
+        with agent._anchored_root(self.root) as held:
+            identity = held.identity()
+        pending = {'scopeFingerprint': agent.source_fingerprint(self.args, self.root.resolve()), 'connectionId': self.args.connection_id}
+        batch_id = str(uuid.uuid4())
+        if not upload_set:
+            pending.update(files=files, body={'batchId': batch_id, 'previousCursorSha256': None, 'nextCursorSha256': cursor,
+                                              'manifestSha256': 'sha256:' + agent.sha256(agent.canonical(events)), 'events': events})
+        else:
+            attempt = 'att_' + uuid.uuid4().hex
+            entries = {name: agent.intake_manifest_entry(name, files[name]) for name in sorted(files) if files[name]['mimeType']}
+            for event in events:
+                if event['nativeId'] in entries:
+                    event['sourceIdempotencyKey'] = agent.approved_source_idempotency_key(attempt, entries[event['nativeId']]['fileKey'])
+            manifest = sorted(entries.values(), key=lambda entry: entry['fileKey'])
+            intake = {'batchId': batch_id, 'previousCursorSha256': None, 'nextCursorSha256': cursor, 'events': events,
+                      'attemptKey': attempt, 'approveUpToCredits': 1, 'allowUnknownPageCount': True,
+                      'clientManifestDigest': agent.intake_manifest_digest(manifest), 'manifest': manifest,
+                      'members': {entry['fileKey']: {'nativeId': name, 'documentId': None, 'phase': 'planned'} for name, entry in entries.items()},
+                      'quote': None, 'approvalPosted': approval_posted, 'approvalBody': None, 'approval': None}
+            # The usual way such a journal is left behind: quoted above the caller's cap, then stopped for review.
+            intake['quote'] = agent.verify_quote(intake, quote_for({'clientManifestDigest': intake['clientManifestDigest'], 'files': manifest}))
+            pending.update(rootIdentity=identity, files=files, intake=intake)
+        self.pending().write_text(json.dumps(pending))
+        return pending
+
+    def test_an_old_agent_upload_journal_is_replayed_without_its_excluded_files(self):
+        # Review r2 B1: the replay used to upload passwords.xlsx and node_modules/x.pdf and send .env and id_rsa events.
+        journal = self.old_agent_journal()
+        quoted = []
+        real_quote = Client.quote
+        def quote(client, body):
+            quoted.append(body)
+            return real_quote(client, body)
+        with patch.object(Client, 'quote', quote), recorded_scan() as (_, read):
+            result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 2})
+        self.assertEqual([name for name, _ in Client.uploads], ['report.pdf'])
+        self.assertEqual(read, ['report.pdf'])  # the upload snapshot only: nothing excluded is opened
+        body = Client.bodies[-1]
+        self.assertEqual(body['batchId'], journal['intake']['batchId'])
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        saved_key = next(e['sourceIdempotencyKey'] for e in journal['intake']['events'] if e['nativeId'] == 'report.pdf')
+        self.assertEqual(body['events'][0]['sourceIdempotencyKey'], saved_key)  # the same attempt and file key replay
+        self.assertEqual([[entry['originalFilename'] for entry in q['files']] for q in quoted], [['report.pdf']])
+        sent = agent.canonical(Client.bodies) + agent.canonical(quoted) + self.args.state.read_text()
+        for marker in SECRET_MARKERS:
+            self.assertNotIn(marker, sent)
+        saved = json.loads(self.args.state.read_text())
+        self.assertEqual(list(saved['files']), ['report.pdf'])
+        self.assertEqual(saved['policyFingerprint'], agent.scope_policy_fingerprint(()))
+        kept = {'report.pdf': {key: journal['files']['report.pdf'][key] for key in ('revision', 'sizeBytes', 'mimeType')}}
+        self.assertEqual(saved['serverCursorSha256'], 'sha256:' + agent.sha256(agent.canonical({'provider': 'file_server', 'files': kept})))
+        self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+
+    def test_an_old_agent_commit_journal_is_replayed_without_its_excluded_events(self):
+        journal = self.old_agent_journal(upload_set=False)
+        result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 0})
+        body = Client.bodies[-1]
+        self.assertEqual((body['batchId'], body['previousCursorSha256']), (journal['body']['batchId'], None))
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertEqual(body['manifestSha256'], 'sha256:' + agent.sha256(agent.canonical(body['events'])))
+        self.assertEqual(Client.uploads, [])
+        for marker in SECRET_MARKERS:
+            self.assertNotIn(marker, agent.canonical(Client.bodies))
+
+    def test_an_old_agent_journal_whose_every_upload_is_excluded_commits_without_uploads(self):
+        journal = self.old_agent_journal(with_report=False)
+        result = agent.sync(self.args)
+        self.assertEqual(result['journalFiltered'], {'droppedEvents': 4, 'droppedUploads': 2})
+        self.assertEqual((Client.bodies[-1]['batchId'], self.events(), Client.uploads), (journal['intake']['batchId'], [], []))
+        self.assertEqual(json.loads(self.args.state.read_text())['files'], {})
+
+    def test_an_old_agent_journal_already_sent_for_approval_with_excluded_files_is_refused(self):
+        self.old_agent_journal(approval_posted=True)
+        before = self.pending().read_bytes()
+        with nothing_requested_or_read():
+            with self.assertRaisesRegex(agent.ReviewRequiredError, 'already sent for approval'):
+                agent.sync(self.args)
+        self.assertEqual(self.pending().read_bytes(), before)
+        self.assertFalse(self.args.state.exists())
+
 if __name__=='__main__':unittest.main()
