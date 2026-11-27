@@ -13,7 +13,7 @@ const { requireFoundationSession, revalidateFoundationSession } = vi.hoisted(() 
 vi.mock("@/lib/developer-auth", () => ({ requireFoundationSession, revalidateFoundationSession }));
 
 import { GET } from "@/app/api/developer/keys/route";
-import { olderKeysNote } from "@/components/developer-panel";
+import { keyStatusLine, olderKeysNote } from "@/components/developer-panel";
 import { DEVELOPER_INVENTORY_LIMIT, listDeveloperApiKeys } from "./developer-store";
 
 const WORKSPACE = "pilot-1234567890abcdef";
@@ -46,6 +46,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   delete process.env.NEXT_PUBLIC_SUPABASE_URL;
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 });
@@ -112,5 +113,35 @@ describe("DN-7 (2): the Developers inventory says when older keys exist", () => 
     const panel = readFileSync(resolve(import.meta.dirname, "../components/developer-panel.tsx"), "utf8");
     expect(panel).toContain("setOlderNote(olderKeysNote(json.truncated));");
     expect(panel).toContain("{olderNote ? <p className=\"world-empty\">{olderNote}</p> : null}");
+  });
+});
+
+// WO-MCP-REFRESH-2: with refresh on, a remote MCP connection is not shown as expiring with its one-hour key.
+describe("the Developers panel follows the refresh flag", () => {
+  const format = (iso: string) => `on ${iso.slice(0, 10)}`;
+  const mcpKey = { revokedAt: null, expiresAt: "2026-11-27T13:00:00.000Z", remoteMcp: true as const };
+  const handKey = { revokedAt: null, expiresAt: "2026-12-27T13:00:00.000Z" };
+
+  it("flag off: the route adds nothing and every status line is the one it always was", async () => {
+    sides = { live: { rows: rows(1), range: null }, mcp: { rows: rows(1), range: null } };
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "");
+    const { json } = await get();
+    expect("remoteMcpRefreshDays" in json).toBe(false);
+    expect(keyStatusLine(mcpKey, null, format)).toBe("Expires on 2026-11-27");
+    expect(keyStatusLine(handKey, null, format)).toBe("Expires on 2026-12-27");
+    expect(keyStatusLine({ revokedAt: null, expiresAt: null }, null, format)).toBe("No expiry");
+    expect(keyStatusLine({ ...mcpKey, revokedAt: "2026-11-27T00:00:00.000Z" }, null, format)).toBe("Revoked");
+  });
+
+  it("flag on: the route reports the real refresh window; only a live remote MCP connection stops showing the key expiry", async () => {
+    sides = { live: { rows: rows(1), range: null }, mcp: { rows: rows(1), range: null } };
+    vi.stubEnv("TAVONEL_REMOTE_MCP_REFRESH_ENABLED", "true");
+    const { json } = await get();
+    expect(json.remoteMcpRefreshDays).toBe(30);
+    expect(keyStatusLine(mcpKey, 30, format)).toBe("Renews while used · up to 30 days without use");
+    expect(keyStatusLine(handKey, 30, format)).toBe("Expires on 2026-12-27");
+    expect(keyStatusLine({ ...mcpKey, revokedAt: "2026-11-27T00:00:00.000Z" }, 30, format)).toBe("Revoked");
+    const panel = readFileSync(resolve(import.meta.dirname, "../components/developer-panel.tsx"), "utf8");
+    expect(panel).toContain("keyStatusLine(key, refreshDays,");
   });
 });
