@@ -44,10 +44,11 @@ import { V34_ROUTE_KEYS, v34Route } from "../lib/v34/routes";
 const V34_TITLE_WEIGHT = "500";
 /**
  * Every V34 registry path whose body is a V34 page; a route that lands on one is held to the V34 roles.
- * /pricing is a registry path whose body is still the retained pricing client (its own T2 root, a
- * Display 2 H1), so it is held to Display 2 like any retained page.
+ * /pricing is a registry path whose body is the retained pricing client, but since WO-UI-A1 its H1 is the V34
+ * sub-hero's (components/pricing-page-client.tsx renders <Hero variant="sub">), so it is held to the V34 roles
+ * like /contact. /evaluation is the one T2 page that is still a retained Display 2 page.
  */
-const V34_PATHS: ReadonlySet<string> = new Set(V34_ROUTE_KEYS.map((key) => v34Route(key).path).filter((path) => path !== "/pricing"));
+const V34_PATHS: ReadonlySet<string> = new Set(V34_ROUTE_KEYS.map((key) => v34Route(key).path));
 
 const TEMPLATES = {
   T0: ["/"],
@@ -278,7 +279,7 @@ for (const width of WIDTHS) test.describe(`type scale (UX-L3) at ${width}`, () =
 });
 
 /*
-  The failure path: each check fires on the defect it exists to catch. On Home and /pricing, a
+  The failure path: each check fires on the defect it exists to catch. On Home and /evaluation, a
   sibling H2 shrunk back to 24px, one element set in Geist, and one H1 set at the old 56px are each
   injected and must each be reported. A reading that cannot fail proves nothing.
 */
@@ -335,14 +336,15 @@ test.describe("the type-scale detector", () => {
   });
 
   test("reports an H1 that left the template's role", async ({ page }) => {
-    const pricing = await readRoute(page, "/pricing");
-    expect(h1Drift([{ route: "/pricing", h1: pricing.h1 }], pricing.displayTwo)).toEqual([]);
+    // /evaluation is the T2 page that is still a retained Display 2 page; /pricing moved to the V34 roles (WO-UI-A1).
+    const evaluation = await readRoute(page, "/evaluation");
+    expect(h1Drift([{ route: "/evaluation", h1: evaluation.h1 }], evaluation.displayTwo)).toEqual([]);
     await set(page, "main h1", "font-size", "56px");
     const drifted = await page.evaluate(read);
-    expect(h1Drift([{ route: "/pricing", h1: drifted.h1 }], drifted.displayTwo)).toEqual(["/pricing: H1 size 56px, expected 52px"]);
+    expect(h1Drift([{ route: "/evaluation", h1: drifted.h1 }], drifted.displayTwo)).toEqual(["/evaluation: H1 size 56px, expected 52px"]);
     // And pairwise, without the token: the same template, two different sizes.
-    expect(h1Drift([{ route: "/contact", h1: pricing.h1 }, { route: "/pricing", h1: drifted.h1 }])).toEqual([
-      "/pricing: H1 size 56px, expected 52px",
+    expect(h1Drift([{ route: "/contact", h1: evaluation.h1 }, { route: "/evaluation", h1: drifted.h1 }])).toEqual([
+      "/evaluation: H1 size 56px, expected 52px",
     ]);
   });
 });
