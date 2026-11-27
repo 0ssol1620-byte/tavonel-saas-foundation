@@ -242,7 +242,7 @@ async function search(request: Request, context: { params: Promise<{ id: string 
           : {}),
       },
       { status: conflict ? 409 : result.code === "RETRIEVAL_QUESTION_INVALID" ? 400
-        : result.code === DERIVED_DATA_REFUSED ? 403 : 503, headers: NO_STORE },
+        : result.code === DERIVED_DATA_REFUSED || result.code === "MEMBER_SOURCE_SCOPE_DENIED" ? 403 : 503, headers: NO_STORE },
     );
   }
 

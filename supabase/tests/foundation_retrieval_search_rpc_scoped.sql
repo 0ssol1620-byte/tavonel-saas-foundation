@@ -10,12 +10,14 @@
 -- pg_stat_xact_user_tables: seq_tup_read, idx_tup_fetch; and, on an index, idx_tup_read) count the
 -- tuples this backend has read from each relation so far in this transaction. pg_temp.examined(sql)
 -- sums them over the retrieval units and embeddings tables and every index on them, before and
--- after running sql. Each scoped function is measured, forty hidden units that match the query (with
--- embeddings) are then added to doc-2 in the same run, and the measurement is repeated: the two
--- numbers must be equal. The unscoped 0023 lexical RPC is measured the same way and must GROW, which
--- shows the instrument would have seen a scan that visited hidden rows.
+-- after running sql. Each scoped function is measured, then three batches of forty hidden units that
+-- match the query (with embeddings) are added to doc-2 in the same run, their ids sorting first, in
+-- the middle and last, with a measurement after each: all four numbers must be equal. The unscoped
+-- 0023 lexical RPC is measured the same way and must GROW at every step, which shows the instrument
+-- would have seen a scan that visited hidden rows. The counters count index entries RETURNED, not
+-- entries a btree visits and rejects inside one scan.
 begin;
-select plan(30);
+select plan(31);
 
 -- ---------------------------------------------------------------------------------------
 -- Existence, security posture, grants
@@ -160,7 +162,7 @@ begin
   return pg_temp.reads() - v_before;
 end;
 $$;
-create temporary table scoped_reads (probe text primary key, before_hidden bigint, after_hidden bigint) on commit drop;
+create temporary table scoped_reads (probe text, stage integer, reads bigint, primary key (probe, stage)) on commit drop;
 
 -- ---------------------------------------------------------------------------------------
 -- Lexical
@@ -200,11 +202,11 @@ select is(
   0,
   'another tenant''s run id under this workspace returns nothing');
 
-select is(
-  (select count(*)::integer from public.search_foundation_retrieval_units_lexical_scoped(
-    'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], array[]::text[], 10)),
-  0,
-  'an empty document list returns nothing');
+select throws_ok(
+  $$select * from public.search_foundation_retrieval_units_lexical_scoped(
+      'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], array[]::text[], 10)$$,
+  'retrieval_scoped_search_documents_empty',
+  'an empty document list is refused, typed, not answered as an empty result');
 
 select throws_ok(
   $$select * from public.search_foundation_retrieval_units_lexical_scoped(
@@ -259,11 +261,11 @@ select is(
   array['retrieval-unit-' || repeat('1', 32), 'retrieval-unit-' || repeat('2', 32), 'retrieval-unit-' || repeat('3', 32)],
   'the scoped structure pool is every admitted unit, ordered by unit_id, and no hidden one');
 
-select is(
-  (select count(*)::integer from public.foundation_retrieval_structure_candidates_scoped(
-    'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array[]::text[], 2000)),
-  0,
-  'an empty document list gives an empty structure pool');
+select throws_ok(
+  $$select * from public.foundation_retrieval_structure_candidates_scoped(
+      'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array[]::text[], 2000)$$,
+  'retrieval_scoped_search_documents_empty',
+  'the structure pool refuses an empty document list');
 
 select throws_ok(
   $$select * from public.foundation_retrieval_structure_candidates_scoped(
@@ -306,50 +308,66 @@ select throws_ok(
   'retrieval_scoped_search_documents_invalid',
   'scoped dense refuses an oversize document list');
 
+select throws_ok(
+  $$select * from public.search_foundation_retrieval_units_dense_scoped(
+      'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), 'bge-m3-v1', array[1, 0, 0]::double precision[], 'cosine',
+      array[]::text[], 10)$$,
+  'retrieval_scoped_search_documents_empty',
+  'scoped dense refuses an empty document list');
+
 -- ---------------------------------------------------------------------------------------
 -- Rows examined do not depend on hidden documents
 -- ---------------------------------------------------------------------------------------
-insert into scoped_reads values
-  ('lexical_scoped', pg_temp.examined($$select * from public.search_foundation_retrieval_units_lexical_scoped(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], array['doc-1'], 10)$$), null),
-  ('dense_scoped', pg_temp.examined($$select * from public.search_foundation_retrieval_units_dense_scoped(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), 'bge-m3-v1', array[1, 0, 0]::double precision[], 'cosine', array['doc-1'], 10)$$), null),
-  ('structure_scoped', pg_temp.examined($$select * from public.foundation_retrieval_structure_candidates_scoped(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['doc-1'], 2000)$$), null),
-  ('lexical_unscoped', pg_temp.examined($$select * from public.search_foundation_retrieval_units_lexical(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], 10)$$), null);
-
--- Forty hidden units in doc-2, same run, every one matching the query and near the query vector.
-insert into public.foundation_retrieval_units (
-  unit_id, workspace_key, compile_run_id, unit_type, document_id, document_version_key, text, content_digest, search_tokens
-)
-select 'retrieval-unit-' || lpad(to_hex(1000 + n), 32, 'f'), 'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), 'section',
-       'doc-2', repeat('d', 64), 'Payment codename filler ' || n, 'sha256:' || lpad(to_hex(n), 64, '0'),
-       array['payment', 'codename', 'filler']
-from generate_series(1, 40) as n;
-insert into public.foundation_retrieval_embeddings (workspace_key, unit_id, retrieval_profile_id, dimension, embedding)
-select 'pilot-scoped1', 'retrieval-unit-' || lpad(to_hex(1000 + n), 32, 'f'), 'bge-m3-v1', 3, '[1,0,0]'
-from generate_series(1, 40) as n;
-
-update scoped_reads set after_hidden = case probe
-  when 'lexical_scoped' then pg_temp.examined($$select * from public.search_foundation_retrieval_units_lexical_scoped(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], array['doc-1'], 10)$$)
-  when 'dense_scoped' then pg_temp.examined($$select * from public.search_foundation_retrieval_units_dense_scoped(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), 'bge-m3-v1', array[1, 0, 0]::double precision[], 'cosine', array['doc-1'], 10)$$)
-  when 'structure_scoped' then pg_temp.examined($$select * from public.foundation_retrieval_structure_candidates_scoped(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['doc-1'], 2000)$$)
-  when 'lexical_unscoped' then pg_temp.examined($$select * from public.search_foundation_retrieval_units_lexical(
-     'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], 10)$$)
+-- Each probe is measured four times: with no extra hidden units, then after each of three batches of
+-- forty hidden doc-2 units that match the query and sit at the query vector. The batches' unit ids sort
+-- FIRST (0-filled, before every admitted id), in the MIDDLE (2-filled: after ...222, before ...333) and
+-- LAST (f-filled), so a plan that walked any unit_id-ordered index and stopped at a LIMIT would meet
+-- hidden rows in at least one stage (review r1 N-d).
+create function pg_temp.measure(p_stage integer) returns void language plpgsql as $m$
+begin
+  insert into scoped_reads values
+    ('lexical_scoped', p_stage, pg_temp.examined($q$select * from public.search_foundation_retrieval_units_lexical_scoped(
+       'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], array['doc-1'], 10)$q$)),
+    ('dense_scoped', p_stage, pg_temp.examined($q$select * from public.search_foundation_retrieval_units_dense_scoped(
+       'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), 'bge-m3-v1', array[1, 0, 0]::double precision[], 'cosine', array['doc-1'], 10)$q$)),
+    ('structure_scoped', p_stage, pg_temp.examined($q$select * from public.foundation_retrieval_structure_candidates_scoped(
+       'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['doc-1'], 2000)$q$)),
+    ('lexical_unscoped', p_stage, pg_temp.examined($q$select * from public.search_foundation_retrieval_units_lexical(
+       'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), array['payment'], 10)$q$));
 end;
+$m$;
+create function pg_temp.add_hidden(p_fill text, p_base integer) returns void language plpgsql as $m$
+begin
+  insert into public.foundation_retrieval_units (
+    unit_id, workspace_key, compile_run_id, unit_type, document_id, document_version_key, text, content_digest, search_tokens
+  )
+  select 'retrieval-unit-' || lpad(to_hex(p_base + n), 32, p_fill), 'pilot-scoped1', 'retrieval-run-' || repeat('c', 32), 'section',
+         'doc-2', repeat('d', 64), 'Payment codename filler ' || n, 'sha256:' || lpad(to_hex(p_base + n), 64, '0'),
+         array['payment', 'codename', 'filler']
+  from generate_series(1, 40) as n;
+  insert into public.foundation_retrieval_embeddings (workspace_key, unit_id, retrieval_profile_id, dimension, embedding)
+  select 'pilot-scoped1', 'retrieval-unit-' || lpad(to_hex(p_base + n), 32, p_fill), 'bge-m3-v1', 3, '[1,0,0]'
+  from generate_series(1, 40) as n;
+end;
+$m$;
 
-select ok((select after_hidden > before_hidden from scoped_reads where probe = 'lexical_unscoped'),
-  'instrument check: the unscoped lexical RPC reads more tuples once hidden matches exist');
-select ok((select before_hidden > 0 and after_hidden = before_hidden from scoped_reads where probe = 'lexical_scoped'),
-  'scoped lexical reads the same number of tuples with or without forty hidden matches');
-select ok((select before_hidden > 0 and after_hidden = before_hidden from scoped_reads where probe = 'dense_scoped'),
-  'scoped dense reads the same number of tuples with or without forty hidden nearest neighbours');
-select ok((select before_hidden > 0 and after_hidden = before_hidden from scoped_reads where probe = 'structure_scoped'),
-  'the scoped structure pool reads the same number of tuples with or without forty hidden units');
+select pg_temp.measure(0);
+select pg_temp.add_hidden('0', 1000);
+select pg_temp.measure(1);
+select pg_temp.add_hidden('2', 2000);
+select pg_temp.measure(2);
+select pg_temp.add_hidden('f', 3000);
+select pg_temp.measure(3);
+
+select ok((select bool_and(r.reads > p.reads) from scoped_reads r join scoped_reads p on p.probe = r.probe and p.stage = r.stage - 1
+            where r.probe = 'lexical_unscoped'),
+  'instrument check: the unscoped lexical RPC reads more tuples after every batch of hidden matches');
+select ok((select min(reads) > 0 and count(distinct reads) = 1 and count(*) = 4 from scoped_reads where probe = 'lexical_scoped'),
+  'scoped lexical reads the same number of tuples with hidden matches sorting first, in the middle and last');
+select ok((select min(reads) > 0 and count(distinct reads) = 1 and count(*) = 4 from scoped_reads where probe = 'dense_scoped'),
+  'scoped dense reads the same number of tuples with hidden nearest neighbours sorting first, in the middle and last');
+select ok((select min(reads) > 0 and count(distinct reads) = 1 and count(*) = 4 from scoped_reads where probe = 'structure_scoped'),
+  'the scoped structure pool reads the same number of tuples with hidden units sorting first, in the middle and last');
 
 select * from finish();
 rollback;

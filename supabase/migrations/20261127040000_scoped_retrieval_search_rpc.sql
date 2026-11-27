@@ -19,8 +19,8 @@
 --   null list, a null or out-of-length element, a duplicate, more than 2000 entries
 --     -> retrieval_scoped_search_documents_invalid
 --   a compile run id outside the 0020 pattern -> retrieval_scoped_search_run_invalid
---   an EMPTY list -> zero rows (scoped to nothing is nothing; the app refuses an empty projection
---     before it calls, so this only keeps the function total).
+--   an EMPTY list -> retrieval_scoped_search_documents_empty (review r1 N-e: a loud refusal, not an
+--     empty answer that looks valid; the app answers MEMBER_SOURCE_SCOPE_DENIED before it calls).
 -- Limits are 0023's (1..500) for lexical and dense, and the app's existing 2000 for structure.
 --
 -- Rows examined, independent of hidden documents. The planner, not the query text, decides which
@@ -52,6 +52,28 @@
 -- Expand-only and re-runnable: create or replace, create index if not exists, revoke/grant restated.
 -- The indexes are built without CONCURRENTLY (migrations run in a transaction): each holds a SHARE
 -- lock on its table for the build, so retrieval-index writes wait for it.
+-- Apply conditions (review PROJ-K2-E2 r1, C1-C4). The lead applies this file only when all four hold:
+--   C1. The hosted db-rehearsal is green at the exact head being applied: the first pgTAP pass
+--       (including supabase/tests/foundation_retrieval_search_rpc_scoped.sql against real pgvector),
+--       the stage-rollback rehearsal and the rollback pairing.
+--   C2. Read the table sizes first, read-only:
+--         select relname, reltuples, pg_size_pretty(pg_total_relation_size(oid)) from pg_class
+--          where relname in ('foundation_retrieval_units', 'foundation_retrieval_embeddings');
+--         select max(char_length(document_id)) from public.foundation_retrieval_units;
+--       Each CREATE INDEX below takes a SHARE lock that blocks every INSERT/DELETE on its table (compile
+--       writes, source-deletion and test-reset cascades) until COMMIT; reads keep working. The units
+--       lock is held through the embeddings build too.
+--   C3. Bound the wait: apply with `set local lock_timeout = '5s'` at the top of the transaction, so a
+--       build queued behind a compile batch fails and is retried instead of stalling ingestion. If C2
+--       shows large tables, first build both indexes with CREATE INDEX CONCURRENTLY outside any
+--       transaction, confirm pg_index.indisvalid for both, and only then apply this file. `if not
+--       exists` silently skips an INVALID index left by a failed concurrent build, and with no valid
+--       scope-key index every function falls back to a sequential scan: correct results, but the
+--       hidden-volume side channel returns with no visible failure. Check indisvalid before any call.
+--   C4. After applying, run read-only EXPLAIN once per function body against production statistics:
+--       lexical, dense and structure must show Index Scan using foundation_retrieval_*_scope_key_idx
+--       and no Seq Scan. Record indisvalid, the build time and the applied version (a connector
+--       apply_migration records its own version string unless one is supplied) in the campaign ledger.
 -- Rollback: supabase/drafts/rollback-20261127040000-scoped-retrieval-search-rpc.sql.
 begin;
 
@@ -74,6 +96,9 @@ as $$
 begin
   if p_compile_run_id !~ '^retrieval-run-[a-f0-9]{32}$' then
     raise exception 'retrieval_scoped_search_run_invalid';
+  end if;
+  if p_document_ids is not null and cardinality(p_document_ids) = 0 then
+    raise exception 'retrieval_scoped_search_documents_empty';
   end if;
   if p_document_ids is null
     or cardinality(p_document_ids) > 2000
@@ -116,9 +141,6 @@ begin
     raise exception 'retrieval_lexical_search_limit_out_of_bounds';
   end if;
   v_keys := public.foundation_retrieval_scope_keys(p_workspace_key, p_compile_run_id, p_document_ids);
-  if cardinality(v_keys) = 0 then
-    return;
-  end if;
 
   select array_agg(distinct token)
     into v_safe_tokens
@@ -181,9 +203,6 @@ begin
     raise exception 'retrieval_dense_search_requires_embedding';
   end if;
   v_keys := public.foundation_retrieval_scope_keys(p_workspace_key, p_compile_run_id, p_document_ids);
-  if cardinality(v_keys) = 0 then
-    return;
-  end if;
 
   v_dimension := cardinality(p_query_embedding);
   if v_dimension < 1 or v_dimension > 8192 then
@@ -263,9 +282,6 @@ begin
     raise exception 'retrieval_structure_candidates_limit_out_of_bounds';
   end if;
   v_keys := public.foundation_retrieval_scope_keys(p_workspace_key, p_compile_run_id, p_document_ids);
-  if cardinality(v_keys) = 0 then
-    return;
-  end if;
 
   return query
   with admitted as materialized (

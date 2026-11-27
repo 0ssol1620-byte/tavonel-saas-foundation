@@ -63,6 +63,7 @@ export type RetrievalPipelineFailure =
   | "RETRIEVAL_EMBEDDER_UNAVAILABLE"
   | "CONNECTOR_SOURCE_ACCESS_UNAVAILABLE"
   | "CONNECTOR_SOURCE_ACCESS_DENIED"
+  | "MEMBER_SOURCE_SCOPE_DENIED"
   | typeof DERIVED_DATA_REFUSED;
 
 export type RetrievalPipelineResult =
@@ -147,6 +148,15 @@ export type RetrievalPipelineInput = {
 
 const DEFAULT_CANDIDATE_LIMIT = 50;
 const DEFAULT_CONTEXT_LIMIT = 10;
+/*
+  WO-PROJ-K2-E2 (review r1 N-b): the scoped structure pool is read through PostgREST, whose max_rows
+  (Supabase default 1000) also caps RPC results, silently. The projected path therefore asks for no
+  more than that cap and treats a full answer as possibly truncated: structure is then skipped and
+  says so, rather than ranked over a pool that may be missing admitted units (ACCEPTANCE #3). The
+  unprojected REST read keeps its 2000, unchanged.
+*/
+export const SCOPED_STRUCTURE_POOL_LIMIT = 1000;
+export const STRUCTURE_POOL_TRUNCATED = "structure retrieval skipped: candidate pool may be truncated";
 
 export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promise<RetrievalPipelineResult> {
   const question = input.question.normalize("NFKC").replace(/\s+/g, " ").trim();
@@ -179,10 +189,13 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   const degradations: string[] = [];
   const projection = input.projection?.kind === "partial" ? input.projection : null;
   // The admitted documents, checked before any read or provider call: a scope the scoped RPCs cannot
-  // take (over MAX_SCOPED_DOCUMENT_IDS, or empty) is a typed refusal, never a wider read.
-  // Undefined without a projection: every store call below is then exactly today's request.
+  // take (over MAX_SCOPED_DOCUMENT_IDS) is a typed refusal, never a wider read. An EMPTY scope means
+  // the member has no accessible source: the whole-World gate's own answer, same code (and status),
+  // with no RPC called. Undefined without a projection: every store call below is then exactly
+  // today's request.
   let admittedDocumentIds: string[] | undefined;
   if (projection) {
+    if (projection.allowedDocumentIds.size === 0) return { ok: false, code: "MEMBER_SOURCE_SCOPE_DENIED" };
     const scoped = scopedDocumentIds(projection.allowedDocumentIds);
     if (!scoped.ok) return { ok: false, code: scoped.code };
     admittedDocumentIds = scoped.value;
@@ -302,8 +315,12 @@ export async function runRetrievalPipeline(input: RetrievalPipelineInput): Promi
   let structureCandidateCount = 0;
   if (seedIds.length > 0) {
     const seeds = await loadUnitsByIds(input.workspaceKey, compileRunId, seedIds);
-    const candidates = await loadStructureCandidates(input.workspaceKey, compileRunId, 2000, admittedDocumentIds);
-    if (seeds.ok && candidates.ok) {
+    const candidates = await loadStructureCandidates(
+      input.workspaceKey, compileRunId, admittedDocumentIds ? SCOPED_STRUCTURE_POOL_LIMIT : 2000, admittedDocumentIds,
+    );
+    if (admittedDocumentIds && candidates.ok && candidates.value.length >= SCOPED_STRUCTURE_POOL_LIMIT) {
+      degradations.push(STRUCTURE_POOL_TRUNCATED);
+    } else if (seeds.ok && candidates.ok) {
       structureCandidateCount = candidates.value.length;
       const structureRanked = rankByStructuralOverlap(candidates.value, {
         seedClaimIds: [...new Set(seeds.value.flatMap((unit) => unit.claimIds))],

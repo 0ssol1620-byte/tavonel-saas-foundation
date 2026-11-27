@@ -93,6 +93,10 @@ describe("internal model-attempt receipts and public projection", () => {
       .toEqual(["embedder"]);
     expect(attemptedRetrievalModelRolesOnFailure({ embedder } as never, "RETRIEVAL_RUN_NOT_FOUND"))
       .toEqual([]);
+    // WO-PROJ-K2-E2: refused from the projection before any embedder call (review r1 N-a).
+    for (const code of ["RETRIEVAL_SCOPE_TOO_LARGE", "MEMBER_SOURCE_SCOPE_DENIED"]) {
+      expect(attemptedRetrievalModelRolesOnFailure({ embedder } as never, code)).toEqual([]);
+    }
   });
 
   it("does not require a receipt store for lexical-only retrieval", async () => {

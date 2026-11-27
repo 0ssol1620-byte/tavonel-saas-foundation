@@ -208,7 +208,7 @@ async function answerQuestion(
     });
     if (!persisted.ok) return { status: 503, body: { code: persisted.code } };
     return {
-      status: pipeline.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : 503,
+      status: pipeline.code === "RETRIEVAL_QUESTION_INVALID" ? 400 : pipeline.code === "MEMBER_SOURCE_SCOPE_DENIED" ? 403 : 503,
       body: { code: pipeline.code },
     };
   }

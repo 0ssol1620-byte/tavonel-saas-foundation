@@ -22,7 +22,7 @@ import {
   decideMemberProjection, memberProjectionMode, projectionAdmits, projectionShadowFields, projectSourceGroups,
   recordProjectionShadow, type ProjectionDecision,
 } from "./member-projection";
-import { runRetrievalPipeline } from "./retrieval-pipeline";
+import { runRetrievalPipeline, SCOPED_STRUCTURE_POOL_LIMIT, STRUCTURE_POOL_TRUNCATED } from "./retrieval-pipeline";
 import { MAX_SCOPED_DOCUMENT_IDS } from "./retrieval-store";
 import { getWorldFreshness } from "./world-store";
 import { buildBgeM3BaselineProfile } from "./retrieval-profile";
@@ -315,7 +315,8 @@ describe("the retrieval pipeline, projected", () => {
     const embed = vi.spyOn(embedder, "embedQuery");
     const tooMany = Array.from({ length: MAX_SCOPED_DOCUMENT_IDS + 1 }, (_unused, n) => `doc-${n}`);
     await expect(run(partial(tooMany))).resolves.toEqual({ ok: false, code: "RETRIEVAL_SCOPE_TOO_LARGE" });
-    await expect(run(partial([]))).resolves.toEqual({ ok: false, code: "RETRIEVAL_SCOPE_INVALID" });
+    // An empty scope is a member with no accessible source: the whole-World gate's own code, no RPC.
+    await expect(run(partial([]))).resolves.toEqual({ ok: false, code: "MEMBER_SOURCE_SCOPE_DENIED" });
     expect(calls).toEqual([]);
     expect(embed).not.toHaveBeenCalled();
     // At the cap it is served.
@@ -341,6 +342,39 @@ describe("the retrieval pipeline, projected", () => {
   byte for byte, and the same result. (What the database does inside one call is measured by
   supabase/tests/foundation_retrieval_search_rpc_scoped.sql; wall-clock time is not measured here.)
 */
+/*
+  Review r1 N-b: PostgREST max_rows (default 1000) caps RPC results silently. The projected structure
+  pool asks for at most that cap, and a full answer is treated as possibly truncated (ACCEPTANCE #3).
+*/
+describe("the scoped structure pool at the PostgREST cap", () => {
+  const admitted = (count: number) => Array.from({ length: count }, (_unused, n) => row(`a${String(n).padStart(4, "0")}`, D1, `Acme filler ${n}`));
+
+  it("skips structure, and says so, when the pool comes back full", async () => {
+    const pool = admitted(SCOPED_STRUCTURE_POOL_LIMIT + 5);
+    world = { units: [...HIDDEN, ...VISIBLE, ...pool], lexical: ids(VISIBLE), dense: [] };
+    const result = await run(partial([D1]));
+    if (!result.ok) throw new Error(result.code);
+    expect(result.diagnostics.degradations).toContain(STRUCTURE_POOL_TRUNCATED);
+    const asked = calls.find(call => call.path.endsWith("/rpc/foundation_retrieval_structure_candidates_scoped"));
+    expect(asked?.body).toMatchObject({ p_limit: SCOPED_STRUCTURE_POOL_LIMIT });
+    // The class the public route names is the existing structure one.
+    expect(STRUCTURE_POOL_TRUNCATED.startsWith("structure retrieval skipped:")).toBe(true);
+  });
+
+  it("ranks structure as usual when the pool is under the cap", async () => {
+    world = { units: [...HIDDEN, ...VISIBLE, ...admitted(SCOPED_STRUCTURE_POOL_LIMIT - 5)], lexical: ids(VISIBLE), dense: [] };
+    const result = await run(partial([D1]));
+    if (!result.ok) throw new Error(result.code);
+    expect(result.diagnostics.degradations).toEqual([]);
+    expect(result.diagnostics.structureCandidateCount).toBe(SCOPED_STRUCTURE_POOL_LIMIT - 1);
+  });
+
+  it("leaves the unprojected structure read at 2000", async () => {
+    await run();
+    expect(calls.some(call => call.path.includes("select=unit_id,claim_ids,entity_ids") && call.path.includes("limit=2000"))).toBe(true);
+  });
+});
+
 describe("hidden volume", () => {
   const many = Array.from({ length: 500 }, (_unused, n) => row(`s${n}`, D2, `Globex notice period termination filler ${n}`));
 

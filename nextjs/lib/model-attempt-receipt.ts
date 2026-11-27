@@ -21,6 +21,8 @@ type AttemptedRole = "embedder" | "reranker";
 type ModelAttemptFailureClass = InternalModelAttemptReceipt["failureClass"];
 const PRE_MODEL_FAILURES = new Set([
   "RETRIEVAL_QUESTION_INVALID", "RETRIEVAL_RUN_NOT_FOUND", "RETRIEVAL_PROFILE_NOT_FOUND",
+  // WO-PROJ-K2-E2: refused from the projection before the run is read or the embedder called.
+  "RETRIEVAL_SCOPE_TOO_LARGE", "MEMBER_SOURCE_SCOPE_DENIED",
 ]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
