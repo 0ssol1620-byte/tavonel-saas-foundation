@@ -10,6 +10,7 @@ import { decideCheckoutPolicy, decideOfferCheckoutPolicy, decideSubscriptionChan
 import { authorizationStage, readCustomerSourceAuthorization } from "@/lib/customer-data-admission";
 import { foundationPilotAccess, getRequestUser } from "@/lib/foundation-pilot";
 import { readPublicStatusV2 } from "@/lib/public-status";
+import { listWorkspaceInvites, listWorkspaceMembers } from "@/lib/workspace-membership";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -71,6 +72,24 @@ export async function POST(request: Request) {
   if (!billing.ok) return NextResponse.json({ code: billing.code }, { status: 503, headers: NO_STORE });
   const change = decideSubscriptionChange(billing.account, body.offerCode);
   if (!change.allowed) return NextResponse.json({ code: change.code }, { status: 409, headers: NO_STORE });
+  // Personal and Developer are one-person plans. A workspace that already has another active member, or an
+  // invitation still open, is refused before an intent: the seat function caps new invitations, never the
+  // people already in. An operator grant answered OWNER_ACCESS_ACTIVE above, so it never reaches this count.
+  // A count that cannot be read refuses too; it is never read as "one member".
+  if (body.offerCode === "personal" || body.offerCode === "developer") {
+    const [members, invites] = await Promise.all([
+      listWorkspaceMembers(membership.workspaceId),
+      listWorkspaceInvites(membership.workspaceId),
+    ]);
+    if (!members.ok) return NextResponse.json({ code: members.code }, { status: members.status, headers: NO_STORE });
+    if (!invites.ok) return NextResponse.json({ code: invites.code }, { status: invites.status, headers: NO_STORE });
+    const now = Date.now();
+    const active = members.members.filter((row) => row?.state === "active").length;
+    const open = invites.invites.filter((row) => row?.state === "pending" && Date.parse(String(row.expires_at)) > now).length;
+    if (active > 1 || open > 0) {
+      return NextResponse.json({ code: "WORKSPACE_HAS_MEMBERS" }, { status: 409, headers: NO_STORE });
+    }
+  }
   // A deployment-wide launch switch is not permission for this customer's sources. In live mode
   // refuse payment before creating a durable checkout intent unless the same workspace receipt
   // that intake and compilation require is current and valid. Sandbox qualification remains
