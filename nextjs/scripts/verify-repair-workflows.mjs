@@ -1184,7 +1184,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
   const pins = [['v34-shell', 47, 23, 3, 0], ['v34-route-registry', 6, 55, 2, 0], ['v34-world', 18, 22, 2, 0], ['v34-route-bodies', 258, 60, 3, 0],
     ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 1, 0], ['proposals-library', 18, 11, 0, 1],
     ['workspace-journey', 8, 3, 0, 1], ['compile-pipeline', 15, 12, 0, 2], ['world-temporal-lens', 13, 6, 0, 2], ['control-plane', 5, 3, 0, 0],
-    ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
+    ['developer-surface', 12, 9, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
     ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 6, 12, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
     // WO-MIG-GUARD-1: db-harness takes the migration redefinition guard, allowlist and suite (19 -> 22 paths, 9 -> 10 Node suites).
     // WO-TRAIN-2: db-harness takes the member-scope race script and its suite (17 -> 19 paths, 8 -> 9 Node suites).

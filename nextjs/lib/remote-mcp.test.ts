@@ -202,8 +202,8 @@ describe("the remote tool list is the stdio bridge's", () => {
       "list_sources", "list_worlds", "get_world", "search_world", "ask_world",
       "get_object", "get_relation", "get_evidence", "download_package",
     ]);
-    expect(result.tools).toEqual(TOOLS.map(({ name, description, inputSchema }: { name: string; description: string; inputSchema: unknown }) => ({
-      name, description, inputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    expect(result.tools).toEqual(TOOLS.map(({ name, title, description, inputSchema }: { name: string; title: string; description: string; inputSchema: unknown }) => ({
+      name, title, description, inputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     })));
     expect(mocks.authenticateKey).not.toHaveBeenCalled();
   });

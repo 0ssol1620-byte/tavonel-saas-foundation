@@ -3224,9 +3224,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     externalChecks: Object.freeze({}),
   }),
   // developer-surface: D18-3 and D19: the remote MCP facade, readiness, refresh and its matrices, and the signed answer receipt parity suite.
+  // WO-MCP-LISTING-2: the OpenAI domain-verification route and its suite join (10 -> 12 paths, 8 -> 9 Node suites).
   'developer-surface': Object.freeze({
-    paths: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-facade.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-readiness.ts', 'lib/remote-mcp-refresh.test.ts']),
-    unitFiles: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-refresh.test.ts']),
+    paths: Object.freeze(['app/.well-known/openai-apps-challenge/route.ts', 'lib/d18-receipt-parity.test.ts', 'lib/openai-apps-challenge.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-facade.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-readiness.ts', 'lib/remote-mcp-refresh.test.ts']),
+    unitFiles: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/openai-apps-challenge.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-refresh.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
