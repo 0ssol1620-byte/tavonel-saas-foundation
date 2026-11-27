@@ -21,7 +21,8 @@ const BYTES_PER_GB = 1_000_000_000;
  * Every v2 offer's storage allowance in bytes, sent with each admission. The database picks the
  * workspace's entry by its `plan_code` under the intake lock (20261117150100). A retired offer has
  * no entry: legacy, owner and trial admissions are never capped, and a v2 code with no entry is
- * refused by the database rather than admitted uncapped.
+ * refused by the database rather than admitted uncapped. An account no plan was ever projected into
+ * is held to Free's 1 GB in SQL (20261127070000); this map has no Free entry.
  */
 export const STORAGE_LIMIT_BYTES: Readonly<Record<string, number>> = Object.fromEntries(
   Object.entries(BILLING_OFFERS).flatMap(([code, offer]) =>

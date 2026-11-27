@@ -111,11 +111,12 @@ reset role;
 -- 20261127060000 (WO-TRIAL-RELEASE-1) redefined the inner function last (968fafde...); its rollback
 -- restores 1bd2c9f6..., the 20261123120000 body. 20261123120000 (WO-C-T2) redefined it before; its rollback restores 240678b7..., the
 -- 20261117160200 (WO-CAT-10) body, whose rollback restores 7a71d281..., the
--- 20261117160100 body supabase/drafts/rollback-20261117160100-*.sql guards on. The wrapper is 160100's.
+-- 20261117160100 body supabase/drafts/rollback-20261117160100-*.sql guards on. The wrapper is
+-- 20261127070000's (WO-METER-NULLPLAN-1, 76e0d93f...); its rollback restores 5c2fd1f5..., the 160100 body.
 select is(md5(pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)'::regprocedure))
     || ' ' || md5(pg_get_functiondef('public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text, jsonb)'::regprocedure)),
-  '968fafded557158da2e898281a35527b 5c2fd1f532fd30259819b8fafe421532',
-  'the inner function is the 20261123120000 body and the wrapper the 20261117160100 body their rollback drafts expect');
+  '968fafded557158da2e898281a35527b 76e0d93f04a8338a8d74d927a1298f5e',
+  'the inner function is the 20261127060000 body (WO-TRIAL-RELEASE-1) and the wrapper the 20261127070000 body (WO-METER-NULLPLAN-1) their rollback drafts expect');
 select ok(not has_function_privilege('service_role', 'public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)', 'EXECUTE')
     and has_function_privilege('service_role', 'public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text, jsonb)', 'EXECUTE')
