@@ -6,6 +6,7 @@ import {
   deriveWorkspaceState,
   type WorkspaceStateInput,
 } from "./workspace-onboarding";
+import { failureSentence } from "./workspace-failure-copy";
 
 const base: WorkspaceStateInput = {
   customerDataAccess: "open",
@@ -168,6 +169,19 @@ describe("workspace state", () => {
     // ready yet", which describes a symptom of it.
     expect(deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_TIMEOUT" })).stateTitle)
       .toBe("The last compile stopped.");
+  });
+
+  it("says a known compile stop in the compile panel's sentence, not as a bare code (WO-FIRST-5-MIN-1)", () => {
+    const known = input({ documentCount: 4, compileErrorCode: "CORE_OUTPUT_TOO_LARGE" });
+    const state = deriveWorkspaceState(known);
+    expect(state.stateDescription).toContain(failureSentence("CORE_OUTPUT_TOO_LARGE", 500));
+    expect(state.stateDescription).not.toContain("CORE_OUTPUT_TOO_LARGE");
+    const item = deriveAttentionItems(known).find((entry) => entry.id === "compile-failed");
+    expect(item?.detail).toContain(failureSentence("CORE_OUTPUT_TOO_LARGE", 500));
+    expect(item?.detail).not.toContain("CORE_OUTPUT_TOO_LARGE");
+    // An unmapped code still reaches the screen, as a reference.
+    expect(deriveWorkspaceState(input({ documentCount: 4, compileErrorCode: "COMPILE_TIMEOUT" })).stateDescription)
+      .toContain("Reference COMPILE_TIMEOUT.");
   });
 
   it("keeps newer news above a run that already ended", () => {

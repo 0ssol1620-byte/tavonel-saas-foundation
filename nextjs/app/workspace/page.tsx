@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { compiledWorldReadyNotice, failureSentence, isSizeLimitFailure, noEntitiesNote, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
+import { compiledWorldReadyNotice, failureSentence, isSizeLimitFailure, noEntitiesNote, offersUpgrade, pageLocale, REVIEW_REQUIRED_ACTIVATION_NOTE, reviewPackageNotice } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -1707,7 +1707,7 @@ export default function WorkspacePage() {
     setCollectionResult((result) => {
       if (!result || result.collectionId !== compiled) return result;
       setNotice(result.lifecycle === "review_required"
-        ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; nothing is active yet.`
+        ? reviewPackageNotice(result.reviewReasons?.length ?? 0)
         : compiledWorldReadyNotice(result.validation.counts));
       return result;
     });
@@ -3325,9 +3325,13 @@ export default function WorkspacePage() {
                       <div className="workspace-intake-gated-actions">
                         <Link className="btn" href="/explore">Explore a compiled World</Link>
                         {sourcePending === "release_pending" ? (
-                          <button type="button" className="btn ghost" disabled={accessRecheck === "checking"} onClick={recheckFileAccess}>
-                            {accessRecheck === "checking" ? "Checking file access…" : "Check file access again"}
-                          </button>
+                          <>
+                            <button type="button" className="btn ghost" disabled={accessRecheck === "checking"} onClick={recheckFileAccess}>
+                              {accessRecheck === "checking" ? "Checking file access…" : "Check file access again"}
+                            </button>
+                            {/* WO-FIRST-5-MIN-1: the wait has no time the customer can read, so a person is one link away. */}
+                            <Link className="btn ghost" href="/contact">Contact support</Link>
+                          </>
                         ) : sourcePending === "workspace_refused" ? (
                           <Link className="btn ghost" href="/contact">Contact support</Link>
                         ) : null}
@@ -3446,7 +3450,9 @@ export default function WorkspacePage() {
                       : stagedCounted.length === 0
                         ? "None of these files states a page count before it is read. Pages are counted while the documents are processed, and the estimate appears once there is a number to show."
                         : accessSource === "trial"
-                          ? "Your free evaluation covers this within its file and page limits. No card is needed."
+                          /* WO-FIRST-5-MIN-1: this said "covers this" for any selection, also one past the
+                             evaluation's file allowance, which the upload then refused file by file. */
+                          ? "Nothing is charged on your free evaluation. Its file and page allowance is shown at the top of this workspace; a file past it is refused, never charged."
                         : stagedConfidence === "verified"
                           ? "Page counts were counted from the documents themselves. You will never be charged above the maximum shown."
                           : "Some files state their own page count rather than being counted — Word records the number it last saved, which can be out of date. The billed page count is confirmed once the documents are processed, and never exceeds the maximum shown."}
@@ -4071,7 +4077,7 @@ export default function WorkspacePage() {
                       <textarea
                         id="review-reason"
                         maxLength={500}
-                        placeholder="Record what you verified in the directory, ontology, graph, evidence links and validation receipt."
+                        placeholder="For example: I checked two answers against their source pages."
                         value={reviewReason}
                         onChange={(event) => setReviewReason(event.target.value)}
                       />
@@ -4084,6 +4090,11 @@ export default function WorkspacePage() {
                           {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision…" : "Activate reviewed candidate"}
                         </button>
                       </div>
+                      {collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" ? (
+                        <p className="fine" role="status" data-testid="review-required-activation-note">
+                          {REVIEW_REQUIRED_ACTIVATION_NOTE} <Link href="/contact">Contact support</Link> · Reference {collectionResult.collectionId}
+                        </p>
+                      ) : null}
                       <p className="fine">Activation uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
                     </div>
                     <div className="version-panel">
