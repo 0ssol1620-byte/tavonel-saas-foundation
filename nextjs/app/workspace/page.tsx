@@ -4241,8 +4241,8 @@ export default function WorkspacePage() {
                             <li key={version.manifest_digest}>
                               <div>
                                 <strong>{version.lifecycle_status}</strong>
-                                <small>{version.manifest_digest}</small>
-                                <small>Activated {version.activation_count} time(s)</small>
+                                <small title={version.manifest_digest}>Version ref {shortReference(version.manifest_digest)}</small>
+                                <small>{version.activation_count === 1 ? "Activated once" : `Activated ${version.activation_count} times`}</small>
                               </div>
                               {activeWorld && version.manifest_digest !== activeWorld.manifestDigest ? (
                                 <button
