@@ -1217,7 +1217,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     ['compile-source-stages', 3, 1, 0, 0],
     ['knowledge-steward-patch', 5, 5, 0, 0],
     ['global-collection-compile', 2, 1, 0, 0],
-    ['router-shadow', 6, 3, 0, 0],
+    ['router-shadow', 10, 4, 0, 0],
     ['workspace-payer-entitlement', 1, 1, 0, 0],
     ['agent-u37-matrix', 3, 2, 0, 0],
     // WO-WS-5: the workspace draws its active World (one owner, one suite).

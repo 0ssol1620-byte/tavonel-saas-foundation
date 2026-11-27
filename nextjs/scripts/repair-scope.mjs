@@ -3590,10 +3590,11 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   }),
   // router-shadow (WO-RTR-1, WO-RTR-2): the evidence table as data, the page classifier and the internal trace store. router-shadow-trace.test.ts
   // reads the JSON table and imports the classifier; router-shadow-store.test.ts imports the store and the classifier; the hook suite
-  // drives the compile hook over both.
+  // drives the compile hook over both. WO-RTR-GAPS-1: the RTR-4 report (lib/router-shadow-report.ts, its suite) and its operator CLI
+  // (scripts/router/shadow-report.mjs; its vitest file runs in the full suite through the scripts/router include).
   'router-shadow': Object.freeze({
-    paths: Object.freeze(['lib/router-evidence-table.v1.json', 'lib/router-shadow-hook.test.ts', 'lib/router-shadow-store.test.ts', 'lib/router-shadow-store.ts', 'lib/router-shadow-trace.test.ts', 'lib/router-shadow-trace.ts']),
-    unitFiles: Object.freeze(['lib/router-shadow-hook.test.ts', 'lib/router-shadow-store.test.ts', 'lib/router-shadow-trace.test.ts']),
+    paths: Object.freeze(['lib/router-evidence-table.v1.json', 'lib/router-shadow-hook.test.ts', 'lib/router-shadow-report.test.ts', 'lib/router-shadow-report.ts', 'lib/router-shadow-store.test.ts', 'lib/router-shadow-store.ts', 'lib/router-shadow-trace.test.ts', 'lib/router-shadow-trace.ts', 'scripts/router/shadow-report.mjs', 'scripts/router/shadow-report.test.mjs']),
+    unitFiles: Object.freeze(['lib/router-shadow-hook.test.ts', 'lib/router-shadow-report.test.ts', 'lib/router-shadow-store.test.ts', 'lib/router-shadow-trace.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
