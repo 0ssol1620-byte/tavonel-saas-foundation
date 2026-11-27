@@ -565,7 +565,7 @@ describe("qualifying the loaded World against the answer that cites it", () => {
     expect(workspace).toContain("const askWorldModel = qualifyAskWorldModel(worldReadModel, collectionResult, askResult?.receipt);");
     expect(workspace.split("qualifyAskWorldModel(")).toHaveLength(2);
     expect(workspace).toContain("resolveCitationRegion(citation, askWorldModel?.evidence)");
-    expect(workspace).toContain('{askWorldModel && askEvidenceId !== undefined ? (\n                  <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId}');
+    expect(workspace).toContain('{askWorldModel && askEvidenceId !== undefined ? (\n                  <WorldStudioUltimate names={names} model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId}');
     expect(workspace).not.toContain("{askEvidenceId !== undefined ? (");
     expect(workspace).not.toContain('<WorldStudioUltimate model={worldReadModel} initialLens="evidence"');
     // A new question also forgets the previously opened region before any answer arrives.

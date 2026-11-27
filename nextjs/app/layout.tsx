@@ -81,10 +81,10 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://tavonel.com"),
   icons: {
     icon: [
-      { url: "/brand/locus-v2.svg", type: "image/svg+xml", sizes: "any" },
-      { url: "/brand/locus-v2-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/brand/blueprint-v34.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/brand/blueprint-v34-32.png", type: "image/png", sizes: "32x32" },
     ],
-    shortcut: "/brand/locus-v2.ico",
+    shortcut: "/brand/blueprint-v34.ico",
   },
   verification: {
     other: { "naver-site-verification": "8543297cf37328d0919d31e4d3d618beecc532de" },
@@ -137,7 +137,11 @@ export const metadata: Metadata = {
   Android and installed surface.
 */
 export const viewport: Viewport = {
-  themeColor: "#090D14",
+  /* Blueprint paper for a light browser chrome, blueprint forest for a dark one; the manifest agrees (light). */
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f8f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1713" },
+  ],
   colorScheme: "dark",
 };
 

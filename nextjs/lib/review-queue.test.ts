@@ -346,9 +346,12 @@ describe("the rendered queue", () => {
       input: { ...base, documentIds: ["doc-x", "doc-y"], blocked: [], documents: [], reviewReasons: ["SECURITY_STOP:doc-x", "OCR_LOW_TEXT_YIELD doc-y"], evidence: [], decisions: [], names: {} },
     }));
     // Not excluded (blocked is empty), so not a "Safety stop": the status line would count it as not excluded.
-    expect(markup).toContain(`<span>Security reason</span><code>SECURITY_STOP:doc-x</code>`);
+    // UI-D: a sentence leads; the recorded code sits behind "Technical details" and stays verbatim.
+    expect(markup).toContain(`<span>Security reason</span><em>One of the checks on this result did not pass.</em>`);
+    expect(markup).toContain(`<summary>Technical details</summary>Reference <code>SECURITY_STOP:doc-x</code>`);
     expect(markup).not.toContain("Safety stop");
-    expect(markup).toContain(`<span>Reading check</span>OCR_LOW_TEXT_YIELD doc-y`);
+    expect(markup).toContain(`<span>Reading check</span><em>One of the checks on this result did not pass.</em>`);
+    expect(markup).toContain(`Reference <code>OCR_LOW_TEXT_YIELD doc-y</code>`);
     expect(markup.split("No review decision recorded yet").length - 1).toBe(1);
     expect(markup).toContain("No review decision recorded yet for any document below.");
   });
@@ -376,11 +379,19 @@ describe("the rendered queue", () => {
       input: { ...base, documentIds: ["doc-long"], blocked: [], documents: [], reviewReasons: [long], evidence: [], decisions: [], names: {} },
     }));
     // A select sizes itself to its widest option, which is how a 360px screen overflows.
-    expect(markup).toContain("…</option>");
+    // B3: a code-shaped reason is labelled by its plain headline, never by the raw string.
+    expect(markup).toContain("<option value=\"" + long + "\" title=\"Reference " + long + "\">One of the checks on this result did not pass.</option>");
     expect(markup).not.toContain(`>${long}</option>`);
+    expect(markup).not.toMatch(/<option[^>]*>[^<]*AUTHORITY_CONFLICT/);
+    // A reason someone already wrote as a sentence is still elided, as before.
+    const prose = `The reader could not tell these two versions apart ${"x".repeat(80)} doc-long`;
+    const proseMarkup = renderToStaticMarkup(createElement(ReviewQueue, {
+      input: { ...base, documentIds: ["doc-long"], blocked: [], documents: [], reviewReasons: [prose], evidence: [], decisions: [], names: {} },
+    }));
+    expect(proseMarkup).toContain("…</option>");
     expect(markup).toContain(`value="${long}"`);
     // The row itself still prints the reason in full.
-    expect(markup).toContain(`<span>Review reason</span>${long}`);
+    expect(markup).toContain(`Reference <code>${long}</code>`);
   });
 
   it("says there is nothing to break down rather than printing an empty table", () => {
@@ -847,10 +858,13 @@ describe("review reason chip", () => {
     expect(ko).toContain(`참조 <code>${raw}</code>`);
   });
 
-  it("prints an unknown reason exactly as before", () => {
+  it("says only that an unknown reason was flagged, and keeps its code verbatim under Technical details", () => {
     const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...input, reviewReasons: ["GLOBAL_REASON_WITH_NO_DOCUMENT"] } }));
-    expect(markup).toContain("<span>Review reason</span><code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
-    expect(markup).not.toContain("<em>");
+    expect(markup).toContain("<span>Review reason</span><em>One of the checks on this result did not pass.</em>");
+    expect(markup).toContain("The exact check is shown under Technical details.");
+    expect(markup).toContain("<summary>Technical details</summary>Reference <code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
+    // The code is never the headline.
+    expect(markup).not.toContain("<em>GLOBAL_REASON_WITH_NO_DOCUMENT");
   });
 });
 

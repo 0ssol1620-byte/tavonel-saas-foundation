@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { displayName, type DocumentNames } from "@/lib/document-names";
+import { distinctDocumentName, type DocumentNames } from "@/lib/document-names";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { LibraryDecision, LibraryDocument } from "@/lib/library-shadow";
 import styles from "./library-panel.module.css";
@@ -142,7 +142,7 @@ export default function LibraryPanel({ documentIds, names, onAvailability }: Pro
     );
   }
 
-  const nameOf = (id: string) => displayName(id, names);
+  const nameOf = (id: string) => distinctDocumentName(id, names);
   const groups = [
     { id: "confirmed" as const, title: "Confirmed", note: "A person confirmed these labels." },
     { id: "proposed" as const, title: "Proposed", note: "The compiler proposed these. Confirm or reject each one." },

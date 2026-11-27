@@ -75,22 +75,25 @@ function evidenceFrame(): string {
 }
 
 /*
-  BQ-008. One mark, one geometry, one place it is drawn.
+  The V34 blueprint mark, drawn from `lib/brand-mark.json` -- the same geometry as
+  `components/logomark.tsx`, `public/icon.svg` and the apple icon. LOCUS (adopted 2026-09-18) is
+  superseded by the V34 blueprint mark; BQ-008's rule stands: one mark, one geometry.
 
-  This was a 3x3 grid of cells with the middle one lit -- the nine-cell AI/ML mark BA-230 banned
-  and `lib/brand-marks.test.ts` already refused in `components/logomark.tsx` and `app/icon.svg`.
-  It was still shipping on twenty-nine share cards, which are the only place most readers meet
-  the brand at all, so the site had two logos and the wrong one travelled.
-
-  Decision A-06's paths, scaled 24 -> 48: verso with its corner cut, a shorter recto, one thread
-  between them at -34.2 degrees. Stroke widths scale with it (1.9 -> 3.8, 1.6 -> 3.2).
-  `brand-marks.test.ts` pins the arithmetic so this cannot drift from the nav mark again.
+  `px` is the tile's own size, as the component's `size` is. Satori turns an `<svg>` into an image,
+  which clips at its viewBox, so this one is drawn on `assetViewBox` (the turned tile's bounds)
+  and sized up by the same ratio.
 */
 export function OgLogomark({ size: px = 48 }: { size?: number }) {
-  // LOCUS, the same two paths as components/logomark.tsx. One ink, fully solid.
+  const { tile, pill, rotate } = mark;
+  const c = tile.size / 2;
+  const box = Number(mark.assetViewBox.split(" ")[2]);
+  const drawn = Math.round((px * box) / tile.size);
   return (
-    <svg width={px} height={px} viewBox={mark.viewBox} fill="none" stroke={INK} strokeLinecap="square">
-      {mark.paths.map(path => <path key={path.d} d={path.d} strokeWidth={path.strokeWidth} />)}
+    <svg width={drawn} height={drawn} viewBox={mark.assetViewBox}>
+      <g transform={`rotate(${rotate} ${c} ${c})`}>
+        <rect width={tile.size} height={tile.size} rx={tile.radius} fill={tile.fill} />
+        <rect x={pill.x} y={pill.y} width={pill.width} height={pill.height} rx={pill.radius} fill={pill.fill} />
+      </g>
     </svg>
   );
 }

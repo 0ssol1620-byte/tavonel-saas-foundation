@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { PipelineRow } from "@/lib/pipeline";
 import type { OcrProgress } from "@/lib/ocr-progress";
 import ReadingView from "./reading-view";
-import { displayName, type DocumentNames } from "@/lib/document-names";
+import { displayName, documentReference, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
 // The rejection sentence names the formats the server actually accepts, so it cannot fall
 // behind the whitelist that produced the rejection. Both come from the Capability Manifest.
@@ -12,7 +12,7 @@ import { acceptedFormatSentence } from "@/lib/qualified-input";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 import { countNoun } from "@/lib/plural";
 import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store";
-import { censusOf, deriveFileStates, reconciles, type CensusBucket, type NextAction } from "@/lib/file-states";
+import { censusLine, censusOf, deriveFileStates, reconciles, type CensusBucket, type NextAction } from "@/lib/file-states";
 // One UTC face for every device, so the time in a support conversation is the time on the screen.
 import { formatTimestamp } from "@/lib/format";
 
@@ -45,12 +45,13 @@ function stageLabel(row: PipelineRow): string {
   return PIPELINE_STAGES[0].label;
 }
 
+/* The data attributes keep one bucket each; the visible line is `censusLine`, the same numbers Home reads. */
 const CENSUS_PARTS: ReadonlyArray<readonly [CensusBucket, string]> = [
-  ["pending", "queued"],
+  ["pending", "ready to compile"],
   ["processing", "processing"],
   ["verified_pending_publish", "compiled, awaiting activation"],
   ["accepted", "active"],
-  ["held", "held"],
+  ["held", "need review"],
   ["excluded", "excluded"],
 ];
 const NEXT_ACTION_WORD: Record<NextAction, string> = { retry: "Retry", reconnect: "Reconnect", "re-upload": "Re-upload", review: "Review", exclude: "Exclude", compile: "Compile", none: "" };
@@ -110,7 +111,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
   if (rows.length === 0) return null;
   const effectiveFilter: Filter = filter === "attention" && counts.attention === 0 ? (counts.failed > 0 ? "failed" : "all") : filter;
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = rows.filter((row) => (effectiveFilter === "all" || statusOf(row) === effectiveFilter) && (!normalizedQuery || displayName(row.id, names, row.filename).toLowerCase().includes(normalizedQuery)));
+  const filtered = rows.filter((row) => (effectiveFilter === "all" || statusOf(row) === effectiveFilter) && (!normalizedQuery || displayName(row.id, names, row.filename).toLowerCase().includes(normalizedQuery) || (documentReference(row.id, names, row.filename) ?? "").toLowerCase().includes(normalizedQuery)));
   const visible = filtered.slice(0, visibleCount);
   const selectFilter = (next: Filter) => { setFilter(next); setVisibleCount(12); setExpandedId(next === "failed" ? firstFailed?.id ?? null : null); trackFunnel("source_filter_changed", { filter: next }); };
   const failedDetail = firstFailed?.stages.find((stage) => stage.state === "failed")?.detail ?? "";
@@ -127,7 +128,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
         </div>
       ) : null}
 
-      {fileStates ? <p className="fine board-census" data-census data-discovered={fileStates.census.discovered} {...Object.fromEntries(CENSUS_PARTS.map(([bucket]) => [`data-${bucket.replaceAll("_", "-")}`, fileStates.census[bucket]]))}>{[countNoun(fileStates.census.discovered, "source"), ...CENSUS_PARTS.filter(([bucket]) => fileStates.census[bucket] > 0).map(([bucket, label]) => `${fileStates.census[bucket]} ${label}`)].join(" · ")}</p> : null}
+      {fileStates ? <p className="fine board-census" data-census data-discovered={fileStates.census.discovered} {...Object.fromEntries(CENSUS_PARTS.map(([bucket]) => [`data-${bucket.replaceAll("_", "-")}`, fileStates.census[bucket]]))}>{censusLine(fileStates.census)}</p> : null}
       {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} aria-pressed={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} aria-pressed={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} aria-pressed={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} aria-pressed={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} aria-pressed={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={countNoun(filtered.length, "matching source")}>
@@ -140,7 +141,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   <span className="sr-only">Include {displayName(row.id, names, row.filename)} in the next candidate</span>
                 </label>
               ) : null}
-              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading, customerDataAccess)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content" title={documentReference(row.id, names, row.filename)}>{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading, customerDataAccess)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
             </div>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>

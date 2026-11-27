@@ -73,6 +73,7 @@ export function ArticleLayout({ title, dek, published, modified, author = "TAVON
           </p>
         </header>
         {cover ? <div className={s.cover}>{cover}</div> : null}
+        <div className={s.reader}>
         <div className={s.body}>
           {blocks.map((block, index) => {
             switch (block.kind) {
@@ -100,6 +101,7 @@ export function ArticleLayout({ title, dek, published, modified, author = "TAVON
             </ol>
           </section>
         ) : null}
+        </div>
       </div>
     </article>
   );

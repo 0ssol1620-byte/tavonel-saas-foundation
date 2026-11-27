@@ -79,9 +79,9 @@ for (const state of ['ready', 'review_required', 'failed', 'cancelled']) test(`a
 test('every page declares the same versioned brand icon with working fallbacks', async ({ page, request }) => {
   for (const route of ['/', '/workspace', '/pricing', '/docs/quickstart']) {
     await page.goto(route);
-    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/brand/locus-v2.svg');
+    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/brand/blueprint-v34.svg');
   }
-  for (const route of ['/brand/locus-v2.svg', '/brand/locus-v2-32.png', '/brand/locus-v2.ico', '/favicon.ico', '/icon.svg']) {
+  for (const route of ['/brand/blueprint-v34.svg', '/brand/blueprint-v34-32.png', '/brand/blueprint-v34.ico', '/favicon.ico', '/icon.svg']) {
     expect((await request.get(route)).status(), route).toBe(200);
   }
 });

@@ -55,10 +55,10 @@ describe("every navigation target exists", () => {
     for (const link of V34_FOOTER_LEGAL_LINKS) expect(hasRouteFile(link.href), link.href).toBe(true);
   });
 
-  it("carries the shapes the shell renders: five primary items, four More columns, five footer groups", () => {
+  it("carries the shapes the shell renders: five primary items, four More columns, four footer groups", () => {
     expect(V34_PRIMARY_NAV).toHaveLength(5);
     expect(V34_MORE_GROUPS.map((group) => group.title)).toEqual(["Product", "For you", "Build & trust", "TAVONEL"]);
-    expect(V34_FOOTER_GROUPS.map((group) => group.title)).toEqual(["Product", "Solutions", "Developers", "Trust", "Company"]);
+    expect(V34_FOOTER_GROUPS.map((group) => group.title)).toEqual(["Product", "For you", "Build & trust", "TAVONEL"]);
   });
 
   it("agrees with the registry about which five routes are primary", () => {

@@ -13,6 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { OWNER_ACCESS_ACTIVE_SENTENCE, useCheckout, type NoticeTone } from "@/lib/use-checkout";
 import { billingCardHeading, type BillingStatusAccount, type EntitlementWaitResult } from "@/lib/entitlement-wait";
 import { formatCount, formatTimestamp } from "@/lib/format";
+import { HELD_BACK, shortReference, workspaceDocumentTitle } from "@/lib/plain-language";
 import { countNoun } from "@/lib/plural";
 import { decideCheckoutResume, heldOfferSentence, readOfferParam, rememberCheckoutIntent, takeCheckoutIntent, type ResumeAccess } from "@/lib/checkout-intent";
 import { BILLING_OFFERS, LOCAL_FOLDER_AGENT_SENTENCE, type BillingOfferCode } from "@/lib/billing-catalog";
@@ -57,14 +58,15 @@ import { clearSourceVersionUnavailable, filterPollableSourceVersions, isCurrentS
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
-import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
+import { censusFor, tallyCensus } from "@/lib/file-states";
+import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
 import { activeWorldOpenOutcome, ActiveWorldPicker, askWorldPanel, ConfirmDialog, discoverActiveWorlds, discoveryFailureCopy, discoveryOutcome, requestConfirm, type ActiveWorldDiscovery, type AskWorldState, type ConfirmRequest } from "@/components/workspace/in-page-choices";
 import type { ActiveWorldSummary } from "@/lib/world-store";
 import DeveloperPanel from "@/components/developer-panel";
-import WorkspaceUltimateShell, { type AccessDetail, type SourcePendingReason, type TrialLimits, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
+import WorkspaceUltimateShell, { SURFACE_TITLES, type AccessDetail, type SourcePendingReason, type TrialLimits, type WorkspaceSurface } from "@/components/workspace-ultimate-shell";
 import WorkspaceGettingStarted from "@/components/workspace-getting-started";
 import WorkspaceUseWithAi from "@/components/workspace-use-with-ai";
 import { useTrialAiAccess } from "@/components/workspace/connect-ai-panel";
@@ -514,6 +516,15 @@ export default function WorkspacePage() {
   /* The code the last inventory read was refused with. A workspace without file access is refused, not broken (hotfix 2026-11-10). */
   const [documentInventoryRefusal, setDocumentInventoryRefusal] = useState<string | null>(null);
   const [workspaceStartupReady, setWorkspaceStartupReady] = useState(false);
+  /*
+    D-06. Home derives its verdict and its one action from the result of the latest compile, and that
+    result arrives after the document list: the compile-job list, then the candidate, then its World.
+    Home used to answer from whatever had arrived, so the same data gave two verdicts depending on load
+    order. These three say whether the answer is still on its way, so Home waits instead of flipping.
+  */
+  const [candidateReads, setCandidateReads] = useState(0);
+  const [jobsFollowed, setJobsFollowed] = useState<string[]>([]);
+  const [jobsRead, setJobsRead] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   useEffect(() => {
     if (!intakeOpen) setSelectedDocumentIds([]);
@@ -530,9 +541,10 @@ export default function WorkspacePage() {
   useEffect(() => {
     if (!documents) return;
     const previous = document.title;
-    document.title = `${documents.length} document${documents.length === 1 ? "" : "s"} — TAVONEL`;
+    /* D-09: the tab and the history name the surface, not the same count on every page. */
+    document.title = workspaceDocumentTitle(SURFACE_TITLES[surface], documents.length);
     return () => { document.title = previous; };
-  }, [documents]);
+  }, [documents, surface]);
   const [proofMode, setProofMode] = useState(false);
   const [collectionResult, setCollectionResult] = useState<CollectionResult | null>(null);
   const [libraryAvailable, setLibraryAvailable] = useState(false);
@@ -1059,7 +1071,7 @@ export default function WorkspacePage() {
     setBillingNotices(readBillingNotices(json.notices));
   };
 
-  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string, observeActiveWorld?: (loaded: ActiveWorld | null | undefined) => void) => {
+  const readCollectionCandidate = async (collectionId: string, manifestDigest?: string, observeActiveWorld?: (loaded: ActiveWorld | null | undefined) => void) => {
     const sequence = ++candidateLoadSequence.current;
     if (!/^collection-[a-f0-9]{32}$/.test(collectionId) || (manifestDigest && !/^sha256:[a-f0-9]{64}$/.test(manifestDigest))) return;
     const client = getSupabaseBrowserClient();
@@ -1119,7 +1131,7 @@ export default function WorkspacePage() {
     setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
       ? `Active World loaded. ${verifiedPackage}`
       : artifact.lifecycle === "review_required"
-        ? `Review-required package loaded. ${verifiedPackage} Resolve its blockers before activation.`
+        ? `Review-required package loaded. ${verifiedPackage} ${REVIEW_REQUIRED_ACTIVATION_NOTE}`
         : `Compiled candidate loaded. ${verifiedPackage}`);
     /*
       The lifecycle of a candidate that actually verified, for the caller that needs to know one
@@ -1128,6 +1140,15 @@ export default function WorkspacePage() {
       React invokes twice under StrictMode and would double every row in the funnel.
     */
     return artifact.lifecycle;
+  };
+  /* A read in flight is an answer still on its way; one that failed is an answer, and the page says so (D-06). */
+  const loadCollectionCandidate = async (collectionId: string, manifestDigest?: string, observeActiveWorld?: (loaded: ActiveWorld | null | undefined) => void) => {
+    setCandidateReads((count) => count + 1);
+    try {
+      return await readCollectionCandidate(collectionId, manifestDigest, observeActiveWorld);
+    } finally {
+      setCandidateReads((count) => count - 1);
+    }
   };
 
   // Browser history selects artifact identity as well as the visible surface.
@@ -1240,12 +1261,12 @@ export default function WorkspacePage() {
       void (async () => {
         const fromCorpus = params.get("corpus");
         if (fromCorpus && /^corpus-[a-f0-9]{32}$/.test(fromCorpus)) {
-          void followCorpus(fromCorpus);
+          await followCorpus(fromCorpus);
           return;
         }
         const fromUrl = params.get("job");
         if (fromUrl && /^cjob-[a-f0-9]{32}$/.test(fromUrl)) {
-          void followCompileJob(fromUrl);
+          await followCompileJob(fromUrl);
           return;
         }
         const token = data.session?.access_token;
@@ -1267,7 +1288,7 @@ export default function WorkspacePage() {
         }
         setCompileJob(open);
         void followCompileJob(open.jobId);
-      })();
+      })().finally(() => setJobsRead(true));
 
       /*
        * R1, last half. Someone who picked a plan before signing in arrives here carrying it --
@@ -1683,7 +1704,7 @@ export default function WorkspacePage() {
     This is the half of masterplan 6.3 the customer sees. The half that matters is that
     deleting this function would not change a single outcome.
   */
-  const followCompileJob = useCallback(async (jobId: string) => {
+  const followCompileJobInner = useCallback(async (jobId: string) => {
     followRef.current?.abort();
     const controller = new AbortController();
     followRef.current = controller;
@@ -1749,6 +1770,14 @@ export default function WorkspacePage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* The follow is done -- the candidate it found has been read or refused -- so Home may answer from it (D-06). */
+  const followCompileJob = useCallback(async (jobId: string) => {
+    try {
+      await followCompileJobInner(jobId);
+    } finally {
+      setJobsFollowed((ids) => ids.includes(jobId) ? ids : [...ids, jobId]);
+    }
+  }, [followCompileJobInner]);
 
   /*
     Follow a corpus: the run above the parts.
@@ -1997,8 +2026,8 @@ export default function WorkspacePage() {
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
         // The reasons are read in the review queue, where each has its sentence and reference (D0 R2).
-        ? `Separate Core produced a review-required package for ${json.collectionId}${json.reviewReasons?.length ? ` with ${countNoun(json.reviewReasons.length, "review reason")}` : ". Manual review required"}. The signed download is available and nothing is active yet.`
-        : `Compiled World ${json.collectionId} is ready for evidence review.`);
+        ? `This compile produced a package that needs review${json.reviewReasons?.length ? ` (${countNoun(json.reviewReasons.length, "review reason")})` : ""}. The signed download is available and nothing was activated.`
+        : "The compiled World is ready for evidence review.");
     } finally {
       setBusy(false);
     }
@@ -2743,7 +2772,7 @@ export default function WorkspacePage() {
     const digestMatches = candidates.inputSha256 === `sha256:${versionKey}`;
     const keyMatches = candidates.sourceImmutableKey === target.sanitizedKey;
     setNotice(
-      `OCR JSON verified for ${target.documentId}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
+      `OCR JSON verified for ${displayName(target.documentId, names)}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
     );
   };
 
@@ -3033,15 +3062,47 @@ export default function WorkspacePage() {
   const compileRunning = Boolean(compileJob && !isCompileJobResting(compileJob.state));
   const activityCount = activePipelineCount || (compileRunning ? Math.max(1, compileJob?.documentsTotal ?? 1) : 0) || (busy ? 1 : 0);
   const candidateReady = Boolean(collectionResult?.coreExecution);
+  /*
+    D-06. True while the answer to "what became of the latest compile" is still on its way: the first
+    reads have not finished, the compile-job list has not answered, a finished run's result is still
+    being followed, or a candidate is mid-read. Home waits on this rather than answering from a partial
+    picture that the next response contradicts.
+  */
+  const resultPending =
+    !workspaceStartupReady ||
+    !(jobsRead || compileJob !== null) ||
+    (compileJob !== null && (compileJob.state === "ready" || compileJob.state === "review_required") && !jobsFollowed.includes(compileJob.jobId)) ||
+    (candidateReads > 0 && collectionResult === null);
   const candidateNeedsDecision = Boolean(
     collectionResult?.coreExecution && activeWorld?.manifestDigest !== collectionResult.manifestDigest,
   );
   const documentCount = documents?.length ?? 0;
-  const readyDocumentCount = documents?.filter((document) => document.hasOcrJson).length ?? 0;
+  /*
+    B4. Home and the Knowledge census read one tally. A source already in a compile is ready AND compiled,
+    on both screens; counting documents with a read result here and the census there split 137 from 136.
+    With no census (rows that fit no state, or a sum that does not add up) the old count stands.
+  */
+  const sourceTally = (() => {
+    const census = censusFor(pipelineRows, {
+      compiledWorldActive: Boolean(activeWorld && collectionResult && activeWorld.manifestDigest === collectionResult.manifestDigest),
+      blocked: compileJob?.blocked,
+      blockedResolution: compileJob?.blockedResolution ?? null,
+    });
+    return census ? tallyCensus(census) : null;
+  })();
+  const readyDocumentCount = sourceTally ? sourceTally.ready : documents?.filter((document) => document.hasOcrJson).length ?? 0;
   /* Which board rows may be ticked for the next candidate: a source that has been read. The
      board owns the list; this owns the eligibility, from the same document read. */
   const compilableDocumentIds = documents?.filter((document) => document.hasOcrJson).map((document) => document.documentId) ?? [];
   const operatorReviewCount = documents?.filter((document) => document.processingState === "operator_review").length ?? 0;
+  /* Held at reading and not in the compile on screen: the part of Home's count the Review queue does not list. Unknown without the compile's document set. */
+  const heldOutsideCompile = compileRecord?.documentIds
+    ? (documents ?? []).filter((document) => document.processingState === "operator_review" && !compileRecord.documentIds.includes(document.documentId)).length
+    : 0;
+  /* Exactly the conditions the promote route and the Activate button refuse a candidate for (collection-download.ts `validatePromotableCollectionArtifact`). */
+  const activationClosed = Boolean(
+    collectionResult && (collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed"),
+  );
   const collectionReviewRequired = Boolean(
     collectionResult?.coreExecution?.status === "review_required" ||
     collectionResult?.validation.status === "review_required" ||
@@ -3093,6 +3154,7 @@ export default function WorkspacePage() {
     hasCandidate: candidateReady,
     candidateNeedsDecision,
     collectionReviewRequired,
+    resultPending,
     reviewCount,
     activeRevision: activeWorld?.revision ?? null,
     compileErrorCode: compileJob?.errorCode ?? null,
@@ -3129,12 +3191,12 @@ export default function WorkspacePage() {
     inventory carries no timestamps, so it is summarised by state; activation history with its
     real receipts lives on Changes (World history), not in a second card here.
   */
-  const readingCount = Math.max(0, documentCount - readyDocumentCount - operatorReviewCount);
+  const readingCount = sourceTally ? sourceTally.processing : Math.max(0, documentCount - readyDocumentCount - operatorReviewCount);
   const workspaceFacts = workspaceState.mode === "returning"
     ? [
       `${readyDocumentCount} ready`,
       `${readingCount} being read`,
-      `${operatorReviewCount} need review`,
+      `${sourceTally ? sourceTally.needReview : operatorReviewCount} need review`,
       homeWorldFact(activeWorld?.revision ?? null, workspaceWorlds),
     ].join(" · ")
     : undefined;
@@ -3713,7 +3775,12 @@ export default function WorkspacePage() {
               <div>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} relations.</p>
                 {noEntitiesNote(collectionResult.validation.counts) ? <p className="fine" data-testid="no-entities-note">{noEntitiesNote(collectionResult.validation.counts)}</p> : null}
-                {activeWorld ? null : (
+                {activeWorld ? null : activationClosed ? (
+                  <p className="fine">
+                    This result is on hold, so nothing is active and your AI cannot use it yet. Open it to see why
+                    and what you can do now.
+                  </p>
+                ) : (
                   <p className="fine">
                     Nothing is active until you approve it. Review the evidence, then activate the
                     candidate to make it the World that Ask, the API and MCP read.
@@ -3731,7 +3798,7 @@ export default function WorkspacePage() {
                   </>
                 ) : (
                   <>
-                    <button type="button" onClick={() => navigateSurface("review")}>Review items</button>
+                    <button type="button" onClick={() => navigateSurface("review")}>{activationClosed ? "See why it is on hold" : "Review items"}</button>
                     <button type="button" onClick={() => navigateSurface("world")}>Inspect candidate</button>
                     <button type="button" disabled={downloading} onClick={() => void downloadCollection()}>{downloading ? "Preparing…" : "Download signed knowledge package"}</button>
                   </>
@@ -3834,7 +3901,7 @@ export default function WorkspacePage() {
                 <p>Compile one or more ready sources into the next candidate. Tick them on the board above; nothing becomes active until you review it.</p>
                 <div className="compile-selection-actions">
                   <small>
-                    <b>{selectedDocumentIds.length} OCR-qualified document{selectedDocumentIds.length === 1 ? "" : "s"} selected</b>
+                    <b>{selectedDocumentIds.length} readable document{selectedDocumentIds.length === 1 ? "" : "s"} selected</b>
                     {" · "}{compileLimits}
                   </small>
                   <button type="button" disabled={busy || !judgeCorpusSet(selectedDocumentIds.length).ok || sizeRefusedSameSet} onClick={() => void compileSelectedDocuments()}>
@@ -3908,6 +3975,7 @@ export default function WorkspacePage() {
                   still required and is still what goes into the ledger.
                 */}
                 <WorldStudioUltimate
+                  names={names}
                   model={worldReadModel}
                   syncUrl
                   onRollback={rollbackReason.trim().length >= 8 ? (digest) => void rollbackWorld(digest) : undefined}
@@ -3957,6 +4025,12 @@ export default function WorkspacePage() {
               {/* WO-WS-4: the eyebrow is the screen's name now; the tag is the count the top bar prints. */}
               <Screen title="Review queue" status={reviewScreenStatus(reviewCount, Boolean(collectionResult), evidenceRead)} aria-labelledby="review-queue-title">
                 <h2 id="review-queue-title">Sources waiting on you, most at risk first.</h2>
+                {/* D-07: Home counts every source held at reading; this queue counts the sources in one compile. Both numbers stay, and this says how they relate. */}
+                {heldOutsideCompile > 0 ? (
+                  <p className="fine" data-testid="held-outside-compile">
+                    {heldOutsideCompile === 1 ? "1 other source was" : `${heldOutsideCompile} other sources were`} held when {heldOutsideCompile === 1 ? "it was" : "they were"} read, so {heldOutsideCompile === 1 ? "it is" : "they are"} not in the compile below. {heldOutsideCompile === 1 ? "It is" : "They are"} filed under Review on Knowledge.
+                  </p>
+                ) : null}
                 <ReviewQueue
                   input={reviewQueueInput}
                   locale={pageLocale()}
@@ -3983,6 +4057,7 @@ export default function WorkspacePage() {
                 {worldReadModel?.evidence.length ? (
                   <>
                     <WorldStudioUltimate
+                      names={names}
                       model={worldReadModel}
                       initialLens="evidence"
                       selectedEvidenceId={reviewEvidenceId}
@@ -4109,12 +4184,12 @@ export default function WorkspacePage() {
                   <p className="world-empty" role="status">
                     This compile&apos;s package carries no page-and-region evidence to open: {collectionResult.validation.counts.claims} claims and {collectionResult.validation.counts.relations} relations were counted, and 0 evidence regions.
                   </p>
-                ) : <p className="world-empty">Compile a collection to review its page-and-bbox-bound evidence.</p>}
+                ) : <p className="world-empty">Compile a collection to review the page evidence behind it.</p>}
               </Screen>
               {/* WO-WS-4: the activation block's eyebrow names the screen and its status output is the screen's tag. */}
               <Screen id="workspace-review" className="world-studio" title="Activate" status={activationScreenStatus(activeWorld?.revision ?? null)}
                 statusAs="output" aria-labelledby="world-studio-title">
-                <h2 id="world-studio-title">Make this the version your AI reads.</h2>
+                <h2 id="world-studio-title">{collectionResult && activationClosed ? "This version is on hold." : "Make this the version your AI reads."}</h2>
                 {!collectionResult ? (
                   <p className="world-empty">Compile or reload a verified collection candidate to begin review.</p>
                 ) : (
@@ -4127,6 +4202,29 @@ export default function WorkspacePage() {
                         <span><b>Current active</b>{activeWorld ? `Revision ${activeWorld.revision}` : "None"}</span>
                       </div>
                       {noEntitiesNote(collectionResult.validation.counts) ? <p className="fine" data-testid="no-entities-note-review">{noEntitiesNote(collectionResult.validation.counts)}</p> : null}
+                      {activationClosed ? (
+                        /*
+                          D-01. The workspace cannot activate this version, so it does not offer the controls for it.
+                          What is true is said instead: what is happening, what can be done now, what happens next.
+                          Nothing here changes any rule; the promote route and the review gate decide as before.
+                        */
+                        <div className="review-hold" role="status" data-testid="review-required-activation-note">
+                          <p><strong>What is happening.</strong> {HELD_BACK}</p>
+                          <p>
+                            <strong>What you can do now.</strong> Open the evidence above and record what you find on each item.
+                            Download the signed package from Home to look at it yourself. You can also add or replace files and compile again. The reasons for the hold are listed in Review.
+                            {activeWorld
+                              ? ` Asking and searching keep using your active version (revision ${activeWorld.revision}).`
+                              : " Asking and searching start once a version is active."}
+                          </p>
+                          <p><strong>What happens next.</strong> This version stays on hold, and nothing about your workspace changes. {REVIEW_REQUIRED_ACTIVATION_NOTE}</p>
+                          <p className="fine"><Link href="/contact">Send us this reference</Link> if you want us to look at it: {shortReference(collectionResult.collectionId)}.</p>
+                          <details>
+                            <summary>Technical details</summary>
+                            <p className="fine">Collection {collectionResult.collectionId}</p>
+                          </details>
+                        </div>
+                      ) : (<>
                       <label htmlFor="review-reason">Human review record</label>
                       <textarea
                         id="review-reason"
@@ -4144,12 +4242,8 @@ export default function WorkspacePage() {
                           {activeWorld?.manifestDigest === collectionResult.manifestDigest ? "This candidate is active" : worldBusy ? "Recording decision…" : "Activate reviewed candidate"}
                         </button>
                       </div>
-                      {collectionResult.lifecycle !== "candidate" || collectionResult.validation.status !== "passed" || collectionResult.coreExecution?.status !== "completed" ? (
-                        <p className="fine" role="status" data-testid="review-required-activation-note">
-                          {REVIEW_REQUIRED_ACTIVATION_NOTE} <Link href="/contact">Contact support</Link> · Reference {collectionResult.collectionId}
-                        </p>
-                      ) : null}
-                      <p className="fine">Activation uses compare-and-swap against the current manifest. A stale browser cannot overwrite a newer human decision.</p>
+                      <p className="fine">If someone changes the active version while this page is open, activation is refused instead of overwriting their decision.</p>
+                      </>)}
                     </div>
                     <div className="version-panel">
                       <p className="eyebrow">Retained versions</p>
@@ -4161,8 +4255,8 @@ export default function WorkspacePage() {
                             <li key={version.manifest_digest}>
                               <div>
                                 <strong>{version.lifecycle_status}</strong>
-                                <small>{version.manifest_digest}</small>
-                                <small>Activated {version.activation_count} time(s)</small>
+                                <small title={version.manifest_digest}>Version ref {shortReference(version.manifest_digest)}</small>
+                                <small>{version.activation_count === 1 ? "Activated once" : `Activated ${version.activation_count} times`}</small>
                               </div>
                               {activeWorld && version.manifest_digest !== activeWorld.manifestDigest ? (
                                 <button
@@ -4225,7 +4319,7 @@ export default function WorkspacePage() {
                         {aiLastRequest === "unconfirmed"
                           ? "Could not confirm a request from your AI. Finish the steps above, then check again."
                           : aiLastRequest && aiLastRequest !== "checking"
-                            ? aiLastRequestSentence(aiLastRequest, (iso) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)))
+                            ? aiLastRequestSentence(aiLastRequest, (iso) => formatTimestamp(iso) ?? iso)
                             : null}{" "}
                         <button type="button" disabled={aiLastRequest === "checking"} onClick={() => void checkAiLastRequest()}>
                           {aiLastRequest === null ? "Check when your AI last asked" : aiLastRequest === "checking" ? "Checking..." : "Check again"}
@@ -4237,7 +4331,7 @@ export default function WorkspacePage() {
                 <Screen title="Ask" status={askScreenStatus(activeWorld?.revision ?? null, askPanel)} aria-labelledby="ask-title">
                 <div>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
-                  <p>Retrieval runs only against the active world. If no page-and-bbox evidence matches, TAVONEL abstains.</p>
+                  <p>Answers come only from your active World. If no page in it matches your question, TAVONEL says so.</p>
                 </div>
                 {askPanel === null ? null : askPanel === "checking" || askPanel === "opening" ? (
                   <p className="notice static" role="status">
@@ -4344,7 +4438,7 @@ export default function WorkspacePage() {
                   </p>
                 ) : null}
                 {askWorldModel && askEvidenceId !== undefined ? (
-                  <WorldStudioUltimate model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
+                  <WorldStudioUltimate names={names} model={askWorldModel} initialLens="evidence" selectedEvidenceId={askEvidenceId} onEvidenceSelect={(selection) => setAskEvidenceId(selection?.id ?? null)} />
                 ) : null}
                 </Screen>
               </div>

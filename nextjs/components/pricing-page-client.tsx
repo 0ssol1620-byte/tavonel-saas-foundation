@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import v34 from "@/components/v34/tokens.module.css";
+import { Hero } from "@/components/v34/ui/hero";
 import PricingPlanOverview, { pricingPlanDestinationClass, pricingPlanId } from "./pricing-plan-overview";
 import tableStyles from "@/components/docs/docs-table.module.css";
 import { useCheckout, type CheckoutHandlers, type NoticeLink, type NoticeTone } from "@/lib/use-checkout";
@@ -971,6 +972,21 @@ export default function PricingPageClient({
       {/* Conversion pass 2026-11-09: the phone sheet's start action, the same one the Evaluation card offers. */}
       {header}
       <main id="main">
+        {/*
+          WO-UI-A1 (layout only). The H1 and its one-sentence lede are the v34 split hero (no art: left on the container edge, the one H1 role /contact holds) every other v34
+          page opens with (components/v34/ui/hero.tsx), instead of the legacy left-aligned .document-title. Same
+          words, same figures: the sentence is the one the pricing-context grid used to carry.
+        */}
+        <Hero
+          variant="split"
+          surface="paper"
+          title="Pages and dollars."
+          lead={<>
+            {PERSONAL.label} includes {grouped(PERSONAL.includedPages)} standard pages each month, rising to{" "}
+            {grouped(BUSINESS.includedPages)} on {BUSINESS.label}. Need more in a month? Talk to us and we will
+            arrange the additional volume.
+          </>}
+        />
         <section className="scene doc">
           <div className="shell">
             {/*
@@ -982,7 +998,6 @@ export default function PricingPageClient({
               H1 is two claims at display size when one of them is the page's subject and the
               other is the argument for it.
             */}
-            <h1 className="document-title">Pages and dollars.</h1>
             {/*
               BA-122. The rate line used to open on {liveCheckout ? "Standard" : "Pilot"}, which in
               this deployment renders "Pilot" -- telling a buyer the unit price is provisional. It
@@ -994,11 +1009,6 @@ export default function PricingPageClient({
               two sentences long -- there is nothing in it a reader has to be steered past.
             */}
             <div className="pricing-context">
-              <p className="lede">
-                {PERSONAL.label} includes {grouped(PERSONAL.includedPages)} standard pages each month, rising to{" "}
-                {grouped(BUSINESS.includedPages)} on {BUSINESS.label}. Need more in a month? Talk to us and we will
-                arrange the additional volume.
-              </p>
               {/*
                 BA-119. Audit M04's disclosure stays -- both gates are still read from
                 `activationPolicy` on the server and printed in the policy's own words -- but not as
@@ -1067,7 +1077,7 @@ export default function PricingPageClient({
             ) : null}
             <div className="plans" ref={plansRef} data-visual>
               {PLANS.map((plan, index) => (
-                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.code === "personal" ? 1 : 0} style={index >= 4 ? { borderTop: "1px solid var(--tv-rule)" } : undefined}>
+                <article className={`plan ${pricingPlanDestinationClass}`} id={pricingPlanId(index)} tabIndex={-1} key={plan.name} data-featured={plan.code === "personal" ? 1 : 0}>
                   {/*
                     BQ-027. Four cards, four shared baselines.
 

@@ -19,7 +19,7 @@ describe("compile-stage state and payload integrity", () => {
   });
   it.each(["draft", "preflight", "awaiting_confirmation", "uploading", "sanitizing", "reading", "structuring", "resolving", "building_world", "review_required", "ready", "failed", "cancelled"] as CompileState[])("%s never paints an empty result as ready for AI", state => {
     const view = deriveCompileStageView([], {}, null, state);
-    expect(view.visual).toBe("none"); expect(view.finalLabel).toBe("Review & activate");
+    expect(view.visual).toBe("none"); expect(view.finalLabel).toBe(state === "review_required" ? "On hold for review" : "Review & activate");
     expect(view.title.length).toBeGreaterThan(5); expect(view.detail.length).toBeGreaterThan(30);
     expect(view.tone).not.toBe("ready");
   });

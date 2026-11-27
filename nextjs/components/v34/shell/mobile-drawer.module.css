@@ -5,7 +5,7 @@
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--v34-fg-border);
+  border: 0;
   border-radius: var(--v34-radius-panel);
   background: transparent;
   color: var(--v34-fg);
@@ -225,6 +225,8 @@
 
 @media (forced-colors: active) {
   .cta { border: 1px solid ButtonText; }
+  /* The trigger is borderless on screen (blueprint); forced colours drop its background, so it keeps a boundary there. */
+  .trigger { border: 1px solid ButtonText; }
   .trigger:focus-visible,
   .close:focus-visible,
   .brand:focus-visible,

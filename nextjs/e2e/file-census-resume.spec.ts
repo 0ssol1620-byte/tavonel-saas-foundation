@@ -100,7 +100,7 @@ test.describe("file census across reopen", () => {
     await open(page);
     const server = await snapshot(page, 10);
     expect(server.attrs).toMatchObject({ "data-discovered": "10", "data-pending": "4", "data-processing": "3", "data-held": "3" });
-    expect(server.census).toBe("10 sources · 4 queued · 3 processing · 3 held");
+    expect(server.census).toBe("10 sources · 4 ready · 3 processing · 3 need review");
     // Next actions: compile for the four ready rows, review for the two held for a person, re-upload for the refusal.
     expect(Object.values(server.next).filter((v) => v === "compile")).toHaveLength(4);
     expect(Object.values(server.next).filter((v) => v === "review")).toHaveLength(2);
@@ -123,7 +123,7 @@ test.describe("file census across reopen", () => {
     await page.getByRole("region", { name: "Compile preflight" }).getByRole("button", { name: /Upload & compile/ }).click();
     await expect(page.locator("[data-census]")).toHaveAttribute("data-discovered", "11");
     await expect(page.locator("[data-census]")).toHaveAttribute("data-processing", "4");
-    await expect(page.locator("[data-census]")).toHaveText("11 sources · 4 queued · 4 processing · 3 held");
+    await expect(page.locator("[data-census]")).toHaveText("11 sources · 4 ready · 4 processing · 3 need review");
     releasePut();
 
     // Reload: the unsent file is gone from this browser, the server's ten are identical.

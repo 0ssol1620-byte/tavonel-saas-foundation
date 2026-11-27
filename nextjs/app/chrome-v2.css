@@ -172,7 +172,6 @@
   .chrome-v2-header > .one-path-primary-nav { margin-left: 28px; }
   .chrome-v2-header > .nav-actions { margin-left: auto; }
 }
-.wordmark .logomark { color: var(--text-mid); }
 .one-path-primary-nav .site-nav-direct {
   flex: 0 0 auto;
   width: auto;

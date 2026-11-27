@@ -132,7 +132,9 @@ describe("every V34 route body", () => {
 
   it("and /pricing, the legacy client, writes one h1 without the brand suffix", () => {
     const source = readFileSync(join(import.meta.dirname, "../../components/pricing-page-client.tsx"), "utf8");
-    const h1s = [...source.matchAll(/<h1\b[^>]*>([^<]*)<\/h1>/g)].map((m) => m[1]!.trim());
+    // WO-UI-A1: the client's one h1 is the v34 split hero's title (components/v34/ui/hero.tsx renders the <h1>); no literal <h1> stays beside it.
+    expect(source.match(/<h1\b/g) ?? []).toHaveLength(0);
+    const h1s = [...source.matchAll(/<Hero\b[^>]*?\btitle="([^"]*)"/g)].map((m) => m[1]!.trim());
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).not.toBe("");
     expect(h1s[0]).not.toMatch(/—\s*TAVONEL/);
@@ -147,7 +149,7 @@ describe("every V34 route body", () => {
     const route = readFileSync(join(import.meta.dirname, "../../app/pricing/page.tsx"), "utf8");
     expect(route).toMatch(/<PricingPageClient\b/);
     const source = readFileSync(join(import.meta.dirname, "../../components/pricing-page-client.tsx"), "utf8");
-    const h1 = source.match(/<h1\b[^>]*>([^<]*)<\/h1>/)![1]!.trim();
+    const h1 = source.match(/<Hero\b[^>]*?\btitle="([^"]*)"/)![1]!.trim();
     expect(h1).toBe("Pages and dollars.");
     expect(h1).not.toBe(v34Route("pricing").heading);
   });

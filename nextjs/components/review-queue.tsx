@@ -16,6 +16,8 @@ import {
 } from "@/lib/review-queue";
 import { formatTimestamp } from "@/lib/format";
 import { countNoun } from "@/lib/plural";
+import { documentReference } from "@/lib/document-names";
+import { describeReviewReason, isReasonCode } from "@/lib/plain-language";
 import { reviewReasonCopy, type PageLocale } from "@/lib/workspace-failure-copy";
 
 /*
@@ -103,15 +105,40 @@ export function reasonFamily(value: string, stopped: boolean): string {
   screen as a selectable reference, the way the failure panel prints "Reference CORE_OUTPUT_TOO_LARGE".
   A reason without one is shown exactly as before.
 */
+/* B3: the filter names a reason by its plain headline; the recorded string stays the option's value and its tooltip. */
+export function reasonOptionLabel(value: string): string {
+  if (isReasonCode(value)) return describeReviewReason(value).headline;
+  return value.length > 40 ? `${value.slice(0, 39)}…` : value;
+}
+
+/* Plain headlines are shared (every unsourced code reads the same), so equal labels are numbered: the options stay distinguishable and the code stays out of the label. */
+export function reasonOptionLabels(values: string[]): string[] {
+  const labels = values.map(reasonOptionLabel);
+  const seen = new Map<string, number>();
+  return labels.map((label) => {
+    if (labels.filter((other) => other === label).length < 2) return label;
+    const n = (seen.get(label) ?? 0) + 1;
+    seen.set(label, n);
+    return `${label} (${n})`;
+  });
+}
+
 function ReasonChip({ value, family, locale }: { value: string; family: string; locale: PageLocale }) {
   const copy = reviewReasonCopy(value, locale);
+  /* UI-D (D-02): the headline is a sentence a first-time customer reads; the recorded code is support's, behind a disclosure. */
+  const plain = describeReviewReason(value);
   return (
     <small className="workspace-review-reason">
       <span>{family}</span>
-      {copy ? <>
+      {!isReasonCode(value) ? value : copy ? <>
         <em>{copy.sentence}</em>
-        {copy.reference} <code>{value}</code>
-      </> : /\s/.test(value) ? value : <code>{value}</code>}
+        <details><summary>Technical details</summary>{copy.reference} <code>{value}</code></details>
+      </> : <>
+        <em>{plain.headline}</em>
+        <b>{plain.meaning}</b>
+        <i>{plain.next}</i>
+        <details><summary>Technical details</summary>Reference <code>{value}</code></details>
+      </>}
     </small>
   );
 }
@@ -236,9 +263,10 @@ export default function ReviewQueue({
             onChange={(event) => setReason(event.target.value)}
           >
             <option value="">All {countNoun(queue.total, "source")}</option>
-            {reasons.map((value) => (
-              <option key={value} value={value}>{value.length > 40 ? `${value.slice(0, 39)}…` : value}</option>
-            ))}
+            {reasonOptionLabels(reasons).map((label, index) => {
+              const value = reasons[index]!;
+              return <option key={value} value={value} title={isReasonCode(value) ? `Reference ${value}` : undefined}>{label}</option>;
+            })}
           </select>
           <p className="fine">
             {rows.length} of {queue.total} shown · ordered by safety stops, then review state, then
@@ -255,7 +283,7 @@ export default function ReviewQueue({
         {rows.map((row, index) => {
           return (
             <li key={row.documentId} data-review-status={row.status} data-security={row.securityBlocked || undefined}>
-              <strong>{row.name}</strong>
+              <strong title={documentReference(row.documentId, input.names ?? {})}>{row.name}</strong>
               <small>
                 {row.securityBlocked ? "Stopped by a safety check · " : ""}
                 {row.evidenceUnverified ? "read state not known (evidence not loaded)" : REVIEW_QUEUE_STATUS_COPY[row.status]}

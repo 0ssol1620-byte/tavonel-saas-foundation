@@ -86,10 +86,9 @@ html:has(.evaluation-page) { color-scheme: light; }
 @media (max-width: 760px) {
   /* Move the plan choice up by tightening rhythm, while keeping every gate and qualifier visible. */
   .pricing-page .scene.doc {
-    padding-top: 64px;
+    padding-top: 0;
     padding-bottom: 48px;
   }
-  .pricing-page .scene.doc > .shell > .document-title { margin-bottom: 12px; }
   .pricing-page .paper-purchase-boundary {
     margin-block: 12px;
     padding: 10px 12px;
@@ -109,8 +108,9 @@ html:has(.evaluation-page) { color-scheme: light; }
 }
 
 /* One ruled comparison, with the current-start conditions above every action. */
-.pricing-page .pricing-context { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; gap: 32px; margin-block: 20px 28px; }
-.pricing-page .pricing-context > .lede { margin: 0; max-width: 52ch; font-size: 17px; line-height: 1.6; }
+/* WO-UI-A1: the lede is the v34 hero's lead now; the page opens on the split hero, so the one boundary note sits in the container's own width. */
+.pricing-page .scene.doc { padding-top: 0; min-height: 0; }
+.pricing-page .pricing-context { display: block; margin-block: 8px 28px; }
 .pricing-page .pricing-context .paper-purchase-boundary { margin: 0; padding: 0 0 0 20px; border: 0; border-left: 1px solid #88928d; background: transparent; }
 .pricing-page .paper-purchase-boundary h2 { font-size: 18px; line-height: 1.35; }
 .pricing-page .paper-purchase-boundary p { font-size: 14px; line-height: 1.5; }
@@ -142,10 +142,12 @@ html:has(.evaluation-page) { color-scheme: light; }
 }
 /* WO-CI-23: the overage table's "Request access" links are controls, 44px at every width (lead decision 14). */
 .pricing-page table[aria-labelledby="pricing-overage-title"] td a { display: inline-flex; align-items: center; min-height: 44px; }
-/* Direction C (2026-11-04): the four plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
-.pricing-page .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
+/* Direction C (2026-11-04): the plans are one white sheet on the warm shadow, divided by hairlines; the featured plan keeps its accent rule, clipped to the sheet's corner. */
+.pricing-page .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); gap: 0; margin-top: 0; border: 0; border-radius: var(--tv-r-card); background: var(--tv-sheet); box-shadow: var(--tv-shadow-1); overflow: hidden; }
 .pricing-page .plan { position: relative; display: grid; grid-template-rows: subgrid; grid-row: span 4; gap: 20px; padding: 32px 28px 28px; border: 0; border-right: 1px solid var(--tv-rule); border-radius: 0; background: transparent; box-shadow: none; }
-.pricing-page .plan:last-child { border-right: 0; }
+.pricing-page .plan:nth-child(3n) { border-right: 0; }
+/* WO-UI-A1: six plans are two rows of three; the second row is divided from the first by one hairline. */
+.pricing-page .plan:nth-child(n + 4) { border-top: 1px solid var(--tv-rule); }
 .pricing-page .plan[data-featured="1"] { background: transparent; border-color: var(--tv-rule); }
 .pricing-page .plan[data-featured="1"]::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tv-action); }
 .pricing-page .plan-head h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; }
@@ -164,19 +166,44 @@ html:has(.evaluation-page) { color-scheme: light; }
 .pricing-page .pricing-purchase p { margin: 0 0 12px; }
 .pricing-page .pricing-purchase .pricing-purchase-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin: 0; }
 .pricing-page .pricing-purchase .btn { min-height: 44px; }
-@media (max-width: 1023px) {
+@media (max-width: 1099px) {
   .pricing-page .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pricing-page .plan:nth-child(2) { border-right: 0; }
+  .pricing-page .plan:nth-child(3n) { border-right: 1px solid var(--tv-rule); }
+  .pricing-page .plan:nth-child(even) { border-right: 0; }
   .pricing-page .plan:nth-child(n + 3) { border-top: 1px solid var(--tv-rule); }
 }
 @media (max-width: 760px) {
-  .pricing-page .pricing-context { grid-template-columns: 1fr; gap: 12px; margin-block: 12px 16px; }
-  .pricing-page .pricing-context > .lede { font-size: 15px; line-height: 1.5; }
+  .pricing-page .pricing-context { margin-block: 8px 16px; }
   .pricing-page .pricing-context .paper-purchase-boundary { padding: 0 0 0 12px; }
   .pricing-page .paper-purchase-boundary h2 { font-size: 17px; }
 }
 @media (max-width: 600px) {
   .pricing-page .plans { grid-template-columns: 1fr; grid-template-rows: none; }
-  .pricing-page .plan { grid-template-rows: auto; grid-row: auto; gap: 14px; padding: 24px 20px; border-right: 0; }
+  .pricing-page .plan:nth-child(n) { grid-template-rows: auto; grid-row: auto; gap: 14px; padding: 24px 20px; border-right: 0; }
   .pricing-page .plan + .plan { border-top: 1px solid var(--tv-rule); }
+}
+/*
+  WO-UI-A1 (audit P4). On a phone "Plans at a glance" is the one place the six prices are read side by side, and the
+  cards under it printed each of them a second time. The card keeps its price and billing unit in the document, for
+  screen readers and for the overview's own check, but not on screen: the figure is read once, in the overview above,
+  and the card opens on the plan name and what it includes. Same breakpoint as the overview (pricing-plan-overview.module.css).
+*/
+@media (max-width: 700px) {
+  .pricing-page .plan .plan-head :is(.price, .price-period) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+}
+/*
+  WO-UI-A1 (audit P3). The calculator filled the left ~650px: its inputs, then the ceiling rows, then the totals
+  each took the first column in turn, and the right half stayed empty. The inputs and the run totals now sit
+  side by side, and the three ceiling rows, which belong to the selection and not to the money column, run the
+  full width under both (three across where the width allows). Placement only: every row, label and figure is
+  the one the component prints.
+*/
+@media (min-width: 761px) {
+  .pricing-page .usage-estimator { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .pricing-page .usage-estimator > div:first-child { grid-column: 1; grid-row: 1; }
+  .pricing-page .usage-estimator > dl:not(.usage-estimator-fit) { grid-column: 2; grid-row: 1; }
+  .pricing-page .usage-estimator > .usage-estimator-fit { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (min-width: 1100px) {
+  .pricing-page .usage-estimator > .usage-estimator-fit { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

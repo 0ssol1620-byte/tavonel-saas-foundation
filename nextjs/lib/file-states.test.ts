@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildPipeline, refusalDetail, type LocalUpload, type PipelineDocument, type PipelineRow, type StageState } from "./pipeline";
-import { censusOf, deriveFileStates, reconciles, type Census } from "./file-states";
+import { censusFor, censusLine, censusOf, deriveFileStates, reconciles, tallyCensus, type Census } from "./file-states";
 
 const doc = (o: Partial<PipelineDocument> = {}): PipelineDocument => ({
   documentId: "d1", versionKey: "v1", sanitizedKey: "s", sanitizedSize: 10, ocrJsonKey: null, ocrJsonSize: null,
@@ -125,5 +126,44 @@ describe("censusOf", () => {
       if (!active) expect(census.accepted).toBe(0);
       expect(rows.filter((r) => r.state === "accepted")).toHaveLength(census.accepted);
     }
+  });
+});
+
+/*
+  B4 (independent review). Home said "137 ready" (documents with a read result) while Knowledge said "136 ready
+  to compile" and "1 compiled" (the census): one source in a compile split them. Both screens now read the
+  census through `tallyCensus`, so one fixture gives one set of numbers.
+*/
+describe("Home and Knowledge read one tally", () => {
+  const ids = Array.from({ length: 141 }, (_, i) => `doc-${i}`);
+  // 137 read, 4 held at reading; the first read one is already in a compile that is not active.
+  const documents = ids.map((documentId, i) => doc({ documentId, versionKey: `v${i}`, hasOcrJson: i < 137, processingState: i < 137 ? "ocr_ready" : "operator_review" }));
+  const rows = buildPipeline([], documents, ["doc-0"]);
+  const ctx = { compiledWorldActive: false };
+
+  it("counts the compiled source as ready on both screens", () => {
+    const census = censusFor(rows, ctx)!;
+    const oldHomeReady = documents.filter((item) => item.hasOcrJson).length;
+    // The old census alone said 136 ready to compile; the old Home said 137.
+    expect(census.pending).toBe(136);
+    expect(oldHomeReady).toBe(137);
+    const tally = tallyCensus(census);
+    expect(tally).toEqual({ discovered: 141, ready: 137, compiled: 1, processing: 0, needReview: 4, excluded: 0 });
+    // Home's number and the Knowledge line's number are the same field.
+    expect(tally.ready).toBe(oldHomeReady);
+    expect(censusLine(census)).toBe("141 sources · 137 ready (1 compiled) · 4 need review");
+  });
+
+  it("prints no sum that does not add up", () => {
+    expect(censusFor(rows, ctx)).not.toBeNull();
+    expect(tallyCensus({ ...censusOf(deriveFileStates(rows, ctx)) }).discovered).toBe(rows.length);
+  });
+
+  it("the page and the board both read it, and neither counts read results on its own any more", () => {
+    const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+    const board = readFileSync(new URL("../components/pipeline-board.tsx", import.meta.url), "utf8");
+    expect(page).toContain("sourceTally ? sourceTally.ready");
+    expect(page).toContain("censusFor(pipelineRows");
+    expect(board).toContain("censusLine(fileStates.census)");
   });
 });

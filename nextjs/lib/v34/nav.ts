@@ -3,7 +3,7 @@
  *
  * The shell (`components/v34/shell/**`) renders what this file declares and decides nothing
  * itself: five primary items, the four columns of the More panel and the drawer, and the footer's
- * five groups. At integration this folds into `lib/site-navigation.ts`.
+ * four groups. At integration this folds into `lib/site-navigation.ts`.
  *
  * An entry is either a registry key or a retained route's path. A registry key is typed against
  * `V34RouteKey`, so a route that is renamed or dropped in the registry stops compiling here; its
@@ -110,68 +110,41 @@ export const V34_MORE_GROUPS: readonly NavGroup[] = [
   },
 ];
 
-/** Footer groups. Registry routes and the retained public routes, in the order a reader leaves a page with. */
+/**
+ * Footer groups: the blueprint's four columns (Product, For you, Build & trust, TAVONEL), the More
+ * panel's own groups, plus the retained public routes a reader leaves a page for (sources, docs,
+ * trust, status, research) placed in the column they belong to. A held route renders nowhere.
+ */
 export const V34_FOOTER_GROUPS: readonly NavGroup[] = [
   {
     title: "Product",
     entries: [
-      route("platform", "Platform"),
-      route("world", "World"),
-      route("evidence", "Evidence"),
-      route("changes", "Changes"),
-      route("compiler", "Compiler"),
+      ...V34_MORE_GROUPS[0].entries,
       /* One step from every page (WO-CI-5a D7): "which files can I put in" is answered by a footer row. */
       retained("/sources", "Sources"),
-      route("capabilities", "Capabilities"),
-      route("studio", "Reference walkthrough"),
       retained("/explore", "Explore a Compiled World"),
     ],
   },
+  V34_MORE_GROUPS[1],
   {
-    title: "Solutions",
+    title: "Build & trust",
     entries: [
-      route("solutions", "Solutions"),
-      route("personal", "Personal"),
-      route("research", "Research"),
-      route("creators", "Creative work"),
-      route("teams", "Teams"),
-      route("enterprise", "Enterprise"),
-      route("markets", "Markets"),
-      route("engineering", "Engineering"),
-      route("trading", "Trading research"),
-      route("realestate", "Real estate"),
-    ],
-  },
-  {
-    title: "Developers",
-    entries: [
-      route("developers", "Developers"),
-      route("connect", "Connect"),
+      ...V34_MORE_GROUPS[2].entries,
       retained("/docs", "Docs"),
       retained("/api", "API"),
-      retained("/changelog", "Changelog"),
       retained("/status", "Status"),
-    ],
-  },
-  {
-    title: "Trust",
-    entries: [
-      route("security", "Security"),
       retained("/trust", "Trust center"),
       retained("/benchmarks", "Benchmarks"),
       retained("/reproducibility", "Reproducibility"),
-      retained("/research/notes", "Research notes"),
-      retained("/research/program", "Research program"),
     ],
   },
   {
-    title: "Company",
+    title: "TAVONEL",
     entries: [
-      route("company", "Company"),
-      route("contact", "Contact"),
-      route("journal", "Journal"),
-      route("pricing", "Pricing"),
-      route("billing", "Billing"),
+      ...V34_MORE_GROUPS[3].entries,
+      retained("/changelog", "Changelog"),
+      retained("/research/notes", "Research notes"),
+      retained("/research/program", "Research program"),
     ],
   },
 ];

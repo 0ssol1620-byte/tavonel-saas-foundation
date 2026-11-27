@@ -43,7 +43,7 @@ export function deriveCompileStageView(rows: readonly PipelineRow[], reading: Re
   let tone: CompileStageView["tone"] = "waiting";
   if (state === "failed") { title = "Compilation stopped"; detail = "This run did not finish. Review the reported error before retrying."; tone = "stopped"; }
   else if (state === "cancelled") { title = "Compilation cancelled"; detail = "This run was cancelled. Your stored sources remain available in Knowledge."; tone = "stopped"; }
-  else if (state === "review_required") { title = "Review required"; detail = "Processing is paused for a decision. This run is not ready for AI use."; tone = "attention"; }
+  else if (state === "review_required") { title = "On hold for review"; detail = "TAVONEL held this result back. It is not ready for AI use, and nothing was activated."; tone = "attention"; }
   else if (activeWorld) { title = "Knowledge is active"; detail = "The activated result is available for AI use. The view below shows its recorded objects and relations."; tone = "ready"; }
   else if (state === "ready" || modelAvailable) { title = "Compilation finished"; detail = "The candidate still needs review and activation before AI use."; tone = "attention"; }
   else if (state === "awaiting_confirmation") { title = "Confirmation needed"; detail = "Review the source selection and estimated work in the run panel to continue."; tone = "attention"; }
@@ -58,5 +58,5 @@ export function deriveCompileStageView(rows: readonly PipelineRow[], reading: Re
     position === 0 && rows.length > 0 && tone === "active" && !["draft", "preflight"].includes(state ?? "") ? "sources" : "none";
   if (visual === "none" && state === "ready") detail += " The result preview is not available in this view; the run details remain below.";
   return { position, title, detail, tone, visual, progressId: (position === 2 ? structured : page)?.[0] ?? null,
-    finalLabel: activeWorld ? "Ready for AI" : "Review & activate" };
+    finalLabel: activeWorld ? "Ready for AI" : state === "review_required" ? "On hold for review" : "Review & activate" };
 }
