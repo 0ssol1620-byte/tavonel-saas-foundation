@@ -58,7 +58,8 @@ import { clearSourceVersionUnavailable, filterPollableSourceVersions, isCurrentS
 import PipelineBoard from "@/components/pipeline-board";
 import CompileStage from "@/components/compile-stage";
 import { hasActiveSourceWork } from "@/lib/compile-stage-view";
-import { recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
+import { censusFor, tallyCensus } from "@/lib/file-states";
+import { displayName, recallDocumentNames, rememberDocumentName, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel, trackFunnelOnce } from "@/lib/funnel-events";
 import ConnectionsPanel from "@/components/connections-panel";
 import { WorkspaceSourceChoices, type WorkspaceAccessSource } from "@/components/workspace/source-choices";
@@ -1130,7 +1131,7 @@ export default function WorkspacePage() {
     setNotice(loadedActiveWorld?.manifestDigest === artifact.manifestDigest
       ? `Active World loaded. ${verifiedPackage}`
       : artifact.lifecycle === "review_required"
-        ? `Review-required package loaded. ${verifiedPackage} Resolve its blockers before activation.`
+        ? `Review-required package loaded. ${verifiedPackage} ${REVIEW_REQUIRED_ACTIVATION_NOTE}`
         : `Compiled candidate loaded. ${verifiedPackage}`);
     /*
       The lifecycle of a candidate that actually verified, for the caller that needs to know one
@@ -2025,8 +2026,8 @@ export default function WorkspacePage() {
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
         // The reasons are read in the review queue, where each has its sentence and reference (D0 R2).
-        ? `Separate Core produced a review-required package for ${json.collectionId}${json.reviewReasons?.length ? ` with ${countNoun(json.reviewReasons.length, "review reason")}` : ". Manual review required"}. The signed download is available and nothing is active yet.`
-        : `Compiled World ${json.collectionId} is ready for evidence review.`);
+        ? `This compile produced a package that needs review${json.reviewReasons?.length ? ` (${countNoun(json.reviewReasons.length, "review reason")})` : ""}. The signed download is available and nothing is active yet.`
+        : "The compiled World is ready for evidence review.");
     } finally {
       setBusy(false);
     }
@@ -2771,7 +2772,7 @@ export default function WorkspacePage() {
     const digestMatches = candidates.inputSha256 === `sha256:${versionKey}`;
     const keyMatches = candidates.sourceImmutableKey === target.sanitizedKey;
     setNotice(
-      `OCR JSON verified for ${target.documentId}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
+      `OCR JSON verified for ${displayName(target.documentId, names)}: ${candidates.pageCount} page(s), ${candidates.text.length} text characters, digest ${digestMatches ? "matched" : "mismatched"}, immutable key ${keyMatches ? "matched" : "mismatched"}, candidatePromotion=${json.candidatePromotion === false ? "false" : "invalid"}.`,
     );
   };
 
@@ -3076,7 +3077,20 @@ export default function WorkspacePage() {
     collectionResult?.coreExecution && activeWorld?.manifestDigest !== collectionResult.manifestDigest,
   );
   const documentCount = documents?.length ?? 0;
-  const readyDocumentCount = documents?.filter((document) => document.hasOcrJson).length ?? 0;
+  /*
+    B4. Home and the Knowledge census read one tally. A source already in a compile is ready AND compiled,
+    on both screens; counting documents with a read result here and the census there split 137 from 136.
+    With no census (rows that fit no state, or a sum that does not add up) the old count stands.
+  */
+  const sourceTally = (() => {
+    const census = censusFor(pipelineRows, {
+      compiledWorldActive: Boolean(activeWorld && collectionResult && activeWorld.manifestDigest === collectionResult.manifestDigest),
+      blocked: compileJob?.blocked,
+      blockedResolution: compileJob?.blockedResolution ?? null,
+    });
+    return census ? tallyCensus(census) : null;
+  })();
+  const readyDocumentCount = sourceTally ? sourceTally.ready : documents?.filter((document) => document.hasOcrJson).length ?? 0;
   /* Which board rows may be ticked for the next candidate: a source that has been read. The
      board owns the list; this owns the eligibility, from the same document read. */
   const compilableDocumentIds = documents?.filter((document) => document.hasOcrJson).map((document) => document.documentId) ?? [];
@@ -3177,12 +3191,12 @@ export default function WorkspacePage() {
     inventory carries no timestamps, so it is summarised by state; activation history with its
     real receipts lives on Changes (World history), not in a second card here.
   */
-  const readingCount = Math.max(0, documentCount - readyDocumentCount - operatorReviewCount);
+  const readingCount = sourceTally ? sourceTally.processing : Math.max(0, documentCount - readyDocumentCount - operatorReviewCount);
   const workspaceFacts = workspaceState.mode === "returning"
     ? [
       `${readyDocumentCount} ready`,
       `${readingCount} being read`,
-      `${operatorReviewCount} need review`,
+      `${sourceTally ? sourceTally.needReview : operatorReviewCount} need review`,
       homeWorldFact(activeWorld?.revision ?? null, workspaceWorlds),
     ].join(" · ")
     : undefined;

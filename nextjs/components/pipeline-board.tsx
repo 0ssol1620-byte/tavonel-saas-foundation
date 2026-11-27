@@ -12,7 +12,7 @@ import { acceptedFormatSentence } from "@/lib/qualified-input";
 import { PIPELINE_STAGES } from "@/lib/pipeline-vocabulary";
 import { countNoun } from "@/lib/plural";
 import type { BlockerResolution, CompileBlocker } from "@/lib/compile-job-store";
-import { censusOf, deriveFileStates, reconciles, type CensusBucket, type NextAction } from "@/lib/file-states";
+import { censusLine, censusOf, deriveFileStates, reconciles, type CensusBucket, type NextAction } from "@/lib/file-states";
 // One UTC face for every device, so the time in a support conversation is the time on the screen.
 import { formatTimestamp } from "@/lib/format";
 
@@ -45,6 +45,7 @@ function stageLabel(row: PipelineRow): string {
   return PIPELINE_STAGES[0].label;
 }
 
+/* The data attributes keep one bucket each; the visible line is `censusLine`, the same numbers Home reads. */
 const CENSUS_PARTS: ReadonlyArray<readonly [CensusBucket, string]> = [
   ["pending", "ready to compile"],
   ["processing", "processing"],
@@ -127,7 +128,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
         </div>
       ) : null}
 
-      {fileStates ? <p className="fine board-census" data-census data-discovered={fileStates.census.discovered} {...Object.fromEntries(CENSUS_PARTS.map(([bucket]) => [`data-${bucket.replaceAll("_", "-")}`, fileStates.census[bucket]]))}>{[countNoun(fileStates.census.discovered, "source"), ...CENSUS_PARTS.filter(([bucket]) => fileStates.census[bucket] > 0).map(([bucket, label]) => `${fileStates.census[bucket]} ${label}`)].join(" · ")}</p> : null}
+      {fileStates ? <p className="fine board-census" data-census data-discovered={fileStates.census.discovered} {...Object.fromEntries(CENSUS_PARTS.map(([bucket]) => [`data-${bucket.replaceAll("_", "-")}`, fileStates.census[bucket]]))}>{censusLine(fileStates.census)}</p> : null}
       {/* The counts live in the filter chips below; four big-number tiles said the same thing with zeroes. */}
       <div className="board-toolbar"><div className="board-filters" role="group" aria-label="Filter sources"><button type="button" data-active={effectiveFilter === "all"} aria-pressed={effectiveFilter === "all"} onClick={() => selectFilter("all")}>All {counts.all}</button><button type="button" data-active={effectiveFilter === "attention"} aria-pressed={effectiveFilter === "attention"} onClick={() => selectFilter("attention")}>Review {counts.attention}</button><button type="button" data-active={effectiveFilter === "processing"} aria-pressed={effectiveFilter === "processing"} onClick={() => selectFilter("processing")}>Processing {counts.processing}</button><button type="button" data-active={effectiveFilter === "ready"} aria-pressed={effectiveFilter === "ready"} onClick={() => selectFilter("ready")}>Ready {counts.ready}</button>{counts.failed > 0 ? <button type="button" data-active={effectiveFilter === "failed"} aria-pressed={effectiveFilter === "failed"} onClick={() => selectFilter("failed")}>Failed {counts.failed}</button> : null}</div><label className="board-search"><span className="sr-only">Search sources</span><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(12); }} placeholder="Search sources…" /></label></div>
       <div className="board-list-wrap"><ol className="board-list board-rows" aria-label={countNoun(filtered.length, "matching source")}>

@@ -123,6 +123,52 @@ export function censusOf(rows: FileStateRow[]): Census {
   return census;
 }
 
+/**
+ * The one set of numbers a customer reads about their sources, from the one census.
+ *
+ * Home's "N ready" and the Knowledge line used to come from two functions (a count of documents with
+ * a read result, and this census), so a source already in a compile split them: 137 ready on Home,
+ * 136 ready to compile and 1 compiled on Knowledge. Both now read this.
+ *
+ * `ready` is every source that has been read and is not held or excluded, compiled or not;
+ * `compiled` says how many of those are already in a compile.
+ */
+export type SourceTally = { discovered: number; ready: number; compiled: number; processing: number; needReview: number; excluded: number };
+
+export function tallyCensus(census: Census): SourceTally {
+  const compiled = census.verified_pending_publish + census.accepted;
+  return {
+    discovered: census.discovered,
+    ready: census.pending + compiled,
+    compiled,
+    processing: census.processing,
+    needReview: census.held,
+    excluded: census.excluded,
+  };
+}
+
+/** The Knowledge census line, in the words Home uses for the same numbers. Zero parts are left out. */
+export function censusLine(census: Census): string {
+  const t = tallyCensus(census);
+  return [
+    `${t.discovered} source${t.discovered === 1 ? "" : "s"}`,
+    ...(t.ready > 0 ? [`${t.ready} ready${t.compiled > 0 ? ` (${t.compiled} compiled)` : ""}`] : []),
+    ...(t.processing > 0 ? [`${t.processing} processing`] : []),
+    ...(t.needReview > 0 ? [`${t.needReview} need review`] : []),
+    ...(t.excluded > 0 ? [`${t.excluded} excluded`] : []),
+  ].join(" · ");
+}
+
+/** The census for a set of board rows, or null when it does not add up or a row fits no state (nothing is guessed). */
+export function censusFor(rows: PipelineRow[], ctx: FileStateContext): Census | null {
+  try {
+    const census = censusOf(deriveFileStates(rows, ctx));
+    return reconciles(census) ? census : null;
+  } catch {
+    return null;
+  }
+}
+
 export function reconciles(census: Census): boolean {
   const sum =
     census.pending +

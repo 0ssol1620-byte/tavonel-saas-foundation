@@ -15,8 +15,9 @@ import {
   label, and a raw code is never a headline.
 */
 
-const validatorCodes = [...readFileSync(new URL("../scripts/compiled-world/validate.mjs", import.meta.url), "utf8")
-  .matchAll(/code: "([A-Z_]+)"/g)].map((match) => match[1]!);
+const validatorSource = readFileSync(new URL("../scripts/compiled-world/validate.mjs", import.meta.url), "utf8");
+/* SIGNATURE_PRESENT is pushed to `notices`, never to `errors`: it can never be a review reason, so it has no row. */
+const validatorCodes = [...validatorSource.matchAll(/code: "([A-Z_]+)"/g)].map((match) => match[1]!).filter((code) => code !== "SIGNATURE_PRESENT");
 
 /** Every code a review reason can start with, from the sources that write them. */
 const knownReasonCodes = [
@@ -142,5 +143,78 @@ describe("a tab title names the surface (D-09)", () => {
     expect(workspaceDocumentTitle("Review", 141)).toBe("Review — TAVONEL");
     expect(workspaceDocumentTitle("Review", 141)).not.toMatch(/141/);
     expect(workspaceDocumentTitle("Activity", 3)).not.toBe(workspaceDocumentTitle("Review", 3));
+  });
+});
+
+/*
+  B1 (independent review). Each sentence says only what the code establishes in the source that raises it.
+  These fail on the first wording, which described a "second check" that does not exist, said the compile
+  "stopped before it looked at everything" when it looked at everything and kept part, told the customer to
+  wait for uploads to finish for an error no customer action changes, and called a normal notice a problem.
+*/
+describe("sentences match what the code means (B1)", () => {
+  const text = (code: string) => { const r = describeReviewReason(code); return `${r.headline} ${r.meaning} ${r.next}`; };
+
+  it("EXTRACTION_BUDGET_REACHED: the compile looked at everything and kept part of it", () => {
+    const reason = describeReviewReason("EXTRACTION_BUDGET_REACHED");
+    expect(reason.headline).toBe("This compile kept only part of what it found.");
+    expect(text("EXTRACTION_BUDGET_REACHED")).not.toMatch(/stopped|before it looked|did not look/i);
+    expect(readFileSync(new URL("./collection-compiler.ts", import.meta.url), "utf8")).toContain("counts every distinct object the extractors derived");
+  });
+
+  it("DETERMINISTIC_MATERIALIZATION_UNPROVEN: the files disagree with their own record, no second check", () => {
+    expect(describeReviewReason("DETERMINISTIC_MATERIALIZATION_UNPROVEN").headline).toBe("The files in this version disagree with their own record.");
+    expect(text("DETERMINISTIC_MATERIALIZATION_UNPROVEN")).not.toMatch(/second time|checked again|repeatable/i);
+  });
+
+  it("READING_LISTING_DISAGREEMENT: a fault on our side, with no invented advice about uploads", () => {
+    const reason = describeReviewReason("READING_LISTING_DISAGREEMENT");
+    expect(reason.next).toBe("Nothing you change in your files fixes this. Send us the reference.");
+    expect(text("READING_LISTING_DISAGREEMENT")).not.toMatch(/uploads have finished|compile again/i);
+    expect(readFileSync(new URL("./compile-job-worker.ts", import.meta.url), "utf8")).toContain("no answer the customer gives changes it");
+  });
+
+  it("SIGNATURE_PRESENT is a notice, not a problem, so it has no problem sentence", () => {
+    expect(validatorSource).toContain('notices.push({ code: "SIGNATURE_PRESENT"');
+    expect(validatorSource).not.toMatch(/errors\.push\(\{ code: "SIGNATURE_PRESENT"/);
+    expect(PLAIN_REASON_CODES).not.toContain("SIGNATURE_PRESENT");
+    expect(text("SIGNATURE_PRESENT")).not.toMatch(/should not have/i);
+  });
+
+  it("states a cause only as a possibility where the code names none", () => {
+    expect(describeReviewReason("OCR_LOW_TEXT_YIELD").meaning).toMatch(/\bmay\b/);
+    expect(describeReviewReason("CONTRADICTION_CANDIDATE").meaning).toMatch(/\bmay\b/);
+    expect(describeReviewReason("CONTRADICTION_CANDIDATE").meaning).not.toMatch(/Documents say/);
+  });
+});
+
+describe("the review filter names a reason in plain words (B3)", () => {
+  it("labels a code-shaped reason by its headline and keeps a written sentence as it was", async () => {
+    const { reasonOptionLabel } = await import("../components/review-queue");
+    expect(reasonOptionLabel("SEMANTIC_CLAIMS_EMPTY")).toBe("No statements could be taken from these documents.");
+    expect(reasonOptionLabel("CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_91a2:claims=216:pairs=23220")).toBe("Many statements on one topic may conflict.");
+    expect(reasonOptionLabel("SEMANTIC_CLAIMS_EMPTY")).not.toMatch(/[A-Z]{3,}_[A-Z_]{3,}/);
+    expect(reasonOptionLabel("A short sentence someone wrote.")).toBe("A short sentence someone wrote.");
+  });
+});
+
+describe("the workspace says nothing that promises an activation path for a held version (B2, B3)", () => {
+  const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+  it("the review-required notice carries the same sentence as the Review screen", () => {
+    expect(page).not.toContain("Resolve its blockers before activation");
+    expect(page).toContain("Review-required package loaded. ${verifiedPackage} ${REVIEW_REQUIRED_ACTIVATION_NOTE}");
+  });
+  it("no notice prints a collection id", () => {
+    expect(page).not.toContain("review-required package for ${json.collectionId}");
+    expect(page).not.toContain("Compiled World ${json.collectionId}");
+    expect(page).not.toContain("OCR JSON verified for ${target.documentId}");
+  });
+});
+
+describe("a long recorded code cannot widen the page (B5)", () => {
+  const css = readFileSync(new URL("../app/workspace-no1.css", import.meta.url), "utf8");
+  it("wraps code inside Technical details and lets the details item shrink", () => {
+    expect(css).toMatch(/\.workspace-review-reason details code \{[^}]*overflow-wrap: anywhere/);
+    expect(css).toMatch(/\.workspace-review-reason > details \{[^}]*min-width: 0/);
   });
 });

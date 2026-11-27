@@ -379,8 +379,16 @@ describe("the rendered queue", () => {
       input: { ...base, documentIds: ["doc-long"], blocked: [], documents: [], reviewReasons: [long], evidence: [], decisions: [], names: {} },
     }));
     // A select sizes itself to its widest option, which is how a 360px screen overflows.
-    expect(markup).toContain("…</option>");
+    // B3: a code-shaped reason is labelled by its plain headline, never by the raw string.
+    expect(markup).toContain("<option value=\"" + long + "\" title=\"Reference " + long + "\">A check flagged this result for a person to look at.</option>");
     expect(markup).not.toContain(`>${long}</option>`);
+    expect(markup).not.toMatch(/<option[^>]*>[^<]*AUTHORITY_CONFLICT/);
+    // A reason someone already wrote as a sentence is still elided, as before.
+    const prose = `The reader could not tell these two versions apart ${"x".repeat(80)} doc-long`;
+    const proseMarkup = renderToStaticMarkup(createElement(ReviewQueue, {
+      input: { ...base, documentIds: ["doc-long"], blocked: [], documents: [], reviewReasons: [prose], evidence: [], decisions: [], names: {} },
+    }));
+    expect(proseMarkup).toContain("…</option>");
     expect(markup).toContain(`value="${long}"`);
     // The row itself still prints the reason in full.
     expect(markup).toContain(`Reference <code>${long}</code>`);

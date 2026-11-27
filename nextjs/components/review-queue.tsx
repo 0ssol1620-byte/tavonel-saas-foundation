@@ -105,6 +105,12 @@ export function reasonFamily(value: string, stopped: boolean): string {
   screen as a selectable reference, the way the failure panel prints "Reference CORE_OUTPUT_TOO_LARGE".
   A reason without one is shown exactly as before.
 */
+/* B3: the filter names a reason by its plain headline; the recorded string stays the option's value and its tooltip. */
+export function reasonOptionLabel(value: string): string {
+  if (isReasonCode(value)) return describeReviewReason(value).headline;
+  return value.length > 40 ? `${value.slice(0, 39)}…` : value;
+}
+
 function ReasonChip({ value, family, locale }: { value: string; family: string; locale: PageLocale }) {
   const copy = reviewReasonCopy(value, locale);
   /* UI-D (D-02): the headline is a sentence a first-time customer reads; the recorded code is support's, behind a disclosure. */
@@ -246,7 +252,7 @@ export default function ReviewQueue({
           >
             <option value="">All {countNoun(queue.total, "source")}</option>
             {reasons.map((value) => (
-              <option key={value} value={value}>{value.length > 40 ? `${value.slice(0, 39)}…` : value}</option>
+              <option key={value} value={value} title={isReasonCode(value) ? `Reference ${value}` : undefined}>{reasonOptionLabel(value)}</option>
             ))}
           </select>
           <p className="fine">
