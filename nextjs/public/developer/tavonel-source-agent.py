@@ -28,7 +28,13 @@ name at a time beneath held directory handles with links and reparse points refu
 that can't be established, mounted sync refuses before anything is listed or read; there is
 no path-based fallback. A later Claude Opus 5.5 revision adds a separate, bounded cloud
 intake plan (run_cloud_plan, plan_s3, s3_plan_client) for --dry-run-plan with --s3-bucket;
-plan_mount, s3_client, scan_s3 and normal sync are unchanged. This file is of mixed authorship.
+plan_mount, s3_client, scan_s3 and normal sync are unchanged. A Claude Opus 5.5 revision (WO-LF-1)
+makes mounted sync apply PLAN_POLICY and a root .tavonelignore before anything is opened, hashed
+or sent, inventories supported types only, skips empty and oversize files locally, re-hashes only
+on changed (file id, size, mtime) or once a day, commits more than 128 changed files in per-cycle
+subsets, refuses volume, home and system roots, and records a policy fingerprint so a narrowed
+inventory is never sent as deletions. S3 sync shares only the per-cycle subsets; its inventory is
+not filtered by the name policy. This file is of mixed authorship.
 """
 
 from __future__ import annotations
@@ -80,19 +86,22 @@ MIME_BY_SUFFIX = {
     ".tiff": "image/tiff",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
+# The one exclusion policy: --dry-run-plan reports it and normal mounted sync applies it before
+# anything is opened, hashed or listed in a batch (policy_exclusion). No option lifts it; a root
+# .tavonelignore can only add exclusions. Version 3 widened the credential names (WO-LF-1).
 PLAN_POLICY = {
-    "version": 2,
+    "version": 3,
     "allowSuffixes": sorted(MIME_BY_SUFFIX),
     "excludeDirectoryNames": [
-        ".aws", ".cache", ".git", ".hg", ".mypy_cache", ".next", ".pytest_cache",
+        ".aws", ".cache", ".git", ".gnupg", ".hg", ".mypy_cache", ".next", ".pytest_cache",
         ".ruff_cache", ".ssh", ".svn", ".turbo", ".venv", "__pycache__", "build",
         "coverage", "dist", "node_modules", "system volume information", "$recycle.bin",
     ],
     "excludeFileNames": [".ds_store", ".netrc", ".npmrc", ".pypirc", "thumbs.db", "desktop.ini"],
     "excludeNamePatterns": [
-        ".env", ".env.*", "credentials", "credentials.*", "secrets.json", "secrets.*",
-        "token", "token.*", "*.token", "passwords.*", "*.pem", "*.key", "*.p12",
-        "*.pfx", "*.keystore", "id_rsa*", "id_ed25519*",
+        ".env*", "*credential*", "*secret*", "*password*", "*passwd*",
+        "token", "token.*", "*.token", "*.pem", "*.key", "*.p12",
+        "*.pfx", "*.keystore", "id_rsa*", "id_ed25519*", "id_ecdsa*", "id_dsa*",
     ],
     "excludeSuffixes": [".cache", ".lock", ".log", ".pyc", ".pyo", ".tmp", ".swp", ".swo"],
     # Bounds on this planner's own work and output. These are not service admission
@@ -116,9 +125,17 @@ PLAN_POLICY = {
         "pageCeilingCheck": "disclosed_not_enforced_at_intake",
     },
 }
-# The shared intake-approval contract: one approval covers a cycle's whole changed upload set
-# and is never split, so a larger set is refused before anything is quoted.
+# The shared intake-approval contract: one approval covers one batch's whole upload set and is
+# never split. A cycle with more changed files commits them in subsets of at most this many,
+# one cursor batch per cycle (WO-LF-1); the rest wait for the next cycle.
 MAX_APPROVAL_FILES = 128
+# A root-level file of extra exclusions, one fnmatch pattern per line; it can never re-include.
+IGNORE_FILE_NAME = ".tavonelignore"
+MAX_IGNORE_FILE_BYTES = 64 * 1024
+# Unchanged (file id, size, mtime) skips re-hashing, except once a day and for files modified
+# within the last few seconds, where a same-size rewrite could keep its mtime.
+FULL_REHASH_SECONDS = 24 * 60 * 60
+RECENT_MTIME_NS = 2_000_000_000
 # Upper bound for --approve-up-to-credits, so a typo cannot authorize an unbounded spend.
 MAX_APPROVE_CREDITS = 10_000_000
 ATTEMPT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
@@ -251,7 +268,11 @@ def read_state(path: Path, connection_id: str) -> dict[str, Any]:
     cursor = value.get("serverCursorSha256")
     if cursor is not None and (not isinstance(cursor, str) or not cursor.startswith("sha256:")):
         raise AgentError("state cursor is invalid")
-    return {"files": value["files"], "serverCursorSha256": cursor, "scopeFingerprint": value.get("scopeFingerprint")}
+    return {
+        "files": value["files"], "serverCursorSha256": cursor, "scopeFingerprint": value.get("scopeFingerprint"),
+        # Absent in state written before WO-LF-1: read as a policy change and a due full re-hash.
+        "policyFingerprint": value.get("policyFingerprint"), "fullRehashAt": value.get("fullRehashAt"),
+    }
 
 
 def write_state(
@@ -260,6 +281,8 @@ def write_state(
     files: dict[str, dict[str, object]],
     cursor: str,
     scope_fingerprint: str | None = None,
+    policy_fingerprint: str | None = None,
+    full_rehash_at: int | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = canonical(
@@ -269,6 +292,8 @@ def write_state(
             "serverCursorSha256": cursor,
             "files": files,
             "scopeFingerprint": scope_fingerprint,
+            "policyFingerprint": policy_fingerprint,
+            "fullRehashAt": full_rehash_at,
         }
     )
     descriptor, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -689,7 +714,96 @@ def _not_followed(metadata: os.stat_result) -> bool:
     return bool(attributes & _FILE_ATTRIBUTE_DIRECTORY) or bool(getattr(metadata, "st_reparse_tag", 0) & _IO_REPARSE_TAG_NAME_SURROGATE)
 
 
-def scan_mount(root: Path | _HeldRoot, max_file_bytes: int, previous: Any = ()) -> dict[str, dict[str, object]]:
+def _ignored(relative: str, patterns: tuple[str, ...]) -> bool:
+    """A pattern with a slash matches the whole root-relative path, one without matches the name."""
+    path = relative.casefold()
+    name = path.rsplit("/", 1)[-1]
+    return any(fnmatch.fnmatchcase(path if "/" in pattern else name, pattern) for pattern in patterns)
+
+
+def policy_exclusion(relative: str, is_dir: bool, ignore: tuple[str, ...] = ()) -> str | None:
+    """Why PLAN_POLICY (plus the root's .tavonelignore, which only narrows) excludes this path, or None."""
+    policy = PLAN_POLICY
+    parts = relative.split("/")
+    name = parts[-1].casefold()
+    directory_names = {item.casefold() for item in policy["excludeDirectoryNames"]}
+    if is_dir and name in directory_names:
+        return "excluded_generated_or_cache_directory"
+    if not is_dir and any(part.casefold() in directory_names for part in parts[:-1]):
+        return "excluded_generated_or_cache_directory"
+    if not is_dir:
+        if name in {item.casefold() for item in policy["excludeFileNames"]}:
+            return "excluded_credential_or_system_file"
+        if any(fnmatch.fnmatchcase(name, pattern.casefold()) for pattern in policy["excludeNamePatterns"]):
+            return "excluded_credential_filename_pattern"
+        if Path(name).suffix in {item.casefold() for item in policy["excludeSuffixes"]}:
+            return "excluded_temporary_or_generated_suffix"
+    if ignore and _ignored(relative, ignore):
+        return "excluded_by_tavonelignore"
+    return None
+
+
+def out_of_scope(native_id: str, ignore: tuple[str, ...] = ()) -> str | None:
+    """Why a synced file id is outside the inventory by name alone: an excluded ancestor, the file, or its type."""
+    parts = native_id.split("/")
+    for depth in range(1, len(parts)):
+        reason = policy_exclusion("/".join(parts[:depth]), True, ignore)
+        if reason:
+            return reason
+    reason = policy_exclusion(native_id, False, ignore)
+    if reason:
+        return reason
+    return None if Path(native_id).suffix.lower() in MIME_BY_SUFFIX else "unsupported_file_type"
+
+
+def scope_policy_fingerprint(ignore: tuple[str, ...]) -> str:
+    """What decides the inventory by name; recorded in state so a narrowed inventory is never read as deletions."""
+    return "sha256:" + sha256(canonical({"policy": PLAN_POLICY, "ignore": list(ignore)}))
+
+
+def _read_ignore_file(backend: Any, root_handle: int) -> tuple[str, ...]:
+    """The root's .tavonelignore, opened as itself beneath the held root; '!' lines would widen and are refused."""
+    descriptor, refusal = backend.open_file_beneath(root_handle, IGNORE_FILE_NAME)
+    if descriptor is None:
+        raise AgentError(f"{IGNORE_FILE_NAME} is not a plain file ({refusal}) and was not read; cursor was not advanced")
+    with os.fdopen(descriptor, "rb") as handle:
+        raw = handle.read(MAX_IGNORE_FILE_BYTES + 1)
+    if len(raw) > MAX_IGNORE_FILE_BYTES:
+        raise AgentError(f"{IGNORE_FILE_NAME} is larger than {MAX_IGNORE_FILE_BYTES} bytes; cursor was not advanced")
+    try:
+        lines = raw.decode("utf-8-sig").splitlines()
+    except UnicodeDecodeError as error:
+        raise AgentError(f"{IGNORE_FILE_NAME} is not UTF-8; cursor was not advanced") from error
+    patterns: set[str] = set()
+    for line in (line.strip() for line in lines):
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("!"):
+            raise AgentError(f"{IGNORE_FILE_NAME} can only exclude; a '!' line would re-include and is refused; cursor was not advanced")
+        if line.strip("/"):
+            patterns.add(line.strip("/").casefold())
+    return tuple(sorted(patterns))
+
+
+def scan_mount(
+    root: Path | _HeldRoot,
+    max_file_bytes: int,
+    previous: Any = (),
+    *,
+    trust_metadata: bool = False,
+    report: dict[str, Any] | None = None,
+) -> dict[str, dict[str, object]]:
+    """The mounted inventory: supported, non-excluded, non-empty files at or under the service byte ceiling.
+
+    An excluded path is pruned from the walk by its name, so it is never opened, hashed or listed in
+    a batch; an unsupported type is never opened either. Empty and oversize supported files are
+    skipped from metadata, named only in `report["skipped"]`, and never block the cycle. With
+    trust_metadata, a file whose (file id, size, mtime) equals its previous entry keeps that entry
+    without being opened. `report` also receives the .tavonelignore patterns applied.
+    """
+    limit = min(max_file_bytes, FOUNDATION_MAX_SOURCE_BYTES)
+    skipped: dict[str, str] = {}
+    ignore: tuple[str, ...] = ()
     def scan_error(error: OSError) -> None:
         raise AgentError("source inventory incomplete; cursor was not advanced") from error
     def entry(path: str) -> os.stat_result:
@@ -707,7 +821,7 @@ def scan_mount(root: Path | _HeldRoot, max_file_bytes: int, previous: Any = ()) 
         # each directory may be reached once (an SMB server-side junction looks like a plain
         # directory but repeats an identity), and no content is read until the walk has completed.
         # rglob may suppress permission errors. Never treat an incomplete walk as deletions.
-        candidates: list[str] = []
+        candidates: list[tuple[str, Any]] = []
         excluded: list[str] = []
         seen: set[tuple[int, int]] = set()
         for directory, dirs, names in os.walk(resolved, followlinks=False, onerror=scan_error):
@@ -722,23 +836,34 @@ def scan_mount(root: Path | _HeldRoot, max_file_bytes: int, previous: Any = ()) 
                 if identity in seen:
                     raise AgentError("source directory reached twice; cursor was not advanced")
                 seen.add(identity)
+            if not prefix and IGNORE_FILE_NAME in names:
+                # Read before anything below the root is kept, so it narrows this same walk.
+                ignore = _read_ignore_file(open_source.backend, open_source.handle)
             kept = []
             for name in sorted(dirs):
                 if _not_followed(entry(os.path.join(directory, name))):
                     excluded.append(prefix + name)
-                else:
+                elif policy_exclusion(prefix + name, True, ignore) is None:
                     kept.append(name)
             dirs[:] = kept
             for name in sorted(names):
+                native_id = prefix + name
+                # Decided by name before any metadata or content of the file is read.
+                if policy_exclusion(native_id, False, ignore) or Path(name).suffix.lower() not in MIME_BY_SUFFIX:
+                    continue
                 path = os.path.join(directory, name)
                 metadata = entry(path)
                 if _not_followed(metadata):
-                    excluded.append(prefix + name)
+                    excluded.append(native_id)
                     continue
                 if not Path(path).resolve(strict=True).is_relative_to(resolved):
                     raise AgentError("source path escaped the mounted root")
-                if stat_module.S_ISREG(metadata.st_mode):
-                    candidates.append(prefix + name)
+                if not stat_module.S_ISREG(metadata.st_mode):
+                    continue
+                if metadata.st_size < 1 or metadata.st_size > limit:
+                    skipped[native_id] = "empty" if metadata.st_size < 1 else "oversize"
+                    continue
+                candidates.append((native_id, metadata))
         # A previously synced path that is now (or now sits under) a link is not a deletion.
         for native_id in previous:
             if any(native_id == skipped or native_id.startswith(skipped + "/") for skipped in excluded):
@@ -747,19 +872,34 @@ def scan_mount(root: Path | _HeldRoot, max_file_bytes: int, previous: Any = ()) 
         # Phase 2 reads content, only through the held root: each file is opened one name at a time
         # beneath held directory handles, so a path swapped since the walk can't redirect the read.
         files: dict[str, dict[str, object]] = {}
-        for native_id in candidates:
+        settled_before = time.time_ns() - RECENT_MTIME_NS
+        for native_id, metadata in candidates:
+            file_id = f"{metadata.st_dev}:{metadata.st_ino}" if metadata.st_ino else None
+            old = previous.get(native_id) if trust_metadata and isinstance(previous, dict) else None
+            if (
+                isinstance(old, dict) and file_id is not None and isinstance(old.get("contentSha256"), str)
+                and (old.get("fileId"), old.get("sizeBytes"), old.get("mtimeNs")) == (file_id, metadata.st_size, metadata.st_mtime_ns)
+                and metadata.st_mtime_ns < settled_before
+            ):
+                files[native_id] = dict(old)
+                continue
             try:
                 descriptor = open_source(native_id)
             except OSError as error:
                 scan_error(error)
                 raise
-            size, digest = _digest_descriptor(descriptor, max_file_bytes)
+            size, digest = _digest_descriptor(descriptor, limit)
             files[native_id] = {
                 "revision": sha256(f"{digest}\x1f{size}"),
                 "sizeBytes": size,
                 "contentSha256": digest,
-                "mimeType": MIME_BY_SUFFIX.get(Path(native_id).suffix.lower()),
+                "mimeType": MIME_BY_SUFFIX[Path(native_id).suffix.lower()],
+                # Walk-time metadata: a change after the walk only makes the next cycle re-hash.
+                "mtimeNs": metadata.st_mtime_ns,
+                "fileId": file_id,
             }
+    if report is not None:
+        report.update(skipped=skipped, ignore=ignore)
     return files
 
 
@@ -1347,6 +1487,29 @@ class _HeldRoot:
             raise AgentError("the mounted root's file identity could not be read; nothing was read and the cursor was not advanced") from error
 
 
+_SYSTEM_TREES_POSIX = ("/bin", "/boot", "/dev", "/etc", "/lib", "/lib32", "/lib64", "/libx32", "/proc", "/run", "/sbin", "/snap", "/sys", "/usr", "/var")
+
+
+def refused_root(path: Path) -> str | None:
+    """Why a resolved directory is never a sync root: a whole volume, the home directory itself, or a system tree."""
+    if path.parent == path or os.path.ismount(path):
+        return "a volume root"
+    try:
+        home = Path.home().resolve()
+    except (RuntimeError, KeyError, OSError) as error:
+        raise AgentError("the home directory can't be determined, so --root can't be checked; nothing was listed or read") from error
+    if path == home or path == home.parent:
+        return "the home directory itself or the folder that holds every user's home"
+    if os.name == "nt":
+        trees = [os.environ.get(name) for name in ("SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData")]
+    else:
+        trees = list(_SYSTEM_TREES_POSIX)
+    for tree in filter(None, trees):
+        if path.is_relative_to(Path(tree)):
+            return "a system directory"
+    return None
+
+
 @contextmanager
 def _anchored_root(root: Path):
     """Resolve the selected root once and hold it, or refuse before anything is listed or read.
@@ -1358,6 +1521,9 @@ def _anchored_root(root: Path):
     path = root.resolve(strict=True)
     if not path.is_dir():
         raise AgentError("--root must be a directory")
+    refused = refused_root(path)
+    if refused:
+        raise AgentError(f"--root may not be {refused}; choose the one folder to sync. Nothing was listed or read")
     try:
         backend = _traversal_backend()
         handle = backend.open_root(str(path))
@@ -1459,23 +1625,6 @@ def plan_mount(root: Path, *, clock=time.monotonic) -> dict[str, object]:
             return True
         return False
 
-    def is_excluded(relative: str, is_dir: bool) -> str | None:
-        parts = relative.split("/")
-        name = parts[-1].casefold()
-        directory_names = {item.casefold() for item in policy["excludeDirectoryNames"]}
-        if is_dir and name in directory_names:
-            return "excluded_generated_or_cache_directory"
-        if not is_dir and any(part.casefold() in directory_names for part in parts[:-1]):
-            return "excluded_generated_or_cache_directory"
-        if not is_dir:
-            if name in {item.casefold() for item in policy["excludeFileNames"]}:
-                return "excluded_credential_or_system_file"
-            if any(fnmatch.fnmatchcase(name, pattern.casefold()) for pattern in policy["excludeNamePatterns"]):
-                return "excluded_credential_filename_pattern"
-            if Path(name).suffix in {item.casefold() for item in policy["excludeSuffixes"]}:
-                return "excluded_temporary_or_generated_suffix"
-        return None
-
     try:
         backend = _traversal_backend()
         root_handle = backend.open_root(root_path)
@@ -1562,7 +1711,9 @@ def plan_mount(root: Path, *, clock=time.monotonic) -> dict[str, object]:
                     add(relative, "needs_review", f"{metadata.link}_not_followed")
                     continue
                 is_dir = metadata.is_dir
-                excluded = is_excluded(relative, is_dir)
+                # The same rule normal sync applies (it also honours a root .tavonelignore, which
+                # this plan never opens, so the plan is an upper bound of what sync inventories).
+                excluded = policy_exclusion(relative, is_dir)
                 if excluded:
                     add(relative, "excluded_by_policy", excluded, itemType="directory" if is_dir else "file")
                     continue
@@ -1587,6 +1738,10 @@ def plan_mount(root: Path, *, clock=time.monotonic) -> dict[str, object]:
                     continue
                 # Page count needs decoding, which this plan never does, so it stays unknown.
                 document = {"sizeBytes": size, "mimeType": MIME_BY_SUFFIX[suffix], "pageCount": None}
+                if size < 1:
+                    # Normal sync skips an empty file too; it has nothing to admit.
+                    add(relative, "unsupported", "empty_file", **document)
+                    continue
                 if size > max_source_bytes:
                     add(relative, "oversized", "exceeds_service_byte_ceiling_needs_review", **document)
                     continue
@@ -2273,7 +2428,35 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
         else:
             return commit_pending(args, client, pending_path, pending)
     cloud = None if root else s3_client(args)
-    current = scan_mount(root, args.max_file_bytes, previous) if root else scan_s3(cloud, args)
+    now = int(time.time())
+    rehash_at = state.get("fullRehashAt")
+    full_rehash = not (type(rehash_at) is int and 0 <= now - rehash_at < FULL_REHASH_SECONDS)
+    next_rehash_at = now if full_rehash else rehash_at
+    report: dict[str, Any] = {"skipped": {}, "ignore": ()}
+    if root:
+        current = scan_mount(root, args.max_file_bytes, previous, trust_metadata=not full_rehash, report=report)
+    else:
+        current = scan_s3(cloud, args)
+    policy_fingerprint = scope_policy_fingerprint(report["ignore"]) if root else None
+    notes: dict[str, object] = {}
+    if root:
+        # A path the policy now excludes by name was not deleted by the customer: it leaves the local
+        # state and the cursor without a deleted event. Only a changed policy fingerprint (state
+        # written before WO-LF-1 has none) explains such a path; under the same policy it is a broken
+        # state and nothing is sent.
+        descoped = [native_id for native_id in previous if out_of_scope(native_id, report["ignore"])]
+        if descoped:
+            if state.get("policyFingerprint") == policy_fingerprint:
+                raise AgentError("state lists paths its own exclusion policy excludes; cursor was not advanced")
+            previous = {native_id: item for native_id, item in previous.items() if native_id not in descoped}
+            notes["policyChange"] = {"descopedWithoutDeletion": len(descoped)}
+        # Empty or oversize now, but synced before: keep the synced entry rather than read it as deleted.
+        for native_id in report["skipped"]:
+            if isinstance(previous.get(native_id), dict):
+                current[native_id] = previous[native_id]
+        reasons = list(report["skipped"].values())
+        if reasons:
+            notes["skippedLocally"] = {"empty": reasons.count("empty"), "oversize": reasons.count("oversize")}
     if previous and not current and not args.allow_empty_snapshot:
         raise AgentError("empty inventory requires --allow-empty-snapshot after source verification")
     for native_id, item in current.items():
@@ -2285,22 +2468,44 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
             and old.get("mimeType") == item.get("mimeType")
         ):
             item["contentSha256"] = old.get("contentSha256")
+
+    def cursor_view(item: object) -> object:
+        # What the cursor and the server see; local hashing metadata (mtime, file id) is not a change.
+        return (item.get("revision"), item.get("sizeBytes"), item.get("mimeType")) if isinstance(item, dict) else item
+
+    changed_ids = sorted(key for key in set(previous) | set(current) if cursor_view(previous.get(key)) != cursor_view(current.get(key)))
+    # One cycle commits at most one approval's worth of uploads within the byte budget, in name order;
+    # the rest keep their previous state and are picked up by the next cycle.
+    uploads: list[str] = []
+    upload_bytes = 0
+    for key in changed_ids:
+        if key in current and isinstance(current[key].get("mimeType"), str):
+            size = int(current[key]["sizeBytes"])
+            if len(uploads) == MAX_APPROVAL_FILES or upload_bytes + size > args.max_upload_bytes:
+                break
+            uploads.append(key)
+            upload_bytes += size
+    deferred = {key for key in changed_ids if key in current and isinstance(current[key].get("mimeType"), str)} - set(uploads)
+    if deferred and not uploads:
+        raise AgentError("source cycle exceeds event or upload-byte budget before upload")
+    changed_ids = [key for key in changed_ids if key not in deferred]
+    if len(changed_ids) > args.max_events:
+        raise AgentError("source cycle exceeds event or upload-byte budget before upload")
+    committed = {key: item for key, item in current.items() if key not in deferred}
+    committed.update({key: previous[key] for key in deferred if key in previous})
+    if deferred:
+        notes["remainingChanges"] = len(deferred)
     cursor_files = {
         native_id: {
             "revision": item["revision"],
             "sizeBytes": item["sizeBytes"],
             "mimeType": item["mimeType"],
         }
-        for native_id, item in current.items()
+        for native_id, item in committed.items()
     }
     next_cursor = "sha256:" + sha256(
         canonical({"provider": "file_server" if root else "s3", "files": cursor_files})
     )
-    changed_ids = [key for key in set(previous) | set(current) if previous.get(key) != current.get(key)]
-    upload_bytes = sum(int(current[key]["sizeBytes"]) for key in changed_ids if key in current and current[key].get("mimeType"))
-    if len(changed_ids) > args.max_events or upload_bytes > args.max_upload_bytes:
-        raise AgentError("source cycle exceeds event or upload-byte budget before upload")
-    uploads = sorted(key for key in changed_ids if key in current and isinstance(current[key].get("mimeType"), str))
     if uploads:
         # Every gate that needs no network runs before anything is quoted, held or read for upload.
         require_upload_approval(args, [(str(current[key]["mimeType"]), int(current[key]["sizeBytes"])) for key in uploads])
@@ -2344,16 +2549,19 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
             }
         )
     if not events and next_cursor == state["serverCursorSha256"]:
-        if existing_scope is None:
-            write_state(args.state, args.connection_id, current, next_cursor, fingerprint)
-        return {"status": "unchanged", "eventCount": 0}
+        # Nothing for the server; local bookkeeping (scope binding, policy, refreshed hashing metadata) is kept.
+        if (existing_scope, state.get("policyFingerprint"), rehash_at) != (fingerprint, policy_fingerprint, next_rehash_at) or committed != previous:
+            write_state(args.state, args.connection_id, committed, next_cursor, fingerprint, policy_fingerprint, next_rehash_at)
+        return {"status": "unchanged", "eventCount": 0, **notes}
     batch_id = str(uuid.uuid4())
     if not uploads:
         check_batch_size(args, events)
         pending = {
             "scopeFingerprint": fingerprint,
             "connectionId": args.connection_id,
-            "files": current,
+            "policyFingerprint": policy_fingerprint,
+            "fullRehashAt": next_rehash_at,
+            "files": committed,
             "body": {
                 "batchId": batch_id,
                 "previousCursorSha256": state["serverCursorSha256"],
@@ -2363,7 +2571,7 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
             },
         }
         write_journal(pending_path, pending)
-        return commit_pending(args, client, pending_path, pending)
+        return {**commit_pending(args, client, pending_path, pending), **notes}
     attempt_key = "att_" + uuid.uuid4().hex
     entries = {native_id: intake_manifest_entry(native_id, current[native_id]) for native_id in uploads}
     for event in events:
@@ -2377,7 +2585,9 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
         "scopeFingerprint": fingerprint,
         "connectionId": args.connection_id,
         "rootIdentity": root.identity() if root else None,
-        "files": current,
+        "policyFingerprint": policy_fingerprint,
+        "fullRehashAt": next_rehash_at,
+        "files": committed,
         "intake": {
             "batchId": batch_id,
             "previousCursorSha256": state["serverCursorSha256"],
@@ -2400,7 +2610,7 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
     }
     # Durable before the first request, so every retry repeats this attempt, these keys and this manifest.
     write_journal(pending_path, pending)
-    return approve_and_upload(args, client, pending_path, pending, resumed=False, root=root, cloud=cloud)
+    return {**approve_and_upload(args, client, pending_path, pending, resumed=False, root=root, cloud=cloud), **notes}
 
 
 def source_fingerprint(args: argparse.Namespace, root: Path | None = None) -> str:
@@ -2446,7 +2656,8 @@ def commit_pending(args: argparse.Namespace, client: FoundationClient, path: Pat
     )
     if result.get("status") not in {"applied", "replayed"}:
         raise AgentError("Foundation did not commit the cursor batch")
-    write_state(args.state, args.connection_id, pending["files"], body["nextCursorSha256"], pending["scopeFingerprint"])
+    write_state(args.state, args.connection_id, pending["files"], body["nextCursorSha256"], pending["scopeFingerprint"],
+                pending.get("policyFingerprint"), pending.get("fullRehashAt"))
     path.unlink(missing_ok=True)
     fsync_directory(path.parent)
     return {"status": result["status"], "eventCount": len(body["events"]), "batchId": body["batchId"]}

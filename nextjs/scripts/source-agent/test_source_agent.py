@@ -433,7 +433,8 @@ def lstat_reporting(**overrides):
     def lstat(path,*args,**kwargs):
         found=real(path,*args,**kwargs);extra=overrides.get(Path(os.fspath(path)).name)
         if extra is None:return found
-        fields=dict(st_mode=found.st_mode,st_dev=found.st_dev,st_ino=found.st_ino,
+        # The sync walk also reads size and mtime (WO-LF-1: empty/oversize skip and the re-hash gate).
+        fields=dict(st_mode=found.st_mode,st_dev=found.st_dev,st_ino=found.st_ino,st_size=found.st_size,st_mtime_ns=found.st_mtime_ns,
                     st_file_attributes=getattr(found,'st_file_attributes',0),st_reparse_tag=getattr(found,'st_reparse_tag',0))
         fields.update(extra);return SimpleNamespace(**fields)
     with patch.object(agent.os,'lstat',lstat):yield
@@ -577,7 +578,9 @@ class SourceScopeTests(SyncFixture, unittest.TestCase):
         agent.sync(self.args);original=self.args.state.read_bytes();bodies=len(Client.bodies);uploads=len(Client.uploads)
         outside=self.base/'outside-test-owned-root';outside.mkdir();(outside/'report.pdf').write_bytes(b'outside')
         def swap():rename_with_retry(actual,self.root/'saved-actual');make_directory_link(self,actual,outside)
-        with after_walk(swap),recorded_scan() as (listed,read),patch.object(Client,'quote',side_effect=AssertionError('quoted')):
+        # WO-LF-1: unchanged files are not re-opened between daily full re-hashes, so this read-boundary case forces one.
+        with after_walk(swap),recorded_scan() as (listed,read),patch.object(Client,'quote',side_effect=AssertionError('quoted')), \
+             patch.object(agent,'FULL_REHASH_SECONDS',0):
             with self.assertRaisesRegex(agent.AgentError,'link or reparse point after inventory'):agent.sync(self.args)
         self.assertEqual(read,['b.pdf'])
         self.assertEqual(original,self.args.state.read_bytes())
@@ -2039,5 +2042,246 @@ class PerFileFallbackWireTests(unittest.TestCase):
 
     def test_a_different_404_is_not_read_as_approval_disabled(self):
         self.assert_refusal_still_requires_review(404, 'NOT_FOUND', 'refused to approve the saved set')
+
+# WO-LF-1: mounted sync applies the exclusion policy before anything is opened, hashed or sent.
+# Written failing-first against the train-3c agent (receipts/WO-LF-1/failing-first-against-train-3c.txt).
+SECRETS = {'.env': b'DB_PASSWORD=hunter2\n', '.ssh/id_rsa': b'-----BEGIN KEY-----\n',
+           'passwords.xlsx': b'PK..', 'node_modules/x.pdf': b'%PDF'}
+SECRET_MARKERS = ('.env', 'id_rsa', 'passwords', 'node_modules', '.ssh')
+
+
+def revision(data):
+    return agent.sha256(f'{sha(data)}\x1f{len(data)}')
+
+
+class LocalFolderPolicyTests(SyncFixture, unittest.TestCase):
+    def write(self, name, data):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return path
+
+    def settle(self, *names):
+        # An mtime in the recent window is never trusted, so fixtures that test the gate are aged.
+        past = time.time() - 600
+        for name in names:
+            os.utime(self.root / name, (past, past))
+
+    def events(self, body=-1):
+        return [(event['kind'], event['nativeId']) for event in Client.bodies[body]['events']]
+
+    def pending(self):
+        return self.args.state.with_name('state.json.pending')
+
+    def test_sync_inventory_equals_the_plan_and_secrets_never_leave_the_machine(self):
+        for name, data in SECRETS.items():
+            self.write(name, data)
+        self.write('report.pdf', b'%PDF-1.4')
+        looked_at = []
+        real_lstat = os.lstat
+
+        def lstat(path, *args, **kwargs):
+            looked_at.append(Path(os.fspath(path)).name)
+            return real_lstat(path, *args, **kwargs)
+
+        with recorded_scan() as (listed, read), patch.object(agent.os, 'lstat', lstat):
+            inventory = agent.scan_mount(self.root, 10**6)
+        self.assertEqual(list(inventory), ['report.pdf'])
+        self.assertEqual(read, ['report.pdf'])
+        self.assertFalse([path for path in listed if path.name in ('.ssh', 'node_modules')])
+        self.assertFalse(set(looked_at) & {'.env', 'id_rsa', 'passwords.xlsx', 'x.pdf'})
+        plan = agent.plan_mount(self.root)
+        eligible = [entry['path'] for entry in plan['entries'] if entry['status'] == 'eligible']
+        self.assertEqual(eligible, list(inventory))
+        with recorded_scan() as (listed, read):
+            result = agent.sync(self.args)
+        self.assertEqual(result['status'], 'applied')
+        self.assertEqual(self.events(), [('added', 'report.pdf')])
+        self.assertEqual([name for name, _ in Client.uploads], ['report.pdf'])
+        self.assertEqual(read, ['report.pdf', 'report.pdf'])  # hashed, then the upload snapshot
+        sent = agent.canonical(Client.bodies) + self.args.state.read_text()
+        for marker in SECRET_MARKERS:
+            self.assertNotIn(marker, sent)
+
+    def test_policy_lists_are_single_sourced_and_the_cli_cannot_lift_them(self):
+        for name in ('.gnupg/k.pdf', '.aws/a.pdf', '.git/g.pdf', 'keys/server.pem', 'keys/server.key', 'keys/a.p12',
+                     'keys/a.pfx', 'id_ed25519.png', '.env.production.pdf', 'client-secret.docx', 'aws-credentials.xlsx'):
+            self.assertIsNotNone(agent.out_of_scope(name), name)
+        self.assertIsNone(agent.out_of_scope('reports/q3.pdf'))
+        options = [option for action in agent.parser()._actions for option in action.option_strings]
+        self.assertFalse([option for option in options if any(word in option for word in ('include', 'exclude', 'ignore', 'policy'))])
+
+    def test_legacy_state_narrowed_by_the_policy_is_not_emitted_as_deletions(self):
+        for name, data in SECRETS.items():
+            self.write(name, data)
+        self.write('report.pdf', b'%PDF-1.4')
+        # The state an agent before WO-LF-1 committed: every file, and no policy fingerprint.
+        legacy = {name: {'revision': revision(data), 'sizeBytes': len(data), 'contentSha256': sha(data),
+                         'mimeType': agent.MIME_BY_SUFFIX.get(Path(name).suffix.lower())}
+                  for name, data in {**SECRETS, 'report.pdf': b'%PDF-1.4'}.items()}
+        cursor = 'sha256:' + 'a' * 64
+        agent.write_state(self.args.state, self.args.connection_id, legacy, cursor,
+                          agent.source_fingerprint(self.args, self.root.resolve()))
+        state = json.loads(self.args.state.read_text())
+        state.pop('policyFingerprint'); state.pop('fullRehashAt')
+        self.args.state.write_text(json.dumps(state))
+        result = agent.sync(self.args)
+        self.assertEqual(result['policyChange'], {'descopedWithoutDeletion': 4})
+        body = Client.bodies[-1]
+        self.assertEqual(body['events'], [])  # no deleted event, and report.pdf is unchanged
+        self.assertEqual(body['previousCursorSha256'], cursor)
+        self.assertEqual(Client.uploads, [])
+        saved = json.loads(self.args.state.read_text())
+        self.assertEqual(list(saved['files']), ['report.pdf'])
+        self.assertEqual(saved['policyFingerprint'], agent.scope_policy_fingerprint(()))
+        self.assertEqual(saved['serverCursorSha256'], body['nextCursorSha256'])
+        self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+        self.assertEqual(len(Client.bodies), 1)
+
+    def test_same_policy_state_holding_an_excluded_path_is_refused(self):
+        self.write('report.pdf', b'%PDF-1.4')
+        agent.sync(self.args)
+        state = json.loads(self.args.state.read_text())
+        state['files']['.env'] = {'revision': 'r', 'sizeBytes': 1, 'contentSha256': None, 'mimeType': None}
+        self.args.state.write_text(json.dumps(state))
+        with self.assertRaisesRegex(agent.AgentError, 'its own exclusion policy'):
+            agent.sync(self.args)
+        self.assertEqual(len(Client.bodies), 1)
+
+    def test_tavonelignore_only_narrows_and_narrowing_is_not_a_deletion(self):
+        self.write('report.pdf', b'one'); self.write('drafts/b.pdf', b'two')
+        agent.sync(self.args)
+        self.assertEqual(self.events(), [('added', 'drafts/b.pdf'), ('added', 'report.pdf')])
+        self.write('.tavonelignore', b'# local drafts\ndrafts/\n')
+        result = agent.sync(self.args)
+        self.assertEqual(result['policyChange'], {'descopedWithoutDeletion': 1})
+        self.assertEqual(self.events(), [])
+        self.assertEqual(list(json.loads(self.args.state.read_text())['files']), ['report.pdf'])
+        # Under the same policy a removed file is still a deletion.
+        (self.root / 'report.pdf').unlink(); self.write('other.pdf', b'three')
+        agent.sync(self.args)
+        self.assertEqual(self.events(), [('added', 'other.pdf'), ('deleted', 'report.pdf')])
+        # A re-including line is refused before anything is listed further or sent.
+        self.write('.tavonelignore', b'drafts/\n!drafts/b.pdf\n')
+        bodies = len(Client.bodies)
+        with self.assertRaisesRegex(agent.AgentError, 'can only exclude'):
+            agent.sync(self.args)
+        self.assertEqual(len(Client.bodies), bodies)
+
+    def test_empty_and_oversize_files_are_skipped_locally_and_never_block(self):
+        self.write('a.pdf', b'example'); self.write('empty.pdf', b'')
+        with (self.root / 'big.pdf').open('wb') as handle:
+            handle.truncate(agent.FOUNDATION_MAX_SOURCE_BYTES + 1)
+        with recorded_scan() as (_, read):
+            result = agent.sync(self.args)
+        self.assertEqual(result['skippedLocally'], {'empty': 1, 'oversize': 1})
+        self.assertEqual(self.events(), [('added', 'a.pdf')])
+        self.assertNotIn('empty.pdf', read); self.assertNotIn('big.pdf', read)
+        # A synced file that becomes empty keeps its synced entry: no deletion, nothing sent.
+        self.write('a.pdf', b'')
+        result = agent.sync(self.args)
+        self.assertEqual((result['status'], result['skippedLocally']), ('unchanged', {'empty': 2, 'oversize': 1}))
+        self.assertEqual(len(Client.bodies), 1)
+
+    def test_unchanged_metadata_is_not_rehashed_until_the_daily_full_rehash(self):
+        self.write('a.pdf', b'example'); self.settle('a.pdf')
+        agent.sync(self.args)
+        with recorded_scan() as (_, read):
+            self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+        self.assertEqual(read, [])
+        # Same size and mtime with new bytes is the gate's known ceiling: found by the daily full re-hash.
+        before = os.stat(self.root / 'a.pdf')
+        self.write('a.pdf', b'exampl2'); os.utime(self.root / 'a.pdf', ns=(before.st_atime_ns, before.st_mtime_ns))
+        self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+        state = json.loads(self.args.state.read_text())
+        state['fullRehashAt'] -= agent.FULL_REHASH_SECONDS + 1
+        self.args.state.write_text(json.dumps(state))
+        with recorded_scan() as (_, read):
+            agent.sync(self.args)
+        self.assertEqual(read, ['a.pdf', 'a.pdf'])
+        self.assertEqual(self.events(), [('changed', 'a.pdf')])
+        self.assertGreater(json.loads(self.args.state.read_text())['fullRehashAt'], state['fullRehashAt'])
+
+    def test_a_touched_file_is_rehashed_but_not_resent(self):
+        self.write('a.pdf', b'example'); self.settle('a.pdf')
+        agent.sync(self.args)
+        os.utime(self.root / 'a.pdf', (time.time() - 60, time.time() - 60))
+        with recorded_scan() as (_, read):
+            self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+        self.assertEqual(read, ['a.pdf'])
+        self.assertEqual(len(Client.bodies), 1)
+
+    def names(self, count):
+        names = [f'doc{index:03}.pdf' for index in range(count)]
+        for name in names:
+            self.write(name, name.encode())
+        return names
+
+    # The subset logic reads MAX_APPROVAL_FILES at run time; a bound of 3 keeps the journal work small on a loaded host.
+    SUBSET = 3
+
+    def test_more_than_the_approval_bound_of_changed_files_commit_in_subsets(self):
+        self.assertEqual(agent.MAX_APPROVAL_FILES, 128)
+        names = self.names(self.SUBSET + 2)
+        with patch.object(agent, 'MAX_APPROVAL_FILES', self.SUBSET):
+            result = agent.sync(self.args)
+            self.assertEqual((result['status'], result['remainingChanges']), ('applied', 2))
+            self.assertEqual([native for _, native in self.events()], names[:self.SUBSET])
+            result = agent.sync(self.args)
+            self.assertNotIn('remainingChanges', result)
+            self.assertEqual(self.events(), [('added', name) for name in names[self.SUBSET:]])
+            self.assertEqual(Client.bodies[1]['previousCursorSha256'], Client.bodies[0]['nextCursorSha256'])
+            self.assertEqual(sorted(name for name, _ in Client.uploads), names)
+            self.assertEqual(agent.sync(self.args)['status'], 'unchanged')
+
+    def test_crash_mid_subset_then_replay_is_exact(self):
+        names = self.names(self.SUBSET + 2)
+        real = Client.upload
+        calls = []
+
+        def crashing(client, path, member, attempt, on_phase=None):
+            calls.append(member['originalFilename'])
+            if len(calls) == 2:
+                raise agent.RetryableAgentError('process lost mid-subset')
+            return real(client, path, member, attempt, on_phase)
+
+        with patch.object(agent, 'MAX_APPROVAL_FILES', self.SUBSET):
+            with patch.object(Client, 'upload', crashing):
+                with self.assertRaises(agent.RetryableAgentError):
+                    agent.sync(self.args)
+            journal = json.loads(self.pending().read_text())
+            self.assertFalse(self.args.state.exists())
+            self.assertEqual(len(Client.uploads), 1)
+            self.assertEqual(agent.sync(self.args)['status'], 'applied')
+            body = Client.bodies[-1]
+            self.assertEqual(len(Client.bodies), 1)
+            self.assertEqual((body['batchId'], body['previousCursorSha256'], body['nextCursorSha256']),
+                             (journal['intake']['batchId'], None, journal['intake']['nextCursorSha256']))
+            self.assertEqual([event['nativeId'] for event in body['events']], names[:self.SUBSET])
+            self.assertEqual([event['sourceIdempotencyKey'] for event in body['events']],
+                             [event['sourceIdempotencyKey'] for event in journal['intake']['events']])
+            uploaded = [name for name, _ in Client.uploads]
+            self.assertEqual(sorted(uploaded), names[:self.SUBSET])  # each member exactly once, none of the deferred two
+            self.assertEqual(sorted(json.loads(self.args.state.read_text())['files']), names[:self.SUBSET])
+            self.assertFalse(self.pending().exists())
+            agent.sync(self.args)
+            self.assertEqual(self.events(), [('added', name) for name in names[self.SUBSET:]])
+            self.assertEqual(Client.bodies[-1]['previousCursorSha256'], journal['intake']['nextCursorSha256'])
+
+    def test_roots_that_are_never_synced_are_refused_before_anything_is_opened(self):
+        home = Path.home().resolve()
+        system = Path(os.environ['SystemRoot']) if os.name == 'nt' else Path('/etc')
+        refused = [home, home.parent, Path(self.base.anchor), system]
+        with patch.object(agent, '_traversal_backend', side_effect=AssertionError('root opened')):
+            for root in refused:
+                with self.subTest(root=root):
+                    with self.assertRaisesRegex(agent.AgentError, 'may not be'):
+                        with agent._anchored_root(root):
+                            pass
+            self.args.root = home
+            with self.assertRaisesRegex(agent.AgentError, 'may not be'):
+                agent.sync(self.args)
+        self.assertFalse(self.args.state.exists())
+        self.assertIsNone(agent.refused_root(self.root.resolve()))
 
 if __name__=='__main__':unittest.main()
