@@ -178,7 +178,7 @@ export const TRUST_PROVISIONS: readonly TrustProvision[] = [
     id: "third_party_assurance",
     subject: "Third-party assurance report",
     state: "not_provided",
-    line: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet. An external penetration test is planned after the first paying customer. SOC 2 timing is not set. The processing addendum's audit right is a real right to inspect controls, not a report that already exists.",
+    line: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet. Our automated checks include CodeQL static analysis, database tenant-isolation tests and a malware-scanner check against a pinned ClamAV image. SOC 2 timing is not set. The processing addendum's audit right is a real right to inspect controls, not a report that already exists.",
     source: ADDENDUM,
   },
   {

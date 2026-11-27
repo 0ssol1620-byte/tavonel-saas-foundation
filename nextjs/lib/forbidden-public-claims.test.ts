@@ -61,18 +61,22 @@ const ALLOWED: readonly { file: string; sentence: string; why: string }[] = [
   { file: "components/opening-film.tsx", sentence: "| Total certified | this period | £32,613.00 |", why: "sample document text" },
   { file: "components/opening-film.tsx", sentence: '["Total certified", "this period", "£32,613.00"]', why: "sample document text" },
   // The /trust row that says the reports do not exist: the negation the Q6 list asks for.
-  { file: "content/trust/provisions.ts", sentence: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet. An external penetration test is planned after the first paying customer. SOC 2 timing is not set.", why: "states the reports are absent" },
+  { file: "content/trust/provisions.ts", sentence: "No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet.", why: "states the reports are absent" },
   // The guide quotes that /trust row, in English and with its Korean reading.
   { file: "lib/guide-content.ts", sentence: "“No SOC 2 report, ISO 27001 certificate or independent penetration-test report exists yet.”", why: "quotes the /trust negation" },
   { file: "lib/guide-content.ts", sentence: "SOC 2 보고서, ISO 27001 인증서, 독립 침투 테스트 보고서는 없습니다.", why: "Korean reading of the same negation" },
   // The two superseded DPA drafts, still published for the record, say the same thing in their audit clause.
-  { file: "public/policy/TAVONEL_DPA_v1_2026-09-11.md", sentence: "**there is no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report for this deployment.** An external penetration test is planned after the first paying customer; SOC 2 timing is not set.", why: "states the reports are absent" },
+  { file: "public/policy/TAVONEL_DPA_v1_2026-09-11.md", sentence: "**there is no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report for this deployment.**", why: "states the reports are absent" },
   // Both drafts open by saying no lawyer has reviewed them: the negation EG-10 being open requires.
   { file: "public/policy/TAVONEL_DPA_v1_2026-09-11.md", sentence: "It has not been reviewed by a lawyer, it is not executed, and it binds nobody until it is signed.", why: "states counsel has not reviewed it" },
   { file: "public/policy/TAVONEL_DPA_v2_2026-09-23.md", sentence: "It has not been reviewed by a lawyer, it is not executed, and it binds nobody until it is signed.", why: "states counsel has not reviewed it" },
   { file: "public/policy/TAVONEL_DPA_v1_2026-09-11.md", sentence: "They are Draft v1 wording and have not been reviewed by a lawyer;", why: "states counsel has not reviewed it" },
   { file: "public/policy/TAVONEL_DPA_v2_2026-09-23.md", sentence: "They are Draft v2 wording and have not been reviewed by a lawyer;", why: "states counsel has not reviewed it" },
-  { file: "public/policy/TAVONEL_DPA_v2_2026-09-23.md", sentence: "**there is no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report for the current service.** An external penetration test is planned after the first paying customer; SOC 2 timing is not set.", why: "states the reports are absent" },
+  { file: "public/policy/TAVONEL_DPA_v2_2026-09-23.md", sentence: "**there is no SOC 2 report, no ISO 27001 certificate and no independent penetration-test report for the current service.**", why: "states the reports are absent" },
+  // /trust and both drafts say no SOC 2 start is set: a statement of absence, with no date promised.
+  { file: "content/trust/provisions.ts", sentence: "SOC 2 timing is not set.", why: "states no SOC 2 work is scheduled" },
+  { file: "public/policy/TAVONEL_DPA_v1_2026-09-11.md", sentence: "SOC 2 timing is not set.", why: "states no SOC 2 work is scheduled" },
+  { file: "public/policy/TAVONEL_DPA_v2_2026-09-23.md", sentence: "SOC 2 timing is not set.", why: "states no SOC 2 work is scheduled" },
 ];
 
 function walk(directory: string): string[] {

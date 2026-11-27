@@ -197,8 +197,8 @@ and allows for an audit by the customer or an auditor it mandates, on reasonable
 than once in twelve months unless a breach or a supervisory authority requires otherwise.
 
 Stated plainly, because a buyer will ask: **there is no SOC 2 report, no ISO 27001 certificate and
-no independent penetration-test report for this deployment.** An external penetration test is
-planned after the first paying customer; SOC 2 timing is not set. The audit right in this clause is
+no independent penetration-test report for this deployment.** SOC 2 timing is not set. The audit
+right in this clause is
 therefore a real right to look, not a right to be handed a report that exists.
 
 ## 12. Data subject requests
