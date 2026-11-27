@@ -71,7 +71,7 @@ function readyDocument() {
 }
 
 /** A candidate that came back needing review, so §13.6 has something real to keep visible. */
-async function installReviewRequiredCollection(page: import("@playwright/test").Page) {
+async function installReviewRequiredCollection(page: import("@playwright/test").Page, reviewReasons: string[] = ["CONTRADICTION_CANDIDATE:claim-a:claim-b"]) {
   await page.route(`**/api/collections/${collectionId}`, route => route.fulfill({
     json: {
       candidatePromotion: false,
@@ -82,7 +82,7 @@ async function installReviewRequiredCollection(page: import("@playwright/test").
         manifestDigest: `sha256:${"b".repeat(64)}`,
         lifecycle: "review_required",
         candidatePromotion: false,
-        reviewReasons: ["CONTRADICTION_CANDIDATE:claim-a:claim-b"],
+        reviewReasons,
         sourceDocuments: [{ documentId: "doc-a" }, { documentId: "doc-b" }],
         coreExecution: {
           status: "review_required",
@@ -282,6 +282,48 @@ test.describe("workspace first use — mobile", () => {
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: receipt("home-mobile-412.png"), fullPage: true });
+  });
+
+  /*
+    B5 (independent review). The recorded code now sits inside <details>. An opened Technical details holding a
+    long unbroken string must not widen the page: measured, not inferred, with the details open at 390px.
+  */
+  test("a long recorded code inside Technical details cannot widen the page at 390px", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const longReason = `CONTRADICTION_GROUP_TOO_LARGE:contradiction_group_${"9a".repeat(32)}:claims=216:pairs=23220`;
+    await installSession(page);
+    await installCommonRoutes(page);
+    await installReviewRequiredCollection(page, [longReason]);
+    await page.route("**/api/compile-jobs", route => route.fulfill({ json: { code: "OK", jobs: [{
+      jobId: `cjob-${"a".repeat(32)}`, state: "review_required", collectionId, documentIds: ["returning-source-a"], blocked: [],
+      documentsTotal: 1, documentsReady: 1, errorCode: null, settledAt: new Date().toISOString(),
+    }] } }));
+    await page.route("**/api/documents", route => route.fulfill({ json: { documents: [readyDocument()] } }));
+
+    await page.goto(`/workspace/review?collection=${collectionId}`);
+    const chip = page.locator(".workspace-review-reason").first();
+    await expect(chip).toBeVisible();
+    // The sentence leads; the raw string is behind the disclosure.
+    await expect(chip.locator("em")).not.toContainText("CONTRADICTION_GROUP_TOO_LARGE:");
+    for (const summary of await page.locator(".workspace-review-reason details summary, .review-hold details summary").all()) await summary.click();
+    await expect(chip.locator("details code")).toBeVisible();
+    const measured = await page.evaluate(() => {
+      const code = document.querySelector<HTMLElement>(".workspace-review-reason details code")!;
+      const style = getComputedStyle(code);
+      return {
+        overflowWrap: style.overflowWrap, wordBreak: style.wordBreak,
+        codeRight: Math.round(code.getBoundingClientRect().right), viewport: document.documentElement.clientWidth,
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    expect(measured.overflowWrap).toBe("anywhere");
+    expect(measured.codeRight).toBeLessThanOrEqual(measured.viewport);
+    expect(measured.pageOverflow).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: receipt("review-reason-details-open-390.png"), fullPage: false });
+    // Control: with the wrapping taken away the code runs past the viewport, so the measurement above can fail.
+    await page.evaluate(() => { for (const code of document.querySelectorAll<HTMLElement>(".workspace-review-reason details code")) { code.style.whiteSpace = "nowrap"; code.style.overflowWrap = "normal"; code.style.wordBreak = "normal"; } });
+    // (An ancestor may clip the overflow, so the control reads the code's own box.)
+    expect(await page.evaluate(() => document.querySelector<HTMLElement>(".workspace-review-reason details code")!.getBoundingClientRect().right - document.documentElement.clientWidth)).toBeGreaterThan(1);
   });
 
   test("shows the first-run guide, not a forced tutorial, on a new mobile workspace", async ({ page }) => {

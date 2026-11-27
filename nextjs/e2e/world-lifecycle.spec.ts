@@ -766,7 +766,7 @@ test("a review-required package is not announced as activatable", async ({ page 
   await installSession(page);
   await mockWorkspace(page, true);
   await page.goto(`/workspace/world?collection=${collectionId}`);
-  await expect(page.getByText("Review-required package loaded. Its required package entries and state were checked. Resolve its blockers before activation.")).toBeVisible();
+  await expect(page.getByText("Review-required package loaded. Its required package entries and state were checked. A version that was held back cannot be activated from the workspace. Its reasons are in the review queue above.")).toBeVisible();
   await expect(page.getByText("Compiled candidate loaded.")).toHaveCount(0);
   await expect(page.locator('[aria-labelledby="world-studio-title"]')).toContainText("A readable compiled model appears here when one is available.");
   await page.screenshot({ path: testInfo.outputPath("review-required-state.png"), fullPage: true });

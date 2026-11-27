@@ -45,13 +45,13 @@ const REASONS: Record<string, Row> = {
     next: FIX_FILES,
   },
   EXTRACTION_BUDGET_REACHED: {
-    headline: "This compile stopped before it looked at everything.",
-    meaning: "There was more to find than one compile checks, so part of the knowledge may be missing from this version.",
+    headline: "This compile kept only part of what it found.",
+    meaning: "TAVONEL found more than one compile keeps, so it kept part of it and left the rest out of this version.",
     next: SEE_EVIDENCE,
   },
   DETERMINISTIC_MATERIALIZATION_UNPROVEN: {
-    headline: "TAVONEL could not confirm this result is repeatable.",
-    meaning: "The files that make up this version did not match when they were checked a second time.",
+    headline: "The files in this version disagree with their own record.",
+    meaning: "The exported files did not agree with each other, or with the totals they declare, so TAVONEL could not confirm the version is consistent.",
   },
   SOURCE_COVERAGE_INCOMPLETE: {
     headline: "A document is missing from the result.",
@@ -63,12 +63,12 @@ const REASONS: Record<string, Row> = {
     next: FIX_FILES,
   },
   IMMUTABLE_INPUTS_ONLY_UNPROVEN: {
-    headline: "TAVONEL could not confirm every file was used exactly as uploaded.",
-    meaning: "The record that ties the result to your uploaded files did not check out.",
+    headline: "TAVONEL could not confirm the result was built from exactly what was stored.",
+    meaning: "A document's stored copy and its recorded fingerprint did not match.",
   },
   READING_NEEDS_OPERATOR_REVIEW: {
     headline: "This document stopped at a reading check.",
-    meaning: "TAVONEL could not read it with enough certainty, so it was set aside instead of guessed at.",
+    meaning: "This document was set aside at the reading step and is not part of the result. TAVONEL did not guess at it.",
     next: "Remove it from the list and upload it again, or upload a clearer copy.",
   },
   READING_DID_NOT_FINISH: {
@@ -77,9 +77,9 @@ const REASONS: Record<string, Row> = {
     next: "Upload it again, then compile again.",
   },
   READING_LISTING_DISAGREEMENT: {
-    headline: "The list of documents changed while it was being read.",
-    meaning: "What was read did not match the list of documents in this compile.",
-    next: "Compile again once the uploads have finished.",
+    headline: "TAVONEL's two lists of your documents disagreed, and the compile stopped.",
+    meaning: "Two internal views of which documents had been read did not agree on repeated tries. This is a problem on our side.",
+    next: "Nothing you change in your files fixes this. Send us the reference.",
   },
   SOURCE_VERSION_AMBIGUOUS: {
     headline: "More than one version of this document was found.",
@@ -88,7 +88,7 @@ const REASONS: Record<string, Row> = {
   },
   OCR_LOW_TEXT_YIELD: {
     headline: "Very little text could be read from this document.",
-    meaning: "The pages are mostly images, or the scan is too faint to read reliably.",
+    meaning: "The pages may be mostly images, or the scan may be too faint to read reliably.",
     next: "Upload a clearer scan or a text version of the file.",
   },
   OCR_SOURCE_EMPTY: {
@@ -113,7 +113,7 @@ const REASONS: Record<string, Row> = {
   },
   CONTRADICTION_CANDIDATE: {
     headline: "Two statements may disagree with each other.",
-    meaning: "Documents say different things about the same topic. TAVONEL does not choose between them for you.",
+    meaning: "Two statements on the same topic may not agree. TAVONEL does not choose between them for you.",
     next: SEE_EVIDENCE,
   },
   CONTRADICTION_GROUP_TOO_LARGE: {
@@ -159,7 +159,6 @@ const INTEGRITY: Record<string, string> = {
   COLLECTION_ID_NOT_STABLE: "The result's identifier would change between runs.",
   BLUEPRINT_UNSUPPORTED: "The result uses a layout TAVONEL does not support.",
   SIGNATURE_ABSENT: "The package is missing its signature.",
-  SIGNATURE_PRESENT: "The package carries a signature it should not have yet.",
 };
 
 /** Every code this module has a sentence for, so a test can hold the review screen's codes to it. */
