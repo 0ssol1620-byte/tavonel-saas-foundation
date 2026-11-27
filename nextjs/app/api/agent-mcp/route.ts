@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { AGENT_MCP_MAX_BODY_BYTES, agentProposalsCohortRefusal, agentProposalsEnabled } from "@/lib/agent-access";
 import { agentTool, agentToolList, callAgentTool } from "@/lib/agent-mcp-tools";
 import { authorizeAgentRequest } from "@/lib/developer-auth";
-import { REMOTE_MCP_PROTOCOL_VERSIONS } from "@/lib/remote-mcp";
+import { agentBearerChallenge } from "@/lib/agent-oauth";
+import { REMOTE_MCP_PROTOCOL_VERSIONS, remoteMcpEnabled, requestOrigin } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,13 +22,39 @@ export const maxDuration = 60;
   caller's workspace outside the cohort -> 404; then the method. Every failure leaves as a constant code: an
   exception anywhere is UNAVAILABLE, never its text. Telemetry is {event, tool, code, decidingReadFailed} only;
   the last says whether a NOT_FOUND came from a deciding read that failed, and never reaches the agent (WO-AN-8).
+
+  WO-AGENT-OAUTH-1 (hosted connectors): an Origin header that is not this origin is refused before the body, as
+  /api/mcp does (Streamable HTTP; server-side clients send none). While the OAuth issuer is on
+  (TAVONEL_REMOTE_MCP_ENABLED), a 401 carries the RFC 9728 challenge naming this resource's metadata, and a missing
+  agent:propose a 403 insufficient_scope challenge, so a connector can discover sign-in and step up. Credential
+  rules, codes and bodies are unchanged; a static agent credential works exactly as before.
 */
 
 const NO_STORE = { "Cache-Control": "no-store" };
 const notFound = () => new NextResponse(null, { status: 404, headers: NO_STORE });
 
-function rpcError(status: number, id: unknown, code: number, message: string) {
-  return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status, headers: NO_STORE });
+function rpcError(status: number, id: unknown, code: number, message: string, headers: Record<string, string> = {}) {
+  return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, error: { code, message } }, { status, headers: { ...NO_STORE, ...headers } });
+}
+
+/**
+ * The WWW-Authenticate header for a refused authorization, or none: issuer off, or a refusal no sign-in fixes (a policy
+ * denial -- membership gone, role reduced, outside the pilot or cohort, product access -- or a store failure, 503).
+ * 401 (no, expired, revoked or wrong-audience token): the challenge. 403 API_KEY_AUTHORIZATION_REVOKED: the challenge only
+ * when authorizeAgentRequest says a new consent could help (`reauthorizable`: a revoked grant, or a revision that moved for
+ * a current owner/admin); a member whose role was reduced gets the bare denial, and re-consent refuses them as well.
+ */
+function challenge(origin: string, status: number, code: string, scope: string | undefined, reauthorizable: boolean): Record<string, string> {
+  if (!remoteMcpEnabled()) return {};
+  if (status === 401 || (code === "API_KEY_AUTHORIZATION_REVOKED" && reauthorizable)) {
+    return { "WWW-Authenticate": agentBearerChallenge(origin, code === "AUTH_REQUIRED" ? undefined : { error: "invalid_token", description: code }) };
+  }
+  // Step-up names every scope the new consent needs: the authorization step refuses a request without agent:read.
+  if (code === "API_SCOPE_REQUIRED" && scope) {
+    const needed = scope === "agent:read" ? "agent:read" : `agent:read ${scope}`;
+    return { "WWW-Authenticate": agentBearerChallenge(origin, { error: "insufficient_scope", description: `This tool needs ${scope}.`, scope: needed }) };
+  }
+  return {};
 }
 const rpcResult = (id: unknown, result: unknown) => NextResponse.json({ jsonrpc: "2.0", id, result }, { headers: NO_STORE });
 
@@ -63,6 +90,9 @@ export async function POST(request: Request) {
 }
 
 async function answer(request: Request): Promise<Response> {
+  const origin = requestOrigin(request);
+  const from = request.headers.get("origin");
+  if (from !== null && from !== origin) return rpcError(403, null, -32000, "MCP_ORIGIN_REFUSED");
   const version = request.headers.get("mcp-protocol-version");
   if (version !== null && !REMOTE_MCP_PROTOCOL_VERSIONS.includes(version)) return rpcError(400, null, -32600, "MCP_PROTOCOL_VERSION_UNSUPPORTED");
   // The response is JSON only: an Accept that names neither JSON nor a wildcard is refused before authorization and any write.
@@ -89,11 +119,12 @@ async function answer(request: Request): Promise<Response> {
   const toolLabel = tool?.name ?? "unknown";
 
   // Every request needs the agent credential; a propose tool spends a unit of agent:propose, anything else agent:read.
-  const auth = await authorizeAgentRequest(request, tool?.scope ?? "agent:read");
+  const scope = tool?.scope ?? "agent:read";
+  const auth = await authorizeAgentRequest(request, scope);
   if (!auth.ok) {
     const code = auth.code === "API_RATE_LIMITED" ? "RATE_LIMITED" : auth.code;
     if (calling) telemetry(toolLabel, code);
-    return rpcError(auth.status, id, -32001, code);
+    return rpcError(auth.status, id, -32001, code, challenge(origin, auth.status, auth.code, scope, "reauthorizable" in auth && auth.reauthorizable === true));
   }
   // The cohort is re-read on every call, so removing a workspace stops its credentials at once.
   if (agentProposalsCohortRefusal(auth.principal.workspaceKey) !== null) return notFound();

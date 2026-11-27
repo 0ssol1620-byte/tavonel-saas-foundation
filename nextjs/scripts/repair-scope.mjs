@@ -3352,10 +3352,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     }),
   }),
   // agent-mcp-route (WO-AN-5, merged): the agent MCP route, its nine tools, the agent proposal DTO and the security suite, with the route
-  // matrices every new API route enters.
+  // matrices every new API route enters. WO-AGENT-OAUTH-1: the agent resource's OAuth module and its dance suite join (6 -> 8 paths, 7 -> 8 suites).
   'agent-mcp-route': Object.freeze({
-    paths: Object.freeze(['app/api/agent-mcp/route.ts', 'lib/agent-mcp-tools.test.ts', 'lib/agent-mcp-tools.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposal-view.ts', 'lib/agent-proposals-security.test.ts']),
-    unitFiles: Object.freeze(['lib/agent-mcp-tools.test.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposals-security.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']),
+    paths: Object.freeze(['app/api/agent-mcp/route.ts', 'lib/agent-mcp-tools.test.ts', 'lib/agent-mcp-tools.ts', 'lib/agent-oauth.test.ts', 'lib/agent-oauth.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposal-view.ts', 'lib/agent-proposals-security.test.ts']),
+    unitFiles: Object.freeze(['lib/agent-mcp-tools.test.ts', 'lib/agent-oauth.test.ts', 'lib/agent-proposal-view.test.ts', 'lib/agent-proposals-security.test.ts', 'lib/csrf-shape-matrix.test.ts', 'lib/output-escaping.test.ts', 'lib/production-route-surface.test.ts', 'lib/route-classification.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),

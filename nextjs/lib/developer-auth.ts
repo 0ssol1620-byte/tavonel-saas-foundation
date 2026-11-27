@@ -317,8 +317,10 @@ export async function authorizeAgentRequest(request: Request, scope: AgentScope)
   if (!principal.agent.scopes.includes(scope)) return { ok: false as const, code: "API_SCOPE_REQUIRED", status: 403 };
   const grant = await readAgentGrant(principal.workspaceKey, principal.agent.grantId, principal.userId);
   if (!grant.ok) return { ok: false as const, code: grant.code, status: 503 };
+  // WO-AGENT-OAUTH-1: `reauthorizable` says whether a new sign-in could help (an OAuth connector is challenged only then).
+  // A revoked or absent grant: the credential is dead and a new consent (which rechecks the current role) may replace it.
   if (grant.grant === null || grant.grant.revokedAt !== null) {
-    return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
+    return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403, reauthorizable: true };
   }
   const pilot = foundationPilotAccess(principal.userId);
   if (!pilot || pilot.membership.workspaceId !== principal.workspaceKey) {
@@ -328,7 +330,9 @@ export async function authorizeAgentRequest(request: Request, scope: AgentScope)
   if (!authority.ok) return authority;
   if (principal.authorizationRevision !== authority.authorizationRevision
     || grant.grant.authorizationRevision !== authority.authorizationRevision) {
-    return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403 };
+    // The revision moved: the credential is dead either way, but a new consent helps only a current owner or admin. A member
+    // whose role was reduced is a policy denial, and re-consent refuses them (lib/agent-oauth.ts answerAgentAuthorization).
+    return { ok: false as const, code: "API_KEY_AUTHORIZATION_REVOKED", status: 403, reauthorizable: isWorkspaceManager(authority.workspaceRole) };
   }
   const productAccess = await authorizeFoundationProduct(principal.workspaceKey, principal.userId, "observer");
   if (!productAccess.ok) return { ok: false as const, code: productAccess.code, status: productAccess.status };

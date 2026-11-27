@@ -8601,7 +8601,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['proposal-executors', 5, '49bb709f8731907a', 4, 'd8543cc900774bb7', [], {}],
   ['agent-access-panel', 3, '4f48a3d2fbf28eb5', 1, '1cf09607117c4dbb', [], { 'e2e/change-proposals.spec.ts': V34_CHANGE_PROPOSALS_CLAIM }],
   // Round 5: WO-AN-5 and WO-CI-6B merged, so their owners left the pending list unchanged.
-  ['agent-mcp-route', 6, '7de747c49dbec65c', 7, 'a9a732c5350f063a', [], {}],
+  // WO-AGENT-OAUTH-1: lib/agent-oauth.ts and its suite join agent-mcp-route (6 -> 8 paths, 7 -> 8 suites).
+  ['agent-mcp-route', 8, '8c9e27796cb09e22', 8, '2224fb7d162374ce', [], {}],
   // Round 6: WO-CI-6C merged; its key guard spec joined WO-CI-6B's group as Product QA's claim at 1440 (the only project its skip allows).
   ['v34-retained-shell', 2, '923aa0f0cdd019c2', 1, '96c34fcc763756a6', [], { 'e2e/explore-shell-keys.spec.ts': v34ProductQa('1440') }],
   // Round 8: the release head's 28 unowned paths (e9364899), in eight owners; one-path.spec.ts is Product QA's claim on its four width

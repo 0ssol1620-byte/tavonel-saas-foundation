@@ -240,7 +240,9 @@ export function remoteMcpSealingKey(env: Env = process.env): Buffer | null {
 }
 
 // AES-256-GCM, the purpose bound as additional data so a client id can never open as a code.
-function seal(purpose: string, claims: object, key: Buffer): string {
+// WO-AGENT-OAUTH-1: the primitives below are exported, unchanged, for lib/agent-oauth.ts, which seals
+// its own purposes ("agent-code") with the same key; a sealed value of one purpose never opens as another.
+export function seal(purpose: string, claims: object, key: Buffer): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   cipher.setAAD(Buffer.from(purpose));
@@ -248,7 +250,7 @@ function seal(purpose: string, claims: object, key: Buffer): string {
   return Buffer.concat([iv, cipher.getAuthTag(), body]).toString("base64url");
 }
 
-function unseal(purpose: string, token: string, key: Buffer): Record<string, unknown> | null {
+export function unseal(purpose: string, token: string, key: Buffer): Record<string, unknown> | null {
   if (!SEALED.test(token)) return null;
   try {
     const raw = Buffer.from(token, "base64url");
@@ -262,9 +264,9 @@ function unseal(purpose: string, token: string, key: Buffer): Record<string, unk
   }
 }
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("base64url");
+export const sha256 = (value: string) => createHash("sha256").update(value).digest("base64url");
 
-function sameText(a: string, b: string) {
+export function sameText(a: string, b: string) {
   const left = Buffer.from(a);
   const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
@@ -323,7 +325,7 @@ export function registerClient(
   };
 }
 
-function openClient(clientId: unknown, key: Buffer): ClientClaims | null {
+export function openClient(clientId: unknown, key: Buffer): ClientClaims | null {
   if (typeof clientId !== "string" || !clientId.startsWith(CLIENT_PREFIX)) return null;
   const claims = unseal("client", clientId.slice(CLIENT_PREFIX.length), key);
   if (!claims || claims.v !== 1 || typeof claims.n !== "string" || !Array.isArray(claims.r) || !claims.r.every(acceptableRedirectUri)) return null;
@@ -347,9 +349,9 @@ export type AuthorizationCheck =
   | { ok: false; redirectTo: string; error: string; description: string };
 
 const PKCE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
-const PKCE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
+export const PKCE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
 
-function redirectWith(redirectUri: string, origin: string, params: Record<string, string | null>) {
+export function redirectWith(redirectUri: string, origin: string, params: Record<string, string | null>) {
   const url = new URL(redirectUri);
   for (const [name, value] of Object.entries(params)) if (value !== null) url.searchParams.set(name, value);
   // RFC 9207: name the issuer so a client talking to several servers can tell responses apart.

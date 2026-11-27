@@ -25,11 +25,17 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Logomark from "@/components/logomark";
+import { AGENT_PROPOSAL_CONSENT } from "@/lib/agent-consent";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 
-type View = { client: { name: string; redirectOrigin: string }; scopes: string[]; lifetime: string };
 // The server states how long the connection lasts (it knows the refresh flag); this is only for a response that predates the field.
 const ONE_HOUR = "The token is bound to this workspace and expires after an hour. Revoke it under Workspace › Developers.";
+/*
+  WO-AGENT-OAUTH-1: the same page serves the agent endpoint (`resource: "agent-mcp"` in the server's describe answer).
+  Then there is no readiness precheck (that is the read-only MCP's cohort), the copy is the Agent access consent copy,
+  and agent:propose has its own unticked line: Allow grants it only when the person ticked it.
+*/
+type View = { client: { name: string; redirectOrigin: string }; scopes: string[]; lifetime: string; resource?: "agent-mcp" };
 type Check = { id: string; ok?: boolean; code: string; action?: { href: string } };
 type Phase =
   | { kind: "checking" }
@@ -62,12 +68,12 @@ async function sessionToken() {
   return data.session?.access_token ?? null;
 }
 
-async function decide(decision: "describe" | "precheck" | "approve" | "deny", token: string | null) {
+async function decide(decision: "describe" | "precheck" | "approve" | "deny", token: string | null, allowPropose?: boolean) {
   const response = await fetch("/api/mcp/oauth/authorize", {
     method: "POST",
     cache: "no-store",
     headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ decision, request: requestFromQuery() }),
+    body: JSON.stringify({ decision, request: requestFromQuery(), ...(allowPropose === undefined ? {} : { allowPropose }) }),
   });
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: response.status, body };
@@ -75,6 +81,7 @@ async function decide(decision: "describe" | "precheck" | "approve" | "deny", to
 
 export default function OAuthAuthorizePage() {
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
+  const [allowPropose, setAllowPropose] = useState(false);
 
   const leave = useCallback((redirectTo: unknown) => {
     if (typeof redirectTo !== "string") return false;
@@ -96,7 +103,7 @@ export default function OAuthAuthorizePage() {
         });
         return;
       }
-      setPhase({ kind: "consent", view: { client: body.client, scopes: body.scopes, lifetime: typeof body.lifetime === "string" ? body.lifetime : ONE_HOUR } as View });
+      setPhase({ kind: "consent", view: { client: body.client, scopes: body.scopes, lifetime: typeof body.lifetime === "string" ? body.lifetime : ONE_HOUR, ...(body.resource === "agent-mcp" ? { resource: "agent-mcp" } : {}) } as View });
     } catch {
       setPhase({ kind: "invalid", description: failureSentence(null, 503), back: null });
     }
@@ -115,7 +122,7 @@ export default function OAuthAuthorizePage() {
         setPhase({ kind: "signed-out", view });
         return;
       }
-      if (decision === "allow") {
+      if (decision === "allow" && view.resource !== "agent-mcp") {
         const { status, body } = await decide("precheck", token);
         if (status === 401) {
           setPhase({ kind: "signed-out", view });
@@ -138,7 +145,8 @@ export default function OAuthAuthorizePage() {
           return;
         }
       }
-      const { status, body } = await decide(decision === "deny" ? "deny" : "approve", token);
+      const { status, body } = await decide(decision === "deny" ? "deny" : "approve", token,
+        view.resource === "agent-mcp" && decision !== "deny" ? allowPropose : undefined);
       if (leave(body.redirectTo)) return;
       if (status === 401) setPhase({ kind: "signed-out", view });
       else setPhase({ kind: "unavailable", code: String(body.code ?? ""), status });
@@ -219,7 +227,27 @@ export default function OAuthAuthorizePage() {
             </div>
           ) : null}
 
-          {view ? (
+          {view && view.resource === "agent-mcp" ? (
+            <>
+              <p className="lead">
+                <b style={WRAP}>{view.client.name}</b> asks to connect to this workspace as an agent that can suggest changes. The access
+                token goes to <b style={WRAP}>{view.client.redirectOrigin}</b>.
+              </p>
+              <ul className="auth-facts">
+                <li><b>What it sees.</b> {AGENT_PROPOSAL_CONSENT.sees(view.client.name)}</li>
+                <li><b>Suggestions only.</b> {AGENT_PROPOSAL_CONSENT.cannotChange} {AGENT_PROPOSAL_CONSENT.cannotReach}</li>
+                <li><b>One workspace.</b> The token is bound to this workspace and expires after 15 minutes. Disconnect it under Workspace › Developers › Agent access.</li>
+                <li><b>Name not verified.</b> The client chose its own name. Check the address above before you allow it.</li>
+                <li><b>Scopes.</b> {allowPropose && view.scopes.includes("agent:propose") ? "agent:read, agent:propose" : "agent:read"}</li>
+              </ul>
+              {view.scopes.includes("agent:propose") ? (
+                <label className="auth-facts" style={WRAP}>
+                  <input type="checkbox" checked={allowPropose} disabled={phase.kind === "working"} onChange={(event) => setAllowPropose(event.target.checked)} />{" "}
+                  <b>Also let it submit suggestions for review.</b> {AGENT_PROPOSAL_CONSENT.suggests} {AGENT_PROPOSAL_CONSENT.securityNote}
+                </label>
+              ) : null}
+            </>
+          ) : view ? (
             <>
               <p className="lead">
                 <b style={WRAP}>{view.client.name}</b> asks to read this workspace through the read-only MCP endpoint. The access token
@@ -231,6 +259,11 @@ export default function OAuthAuthorizePage() {
                 <li><b>Name not verified.</b> The client chose its own name. Check the address above before you allow it.</li>
                 <li><b>Scopes.</b> {view.scopes.join(", ")}</li>
               </ul>
+            </>
+          ) : null}
+
+          {view ? (
+            <>
               <div className="auth-actions">
                 {phase.kind === "signed-out" ? (
                   <>
@@ -242,7 +275,7 @@ export default function OAuthAuthorizePage() {
                     {phase.kind === "no-world" ? (
                       <button className="btn" type="button" onClick={() => void submit("connect", view)}>Connect anyway</button>
                     ) : (
-                      <button className="btn" type="button" disabled={phase.kind === "working"} onClick={() => void submit("allow", view)}>Allow read-only access</button>
+                      <button className="btn" type="button" disabled={phase.kind === "working"} onClick={() => void submit("allow", view)}>{view.resource === "agent-mcp" ? "Allow agent access" : "Allow read-only access"}</button>
                     )}
                     <button className="btn ghost" type="button" disabled={phase.kind === "working"} onClick={() => void submit("deny", view)}>Deny</button>
                   </>

@@ -1190,7 +1190,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     // WO-TRAIN-2: db-harness takes the member-scope race script and its suite (17 -> 19 paths, 8 -> 9 Node suites).
     ['v34-qa-harness', 10, 0, 2, 2], ['db-harness', 22, 10, 0, 0], ['agent-proposals', 5, 2, 0, 0],
     ['proposals-decision-path', 3, 6, 0, 0], ['agent-grants', 6, 5, 0, 0], ['proposal-executors', 5, 4, 0, 0], ['agent-access-panel', 3, 1, 0, 1],
-    ['agent-mcp-route', 6, 7, 0, 0], ['v34-retained-shell', 2, 1, 0, 1],
+    ['agent-mcp-route', 8, 8, 0, 0], ['v34-retained-shell', 2, 1, 0, 1],
     // Round 8: the release head's 28 unowned paths, in eight owners (db-harness took the plan-allowance race: 15 -> 17 paths, 7 -> 8 suites).
     ['catalog-meters', 8, 4, 0, 0], ['workspace-e2e-fixtures', 2, 0, 11, 1], ['page-meter-cohort', 3, 4, 0, 0], ['sale-opening', 2, 7, 0, 0],
     ['sitemap-shallow', 1, 1, 0, 0], ['v34-held-feature', 3, 3, 6, 0], ['v34-in-sentence-guard', 4, 5, 2, 0], ['v34-frame', 3, 2, 1, 0],

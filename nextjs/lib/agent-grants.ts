@@ -134,6 +134,9 @@ async function rpc(name: string, args: Record<string, unknown>, timeoutMs?: numb
  * returns the token -- the only time it exists outside the agent host. The RPC receives the sha256,
  * never the token. A membership that moved since the session was read is AUTHORIZATION_CHANGED_RETRY;
  * a workspace at its active-key cap (shared with every key kind) is AGENT_GRANT_LIMIT_REACHED.
+ *
+ * WO-AGENT-OAUTH-1: an OAuth connector's grant passes `scopes` (what the person consented to, a non-empty
+ * subset of AGENT_SCOPES) and `ttlSeconds` (AGENT_OAUTH_TOKEN_TTL_SECONDS); the panel passes neither.
  */
 export async function createAgentGrant(input: {
   workspaceKey: string;
@@ -141,18 +144,24 @@ export async function createAgentGrant(input: {
   authorizationRevision: number;
   clientLabel: string;
   grantorEmail: string | null | undefined;
+  scopes?: readonly AgentScope[];
+  ttlSeconds?: number;
   now?: Date;
 }): Promise<{ ok: true; grant: AgentGrant; token: string } | Failure> {
   const clientLabel = normalizeClientLabel(input.clientLabel);
   const now = input.now ?? new Date();
+  const scopes: readonly AgentScope[] = input.scopes ?? AGENT_SCOPES;
+  const ttlMs = input.ttlSeconds === undefined ? AGENT_CREDENTIAL_TTL_DAYS * 86_400_000 : input.ttlSeconds * 1000;
   if (!clientLabel || !WORKSPACE_KEY.test(String(input.workspaceKey)) || !isId(input.userId)
-    || !Number.isSafeInteger(input.authorizationRevision) || input.authorizationRevision < 1 || !Number.isFinite(now.getTime())) {
+    || !Number.isSafeInteger(input.authorizationRevision) || input.authorizationRevision < 1 || !Number.isFinite(now.getTime())
+    || scopes.length === 0 || new Set(scopes).size !== scopes.length || !scopes.every((scope) => (AGENT_SCOPES as readonly unknown[]).includes(scope))
+    || (input.ttlSeconds !== undefined && (!Number.isSafeInteger(input.ttlSeconds) || input.ttlSeconds <= 0))) {
     return fail("AGENT_GRANT_INPUT_INVALID");
   }
   // The grantor's address is shown beside the proposals; one the store would refuse is not shown at all.
   const grantorEmail = typeof input.grantorEmail === "string" && input.grantorEmail.length <= GRANTOR_EMAIL_MAX
     && !/[\p{Cs}\p{Cc}]/u.test(input.grantorEmail) ? input.grantorEmail : null;
-  const expiresAt = new Date(now.getTime() + AGENT_CREDENTIAL_TTL_DAYS * 86_400_000).toISOString();
+  const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
   let minted: Awaited<ReturnType<typeof mintApiKeyToken>>;
   try { minted = await mintApiKeyToken("agt"); } catch { return fail("AGENT_GRANT_CREATE_FAILED"); }
   const answer = await rpc("create_foundation_agent_grant", {
@@ -163,7 +172,7 @@ export async function createAgentGrant(input: {
     p_grantor_email: grantorEmail,
     p_key_prefix: minted.prefix,
     p_token_sha256: minted.sha256,
-    p_scopes: [...AGENT_SCOPES],
+    p_scopes: [...scopes],
     p_expires_at: expiresAt,
   });
   if (answer === null) return fail("DEVELOPER_STORE_NOT_CONFIGURED");
@@ -175,7 +184,7 @@ export async function createAgentGrant(input: {
   }
   const body = answer.body;
   if (!isRecord(body) || !isId(body.grantId) || !isId(body.keyId) || body.keyPrefix !== minted.prefix || !isTime(body.createdAt) || !isTime(body.expiresAt)
-    || !Array.isArray(body.scopes) || body.scopes.length !== AGENT_SCOPES.length || !AGENT_SCOPES.every((scope: AgentScope) => (body.scopes as unknown[]).includes(scope))) {
+    || !Array.isArray(body.scopes) || body.scopes.length !== scopes.length || !scopes.every((scope: AgentScope) => (body.scopes as unknown[]).includes(scope))) {
     return fail("DEVELOPER_STORE_BINDING_INVALID");
   }
   return {

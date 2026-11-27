@@ -18,6 +18,11 @@ export type AgentScope = (typeof AGENT_SCOPES)[number];
 export const AGENT_SCOPE_RATE_LIMITS: Readonly<Record<AgentScope, number>> = { "agent:read": 120, "agent:propose": 10 };
 /** Lifetime of one agent credential. Start value, uncalibrated. */
 export const AGENT_CREDENTIAL_TTL_DAYS = 30;
+/**
+ * Lifetime of the access token an OAuth connector receives for /api/agent-mcp (WO-AGENT-OAUTH-1; decision
+ * FOUNDER-DECISIONS-20261127 §C). Design target, uncalibrated. The read-only MCP keeps its own 3,600 s.
+ */
+export const AGENT_OAUTH_TOKEN_TTL_SECONDS = 900;
 /** Open agent proposals per (workspace, person) across all their grants. Start value, uncalibrated. */
 export const AGENT_OPEN_PROPOSALS_PER_PERSON = 200;
 /** Items in one propose_library_labels call. Start value, uncalibrated. */

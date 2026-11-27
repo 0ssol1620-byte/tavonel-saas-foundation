@@ -3,6 +3,7 @@ import { requireFoundationSession } from "@/lib/developer-auth";
 import { remoteMcpReadiness } from "@/lib/remote-mcp-readiness";
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess } from "@/lib/trial-ai-access";
+import { agentOAuthEnabled, answerAgentAuthorization, isAgentResource } from "@/lib/agent-oauth";
 import {
   checkAuthorizationRequest,
   cohortRefusalStatus,
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
   const origin = requestOrigin(request);
   const text = await request.text();
   if (text.length > 16_384) return NextResponse.json({ code: "REQUEST_TOO_LARGE" }, { status: 413, headers: NO_STORE });
-  let body: { decision?: unknown; request?: Record<string, unknown> };
+  let body: { decision?: unknown; allowPropose?: unknown; request?: Record<string, unknown> };
   try {
     body = JSON.parse(text) as typeof body;
   } catch {
@@ -49,6 +50,9 @@ export async function POST(request: Request) {
     if (typeof value === "string") parameters[name] = value;
   }
 
+  // WO-AGENT-OAUTH-1: the agent resource is a second protected resource of this issuer, answered in lib/agent-oauth.ts.
+  // Flag off, it is not this server's resource and the check below refuses it (invalid_target), as before.
+  if (agentOAuthEnabled() && isAgentResource(parameters.resource, origin)) return answerAgentAuthorization(request, body, parameters, key, origin);
   const checked = checkAuthorizationRequest(parameters, key, origin);
   if (!checked.ok) {
     return checked.redirectTo === null

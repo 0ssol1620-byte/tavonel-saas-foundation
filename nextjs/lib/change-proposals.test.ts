@@ -260,3 +260,43 @@ describe("cursor validation", () => {
     expect(accepted).toBeGreaterThan(20);
   });
 });
+
+// WO-AGENT-OAUTH-1 review P1: the sweep that revokes an ended OAuth grant asks this first; open, unknown and unreadable never read as "none".
+describe("grantHasOpenProposals", () => {
+  const GRANT = "9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a";
+  const agentRow = (n: number, state: string) => ({
+    proposal_id: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`, workspace_key: "pilot-a", collection_id: COLLECTION, action_type: "library_label",
+    input, input_sha256: `sha256:${"9".repeat(64)}`, evidence_ids: ["ev-1"], state, expires_at: "2026-11-23T00:00:00Z",
+    created_at: `2026-11-16T00:00:${String(59 - (n % 60)).padStart(2, "0")}Z`, decided_at: state === "proposed" ? null : "2026-11-17T00:00:00Z",
+    expected_manifest_digest: `sha256:${"8".repeat(64)}`, principal_kind: "agent", principal_id: "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a", idempotency_key: "secret-key-001",
+    receipt: null, binding_kind: "active_manifest", agent_grant_id: GRANT, decided_by: state === "proposed" || state === "withdrawn" ? null : "7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a",
+    agent_client_label: "ChatGPT #AAAAAAAAAAAA", agent_grantor_email: null,
+  });
+
+  it("asks the store for this grant only and answers open only for a proposed row", async () => {
+    rpc.mockImplementation(() => ({ status: 200, body: [agentRow(1, "rejected"), agentRow(2, "withdrawn")] }));
+    expect(await lib.grantHasOpenProposals("pilot-a", GRANT)).toEqual({ ok: true, open: false });
+    expect(rpc.mock.calls[0]![1]).toMatchObject({ p_workspace_key: "pilot-a", p_agent_grant_id: GRANT, p_before_created_at: null });
+    rpc.mockImplementation(() => ({ status: 200, body: [agentRow(1, "rejected"), agentRow(2, "proposed")] }));
+    expect(await lib.grantHasOpenProposals("pilot-a", GRANT)).toEqual({ ok: true, open: true });
+  });
+
+  it("no rows is none; a store failure is a failure; a malformed id never reaches the store", async () => {
+    rpc.mockImplementation(() => ({ status: 200, body: [] }));
+    expect(await lib.grantHasOpenProposals("pilot-a", GRANT)).toEqual({ ok: true, open: false });
+    rpc.mockReset();
+    rpc.mockImplementation(() => ({ status: 500, body: { message: "down" } }));
+    expect((await lib.grantHasOpenProposals("pilot-a", GRANT)).ok).toBe(false);
+    rpc.mockReset();
+    expect(await lib.grantHasOpenProposals("pilot-a", "not-a-uuid")).toEqual({ ok: false, code: "PROPOSAL_REQUEST_INVALID", status: 400 });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("full pages with nothing open past the scan bound read as open (never withdraw what was not seen)", async () => {
+    let n = 0;
+    rpc.mockImplementation(() => ({ status: 200, body: Array.from({ length: 50 }, () => agentRow(++n, "rejected")) }));
+    expect(await lib.grantHasOpenProposals("pilot-a", GRANT)).toEqual({ ok: true, open: true });
+    expect(rpc.mock.calls.length).toBeGreaterThan(1);
+    expect(rpc.mock.calls[1]![1].p_before_id).toBe(`00000000-0000-4000-8000-${String(50).padStart(12, "0")}`);
+  });
+});
