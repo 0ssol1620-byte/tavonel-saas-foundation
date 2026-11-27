@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import fixture from "../scripts/fixtures/extraction-loss.synthetic.inputs.json";
+import fixture from "./extraction-loss-report.synthetic.inputs.json";
 import {
   compileCollectionCandidate,
   compileCollectionCandidateWithLossReport,

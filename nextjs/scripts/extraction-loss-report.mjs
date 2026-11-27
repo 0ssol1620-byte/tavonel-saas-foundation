@@ -3,7 +3,7 @@
 //   node scripts/extraction-loss-report.mjs [inputs.json]
 //
 // `inputs.json` is an array of CollectionOcrInput (the shape lib/entity-extraction-eval.inputs.json
-// has). Without an argument it runs the synthetic fixture in scripts/fixtures. It runs the
+// has). Without an argument it runs the synthetic fixture lib/extraction-loss-report.synthetic.inputs.json. It runs the
 // TypeScript FALLBACK extractor; the Python Core's funnel is not measured here (see the report's
 // `notMeasured`). Needs no env flag: running this script is the opt-in. Reads files, writes
 // stdout only, makes no network call.
@@ -34,7 +34,7 @@ const { compareCountsToReadModel } = await import("../lib/extraction-loss-report
 const { buildWorldReadModel } = await import("../lib/world-read-model.ts");
 
 const inputPath = resolve(process.argv.slice(2).filter((arg) => arg !== "--")[0]
-  ?? join(here, "fixtures", "extraction-loss.synthetic.inputs.json"));
+  ?? join(here, "..", "lib", "extraction-loss-report.synthetic.inputs.json"));
 const raw = JSON.parse(readFileSync(inputPath, "utf8"));
 const inputs = raw.map((item) => validateCollectionOcrInput(item));
 if (!Array.isArray(raw) || inputs.length === 0 || inputs.some((item) => item === null)) {

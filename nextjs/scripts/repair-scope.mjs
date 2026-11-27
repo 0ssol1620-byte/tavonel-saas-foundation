@@ -3611,6 +3611,14 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
+  // extraction-loss-report (WO-EXTRACT-LOSS-1): the operator-only, default-off loss report for entity extraction. The one suite imports the report
+  // module, the compiler and the synthetic fixture the offline script also runs; the script is the same module's CLI.
+  'extraction-loss-report': Object.freeze({
+    paths: Object.freeze(['lib/extraction-loss-report.synthetic.inputs.json', 'lib/extraction-loss-report.test.ts', 'lib/extraction-loss-report.ts', 'scripts/extraction-loss-report.mjs']),
+    unitFiles: Object.freeze(['lib/extraction-loss-report.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.
