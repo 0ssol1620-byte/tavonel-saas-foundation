@@ -5,8 +5,6 @@ import type { DocumentListItem } from "@/lib/immutable-keys";
 import type { PipelineRow } from "@/lib/pipeline";
 import { buildOperationsSnapshot, type OperationsGate } from "@/lib/operations-view-model";
 import { displayName, type DocumentNames } from "@/lib/document-names";
-import { formatTimestamp } from "@/lib/format";
-import { labelForReference, plainEvent } from "@/lib/plain-language";
 import {
   buildPreflightSummary,
   describePreflightFile,
@@ -54,9 +52,6 @@ export default function OperationsUltimate({ mode, rows, documents, names, gates
   const refreshFromStream = useRef(onRefresh);
   useEffect(() => { refreshFromStream.current = onRefresh; }, [onRefresh]);
 
-  /* D-03: an audit row names a document by its filename and any other record by its kind; the id is the tooltip. */
-  const targetLabel = (id: string) => names[id] ?? labelForReference(id).label;
-  const targetTitle = (id: string) => names[id] ? undefined : labelForReference(id).title;
   const loadAudit = async () => {
     setAuditState("READING");
     const client = getSupabaseBrowserClient();
@@ -119,7 +114,7 @@ export default function OperationsUltimate({ mode, rows, documents, names, gates
       <section className={styles.activity} aria-labelledby="activity-center-title">
         <div className={styles.head}><div><p>Activity center · persisted audit</p><h2 id="activity-center-title">What the workspace recorded.</h2></div><button className={styles.refresh} type="button" onClick={() => void loadAudit()}>Refresh audit</button></div>
         <p className={styles.clear} role="status">{auditState}. Browser-only notices are not presented as durable events.</p>
-        {events && events.length > 0 ? <ol className={styles.events}>{events.map((event) => <li key={event.eventId}><strong title={event.action}>{plainEvent(event.action)}</strong><span title={targetTitle(event.targetId)}>{targetLabel(event.targetId)}</span><time className={styles.eventMeta} dateTime={event.createdAt}>{formatTimestamp(event.createdAt) ?? event.createdAt}</time></li>)}</ol> : <div className={styles.empty}>No durable audit rows are available to this session. TAVONEL does not synthesize an activity timeline.</div>}
+        {events && events.length > 0 ? <ol className={styles.events}>{events.map((event) => <li key={event.eventId}><strong>{event.action}</strong><span>{event.targetId}</span><time className={styles.eventMeta} dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time></li>)}</ol> : <div className={styles.empty}>No durable audit rows are available to this session. TAVONEL does not synthesize an activity timeline.</div>}
       </section>
     </div>
   );
