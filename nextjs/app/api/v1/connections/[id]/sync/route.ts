@@ -14,7 +14,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 // The batch was understood and refused against stored state; retrying it unchanged cannot succeed.
 const CONFLICT_CODES = new Set([
   "CONNECTION_CURSOR_CONFLICT", "CONNECTION_BATCH_CONFLICT", "CONNECTION_SOURCE_NOT_ADMITTED",
-  "CONNECTION_SOURCE_MISMATCH", "CONNECTION_SOURCE_UNAVAILABLE", "CONNECTION_SOURCE_CONFLICT",
+  "CONNECTION_SOURCE_MISMATCH", "CONNECTION_SOURCE_CONFLICT",
 ]);
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {

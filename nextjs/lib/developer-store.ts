@@ -592,7 +592,6 @@ const SOURCE_BINDING_ERRORS: ReadonlyArray<readonly [string, string]> = [
   ["connection_batch_contract_invalid", "CONNECTION_BATCH_INVALID"],
   ["connection_batch_source_unadmitted", "CONNECTION_SOURCE_NOT_ADMITTED"],
   ["connection_batch_source_invalid", "CONNECTION_SOURCE_MISMATCH"],
-  ["connection_batch_source_unavailable", "CONNECTION_SOURCE_UNAVAILABLE"],
   ["connection_batch_source_conflict", "CONNECTION_SOURCE_CONFLICT"],
 ];
 

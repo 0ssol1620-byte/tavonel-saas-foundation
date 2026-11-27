@@ -214,14 +214,14 @@ describe("the batch contract (D2)", () => {
 
   it("passes the database's per-source counts through and types its refusals", async () => {
     mocks.batchResult = { status: "applied", batchId: "59d42924-a3cc-4a09-b92d-9c86b58901a1",
-      sources: { bound: 0, suspended: 0, deletionRecorded: 1, deletionHeld: 0, deletionDeferred: 0 } };
+      sources: { bound: 0, suspended: 0, deletionRecorded: 1, deletionHeld: 0, deletionDeferred: 0,
+        reactivated: 0, unavailable: 0 } };
     const ok = await sync([deleted("a.pdf", { removal: "deleted" })]);
     expect(ok.status).toBe(200);
     await expect(ok.json()).resolves.toMatchObject({ code: "OK", sources: { deletionRecorded: 1 } });
     for (const [message, status, code] of [
       ["connection_batch_source_unadmitted", 409, "CONNECTION_SOURCE_NOT_ADMITTED"],
       ["connection_batch_source_invalid", 409, "CONNECTION_SOURCE_MISMATCH"],
-      ["connection_batch_source_unavailable", 409, "CONNECTION_SOURCE_UNAVAILABLE"],
       ["connection_batch_source_conflict", 409, "CONNECTION_SOURCE_CONFLICT"],
       ["connection_batch_contract_invalid", 400, "CONNECTION_BATCH_INVALID"],
       ["connection_not_syncable", 423, "CONNECTION_NOT_SYNCABLE"],

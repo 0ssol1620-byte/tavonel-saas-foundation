@@ -8,7 +8,7 @@
 --   pilot-d2d2d2d2d2d24d2d  B, another tenant
 --   pilot-d3d3d3d3d3d34d3d  C, an enterprise assignment without a policy (legal hold unreadable)
 begin;
-select plan(66);
+select plan(85);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -95,7 +95,7 @@ language sql as $fn$
   select v.document_id from public.foundation_connection_sources s
     join public.foundation_connection_source_versions v on v.source_version_id = s.current_source_version_id
    where s.connection_id = 'd1000000-0000-4000-8000-0000000000c1' and s.native_id = p_native
-   order by s.generation desc limit 1
+   order by s.updated_at desc, s.generation desc limit 1
 $fn$;
 
 -- ---------------------------------------------------------------------------
@@ -139,7 +139,8 @@ select is(pg_temp.a('01', null, '1', jsonb_build_array(
     pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'a/report.pdf', 'rev-1', '1', 100),
     pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'b/notes.pdf', 'rev-n', '3', 50))),
   jsonb_build_object('status', 'applied', 'batchId', 'd1000000-0000-4000-8000-000000000001',
-    'sources', jsonb_build_object('bound', 2, 'suspended', 0, 'deletionRecorded', 0, 'deletionHeld', 0, 'deletionDeferred', 0)),
+    'sources', jsonb_build_object('bound', 2, 'suspended', 0, 'deletionRecorded', 0, 'deletionHeld', 0, 'deletionDeferred', 0,
+      'reactivated', 0, 'unavailable', 0)),
   'a first batch binds both uploaded files and reports the counts');
 select is((select count(*)::integer from public.foundation_connection_sources
             where connection_id = 'd1000000-0000-4000-8000-0000000000c1'), 2, 'one logical source per path');
@@ -204,7 +205,8 @@ select is((select cursor_sha256 from public.foundation_connections where connect
 -- Removal: suspension, deletion receipt, re-add as a new generation
 -- ---------------------------------------------------------------------------
 select is(pg_temp.a('04', '3', '4', jsonb_build_array(pg_temp.gone('a/report.pdf', null)))->'sources',
-  jsonb_build_object('bound', 0, 'suspended', 1, 'deletionRecorded', 0, 'deletionHeld', 0, 'deletionDeferred', 0),
+  jsonb_build_object('bound', 0, 'suspended', 1, 'deletionRecorded', 0, 'deletionHeld', 0, 'deletionDeferred', 0,
+    'reactivated', 0, 'unavailable', 0),
   'a deleted event from a client without the removal marker suspends access only');
 select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', '1'), true, 'the current document of a suspended source is blocked');
 select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', '2'), true, 'and so is every earlier version');
@@ -236,10 +238,73 @@ select is((select max(generation) from public.foundation_connection_sources
 select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', '4'), false, 'the re-added document is readable');
 select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', '1'), true, 'the removed generation stays blocked');
 
+-- ---------------------------------------------------------------------------
+-- Restore of the same bytes (review-MIGRATIONS-3 BLOCKER 1): the per-file path derives the same
+-- document id again. It reactivates a suspended source; it never revives a deleted one; and in no
+-- case does it fail the batch, so the cursor advances and the other files of the batch bind.
+-- ---------------------------------------------------------------------------
+select pg_temp.admit('pilot-d1d1d1d1d1d14d1d', 'd1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1', 'a', 10);
+select pg_temp.admit('pilot-d1d1d1d1d1d14d1d', 'd1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1', 'b', 11);
+select pg_temp.admit('pilot-d1d1d1d1d1d14d1d', 'd1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1', 'c', 12);
+select is(pg_temp.a('11', '7', 'b', jsonb_build_array(
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/keep.pdf', 'rev-k', 'a', 10),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/gone.pdf', 'rev-g', 'b', 11)))->'sources'->>'bound',
+  '2', 'two more files bind');
+select is(pg_temp.a('12', 'b', 'c', jsonb_build_array(
+    pg_temp.gone('e/keep.pdf', null), pg_temp.gone('e/gone.pdf', 'deleted')))->'sources',
+  jsonb_build_object('bound', 0, 'suspended', 1, 'deletionRecorded', 1, 'deletionHeld', 0, 'deletionDeferred', 0,
+    'reactivated', 0, 'unavailable', 0),
+  'one file is removed without the marker, the other is deleted (its bytes are queued for purge)');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', 'a'), true, 'the suspended file is blocked');
+
+select is(pg_temp.a('13', 'c', 'd', jsonb_build_array(
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/keep.pdf', 'rev-k', 'a', 10),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/gone.pdf', 'rev-g', 'b', 11),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'changed', 'a/report.pdf', 'rev-1', '1', 100),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/new.pdf', 'rev-n', 'c', 12))),
+  jsonb_build_object('status', 'applied', 'batchId', 'd1000000-0000-4000-8000-000000000013',
+    'sources', jsonb_build_object('bound', 1, 'suspended', 0, 'deletionRecorded', 0, 'deletionHeld', 0,
+      'deletionDeferred', 0, 'reactivated', 1, 'unavailable', 2)),
+  'restoring the same bytes applies: one source reactivated, two restores skipped, the new file bound');
+select is((select cursor_sha256 from public.foundation_connections where connection_id = 'd1000000-0000-4000-8000-0000000000c1'),
+  'sha256:' || repeat('d', 64), 'the cursor advances past the restores');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', 'a'), false, 'the restored file is readable again');
+select is((select count(*)::integer from public.connector_source_suspensions css
+            join public.foundation_connection_sources s using (source_id)
+           where s.native_id = 'e/keep.pdf'), 0, 'its suspension is lifted');
+select is((select count(*)::integer from public.foundation_connection_sources
+            where connection_id = 'd1000000-0000-4000-8000-0000000000c1' and native_id = 'e/keep.pdf'), 1,
+  'it is the same logical source, not a new generation');
+select is(pg_temp.current_doc('e/keep.pdf'), pg_temp.doc('pilot-d1d1d1d1d1d14d1d', repeat('a', 64)),
+  'and its restored document is current');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', 'b'), true, 'a restore never revives a deleted document');
+select is((select count(*)::integer from public.foundation_connection_sources
+            where connection_id = 'd1000000-0000-4000-8000-0000000000c1' and native_id = 'e/gone.pdf'), 1,
+  'and binds nothing for it');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', '1'), true,
+  'earlier bytes of a path whose later source is active stay blocked');
+select is(pg_temp.current_doc('a/report.pdf'), pg_temp.doc('pilot-d1d1d1d1d1d14d1d', repeat('4', 64)),
+  'and do not displace that source');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', 'c'), false, 'the other file of the batch is bound and readable');
+
+select is(pg_temp.a('13', 'c', 'd', jsonb_build_array(
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/keep.pdf', 'rev-k', 'a', 10),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/gone.pdf', 'rev-g', 'b', 11),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'changed', 'a/report.pdf', 'rev-1', '1', 100),
+    pg_temp.up('pilot-d1d1d1d1d1d14d1d', 'added', 'e/new.pdf', 'rev-n', 'c', 12)))->>'status',
+  'replayed', 'the restore batch replays');
+select is((select count(*)::integer from public.foundation_connection_source_versions
+            where connection_id = 'd1000000-0000-4000-8000-0000000000c1'), 7, 'a replay writes no version');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', 'a'), false, 'and leaves the reactivated source readable');
+
+select is(pg_temp.a('14', 'd', 'e', jsonb_build_array(pg_temp.gone('e/keep.pdf', null)))->'sources'->>'suspended',
+  '1', 'a reactivated source can be removed again');
+select is(pg_temp.blocked('pilot-d1d1d1d1d1d14d1d', 'a'), true, 'and is blocked again');
+
 -- Legal hold: the deletion is recorded as held; the suspension still blocks access.
 insert into public.source_operator_legal_holds (workspace_key, reason)
 values ('pilot-d1d1d1d1d1d14d1d', 'fixture: litigation hold');
-select is(pg_temp.a('08', '7', '8', jsonb_build_array(pg_temp.gone('a/report.pdf', 'deleted')))->'sources'->>'deletionHeld',
+select is(pg_temp.a('08', 'e', '8', jsonb_build_array(pg_temp.gone('a/report.pdf', 'deleted')))->'sources'->>'deletionHeld',
   '1', 'under an active legal hold the deletion is held');
 select is((select count(*)::integer from public.source_deletion_tombstones
             where workspace_key = 'pilot-d1d1d1d1d1d14d1d' and document_id = pg_temp.doc('pilot-d1d1d1d1d1d14d1d', repeat('4', 64))),

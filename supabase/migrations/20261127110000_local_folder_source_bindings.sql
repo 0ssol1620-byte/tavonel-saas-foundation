@@ -36,12 +36,17 @@
 --        hold unreadable -> 'deferred' (no tombstone; the suspension still blocks access).
 --      `"removal": "out_of_scope"`, or no removal field (every client released before LF-1), is a
 --      suspension only: bytes are kept and the customer decides in the Library. Re-adding the same
---      path later starts a new generation, i.e. a new logical source.
+--      path with new bytes later starts a new generation, i.e. a new logical source. Restoring the same
+--      bytes (the per-file path derives the same document id) reactivates the removed source: its
+--      suspension is lifted and it is current again -- unless a deletion receipt exists for any of its
+--      versions, or another source of the path is active. Such an event binds nothing and is counted
+--      `unavailable`; it never fails the batch, so the cursor still advances.
 --   5. connector_documents_blocked gains one more `or exists`: a document of a local version is
 --      blocked when its connection is revoked or paused, or its source is suspended. The OAuth and
 --      upload-tombstone clauses are unchanged, so every serving path sees the same deny.
 --   6. guard_connector_source_suspension accepts a local source as bound (after the unchanged OAuth
---      lookup).
+--      lookup), and lets the batch lift a local source's suspension (point 4); OAuth suspensions stay
+--      immutable.
 --
 -- Scope wording (docs/ip/TECHNOLOGY_INTAKE_REGISTER.yaml, tech_palantir_propagated_deletion,
 -- DESIGN_AROUND): this is access suspension of removed sources and a legal-hold-gated deletion
@@ -252,6 +257,12 @@ create or replace function public.guard_connector_source_suspension()
 returns trigger language plpgsql set search_path = '' as $$
 begin
   if tg_op='DELETE' and public.founder_test_reset_archive_allows_delete(tg_table_name,to_jsonb(old)) then return old; end if;
+  -- LF-2: apply_foundation_connection_batch lifts a local source's suspension when the same file comes
+  -- back unchanged. Only that function's transaction names the source; OAuth suspensions stay immutable.
+  if tg_op='DELETE' and pg_catalog.current_setting('tavonel.local_source_reactivation', true) = old.source_id
+    and exists (select 1 from public.foundation_connection_sources where source_id=old.source_id and workspace_key=old.workspace_key) then
+    return old;
+  end if;
   if tg_op<>'INSERT' then raise exception 'CONNECTOR_SUSPENSION_IMMUTABLE'; end if;
   perform 1 from public.connector_document_bindings where source_id=new.source_id and workspace_key=new.workspace_key;
   if not found then
@@ -348,7 +359,8 @@ $$;
 --      `removal` field only on a deleted event, valued 'deleted' or 'out_of_scope';
 --   b. the documents a `removal: deleted` event will tombstone are locked with the approved documents,
 --      in one sorted pass, before the intake and legal-hold locks (the order every deletion takes);
---   c. after the batch row exists, file_server events bind or remove their logical sources;
+--   c. after the batch row exists, file_server events bind, reactivate or remove their logical
+--      sources; an event whose document is deleted is skipped and counted, never raised;
 --   d. the result of a file_server batch carries a `sources` summary (counts of logical sources).
 create or replace function public.apply_foundation_connection_batch(
   p_batch_id uuid,
@@ -402,6 +414,9 @@ declare
   v_recorded integer := 0;
   v_held integer := 0;
   v_deferred integer := 0;
+  v_prior public.foundation_connection_sources%rowtype;
+  v_reactivated integer := 0;
+  v_unavailable integer := 0;
 begin
   if p_workspace_key !~ '^pilot-[A-Za-z0-9]{1,16}$'
     or p_next_cursor_sha256 !~ '^sha256:[a-f0-9]{64}$'
@@ -472,7 +487,7 @@ begin
       cross join lateral (
         select s.source_id from public.foundation_connection_sources s
          where s.connection_id = p_connection_id and s.native_id = item.value->>'nativeId'
-         order by s.generation desc limit 1
+         order by s.updated_at desc, s.generation desc limit 1
       ) latest
       join public.foundation_connection_source_versions v on v.source_id = latest.source_id
      where item.value->>'kind' = 'deleted' and item.value->>'removal' = 'deleted'
@@ -595,7 +610,7 @@ begin
       v_native_id := v_event->>'nativeId';
       select * into v_source from public.foundation_connection_sources s
        where s.connection_id = p_connection_id and s.native_id = v_native_id
-       order by s.generation desc limit 1;
+       order by s.updated_at desc, s.generation desc limit 1;
       v_suspended := found and exists (select 1 from public.connector_source_suspensions css
                                         where css.source_id = v_source.source_id);
       if v_source.source_id is null then v_suspended := false; end if;
@@ -634,31 +649,63 @@ begin
           and v_admission.source_sha256 is distinct from 'sha256:' || (v_event->>'contentSha256')) then
         raise exception 'connection_batch_source_invalid';
       end if;
+      -- A deleted document (a deletion receipt exists, held or not) is never bound again. The event is
+      -- skipped and counted, not refused: one restored file must not hold back every later change.
       if exists (select 1 from public.source_deletion_tombstones t
                   where t.workspace_key = p_workspace_key and t.document_id = v_document_id) then
-        raise exception 'connection_batch_source_unavailable';
+        v_unavailable := v_unavailable + 1;
+        continue;
       end if;
 
-      -- A path whose previous source was removed starts a new logical source.
+      -- The document is already a version of this connection: the per-file path derives the same
+      -- document from (connection, path, revision), so a revert or a restore of the same bytes names it
+      -- again. That is the same logical source becoming current again; a removal that only suspended it
+      -- is lifted. Any other owner of the document is a conflict.
+      select * into v_version from public.foundation_connection_source_versions v
+       where v.workspace_key = p_workspace_key and v.document_id = v_document_id;
+      if found then
+        select * into v_prior from public.foundation_connection_sources s where s.source_id = v_version.source_id;
+        if v_prior.connection_id is distinct from p_connection_id or v_prior.native_id is distinct from v_native_id
+          or v_version.revision is distinct from v_event->>'revision' then
+          raise exception 'connection_batch_source_conflict';
+        end if;
+        if exists (select 1 from public.connector_source_suspensions css where css.source_id = v_prior.source_id) then
+          -- Never lifted once a deletion receipt exists for any of its versions, or while another
+          -- source of the same path is active (a path has at most one active source).
+          if exists (select 1 from public.foundation_connection_source_versions pv
+                       join public.source_deletion_tombstones t
+                         on t.workspace_key = pv.workspace_key and t.document_id = pv.document_id
+                      where pv.source_id = v_prior.source_id)
+            or exists (select 1 from public.foundation_connection_sources s
+                        where s.connection_id = p_connection_id and s.native_id = v_native_id
+                          and s.source_id <> v_prior.source_id
+                          and not exists (select 1 from public.connector_source_suspensions css
+                                           where css.source_id = s.source_id)) then
+            v_unavailable := v_unavailable + 1;
+            continue;
+          end if;
+          perform pg_catalog.set_config('tavonel.local_source_reactivation', v_prior.source_id, true);
+          delete from public.connector_source_suspensions
+           where source_id = v_prior.source_id and workspace_key = p_workspace_key;
+          perform pg_catalog.set_config('tavonel.local_source_reactivation', '', true);
+          v_reactivated := v_reactivated + 1;
+        else
+          v_bound := v_bound + 1;
+        end if;
+        update public.foundation_connection_sources
+           set current_source_version_id = v_version.source_version_id, updated_at = pg_catalog.clock_timestamp()
+         where source_id = v_prior.source_id;
+        continue;
+      end if;
+
+      -- A new document: a new version of the path's current source, or of a new generation (a new
+      -- logical source) when that source was removed.
       v_generation := case when v_source.source_id is null then 0
-                           when v_suspended then v_source.generation + 1
+                           when v_suspended then (select pg_catalog.max(s.generation) + 1 from public.foundation_connection_sources s
+                                                   where s.connection_id = p_connection_id and s.native_id = v_native_id)
                            else v_source.generation end;
       select * into v_identity from public.local_folder_source_identity(
         p_workspace_key, p_connection_id, v_native_id, v_generation, v_event->>'revision', v_document_id);
-
-      select * into v_version from public.foundation_connection_source_versions
-       where source_version_id = v_identity.source_version_id;
-      if found then
-        -- A re-observation (a revert through the per-file path). Its row must be this exact one.
-        if v_version.source_id is distinct from v_identity.source_id or v_version.workspace_key is distinct from p_workspace_key
-          or v_version.document_id is distinct from v_document_id then
-          raise exception 'connection_batch_source_conflict';
-        end if;
-      elsif exists (select 1 from public.foundation_connection_source_versions v
-                     where v.workspace_key = p_workspace_key and v.document_id = v_document_id) then
-        -- One document is one version of one source.
-        raise exception 'connection_batch_source_conflict';
-      end if;
 
       insert into public.foundation_connection_sources
         (source_id, workspace_key, connection_id, native_id, generation, current_source_version_id)
@@ -667,14 +714,12 @@ begin
       on conflict (source_id) do update
         set current_source_version_id = excluded.current_source_version_id,
             updated_at = pg_catalog.clock_timestamp();
-      if v_version.source_version_id is null then
-        insert into public.foundation_connection_source_versions
-          (source_version_id, source_id, workspace_key, connection_id, revision, document_id,
-           content_sha256, byte_length, mime_type, batch_id)
-        values (v_identity.source_version_id, v_identity.source_id, p_workspace_key, p_connection_id,
-          v_event->>'revision', v_document_id, 'sha256:' || (v_event->>'contentSha256'),
-          v_admission.requested_bytes, v_admission.declared_mime_type, p_batch_id);
-      end if;
+      insert into public.foundation_connection_source_versions
+        (source_version_id, source_id, workspace_key, connection_id, revision, document_id,
+         content_sha256, byte_length, mime_type, batch_id)
+      values (v_identity.source_version_id, v_identity.source_id, p_workspace_key, p_connection_id,
+        v_event->>'revision', v_document_id, 'sha256:' || (v_event->>'contentSha256'),
+        v_admission.requested_bytes, v_admission.declared_mime_type, p_batch_id);
       v_bound := v_bound + 1;
     end loop;
   end if;
@@ -697,7 +742,8 @@ begin
   return jsonb_build_object('status', 'applied', 'batchId', p_batch_id)
     || case when v_local then jsonb_build_object('sources', jsonb_build_object(
          'bound', v_bound, 'suspended', v_suspended_only, 'deletionRecorded', v_recorded,
-         'deletionHeld', v_held, 'deletionDeferred', v_deferred)) else '{}'::jsonb end;
+         'deletionHeld', v_held, 'deletionDeferred', v_deferred, 'reactivated', v_reactivated,
+         'unavailable', v_unavailable)) else '{}'::jsonb end;
 end;
 $$;
 
