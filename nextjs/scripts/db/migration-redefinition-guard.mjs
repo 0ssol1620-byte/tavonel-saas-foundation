@@ -34,7 +34,9 @@ export const DEFAULT_MIGRATIONS_DIR = resolve(HERE, "../../../supabase/migration
 export const DEFAULT_ALLOWLIST = join(HERE, "migration-redefinition-allowlist.json");
 
 const IDENT = String.raw`(?:"[^"]+"|[A-Za-z_][\w$]*)`;
-const FN_START = new RegExp(String.raw`^[ \t]*create[ \t]+(?:or[ \t]+replace[ \t]+)?function[ \t]+(${IDENT}(?:[ \t]*\.[ \t]*${IDENT})?)[ \t]*\(`, "gim");
+// Whitespace between tokens is \s so a definition written `create or replace function\n  public.foo(` is scanned. The start stays
+// anchored to a line that begins with `create`, so a `--` comment line can never match.
+const FN_START = new RegExp(String.raw`^[ \t]*create\s+(?:or\s+replace\s+)?function\s+(${IDENT}(?:\s*\.\s*${IDENT})?)\s*\(`, "gim");
 const PRED_HASH = /^[ \t]*--[ \t]*predecessor-hash:[ \t]*(\S+)[ \t]+([0-9a-f]{64})[ \t]*$/gim;
 const PRED_VERSION = /^[ \t]*--[ \t]*predecessor:[ \t]*(\S+)[ \t]+(\S+)[ \t]*$/gim;
 

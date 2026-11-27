@@ -54,6 +54,19 @@ test("parallel whole-body replacement fails: the third definition must name the 
   assert.match(failures[0], /20261103000000_c\.sql/);
 });
 
+test("a definition with the name on the next line is scanned: unmarked redefinition fails, a correct marker passes", () => {
+  const split = (body) => fn(body).replace("function public.reset_x()", "function\n  public.reset_x\n  ()");
+  const first = split("perform 1");
+  assert.deepEqual(scanSql(first).map((d) => d.name), ["public.reset_x"]);
+  const failures = check({ "20261101000000_a.sql": first, "20261102000000_b.sql": split("perform 2") });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /20261102000000_b\.sql: public\.reset_x: redefinition of 20261101000000_a\.sql without/);
+  const later = `-- predecessor-hash: public.reset_x ${hashBody(first)}\n-- predecessor: public.reset_x 20261101000000\n${split("perform 2")}`;
+  assert.deepEqual(check({ "20261101000000_a.sql": first, "20261102000000_b.sql": later }), []);
+  // a mixed spelling (one line, one split) is the same function
+  assert.equal(check({ "20261101000000_a.sql": FIRST, "20261102000000_b.sql": split("perform 2") }).length, 1);
+});
+
 test("the hash ignores CRLF and trailing whitespace but not the body", () => {
   assert.equal(hashBody(FIRST), hashBody(FIRST.replace(/\n/g, "\r\n").replace("begin", "begin   ")));
   assert.notEqual(hashBody(FIRST), hashBody(fn("perform 2")));
