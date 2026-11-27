@@ -191,14 +191,36 @@ export function createCanonicalFacade(input: {
     const world = claims.c, digest = claims.d, known = claims.k as string | null, wanted = claims.e as string[];
     if ((claims.exp as number) < now() || claims.a !== principal!.authorizationRevision) refuse("RESULT_ID_STALE: search again");
 
-    const query = new URLSearchParams({ ids: wanted.join(","), ...(known !== null ? { known_at: known } : {}) });
-    const payload = validateSuccess(tool("get_evidence"), await call({ method: "GET", path: `/api/v1/world/${world}/evidence?${query}` })) as Json;
-    // The World moved since the id was issued: a region of the old one is not this World's answer.
-    if (obj(payload.world)?.manifestDigest !== digest) refuse("RESULT_ID_STALE: search again");
-    const byId = new Map((payload.evidence as Json[]).map((entry) => [entry.id, entry]));
-    const found = wanted.map((evidenceId) => byId.get(evidenceId));
-    if (found.some((entry) => entry === undefined)) return notFound();
-    const regions = found as Json[];
+    const knownQuery: Record<string, string> = known !== null ? { known_at: known } : {};
+    const readEvidence = async (query: URLSearchParams) => {
+      const text = query.toString();
+      const suffix = text.length > 0 ? `?${text}` : "";
+      const payload = validateSuccess(tool("get_evidence"), await call({ method: "GET", path: `/api/v1/world/${world}/evidence${suffix}` })) as Json;
+      // The World moved since the id was issued: a region of the old one is not this World's answer.
+      if (obj(payload.world)?.manifestDigest !== digest) refuse("RESULT_ID_STALE: search again");
+      return payload.evidence as Json[];
+    };
+    const exact = new Map((await readEvidence(new URLSearchParams({ ids: wanted.join(","), ...knownQuery }))).map((entry) => [entry.id, entry]));
+    /*
+      Search cites the bare evidence id; the World's evidence rows are `<evidenceId>:<chunkId>`, one per
+      chunk, so a by-id read of the bare id never matches a real row. A cited id with no row of its own
+      is resolved to every chunk row under it (prefix on the `:` boundary, so ev_1 never takes ev_10:...),
+      in the lens's own order. A cited id with no row at all is still NOT_FOUND.
+      ponytail: the by-id read has no prefix form, so this reads the whole lens once, as the bridge's
+      get_evidence does; page it (limit/cursor) if a World's evidence lens outgrows one response.
+    */
+    let lens: Json[] | null = null;
+    const regionsById = new Map<unknown, Json>();
+    for (const evidenceId of wanted) {
+      let hits = exact.has(evidenceId) ? [exact.get(evidenceId)!] : [];
+      if (hits.length === 0) {
+        lens ??= await readEvidence(new URLSearchParams(knownQuery));
+        hits = lens.filter((entry) => typeof entry.id === "string" && entry.id.startsWith(`${evidenceId}:`));
+      }
+      if (hits.length === 0) return notFound();
+      for (const hit of hits) regionsById.set(hit.id, hit);
+    }
+    const regions = [...regionsById.values()];
 
     const delivery = renderDelivery(
       regions.map((entry) => ({
