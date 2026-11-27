@@ -108,7 +108,7 @@ select is(pg_temp.admit7('pilot-rearm02', 'a8a8a8a8-0000-4000-8000-0000000000a8'
 reset role;
 
 -- 19-20: the installed bodies are the ones the rollback drafts guard on, and the grants are kept.
--- 20261127030000 (WO-TRIAL-RELEASE-1) redefined the inner function last (968fafde...); its rollback
+-- 20261127060000 (WO-TRIAL-RELEASE-1) redefined the inner function last (968fafde...); its rollback
 -- restores 1bd2c9f6..., the 20261123120000 body. 20261123120000 (WO-C-T2) redefined it before; its rollback restores 240678b7..., the
 -- 20261117160200 (WO-CAT-10) body, whose rollback restores 7a71d281..., the
 -- 20261117160100 body supabase/drafts/rollback-20261117160100-*.sql guards on. The wrapper is 160100's.

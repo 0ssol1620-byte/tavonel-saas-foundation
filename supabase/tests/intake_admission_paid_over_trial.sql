@@ -97,14 +97,14 @@ select throws_ok($$select pg_temp.admit('pilot-pot003', 'c3c3c3c3-0000-4000-8000
   'P0001', 'foundation_trial_not_active', 'the refusal is stable on a second attempt');
 reset role;
 
--- 13: the installed body is the one the latest rollback guards on. 20261127030000 (WO-TRIAL-RELEASE-1)
+-- 13: the installed body is the one the latest rollback guards on. 20261127060000 (WO-TRIAL-RELEASE-1)
 -- redefined the function last (968fafde...); its rollback restores 1bd2c9f6..., the body below. 20261123120000 (WO-C-T2) redefined
 -- the function; its rollback (receipts/WO-C-T2/rollback.sql) restores 240678b7f388b6e4b6f75dbe3cf0191e,
 -- the 20261117160200 (WO-CAT-10) body, whose rollback restores 7a71d28126582df7b7ec34b07b4b3cff (20261117160100), whose rollback
 -- restores c6ad2d27d175e27f3f43439b608a8e05, the 20261110040000 body that
 -- supabase/drafts/rollback-20261110040000-*.sql guards on.
 select is(md5(pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)'::regprocedure)),
-  '968fafded557158da2e898281a35527b', 'the installed function is exactly the 20261127030000 body its rollback expects');
+  '968fafded557158da2e898281a35527b', 'the installed function is exactly the 20261127060000 body its rollback expects');
 
 -- 14-15: the client boundary is unchanged.
 select ok(not has_function_privilege('authenticated', 'public.reserve_foundation_intake_admission(text, uuid, uuid, text, integer, text)', 'EXECUTE'),

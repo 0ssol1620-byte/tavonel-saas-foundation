@@ -1,48 +1,49 @@
--- Rollback for migration 20261127030000_trial_intake_release_on_refusal (WO-TRIAL-RELEASE-1).
+-- WO-TRIAL-RELEASE-1 (first-5-minutes audit #20): an upload the server refuses after its intake admission
+-- was reserved no longer holds a slot of the free evaluation's three files.
 --
--- Not a migration: run by hand, as one transaction, against the database where 20261127030000 was
--- applied. It undoes exactly that change and refuses to run over anything else, including itself:
--- a second run finds the restored bodies, not the ones it guards on, and stops.
+-- DRAFT. Not applied by its author; the lead dispatches the hosted DB rehearsal
+-- (supabase/tests/trial_intake_release_on_refusal.sql is the proof) before this reaches any project.
+-- Ordering: 20261127060000, after production's head 20261127055721 (the seat-race migration, repo 20261127050000)
+-- and before the meter lane's 20261127070000 and LF-2's 20261127110000 (review-MIGRATIONS-3 r1 N1; was 20261127030000).
 --
---   1. Asserts each of the three functions is the body 20261127030000 installed, by a line only that
---      body carries.
---   2. Restores, with `create or replace` (owner, grants and comments kept):
---        refuse_foundation_intake_admission(text,uuid,text)                               0051
---        reserve_foundation_intake_admission_unchecked(text,uuid,uuid,text,integer,text)   20261124000100
---        confirm_foundation_intake_admission(text,uuid,uuid,text,bigint,text)              20260927102000
---   3. Asserts the restored bodies are byte-for-byte the earlier ones: md5 of pg_get_functiondef with
---      carriage returns removed, as measured on a local cluster built from origin/main 9c6e456f
---      (receipts/WO-TRIAL-RELEASE-1/md5-base.json):
---        refuse 77479298dd36193b090103a99826f7e9   unchecked 1bd2c9f6d4c8e2fb64fa6d846ae69185
---        confirm 70f05b8c2db871446680187f0483e606
+-- The lifecycle, and what was wrong. The capability route reserves the admission
+-- (reserve_foundation_intake_admission -> _unchecked, 10-minute window), then the compute hold
+-- (reserve_foundation_compute_v3). A compute refusal (trial page limit, spend stop, credits, ...) rolls
+-- back the hold only: the admission stayed live, unconfirmed, for its window, and every count of
+-- _unchecked (trial file count, minute and day quotas) and the storage sum of the wrapper count
+-- `confirmed_at is not null or expires_at > now`, never `state`. The route never released it, and
+-- refuse_foundation_intake_admission (0051) only set state = 'rejected'. An admission that EXPIRED
+-- unconfirmed is already not counted (that predicate), and its retry is re-armed through every check
+-- (20261117160200); that half needed no change.
 --
--- What the rollback brings back: an upload refused after its admission was reserved holds a trial file
--- slot (and a place in the minute/day quotas and the storage sum) until its ten-minute window ends, and
--- the capability route's release call only marks the row 'rejected' again (the route needs no revert:
--- the 0051 body it calls still exists). Rows released while 20261127030000 was in force keep their
--- closed window and 'rejected' state: they are not re-counted, and a retry re-arms them as an expired
--- admission (state stays 'rejected' after the rollback; nothing reads it for an unconfirmed row except
--- the confirm guard this file removes).
+-- The fix: a refusal closes the window, so the existing predicate stops counting it -- no count is
+-- rewritten and no second notion of "counted" exists.
+--   1. refuse_foundation_intake_admission: an unconfirmed admission's expires_at becomes
+--      least(expires_at, now). Confirmed ones (the CDR refusal of a file that arrived, the only caller
+--      until now) are unchanged: state = 'rejected', window kept, still counted.
+--   2. reserve_foundation_intake_admission_unchecked: the re-arm of an expired admission (the path a
+--      refused one now takes on retry, through every check a first reservation passes, under the same
+--      workspace lock) also turns state 'rejected' back into 'requested'. Nothing else changes.
+--   3. confirm_foundation_intake_admission (the wrapper the server calls): a rejected, unconfirmed
+--      admission cannot be confirmed (foundation_intake_admission_refused). Without it an upload URL
+--      issued earlier for the same document could still confirm a file the counts had released.
+-- The route (nextjs/app/api/uploads/capability/route.ts) calls (1) after a compute refusal of an
+-- unconfirmed admission. A failed release leaves the slot held until the window ends (the old answer).
 --
--- Recording it: this file does not edit supabase_migrations.schema_migrations. After it commits, the
--- operator runs
---   delete from supabase_migrations.schema_migrations where version = '20261127030000';
--- in the same session, and writes the version, the time and who ran it into the campaign ledger.
-\set ON_ERROR_STOP on
+-- Paid and owner workspaces: no trial count applies. The visible difference is (1): a refused, never
+-- uploaded admission leaves the minute/day quotas and the storage sum at once rather than after ten
+-- minutes. Every confirmed or live admission is counted exactly as before.
+--
+-- Expand-type and idempotent: create or replace on existing signatures, no table, type or grant change
+-- (create or replace keeps owner, grants and comments).
+-- Rollback: supabase/drafts/rollback-20261127060000-trial-intake-release-on-refusal.sql.
+-- predecessor-hash: public.refuse_foundation_intake_admission 535c4af9f82972822d1fa5ed01bc63f065eb8871bd8912e99e2fb2f935eb787e
+-- predecessor: public.refuse_foundation_intake_admission 0051
+-- predecessor-hash: public.reserve_foundation_intake_admission_unchecked 206c8e6b16c2d4eed4ceffd084a9f282ab96bb29bff404f6de008d2baded4c40
+-- predecessor: public.reserve_foundation_intake_admission_unchecked 20261124000100
+-- predecessor-hash: public.confirm_foundation_intake_admission bf07499c88fbcce984c391b26baf17d03b57dce5ead25d883d3f4b629e4b750f
+-- predecessor: public.confirm_foundation_intake_admission 20260927102000
 begin;
-
-do $guard$
-begin
-  if position('stop counting it at once' in pg_get_functiondef(
-        to_regprocedure('public.refuse_foundation_intake_admission(text,uuid,text)'))) = 0
-    or position('A refused upload retried is a request again' in pg_get_functiondef(
-        to_regprocedure('public.reserve_foundation_intake_admission_unchecked(text,uuid,uuid,text,integer,text)'))) = 0
-    or position('foundation_intake_admission_refused' in pg_get_functiondef(
-        to_regprocedure('public.confirm_foundation_intake_admission(text,uuid,uuid,text,bigint,text)'))) = 0 then
-    raise exception 'rollback-20261127030000 refused: the functions are not the ones 20261127030000 installed';
-  end if;
-end
-$guard$;
 
 create or replace function public.refuse_foundation_intake_admission(
   p_workspace_key text,
@@ -72,8 +73,13 @@ begin
   if admission.state in ('ocr_ready', 'sanitized') then
     return jsonb_build_object('status', 'ignored', 'documentId', admission.document_id, 'state', admission.state);
   end if;
+  -- An admission refused before its upload was confirmed never held a file: its window closes now,
+  -- so the trial file count, the minute and day quotas and the storage sum (each reads confirmed or
+  -- live admissions only) stop counting it at once instead of after ten minutes. A confirmed one
+  -- (a CDR refusal of a file that arrived) keeps its window and stays counted.
   update public.foundation_intake_admissions
-  set state = 'rejected', updated_at = now()
+  set state = 'rejected', updated_at = now(),
+      expires_at = case when confirmed_at is null then least(expires_at, clock_timestamp()) else expires_at end
   where workspace_key = p_workspace_key and document_id = p_document_id
   returning * into admission;
   return jsonb_build_object('status', 'refused', 'documentId', admission.document_id, 'state', admission.state);
@@ -227,7 +233,10 @@ begin
     -- (expires_at <= created_at + 15 minutes, 0008) cannot hold for an expired row otherwise.
     update public.foundation_intake_admissions
     set requested_bytes = p_requested_bytes, created_at = expires_at_value - interval '10 minutes',
-      expires_at = expires_at_value
+      expires_at = expires_at_value,
+      -- A refused upload retried is a request again, never a confirmable refusal.
+      state = case when existing.state = 'rejected' then 'requested'::public.foundation_intake_state
+                   else existing.state end
     where workspace_key = p_workspace_key and document_id = p_document_id
     returning * into existing;
     return jsonb_build_object('documentId', existing.document_id, 'objectKey', existing.object_key,
@@ -254,22 +263,15 @@ begin
               where t.workspace_key = p_workspace_key and t.document_id = p_document_id) then
     raise exception 'foundation_intake_source_deleted';
   end if;
+  -- A refused admission is no longer counted, so it can never become a file either.
+  if exists (select 1 from public.foundation_intake_admissions a
+              where a.workspace_key = p_workspace_key and a.document_id = p_document_id
+                and a.state::text = 'rejected' and a.confirmed_at is null) then
+    raise exception 'foundation_intake_admission_refused';
+  end if;
   return public.confirm_foundation_intake_admission_unchecked(p_workspace_key, p_document_id, p_user_id,
     p_source_sha256, p_observed_bytes, p_observed_mime);
 end;
 $$;
-
-do $verify$
-begin
-  if md5(replace(pg_get_functiondef('public.refuse_foundation_intake_admission(text,uuid,text)'::regprocedure), E'\r', ''))
-       <> '77479298dd36193b090103a99826f7e9'
-    or md5(replace(pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text,uuid,uuid,text,integer,text)'::regprocedure), E'\r', ''))
-       <> '1bd2c9f6d4c8e2fb64fa6d846ae69185'
-    or md5(replace(pg_get_functiondef('public.confirm_foundation_intake_admission(text,uuid,uuid,text,bigint,text)'::regprocedure), E'\r', ''))
-       <> '70f05b8c2db871446680187f0483e606' then
-    raise exception 'rollback-20261127030000: a restored body is not the earlier one';
-  end if;
-end
-$verify$;
 
 commit;

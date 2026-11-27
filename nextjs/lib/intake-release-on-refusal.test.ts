@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /*
   Audit #20 (WO-TRIAL-RELEASE-1): an upload refused at the compute hold, after its intake admission was
   reserved, releases that admission so it stops holding a slot of the free evaluation's three files.
-  The database half (migration 20261127030000) is proven by supabase/tests/trial_intake_release_on_refusal.sql.
+  The database half (migration 20261127060000) is proven by supabase/tests/trial_intake_release_on_refusal.sql.
   Real intake-admission and compute-reservation modules; only PostgREST is a fake.
 */
 

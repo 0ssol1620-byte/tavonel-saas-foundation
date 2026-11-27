@@ -1,4 +1,4 @@
--- Migration 20261127030000: an upload refused after its intake admission was reserved no longer holds a
+-- Migration 20261127060000: an upload refused after its intake admission was reserved no longer holds a
 -- slot of the free evaluation's three files (WO-TRIAL-RELEASE-1, first-5-minutes audit #20).
 --
 -- Every reservation goes through the seven-argument wrapper the upload route calls; every refusal through
@@ -72,7 +72,7 @@ select ok((select (r).expires_at <= clock_timestamp() and (r).confirmed_at is nu
     and pg_temp.counted('pilot-trl01') = 2,
   'the refused, unconfirmed admission closed its window: two files are counted');
 set local role service_role;
--- Before 20261127030000 this raised foundation_trial_file_limit_exceeded for the next ten minutes.
+-- Before 20261127060000 this raised foundation_trial_file_limit_exceeded for the next ten minutes.
 select is(pg_temp.admit('pilot-trl01', 'a1a1a1a1-0000-4000-8000-0000000000a1', 'b1b1b1b1-0000-4000-8000-000000000004')->>'intakeClass',
   'trial', 'a different file takes the released slot');
 select throws_ok($$select pg_temp.admit('pilot-trl01', 'a1a1a1a1-0000-4000-8000-0000000000a1', 'b1b1b1b1-0000-4000-8000-000000000005')$$,
@@ -175,7 +175,7 @@ select is(md5(pg_get_functiondef('public.refuse_foundation_intake_admission(text
     || ' ' || md5(pg_get_functiondef('public.reserve_foundation_intake_admission_unchecked(text, uuid, uuid, text, integer, text)'::regprocedure))
     || ' ' || md5(pg_get_functiondef('public.confirm_foundation_intake_admission(text, uuid, uuid, text, bigint, text)'::regprocedure)),
   '6acce3d69b7441bf4adc76b8b438105d 968fafded557158da2e898281a35527b 8f559f53a69827ce38727aaf129f4954',
-  'the three functions are the 20261127030000 bodies its rollback draft expects');
+  'the three functions are the 20261127060000 bodies its rollback draft expects');
 select ok(has_function_privilege('service_role', 'public.refuse_foundation_intake_admission(text, uuid, text)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.refuse_foundation_intake_admission(text, uuid, text)', 'EXECUTE')
     and has_function_privilege('service_role', 'public.confirm_foundation_intake_admission(text, uuid, uuid, text, bigint, text)', 'EXECUTE')

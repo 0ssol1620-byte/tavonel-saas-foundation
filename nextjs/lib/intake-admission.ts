@@ -93,7 +93,7 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
 
 /**
  * Releases an admission whose upload the server then refused (a compute refusal), so it stops holding
- * a slot of the trial's file allowance (migration 20261127030000). The database closes the window of an
+ * a slot of the trial's file allowance (migration 20261127060000). The database closes the window of an
  * unconfirmed admission only; a confirmed one is never released. Not ok leaves the slot held until the
  * admission's own window ends, which is the safe direction: the caller still answers its refusal.
  */
