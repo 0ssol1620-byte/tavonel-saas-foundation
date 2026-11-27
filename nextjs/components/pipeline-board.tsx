@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { PipelineRow } from "@/lib/pipeline";
 import type { OcrProgress } from "@/lib/ocr-progress";
 import ReadingView from "./reading-view";
-import { displayName, type DocumentNames } from "@/lib/document-names";
+import { displayName, documentReference, type DocumentNames } from "@/lib/document-names";
 import { trackFunnel } from "@/lib/funnel-events";
 // The rejection sentence names the formats the server actually accepts, so it cannot fall
 // behind the whitelist that produced the rejection. Both come from the Capability Manifest.
@@ -46,11 +46,11 @@ function stageLabel(row: PipelineRow): string {
 }
 
 const CENSUS_PARTS: ReadonlyArray<readonly [CensusBucket, string]> = [
-  ["pending", "queued"],
+  ["pending", "ready to compile"],
   ["processing", "processing"],
   ["verified_pending_publish", "compiled, awaiting activation"],
   ["accepted", "active"],
-  ["held", "held"],
+  ["held", "need review"],
   ["excluded", "excluded"],
 ];
 const NEXT_ACTION_WORD: Record<NextAction, string> = { retry: "Retry", reconnect: "Reconnect", "re-upload": "Re-upload", review: "Review", exclude: "Exclude", compile: "Compile", none: "" };
@@ -140,7 +140,7 @@ export default function PipelineBoard({ rows, reading = {}, names = {}, onDismis
                   <span className="sr-only">Include {displayName(row.id, names, row.filename)} in the next candidate</span>
                 </label>
               ) : null}
-              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content">{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading, customerDataAccess)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
+              <button type="button" className="board-row-summary" aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : row.id)}><span className="board-row-name" data-sensitive="content" title={documentReference(row.id, names, row.filename)}>{displayName(row.id, names, row.filename)}</span><span className="board-row-stage">{stageLabel(row)}</span><span className="board-row-status" data-status={rowStatus}>{statusLabel(row, reading, customerDataAccess)}</span><span className="board-row-chevron" aria-hidden="true">{expanded ? "−" : "+"}</span></button>
             </div>
             {row.transfer ? <div className="board-transfer compact" aria-label="Upload progress"><i style={{ width: `${row.transfer.total > 0 ? (row.transfer.loaded / row.transfer.total) * 100 : 0}%` }} /></div> : null}
             <div className="board-row-detail" hidden={!expanded}>

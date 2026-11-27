@@ -322,7 +322,7 @@ export function reviewPackageNotice(reasons: number): string {
 }
 
 export const REVIEW_REQUIRED_ACTIVATION_NOTE =
-  "A version that needs review cannot be activated from the workspace. Its reasons are in the review queue above. To go further with it, contact support and quote the reference below.";
+  "A version that was held back cannot be activated from the workspace. Its reasons are in the review queue above.";
 
 export function compiledWorldReadyNotice(counts: {
   documents: number; topics?: number | null; entities: number; claims: number; relations: number;

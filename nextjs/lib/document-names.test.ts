@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { displayName, elideKey, recallDocumentNames, rememberDocumentName, shortHandle } from "./document-names";
+import { displayName, documentReference, elideKey, recallDocumentNames, rememberDocumentName, shortHandle } from "./document-names";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -26,7 +26,10 @@ describe("what a document is called", () => {
   it("prefers the remembered filename, then a local one, then the source label", () => {
     expect(displayName(ID, { [ID]: "Services Agreement 2026.pdf" })).toBe("Services Agreement 2026.pdf");
     expect(displayName(ID, {}, "in-flight.pdf")).toBe("in-flight.pdf");
-    expect(displayName(ID, {})).toBe("Source 10FC3C");
+    // UI-D (D-03): an id is never the label. The short reference is the tooltip.
+    expect(displayName(ID, {})).toBe("Untitled document");
+    expect(documentReference(ID, {})).toBe("Reference 10FC3C");
+    expect(documentReference(ID, { [ID]: "a.pdf" })).toBeUndefined();
   });
 
   it("survives the reload that lost it before", () => {

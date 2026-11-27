@@ -3,6 +3,8 @@
 import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEVELOPER_SCOPES, type DeveloperScope } from "@/lib/developer-contracts";
+import { formatDay } from "@/lib/format";
+import { plainScope } from "@/lib/plain-language";
 import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import ConsumerVerificationPanel from "@/components/consumer-verification-panel";
@@ -178,7 +180,7 @@ export default function DeveloperPanel({ confirm }: { confirm: ConfirmInPage }) 
             {DEVELOPER_SCOPES.map((scope) => (
               <label key={scope}>
                 <input type="checkbox" checked={scopes.includes(scope)} onChange={(event) => setScopes((current) => event.target.checked ? [...current, scope] : current.filter((item) => item !== scope))} />
-                <span>{scope}</span>
+                <span title={scope}>{plainScope(scope)}</span>
               </label>
             ))}
           </fieldset>
@@ -197,7 +199,7 @@ export default function DeveloperPanel({ confirm }: { confirm: ConfirmInPage }) 
             {keys?.map((key) => (
               <article key={key.keyId} data-revoked={key.revokedAt ? "true" : "false"}>
                 <KeyRound size={16} aria-hidden="true" />
-                <div><strong>{key.name}</strong><small>{key.remoteMcp ? `tvnl_mcp_${key.prefix}_... · remote MCP connection` : `tvnl_live_${key.prefix}_...`} · {key.scopes.join(" · ")}</small><small>{keyStatusLine(key, refreshDays, (iso) => new Intl.DateTimeFormat().format(new Date(iso)))}{key.lastUsedAt ? ` · last used ${new Intl.DateTimeFormat().format(new Date(key.lastUsedAt))}` : " · never used"}</small></div>
+                <div><strong>{key.name}</strong><small>{key.remoteMcp ? `tvnl_mcp_${key.prefix}_... · remote MCP connection` : `tvnl_live_${key.prefix}_...`} · {key.scopes.map(plainScope).join(" · ")}</small><small>{keyStatusLine(key, refreshDays, (iso) => formatDay(iso) ?? iso)}{key.lastUsedAt ? ` · last used ${formatDay(key.lastUsedAt) ?? key.lastUsedAt}` : " · never used"}</small></div>
                 {!key.revokedAt ? <button type="button" className="icon-action" disabled={busy} onClick={() => void revoke(key)} aria-label={`Revoke ${key.name}`}><Trash2 size={15} /></button> : null}
               </article>
             ))}

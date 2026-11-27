@@ -6,6 +6,7 @@ import { failureSentence } from "@/lib/workspace-failure-copy";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { GrantActivityRow } from "@/lib/change-proposals";
 import styles from "./agent-access-panel.module.css";
+import { formatDay } from "@/lib/format";
 
 /*
   Agent access (WO-AN-6): the people-facing end of an agent grant. A person names the client, reads
@@ -124,7 +125,8 @@ export function GrantActivity({ grantId }: { grantId: string }) {
 
 const isGrant = (g: unknown): g is Grant => Boolean(g) && typeof (g as Grant).grantId === "string" && typeof (g as Grant).clientLabel === "string"
   && typeof (g as Grant).createdAt === "string";
-const day = (iso: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(iso));
+/* D-18: one pinned UTC format, never the browser's locale. */
+const day = (iso: string) => formatDay(iso) ?? iso;
 
 /**
  * What GET /api/agent-grants answered. WO-REL-5: `creatable` is the server's own answer to "would a create be

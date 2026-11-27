@@ -362,8 +362,8 @@ export default function CompileStage({ rows, reading = {}, sourceObservation = n
         <div><dt>{runProgress ? "Run sources" : "Sources in view"}</dt><dd>{runProgress?.documentsTotal ?? rows.length}</dd></div>
         {runProgress ? <div><dt>Sources read</dt><dd>{runProgress.documentsReady}</dd></div> : null}
         {world && view.visual === "world" ? <>
-          <div><dt>Compiled objects</dt><dd>{world.objects.length}</dd></div>
-          <div><dt>Recorded relations</dt><dd>{world.relations.length}</dd></div>
+          <div><dt>Items found</dt><dd>{world.objects.length}</dd></div>
+          <div><dt>Links between them</dt><dd>{world.relations.length}</dd></div>
         </> : null}
       </dl> : null}
       {currentObservation ? (
@@ -430,10 +430,11 @@ export default function CompileStage({ rows, reading = {}, sourceObservation = n
       {hasCanvasVisual ? <canvas ref={canvasRef} className="compile-stage-canvas" data-sensitive="content" aria-hidden="true" hidden={!drawable}
         style={canvasHeight ? { height: canvasHeight } : undefined} /> : null}
       {hasVisual ? <div className="compile-stage-film-caption" aria-label="Observed compilation chapter">
-        <span>{PIPELINE_STAGES[reached].label}</span>
-        <span className="compile-stage-film-progress" aria-hidden="true" data-derived="1">
+        {/* D-07: the last chapter is named by what the run reached (`finalLabel`), never "Ready for AI" for a result that is on hold. */}
+        <span>{reached === PIPELINE_STAGES.length - 1 ? view.finalLabel : PIPELINE_STAGES[reached].label}</span>
+        {view.tone === "attention" ? null : <span className="compile-stage-film-progress" aria-hidden="true" data-derived="1">
           {String(reached + 1).padStart(2, "0")} / {String(PIPELINE_STAGES.length).padStart(2, "0")}
-        </span>
+        </span>}
       </div> : null}
       {showCounts && !drawable && hasCanvasVisual ? <p className="compile-stage-summary">The visual is unavailable in this browser; run details remain available below.</p> : null}
     </section>

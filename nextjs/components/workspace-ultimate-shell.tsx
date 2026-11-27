@@ -48,7 +48,7 @@ const MORE_ITEMS: NavItem[] = [
   The headings are the rail's own words rather than a second vocabulary: whatever the nav row
   says, the heading says, so no surface is called two things in one viewport (BQ-025).
 */
-const SURFACE_TITLES: Record<WorkspaceSurface, string> = {
+export const SURFACE_TITLES: Record<WorkspaceSurface, string> = {
   home: "Home",
   sources: "Knowledge",
   runs: "Runs",

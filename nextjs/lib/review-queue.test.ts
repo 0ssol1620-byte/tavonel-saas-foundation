@@ -346,9 +346,12 @@ describe("the rendered queue", () => {
       input: { ...base, documentIds: ["doc-x", "doc-y"], blocked: [], documents: [], reviewReasons: ["SECURITY_STOP:doc-x", "OCR_LOW_TEXT_YIELD doc-y"], evidence: [], decisions: [], names: {} },
     }));
     // Not excluded (blocked is empty), so not a "Safety stop": the status line would count it as not excluded.
-    expect(markup).toContain(`<span>Security reason</span><code>SECURITY_STOP:doc-x</code>`);
+    // UI-D: a sentence leads; the recorded code sits behind "Technical details" and stays verbatim.
+    expect(markup).toContain(`<span>Security reason</span><em>A safety check stopped this document.</em>`);
+    expect(markup).toContain(`<summary>Technical details</summary>Reference <code>SECURITY_STOP:doc-x</code>`);
     expect(markup).not.toContain("Safety stop");
-    expect(markup).toContain(`<span>Reading check</span>OCR_LOW_TEXT_YIELD doc-y`);
+    expect(markup).toContain(`<span>Reading check</span><em>Very little text could be read from this document.</em>`);
+    expect(markup).toContain(`Reference <code>OCR_LOW_TEXT_YIELD doc-y</code>`);
     expect(markup.split("No review decision recorded yet").length - 1).toBe(1);
     expect(markup).toContain("No review decision recorded yet for any document below.");
   });
@@ -380,7 +383,7 @@ describe("the rendered queue", () => {
     expect(markup).not.toContain(`>${long}</option>`);
     expect(markup).toContain(`value="${long}"`);
     // The row itself still prints the reason in full.
-    expect(markup).toContain(`<span>Review reason</span>${long}`);
+    expect(markup).toContain(`Reference <code>${long}</code>`);
   });
 
   it("says there is nothing to break down rather than printing an empty table", () => {
@@ -847,10 +850,13 @@ describe("review reason chip", () => {
     expect(ko).toContain(`참조 <code>${raw}</code>`);
   });
 
-  it("prints an unknown reason exactly as before", () => {
+  it("says only that an unknown reason was flagged, and keeps its code verbatim under Technical details", () => {
     const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...input, reviewReasons: ["GLOBAL_REASON_WITH_NO_DOCUMENT"] } }));
-    expect(markup).toContain("<span>Review reason</span><code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
-    expect(markup).not.toContain("<em>");
+    expect(markup).toContain("<span>Review reason</span><em>A check flagged this result for a person to look at.</em>");
+    expect(markup).toContain("does not guess what it found");
+    expect(markup).toContain("<summary>Technical details</summary>Reference <code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
+    // The code is never the headline.
+    expect(markup).not.toContain("<em>GLOBAL_REASON_WITH_NO_DOCUMENT");
   });
 });
 

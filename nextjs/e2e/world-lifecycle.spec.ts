@@ -1298,11 +1298,16 @@ test("keeps review-required packages downloadable and promotion-closed", async (
   // The signed download sits with the collection result on Home; the review record now has a
   // dedicated Review surface. Crossing those surfaces proves that review-required packages stay
   // downloadable while activation remains closed.
-  await page.getByRole("button", { name: "Review & activate" }).click();
-  // D31: the button reads "Activate reviewed candidate" now; the closed gate is the same gate.
-  const activate = page.getByRole("button", { name: "Activate reviewed candidate" });
-  await page.getByLabel("Human review record").fill("Reviewed contradiction evidence and retained the gate.");
-  await expect(activate).toBeDisabled();
+  // UI-D (D-01): Home no longer offers "Review & activate" for a result that cannot be activated; it says why.
+  await expect(page.getByRole("button", { name: "Review & activate" })).toHaveCount(0);
+  await page.getByRole("button", { name: "See why it is on hold" }).first().click();
+  // The closed gate is the same gate: no activation controls, and the screen says what happens instead.
+  await expect(page.getByRole("button", { name: "Activate reviewed candidate" })).toHaveCount(0);
+  await expect(page.getByLabel("Human review record")).toHaveCount(0);
+  const hold = page.getByTestId("review-required-activation-note");
+  await expect(hold).toContainText("What you can do now.");
+  await expect(hold).toContainText("cannot be activated from the workspace");
+  await expect(hold.getByRole("link", { name: "Send us this reference" })).toBeVisible();
 
   expect(browserErrors).toEqual([]);
   await testInfo.attach("review-required-gate", {
