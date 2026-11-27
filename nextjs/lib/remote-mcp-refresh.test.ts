@@ -1,4 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -557,5 +559,13 @@ describe("registration and consent follow the refresh flag", () => {
     const first = await connect(registration.client_id);
     expect(first.refresh_token).toBeTruthy();
     expect((await json(await refresh(registration.client_id, first.refresh_token!))).access_token).toBeTruthy();
+  });
+
+  it("the conformance script decides refresh from the mode it starts the server in, and fails a mixed state", () => {
+    const script = readFileSync(resolve(import.meta.dirname, "../scripts/remote-mcp/conformance.mjs"), "utf8");
+    expect(script).toContain('process.argv.includes("--refresh")');
+    expect(script).toContain('("refresh_token" in (flow.token.json ?? {})) === refreshOn');
+    expect(script).toContain('grants.includes("refresh_token") === refreshOn');
+    expect(script).not.toContain('!("refresh_token" in');
   });
 });

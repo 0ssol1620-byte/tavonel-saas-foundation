@@ -5,7 +5,7 @@ import { createDeveloperApiKey, listDeveloperApiKeys } from "@/lib/developer-sto
 import { recordServerFunnel } from "@/lib/funnel-events";
 import { trialAiAccess, type TrialAiOperation } from "@/lib/trial-ai-access";
 import type { FoundationPrincipal } from "@/lib/developer-auth";
-import { reservedKeyName } from "@/lib/remote-mcp";
+import { REMOTE_MCP_REFRESH_TTL_SECONDS, remoteMcpRefreshEnabled, reservedKeyName } from "@/lib/remote-mcp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,7 +53,9 @@ export async function GET(request: Request) {
   if (!result.ok) return NextResponse.json({ code: result.code }, { status: 503, headers: NO_STORE });
   const current = await revalidateFoundationSession(request, auth.principal, "observer");
   if (!current.ok) return NextResponse.json({ code: current.code }, { status: current.status, headers: NO_STORE });
-  return NextResponse.json({ code: "OK", keys: result.keys, remoteMcpKeys: result.remoteMcpKeys, truncated: result.truncated }, { headers: NO_STORE });
+  // Refresh on, a remote MCP key is replaced as it is used: the panel says so instead of showing the one-hour key expiry. Absent when off, so that response is unchanged.
+  const refresh = remoteMcpRefreshEnabled() ? { remoteMcpRefreshDays: REMOTE_MCP_REFRESH_TTL_SECONDS / 86400 } : {};
+  return NextResponse.json({ code: "OK", keys: result.keys, remoteMcpKeys: result.remoteMcpKeys, truncated: result.truncated, ...refresh }, { headers: NO_STORE });
 }
 
 export async function POST(request: Request) {
