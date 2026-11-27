@@ -247,6 +247,49 @@ describe("applying an ontology patch", () => {
     expect(errors(result.artifact)).toEqual([]);
   });
 
+  /*
+    WO-ENT-UX-1. A Core V2 candidate reports `topics: null` (no Topic concept) and its package
+    report carries no counts object, so a recount over a graph with no Topic must leave the null
+    alone -- a 0 would claim a search that never ran -- and must become a number only once a patch
+    really adds a Topic.
+  */
+  function noTopicConcept(): Stored {
+    const base = fallback();
+    const report = base.package.files.find((file) => file.path === "validation/report.json")!;
+    const { counts: _counts, ...withoutCounts } = JSON.parse(report.content);
+    void _counts;
+    const content = JSON.stringify(withoutCounts, null, 2) + "\n";
+    return {
+      ...base,
+      package: { ...base.package, files: base.package.files.map((file) => file === report
+        ? { ...file, content, sizeBytes: Buffer.byteLength(content), sha256: `sha256:${sha256(content)}` } : file) },
+      validation: { ...base.validation, counts: { ...base.validation.counts, topics: null, topicConcept: "not_in_engine" as const } },
+    };
+  }
+
+  it("keeps a null topic count null when a patch leaves no Topic in the graph", () => {
+    const base = noTopicConcept();
+    const topic = node(base, "Topic");
+    const ops = [
+      ...edgesOf(base, "discusses_topic").map((edge) => ({ op: "remove_relation", edgeId: edge.id })),
+      { op: "retype", objectId: topic.id, from: "Topic", to: "Entity" },
+    ];
+    const result = applyOntologyPatch(base, ops, ACTOR);
+    if (!result.ok) throw new Error(result.refusal.code);
+    expect(result.artifact.ontology.nodes.some((item) => item.kind === "Topic")).toBe(false);
+    expect(result.artifact.validation.counts.topics).toBeNull();
+    expect(result.artifact.validation.counts.topicConcept).toBe("not_in_engine");
+    expect(result.artifact.validation.counts.entities).toBe(2);
+    expect(errors(result.artifact)).toEqual([]);
+  });
+
+  it("turns a null topic count into a real number once a patch adds a Topic", () => {
+    const base = noTopicConcept();
+    const result = applyOntologyPatch(base, addTopic(base), ACTOR);
+    if (!result.ok) throw new Error(result.refusal.code);
+    expect(result.artifact.validation.counts.topics).toBe(2);
+  });
+
   it("keeps a Core V2 candidate's declared predicates (K01) and its own validation", () => {
     const base = coreShaped();
     expect(errors(base)).toEqual([]);

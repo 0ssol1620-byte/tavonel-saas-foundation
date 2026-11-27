@@ -417,6 +417,23 @@ const NOT_PROJECTED_KINDS = new Set([
   artifact. Adding a predicate is one line, next to the Core change that starts emitting it.
 */
 const CORE_RELATION_PREDICATES = new Set(["mentions"]);
+
+/*
+  The label a node is shown with, read off the field the Core really writes for that kind.
+
+  `SemanticEntity.as_record()` (semantics.py) carries `canonicalName` and nothing called `title`
+  or `text`, so a chain that stopped at `title ?? text ?? evidenceId` rendered every entity as its
+  stable id (`entity_0c48...`). A document has `title`, a claim and a block have `text`, an
+  entity has `canonicalName`. A blank string is not a label: it is skipped, so the id is only
+  the last resort and never a silently empty node (world-read-model refuses an empty label).
+*/
+function projectedLabel(payload: Record<string, unknown>, stableId: unknown): string {
+  for (const key of ["title", "canonicalName", "text", "evidenceId"] as const) {
+    const value = payload[key];
+    if (value !== undefined && value !== null && String(value).trim().length > 0) return String(value);
+  }
+  return String(stableId);
+}
 const CONTRADICTION_REASONS = new Set(["numeric_disagreement", "polarity_disagreement"]);
 
 export function projectProductCoreV2Candidate(
@@ -485,7 +502,7 @@ export function projectProductCoreV2Candidate(
       return {
         id: String(item.stableId),
         kind: NODE_KIND_NAME[kind],
-        label: String(payload.title ?? payload.text ?? payload.evidenceId ?? item.stableId),
+        label: projectedLabel(payload, item.stableId),
         ...(documentId ? { documentId } : {}),
         evidenceIds: kind === "evidence" ? [String(payload.evidenceId ?? item.stableId)] : [],
       };
@@ -588,7 +605,12 @@ export function projectProductCoreV2Candidate(
 
   const counts = {
     documents: documents.length,
-    topics: 0,
+    /*
+      Absent, not zero. The Core has no Topic concept, so "0" would read as "looked, found none".
+      `topicConcept` says why the number is missing; every consumer omits the topic line on null.
+    */
+    topics: null,
+    topicConcept: "not_in_engine" as const,
     entities: nodes.filter((item) => item.kind === "Entity").length,
     claims: nodes.filter((item) => item.kind === "Claim").length,
     evidence: nodes.filter((item) => item.kind === "Evidence").length,

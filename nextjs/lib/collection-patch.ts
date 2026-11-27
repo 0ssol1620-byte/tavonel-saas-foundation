@@ -199,8 +199,11 @@ function rebuild(artifact: StoredArtifact, nodes: Nodes, edges: Edges, recount: 
   ]);
   let validation = artifact.validation;
   if (recount) {
+    const topicCount = nodes.filter((node) => node.kind === "Topic").length;
     const counts = {
-      topics: nodes.filter((node) => node.kind === "Topic").length,
+      // A Core V2 candidate reports topics as null (no Topic concept in the engine). Recounting
+      // must not turn that into a 0; it becomes a number only once a patch adds a real Topic.
+      ...(validation.counts.topics === null && topicCount === 0 ? {} : { topics: topicCount }),
       entities: nodes.filter((node) => node.kind === "Entity").length,
       relations: edges.length,
     };

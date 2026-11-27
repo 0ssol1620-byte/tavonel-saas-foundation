@@ -567,7 +567,7 @@ console.log("compile job:", accepted.jobId);` },
           `contradicts` between two claims. The first two were always computed; R3-K09 is why
           the last two now reach the package at all -- the projection used to discard every
           RELATION and VALIDATION_RECORD object the Core produced. Its knowledge model has no
-          Topic kind, so the candidate reports `topics: 0` and no `discusses_topic` edge is
+          Topic kind, so the candidate reports `topics: null` (topicConcept "not_in_engine") and no `discusses_topic` edge is
           produced on this path.
         - `discusses_topic` and `mentions_entity` come from the TypeScript fallback engine, which
           is what builds the public Explore sample. Both are document-level text heuristics: a

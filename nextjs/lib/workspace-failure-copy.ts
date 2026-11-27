@@ -269,3 +269,27 @@ export function reviewReasonCopy(value: string, locale: PageLocale = "en"): { se
   const code = match[1] as "CONTRADICTION_GROUP_TOO_LARGE" | "CONTRADICTION_PAIR_BUDGET_EXCEEDED";
   return { sentence: copy[code](format(match[2]), format(match[3])), reference: copy.reference };
 }
+
+/*
+  Honest count lines for a compiled World (WO-ENT-UX-1). Both read only counts the payload already
+  carries; neither invents a threshold.
+
+  - `topics` is `null` when the engine has no Topic concept (Core V2: `topicConcept: "not_in_engine"`).
+    A literal 0 there read as "looked for topics, found none", so the topic phrase is left out
+    rather than printed as a number. `undefined` (an older stored candidate) is treated the same.
+  - "Validation: Passed" beside zero entities, with claims present, is true and still easy to
+    misread as "the engine understood the documents". The note says what the counts say and no more.
+*/
+export const NO_ENTITIES_NOTE =
+  "No entities were identified in this run; the engine may have found none or its patterns did not match.";
+
+export function noEntitiesNote(counts: { claims: number; entities: number }): string | null {
+  return counts.claims > 0 && counts.entities === 0 ? NO_ENTITIES_NOTE : null;
+}
+
+export function compiledWorldReadyNotice(counts: {
+  documents: number; topics?: number | null; entities: number; claims: number; relations: number;
+}): string {
+  const topics = typeof counts.topics === "number" ? `${counts.topics} topics, ` : "";
+  return `Compiled World ready from ${counts.documents} documents: ${topics}${counts.entities} entities, ${counts.claims} claims and ${counts.relations} relations.`;
+}

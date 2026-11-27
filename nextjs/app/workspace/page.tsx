@@ -6,7 +6,7 @@ import WorldExplorer from "@/components/world-explorer";
 import { FileText, ShieldCheck, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activationPolicy, type ActivationCapability } from "@/lib/activation-policy";
-import { failureSentence, isSizeLimitFailure, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
+import { compiledWorldReadyNotice, failureSentence, isSizeLimitFailure, noEntitiesNote, offersUpgrade, pageLocale } from "@/lib/workspace-failure-copy";
 import { askAbstentionCopy, askSourceCopy, CITED_EVIDENCE_NOT_IN_PACKET, EVIDENCE_EXCEEDS_ANSWER_LIMIT, qualifyAskWorldModel, resolveCitationRegion } from "@/lib/workspace-ask-copy";
 import type { DocumentListItem } from "@/lib/immutable-keys";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -105,7 +105,7 @@ import WorldFreshness from "@/components/world-freshness";
 import FounderTestResetPanel from "@/components/founder-test-reset-panel";
 import { Screen } from "@/components/v34/ui/screen";
 import WorldPicture from "@/components/workspace/world-picture";
-import { pictureScreenStatus } from "@/lib/workspace-world-picture";
+import { homeWorldKey, pickHomeWorld, pictureScreenStatus, readHomeWorldModel, type HomeWorldRead } from "@/lib/workspace-world-picture";
 import { activationScreenStatus, AI_SETUP_SCREEN_STATUS, askScreenStatus, attentionScreenStatus, evidenceScreenStatus, homeWorldFact, readyScreenStatus, reviewScreenStatus, worldScreenStatus, type WorkspaceWorlds } from "./screen-status";
 import {
   buildReviewQueue,
@@ -154,7 +154,7 @@ type CollectionResult = {
   directoryPlan: Array<{ path: string; kind: string; sourceIds: string[] }>;
   validation: {
     status: "passed" | "review_required";
-    counts: { documents: number; topics: number; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
+    counts: { documents: number; topics: number | null; topicConcept?: "not_in_engine"; entities: number; claims: number; evidence: number; relations: number; packageFiles: number };
   };
 };
 
@@ -859,6 +859,33 @@ export default function WorkspacePage() {
     // getAuthToken only reads the session; the open World's identity is what makes the listing stale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, workspaceStartupReady, activeWorld?.manifestDigest, activeWorld?.revision]);
+  /*
+    WO-WS-5c: Home draws the active World on a fresh visit. The picture above reads `worldReadModel`, which loads only for an
+    open collection (`?collection=`), so a returning visitor with active Worlds saw none. With no collection open, Home reads
+    the one World `pickHomeWorld` names from the listing above (the same listing Ask reads) with the review flow's own request,
+    after the page has painted and the listing has answered; with no active World it makes no request. The read is held under
+    its World's key, so a read for another World or revision is never drawn, and a failed read draws nothing.
+  */
+  const homeWorld = !activeWorld && !collectionResult && surface === "home" && tab === "overview" ? pickHomeWorld(workspaceWorlds) : null;
+  const homeKey = homeWorldKey(homeWorld);
+  const [homeWorldRead, setHomeWorldRead] = useState<{ key: string; read: HomeWorldRead }>({ key: "", read: { status: "failed", code: null, httpStatus: null } });
+  useEffect(() => {
+    if (!homeWorld || session !== "signed-in" || !workspaceStartupReady) return;
+    const controller = new AbortController();
+    void (async () => {
+      let read: HomeWorldRead | null;
+      try {
+        const token = await getAuthToken();
+        read = token ? await readHomeWorldModel(token, homeWorld, controller.signal) : { status: "failed", code: "AUTH_REQUIRED", httpStatus: null };
+      } catch {
+        read = { status: "failed", code: null, httpStatus: null };
+      }
+      if (read && !controller.signal.aborted) setHomeWorldRead({ key: homeKey, read });
+    })();
+    return () => controller.abort();
+    // The World's key is its identity; getAuthToken only reads the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeKey, session, workspaceStartupReady]);
   const askPanel = askWorldPanel(activeWorld, askWorlds);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const pendingConfirm = useRef<ConfirmRequest | null>(null);
@@ -1681,7 +1708,7 @@ export default function WorkspacePage() {
       if (!result || result.collectionId !== compiled) return result;
       setNotice(result.lifecycle === "review_required"
         ? `Collection ${result.collectionId} produced a signed review package with ${result.reviewReasons?.length ?? 0} review reason(s). Download and inspect it; nothing is active yet.`
-        : `Compiled World ready from ${result.validation.counts.documents} documents: ${result.validation.counts.topics} topics, ${result.validation.counts.entities} entities, ${result.validation.counts.claims} claims and ${result.validation.counts.relations} relations.`);
+        : compiledWorldReadyNotice(result.validation.counts));
       return result;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3625,6 +3652,7 @@ export default function WorkspacePage() {
               status={worldScreenStatus(activeWorld?.revision ?? null)} bodyClassName="workspace-complete" aria-labelledby="workspace-complete-title">
               <div>
                 <p>{collectionResult.validation.counts.documents} sources became {collectionResult.validation.counts.entities} entities, {collectionResult.validation.counts.claims} claims, and {collectionResult.validation.counts.relations} relations.</p>
+                {noEntitiesNote(collectionResult.validation.counts) ? <p className="fine" data-testid="no-entities-note">{noEntitiesNote(collectionResult.validation.counts)}</p> : null}
                 {activeWorld ? null : (
                   <p className="fine">
                     Nothing is active until you approve it. Review the evidence, then activate the
@@ -3675,6 +3703,25 @@ export default function WorkspacePage() {
                 onOpenEvidence={(evidenceId) => { selectReviewEvidence(evidenceId); navigateSurface("review"); }}
               />
             </Screen>
+          ) : null}
+
+          {/* WO-WS-5c: the same picture for a fresh Home visit, from the read `homeWorldRead` holds for the World it names (never another's). */}
+          {homeWorld && homeKey === homeWorldRead.key ? (
+            homeWorldRead.read.status === "ready" ? (
+              <Screen title="Your World, drawn" titleAs="h2" titleId="workspace-world-picture-title" status={pictureScreenStatus(homeWorldRead.read.model, homeWorld)} aria-labelledby="workspace-world-picture-title">
+                <WorldPicture
+                  model={homeWorldRead.read.model}
+                  openLabel="Open this World in Review"
+                  onOpenEvidence={(evidenceId) => { void openActiveWorld(homeWorld, "push").then(() => selectReviewEvidence(evidenceId)); navigateSurface("review"); }}
+                />
+              </Screen>
+            ) : (
+              <Screen title="Your World, drawn" titleAs="h2" titleId="workspace-world-picture-title" status={{ tone: "waiting", label: "World not opened" }} aria-labelledby="workspace-world-picture-title">
+                <p className="notice static" role="status">
+                  <strong>The active World could not be opened.</strong> {failureSentence(homeWorldRead.read.code, homeWorldRead.read.httpStatus ?? 503)}
+                </p>
+              </Screen>
+            )
           ) : null}
 
           {tab === "overview" && surface !== "runs" && surface !== "activity" ? (
@@ -4019,6 +4066,7 @@ export default function WorkspacePage() {
                         <span><b>Validation</b>{collectionResult.validation.status === "passed" ? "Passed" : "Needs review"}</span>
                         <span><b>Current active</b>{activeWorld ? `Revision ${activeWorld.revision}` : "None"}</span>
                       </div>
+                      {noEntitiesNote(collectionResult.validation.counts) ? <p className="fine" data-testid="no-entities-note-review">{noEntitiesNote(collectionResult.validation.counts)}</p> : null}
                       <label htmlFor="review-reason">Human review record</label>
                       <textarea
                         id="review-reason"

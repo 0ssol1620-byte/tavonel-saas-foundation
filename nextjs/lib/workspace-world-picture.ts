@@ -3,6 +3,9 @@ import type { CorpusEdge, CorpusNode, WorldCorpus, WorldKind } from "./v34/world
 import type { ScreenStatus } from "../components/v34/ui/screen";
 import { worldScreenStatus } from "../app/workspace/screen-status";
 import type { WorldObjectType, WorldReadModel } from "./world-read-model";
+import { worldReadFailureCode } from "./review-queue";
+import type { ActiveWorldDiscovery } from "../components/workspace/in-page-choices";
+import type { ActiveWorldSummary } from "./world-store";
 
 /*
   WO-WS-5: the workspace draws its World with the renderer the public pages use.
@@ -190,4 +193,53 @@ export function findObjects(picture: WorldPicture, query: string, limit: number 
 
 export function pictureAriaLabel(picture: WorldPicture): string {
   return `The World drawn as a graph: ${n(picture.drawn.objects)} objects and ${n(picture.drawn.relations)} relations. The canvas is pointer-only; the find box below it selects any drawn object.`;
+}
+
+/*
+  WO-WS-5c: Home draws the active World without a collection being open.
+
+  `pickHomeWorld` is the one World Home reads: the only active World, or with several the first of the listing Ask reads
+  (most recently activated first, the ordering `discoverActiveWorlds` already applies and `homeWorldFact` already names).
+  Nothing else is chosen or ordered here, and a listing that is still checking, empty or failed picks nothing.
+*/
+export function pickHomeWorld(found: ActiveWorldDiscovery | "checking"): ActiveWorldSummary | null {
+  if (found === "checking") return null;
+  if (found.kind === "one") return found.world;
+  return found.kind === "several" ? found.worlds[0] ?? null : null;
+}
+
+/** The key a Home read is held under: a read for another collection or revision never reads as this one's. */
+export const homeWorldKey = (world: ActiveWorldSummary | null): string => (world ? `${world.collectionId}@${world.manifestDigest}` : "");
+
+export type HomeWorldRead =
+  | { status: "ready"; model: WorldReadModel }
+  | { status: "failed"; code: string | null; httpStatus: number | null };
+
+/*
+  The same request the review flow makes (`GET /api/v1/world/<id>?manifest=<digest>`), with the same session token and the
+  same refusals. A refusal, a thrown fetch, a body without a model, or a model for another collection or manifest is
+  `failed`: the picture is never drawn from it. An aborted read returns null and its caller drops it.
+*/
+export async function readHomeWorldModel(
+  token: string,
+  world: ActiveWorldSummary,
+  signal: AbortSignal,
+  fetchImpl: (input: string, init: RequestInit) => Promise<Response> = fetch,
+): Promise<HomeWorldRead | null> {
+  try {
+    const response = await fetchImpl(`/api/v1/world/${encodeURIComponent(world.collectionId)}?manifest=${encodeURIComponent(world.manifestDigest)}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { authorization: `Bearer ${token}` },
+      signal,
+    });
+    if (!response.ok) return { status: "failed", code: worldReadFailureCode(await response.json().catch(() => null)), httpStatus: response.status };
+    const model = ((await response.json().catch(() => null)) as { model?: WorldReadModel | null } | null)?.model;
+    if (!model || model.world?.id !== world.collectionId || model.world.manifestDigest !== world.manifestDigest) {
+      return { status: "failed", code: "WORLD_READ_MODEL_MISMATCH", httpStatus: null };
+    }
+    return { status: "ready", model };
+  } catch {
+    return signal.aborted ? null : { status: "failed", code: null, httpStatus: null };
+  }
 }
