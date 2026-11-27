@@ -407,7 +407,7 @@ export function deriveOnboardingSteps(input: WorkspaceStateInput): OnboardingSte
     {
       id: "compile",
       title: "Compile a candidate",
-      detail: "Ready sources are compiled into one version of your knowledge, called a World. Every statement in it is tied to the page it came from.",
+      detail: "Ready sources are compiled into one version of your knowledge, called a World. Checks run on the result before it can be activated.",
       done: input.hasCandidate,
     },
     {

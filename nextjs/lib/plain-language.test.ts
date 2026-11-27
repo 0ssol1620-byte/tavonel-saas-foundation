@@ -207,9 +207,10 @@ describe("sentences match what the code means (B1)", () => {
     expect(text("DETERMINISTIC_MATERIALIZATION_UNPROVEN")).not.toMatch(/second time|checked again|repeatable|disagree with their own record/i);
   });
 
-  it("READING_LISTING_DISAGREEMENT: a fault on our side, with no invented advice about uploads", () => {
+  it("READING_LISTING_DISAGREEMENT: says what the worker says (no document to drop), no invented advice about uploads", () => {
     const reason = describeReviewReason("READING_LISTING_DISAGREEMENT");
-    expect(reason.next).toBe("Nothing you change in your files fixes this. Send us the reference.");
+    expect(reason.next).toBe("This is not caused by one document you can drop. Send us the reference.");
+    expect(`${reason.meaning} ${reason.next}`).not.toMatch(/our side|nothing you change|fixes this/i);
     expect(text("READING_LISTING_DISAGREEMENT")).not.toMatch(/uploads have finished|compile again/i);
     expect(readFileSync(new URL("./compile-job-worker.ts", import.meta.url), "utf8")).toContain("no answer the customer gives changes it");
   });
@@ -280,5 +281,59 @@ describe("a long recorded code cannot widen the page (B5)", () => {
   it("wraps code inside Technical details and lets the details item shrink", () => {
     expect(css).toMatch(/\.workspace-review-reason details code \{[^}]*overflow-wrap: anywhere/);
     expect(css).toMatch(/\.workspace-review-reason > details \{[^}]*min-width: 0/);
+  });
+});
+
+/*
+  Review round 4 (rD3 notes). Sentences that claimed trust, evidence or readiness the state does not guarantee.
+*/
+describe("no sentence promises evidence, trust or a fix the state does not guarantee (rD3)", () => {
+  it("N4: a reason with no page evidence of its own does not point at the evidence list", () => {
+    for (const code of ["OCR_SOURCE_EMPTY", "READING_DID_NOT_FINISH", "OCR_TIMEOUT_OR_NETWORK", "SOURCE_VERSION_AMBIGUOUS", "SOURCE_COVERAGE_INCOMPLETE", "EVIDENCE_COVERAGE_INCOMPLETE", "IMMUTABLE_INPUTS_ONLY_UNPROVEN", "DETERMINISTIC_MATERIALIZATION_UNPROVEN", "MODEL_EMPTY", "PAGE_OUT_OF_RANGE"]) {
+      expect(describeReviewReason(code).next, code).not.toMatch(/pages and evidence|see what was read/i);
+    }
+    // The neutral sentence points nowhere either: it may stand for a result with no evidence at all.
+    expect(describeReviewReason("SOMETHING_NEW_AND_UNMAPPED").next).toBe("Send us the reference if you want us to look at it.");
+    // A reason that is about page evidence still says where to look.
+    expect(describeReviewReason("CONTRADICTION_CANDIDATE:a:b").next).toMatch(/pages and evidence/);
+  });
+
+  it("OCR_PAGES_INCOMPLETE does not say whether the document is in the result (ocr.ts says only that nothing was assembled)", () => {
+    expect(describeReviewReason("OCR_PAGES_INCOMPLETE").meaning).not.toMatch(/in the result/);
+  });
+
+  it("states entities, evidence and JSON as the validator names them", () => {
+    expect(describeReviewReason("EVIDENCE_DANGLING").meaning).toBe("An item points at evidence that is not in the result.");
+    expect(describeReviewReason("ENTITY_DANGLING").meaning).toBe("An item refers to an entity that is not in the result.");
+    expect(describeReviewReason("DETERMINISTIC_MATERIALIZATION_UNPROVEN").meaning).toContain("not valid JSON");
+    expect(describeReviewReason("DETERMINISTIC_MATERIALIZATION_UNPROVEN").meaning).not.toContain("read back");
+  });
+
+  const page = readFileSync(new URL("../app/workspace/page.tsx", import.meta.url), "utf8");
+  const grounded = readFileSync(new URL("./grounded-ask.ts", import.meta.url), "utf8");
+
+  it("N1: the setup checklist does not say every statement is tied to a page", async () => {
+    const { deriveOnboardingSteps } = await import("./workspace-onboarding");
+    const onboarding = readFileSync(new URL("./workspace-onboarding.ts", import.meta.url), "utf8");
+    expect(onboarding).not.toContain("Every statement in it is tied to the page it came from");
+    expect(onboarding).toContain("Checks run on the result before it can be activated.");
+    expect(typeof deriveOnboardingSteps).toBe("function");
+  });
+
+  it("N2: the held-version panel offers files and a new compile without implying that clears the hold", () => {
+    expect(page).not.toContain("Or add or replace files and compile again.");
+    expect(page).toContain("You can also add or replace files and compile again. The reasons for the hold are listed in Review.");
+  });
+
+  it("N4/N6: Ask says only what it does, matching on pages, and abstains when no region matches", () => {
+    expect(page).not.toContain("supports an answer");
+    expect(page).not.toContain("supports an answer, TAVONEL says so instead of guessing");
+    expect(page).toContain("If no page in it matches your question, TAVONEL says so.");
+    expect(grounded).toContain('"NO_REGION_BOUND_EVIDENCE_MATCH"');
+  });
+
+  it("N7: the compile notice does not say nothing is active (an earlier version may be)", () => {
+    expect(page).not.toContain("and nothing is active yet.");
+    expect(page).toContain("The signed download is available and nothing was activated.");
   });
 });

@@ -34,7 +34,7 @@ export const HELD_BACK =
   "TAVONEL held this result back. Nothing was activated and nothing was changed. A version that was held back cannot be activated from the workspace.";
 
 const SEE_EVIDENCE = "Look at the pages and evidence below to see what was read.";
-const SEND_REFERENCE = "If it is not clear, send us the reference.";
+const SEND_REFERENCE = "Send us the reference if you want us to look at it.";
 
 /*
   The policy (UI-D review round 3). A sentence here states ONLY (a) what the product visibly does or (b) what
@@ -69,7 +69,7 @@ const REASONS: Record<string, Row> = {
   },
   DETERMINISTIC_MATERIALIZATION_UNPROVEN: {
     headline: "The files in this version failed the package's own file checks.",
-    meaning: "The package validator reported a problem with the exported files themselves, such as files that disagree, a file that cannot be read back, or totals that disagree.",
+    meaning: "The package validator reported a problem with the exported files themselves, such as files that disagree, a file that is not valid JSON, or totals that disagree.",
     source: [`${SHARED}:73`, `${COMPILER}:860`],
   },
   SOURCE_COVERAGE_INCOMPLETE: {
@@ -100,8 +100,8 @@ const REASONS: Record<string, Row> = {
   },
   READING_LISTING_DISAGREEMENT: {
     headline: "TAVONEL's two lists of your documents disagreed, and the compile stopped.",
-    meaning: "Two internal views of which documents had been read did not agree on repeated tries. This is a problem on our side.",
-    next: "Nothing you change in your files fixes this. Send us the reference.",
+    meaning: "Two internal views of which documents had been read did not agree on repeated tries.",
+    next: "This is not caused by one document you can drop. Send us the reference.",
     source: [`${WORKER}:92`, `${WORKER}:456`],
   },
   SOURCE_VERSION_AMBIGUOUS: {
@@ -116,7 +116,7 @@ const REASONS: Record<string, Row> = {
   },
   OCR_PAGES_INCOMPLETE: {
     headline: "Reading this document did not finish.",
-    meaning: "Not every range of pages had a stored answer, so nothing was assembled for this document and it is not in the result.",
+    meaning: "Not every range of pages had a stored answer, so nothing was assembled for this document.",
     source: [`${OCR}:60`],
   },
   OCR_TIMEOUT_OR_NETWORK: {
@@ -128,7 +128,7 @@ const REASONS: Record<string, Row> = {
     headline: "Two readings of a page region disagreed.",
     meaning: "Two reading engines returned different text for the same page region. It is recorded as a conflict and is not decided for you.",
     next: SEE_EVIDENCE,
-    source: ["nextjs/lib/collection-download.ts:292"],
+    source: ["nextjs/lib/collection-download.ts:292", "nextjs/lib/collection-download.ts:321"],
   },
   CONTRADICTION_CANDIDATE: {
     headline: "Two statements may disagree with each other.",
@@ -156,9 +156,9 @@ const INTEGRITY: Record<string, { meaning: string; line: number }> = {
   SOURCE_UNBOUND: { meaning: "A statement cites a document that is not in the result's list of inputs.", line: 353 },
   SOURCE_VERSION_INVALID: { meaning: "A document's version key in the result is not in the expected form.", line: 326 },
   SOURCE_DIGEST_INVALID: { meaning: "A document's input digest in the result is not in the expected form.", line: 329 },
-  EVIDENCE_DANGLING: { meaning: "A statement points at evidence that is not in the result.", line: 359 },
+  EVIDENCE_DANGLING: { meaning: "An item points at evidence that is not in the result.", line: 359 },
   CLAIM_DANGLING: { meaning: "An item refers to a statement that is not in the result.", line: 399 },
-  ENTITY_DANGLING: { meaning: "An item refers to a name that is not in the result.", line: 402 },
+  ENTITY_DANGLING: { meaning: "An item refers to an entity that is not in the result.", line: 402 },
   RELATION_DANGLING: { meaning: "A link refers to something that is not in the result.", line: 367 },
   COORDINATE_MALFORMED: { meaning: "A page region's position is not four whole numbers.", line: 380 },
   COORDINATE_OUT_OF_RANGE: { meaning: "A page region leaves the 0 to 1000 page frame.", line: 384 },
@@ -214,7 +214,7 @@ export function describeReviewReason(value: string): PlainReason {
   const code = codeOf(value);
   const row = REASONS[code];
   if (row) {
-    return { headline: row.headline, meaning: row.meaning, didWhat: HELD_BACK, next: row.next ?? SEE_EVIDENCE, technical: value, known: true };
+    return { headline: row.headline, meaning: row.meaning, didWhat: HELD_BACK, next: row.next ?? SEND_REFERENCE, technical: value, known: true };
   }
   const integrity = INTEGRITY[code];
   if (integrity) {
@@ -222,7 +222,7 @@ export function describeReviewReason(value: string): PlainReason {
       headline: "A check on the built result failed.",
       meaning: integrity.meaning,
       didWhat: HELD_BACK,
-      next: `${SEND_REFERENCE}`,
+      next: SEND_REFERENCE,
       technical: value,
       known: true,
     };
@@ -231,7 +231,7 @@ export function describeReviewReason(value: string): PlainReason {
     headline: NEUTRAL_HEADLINE,
     meaning: NEUTRAL_MEANING,
     didWhat: HELD_BACK,
-    next: `${SEE_EVIDENCE} ${SEND_REFERENCE}`,
+    next: SEND_REFERENCE,
     technical: value,
     known: false,
   };

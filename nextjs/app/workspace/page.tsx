@@ -2026,7 +2026,7 @@ export default function WorkspacePage() {
       await loadWorldState(json.collectionId, token);
       setNotice(json.coreExecution.status === "review_required"
         // The reasons are read in the review queue, where each has its sentence and reference (D0 R2).
-        ? `This compile produced a package that needs review${json.reviewReasons?.length ? ` (${countNoun(json.reviewReasons.length, "review reason")})` : ""}. The signed download is available and nothing is active yet.`
+        ? `This compile produced a package that needs review${json.reviewReasons?.length ? ` (${countNoun(json.reviewReasons.length, "review reason")})` : ""}. The signed download is available and nothing was activated.`
         : "The compiled World is ready for evidence review.");
     } finally {
       setBusy(false);
@@ -4212,7 +4212,7 @@ export default function WorkspacePage() {
                           <p><strong>What is happening.</strong> {HELD_BACK}</p>
                           <p>
                             <strong>What you can do now.</strong> Open the evidence above and record what you find on each item.
-                            Download the signed package from Home to look at it yourself. Or add or replace files and compile again.
+                            Download the signed package from Home to look at it yourself. You can also add or replace files and compile again. The reasons for the hold are listed in Review.
                             {activeWorld
                               ? ` Asking and searching keep using your active version (revision ${activeWorld.revision}).`
                               : " Asking and searching start once a version is active."}
@@ -4331,7 +4331,7 @@ export default function WorkspacePage() {
                 <Screen title="Ask" status={askScreenStatus(activeWorld?.revision ?? null, askPanel)} aria-labelledby="ask-title">
                 <div>
                   <h2 id="ask-title">Ask your knowledge. Check the source.</h2>
-                  <p>Answers come only from your active World. If no page in your documents supports an answer, TAVONEL says so instead of guessing.</p>
+                  <p>Answers come only from your active World. If no page in it matches your question, TAVONEL says so.</p>
                 </div>
                 {askPanel === null ? null : askPanel === "checking" || askPanel === "opening" ? (
                   <p className="notice static" role="status">
