@@ -8,7 +8,7 @@ import tokens from "../tokens.module.css";
 import s from "./site-footer.module.css";
 
 /**
- * The footer, on the forest surface: the brand and its one-line descriptor, five link groups and
+ * The footer, on the forest surface: the brand and its one-line descriptor, four link groups and
  * the legal row. Held routes are filtered out of the groups. The consent link is the shared one
  * and renders only on measured public paths. On a phone the groups are `<details>` disclosures
  * (WO-CI-22, lead decision 7).
@@ -20,7 +20,7 @@ export default function SiteFooter() {
       <div className={s.shell}>
         <div className={s.lead}>
           <Link href="/" className={s.brand} aria-label="TAVONEL home" prefetch={false}>
-            <Logomark size={26} />
+            <Logomark size={31} className={s.mark} />
             <span className={s.wordmark}>TAVONEL</span>
           </Link>
           <p className={s.tagline}>{BRAND_LINE.descriptor}</p>

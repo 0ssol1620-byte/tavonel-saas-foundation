@@ -24,7 +24,7 @@ export default function SiteHeader({ currentPath = "" }: { currentPath?: string 
     <header className={`${tokens.paper} ${s.header}`} data-v34-header="">
       <div className={s.inner}>
         <Link href="/" className={s.brand} aria-label="TAVONEL home" prefetch={false}>
-          <Logomark size={26} />
+          <Logomark size={31} className={s.mark} />
           <span className={s.wordmark}>TAVONEL</span>
         </Link>
         <div className={s.center}>

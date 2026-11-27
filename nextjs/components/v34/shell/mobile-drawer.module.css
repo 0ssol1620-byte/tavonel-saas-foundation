@@ -5,7 +5,7 @@
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--v34-fg-border);
+  border: 0;
   border-radius: var(--v34-radius-panel);
   background: transparent;
   color: var(--v34-fg);
