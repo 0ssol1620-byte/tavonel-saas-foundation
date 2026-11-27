@@ -10,8 +10,8 @@
   next -- and the raw code stays available as a technical reference (a collapsed disclosure), never as the
   headline.
 
-  Nothing here invents a meaning. A code with no row says only that a check flagged the result for a person
-  and prints the reference; it does not guess what the check was (the same rule as `failureSentence`).
+  Nothing here invents a meaning. A code with no sourced row says only that one of the checks did not pass and
+  prints the reference; it does not guess what the check was. See the policy comment below `SEE_EVIDENCE`.
 */
 
 export type PlainReason = {
@@ -31,135 +31,166 @@ export type PlainReason = {
 
 /** What happened to the result, the same for every review reason: the held-back state is the product's rule. */
 export const HELD_BACK =
-  "TAVONEL held this result back. Nothing was activated and nothing was changed, so your AI cannot use it yet.";
+  "TAVONEL held this result back. Nothing was activated and nothing was changed. A version that was held back cannot be activated from the workspace.";
 
 const SEE_EVIDENCE = "Look at the pages and evidence below to see what was read.";
-const FIX_FILES = "Check that the files hold readable text, replace or add files, then run the compile again.";
+const SEND_REFERENCE = "If it is not clear, send us the reference.";
 
-type Row = { headline: string; meaning: string; next?: string };
+/*
+  The policy (UI-D review round 3). A sentence here states ONLY (a) what the product visibly does or (b) what
+  a source in THIS repository says the check is. Anything else is the neutral sentence, with the exact code
+  left under Technical details. Twice a sentence explained a mechanism the code did not perform ("a second
+  check", "past the last page"), so the rule is structural rather than a matter of care:
+
+    - every non-neutral sentence is listed in `SENTENCE_SOURCES` with the file:line that states it;
+    - a test asserts that each cited file contains the cited code;
+    - a code with no source in this repo has no row, and gets the neutral sentence.
+
+  When in doubt, delete the row. A code the Python core alone emits (SEMANTIC_CLAIMS_EMPTY) or that only
+  appears in a list of names (OCR_LOW_TEXT_YIELD) has no row for that reason.
+*/
+export const NEUTRAL_HEADLINE = "One of the checks on this result did not pass.";
+export const NEUTRAL_MEANING = "The exact check is shown under Technical details.";
+
+type Row = { headline: string; meaning: string; next?: string; source: string[] };
+
+const WORKER = "nextjs/lib/compile-job-worker.ts";
+const COMPILER = "nextjs/lib/collection-compiler.ts";
+const OCR = "quarantine-sidecar/foundation-cdr-worker/src/ocr.ts";
+const SHARED = "shared/compiledWorldValidation.ts";
+const VALIDATOR = "nextjs/scripts/compiled-world/validate.mjs";
 
 const REASONS: Record<string, Row> = {
-  SEMANTIC_CLAIMS_EMPTY: {
-    headline: "No statements could be taken from these documents.",
-    meaning: "TAVONEL read the pages but found no statement it could tie back to a page, so there is nothing to build knowledge from.",
-    next: FIX_FILES,
-  },
   EXTRACTION_BUDGET_REACHED: {
     headline: "This compile kept only part of what it found.",
     meaning: "TAVONEL found more than one compile keeps, so it kept part of it and left the rest out of this version.",
     next: SEE_EVIDENCE,
+    source: [`${COMPILER}:871`, `${COMPILER}:662`],
   },
   DETERMINISTIC_MATERIALIZATION_UNPROVEN: {
-    headline: "The files in this version disagree with their own record.",
-    meaning: "The exported files did not agree with each other, or with the totals they declare, so TAVONEL could not confirm the version is consistent.",
+    headline: "The files in this version failed the package's own file checks.",
+    meaning: "The package validator reported a problem with the exported files themselves, such as files that disagree, a file that cannot be read back, or totals that disagree.",
+    source: [`${SHARED}:73`, `${COMPILER}:860`],
   },
   SOURCE_COVERAGE_INCOMPLETE: {
-    headline: "A document is missing from the result.",
-    meaning: "At least one document you chose does not appear in what was built.",
+    headline: "This version failed its check that every document is accounted for.",
+    meaning: "The check that each document you chose appears in the built result did not pass.",
+    source: [`${SHARED}:74`, `${COMPILER}:861`],
   },
   EVIDENCE_COVERAGE_INCOMPLETE: {
-    headline: "A document has nothing tied to a page.",
-    meaning: "At least one document produced no statement that points back to a page region.",
-    next: FIX_FILES,
+    headline: "This version failed its check that every document is tied to a page.",
+    meaning: "The check that each document has at least one statement tied to a valid page region did not pass.",
+    source: [`${SHARED}:75`, `${COMPILER}:864`],
   },
   IMMUTABLE_INPUTS_ONLY_UNPROVEN: {
-    headline: "TAVONEL could not confirm the result was built from exactly what was stored.",
-    meaning: "A document's stored copy and its recorded fingerprint did not match.",
+    headline: "This version failed its check on the recorded inputs.",
+    meaning: "The check that each input's recorded key and digest match the version that was read did not pass.",
+    source: [`${SHARED}:76`, `${COMPILER}:866`],
   },
   READING_NEEDS_OPERATOR_REVIEW: {
     headline: "This document stopped at a reading check.",
-    meaning: "This document was set aside at the reading step and is not part of the result. TAVONEL did not guess at it.",
-    next: "Remove it from the list and upload it again, or upload a clearer copy.",
+    meaning: "The reader produced a review package instead of a result, so this document is not part of the compile.",
+    next: "Remove it from the list and upload it again.",
+    source: [`${WORKER}:194`, "nextjs/lib/workspace-failure-copy.ts:212"],
   },
   READING_DID_NOT_FINISH: {
     headline: "Reading this document did not finish.",
-    meaning: "The document was not fully read, so it is not part of the result.",
-    next: "Upload it again, then compile again.",
+    meaning: "It had not finished being read when the compile stopped waiting for it, so it is not part of this compile.",
+    source: [`${WORKER}:197`, "nextjs/components/compile-job-panel.tsx:66"],
   },
   READING_LISTING_DISAGREEMENT: {
     headline: "TAVONEL's two lists of your documents disagreed, and the compile stopped.",
     meaning: "Two internal views of which documents had been read did not agree on repeated tries. This is a problem on our side.",
     next: "Nothing you change in your files fixes this. Send us the reference.",
+    source: [`${WORKER}:92`, `${WORKER}:456`],
   },
   SOURCE_VERSION_AMBIGUOUS: {
-    headline: "More than one version of this document was found.",
-    meaning: "TAVONEL cannot tell which version you meant, so it did not pick one.",
-    next: "Remove the extra copies, then compile again.",
-  },
-  OCR_LOW_TEXT_YIELD: {
-    headline: "Very little text could be read from this document.",
-    meaning: "The pages may be mostly images, or the scan may be too faint to read reliably.",
-    next: "Upload a clearer scan or a text version of the file.",
+    headline: "Two versions of this document carry the same identity.",
+    meaning: "Nothing chose between them.",
+    source: ["nextjs/lib/api-error-codes.ts:408"],
   },
   OCR_SOURCE_EMPTY: {
     headline: "This document is empty.",
-    meaning: "There were no pages to read.",
-    next: "Upload the right file, then compile again.",
+    meaning: "The stored PDF for this document is empty.",
+    source: [`${OCR}:609`],
   },
   OCR_PAGES_INCOMPLETE: {
-    headline: "Some pages of this document could not be read.",
-    meaning: "Only part of the document is in the result.",
-    next: "Upload it again, or upload a clearer copy.",
+    headline: "Reading this document did not finish.",
+    meaning: "Not every range of pages had a stored answer, so nothing was assembled for this document and it is not in the result.",
+    source: [`${OCR}:60`],
   },
   OCR_TIMEOUT_OR_NETWORK: {
-    headline: "Reading this document timed out.",
-    meaning: "The reader did not answer in time. This says nothing about the document itself.",
-    next: "Upload it again.",
+    headline: "Reading this document hit a timeout or a network problem.",
+    meaning: "This is recorded as a transport fault, not as a finding about the document's content.",
+    source: [`${OCR}:55`],
   },
   OCR_RECOGNITION_CONFLICT: {
-    headline: "Two readings of a page disagreed.",
-    meaning: "TAVONEL read the same page twice and got different text, so it asks a person to decide.",
+    headline: "Two readings of a page region disagreed.",
+    meaning: "Two reading engines returned different text for the same page region. It is recorded as a conflict and is not decided for you.",
     next: SEE_EVIDENCE,
+    source: ["nextjs/lib/collection-download.ts:292"],
   },
   CONTRADICTION_CANDIDATE: {
     headline: "Two statements may disagree with each other.",
-    meaning: "Two statements on the same topic may not agree. TAVONEL does not choose between them for you.",
+    meaning: "Two statements about the same topic and time were flagged as possibly disagreeing on a number or on whether something holds. TAVONEL does not decide between them.",
     next: SEE_EVIDENCE,
+    source: ["nextjs/lib/core-runtime-v2.ts:576"],
   },
   CONTRADICTION_GROUP_TOO_LARGE: {
     headline: "Many statements on one topic may conflict.",
-    meaning: "There are more possible conflicts on one topic than a compile checks automatically.",
+    meaning: "Comparing them takes more checks than a compile makes automatically.",
     next: SEE_EVIDENCE,
+    source: ["nextjs/lib/workspace-failure-copy.ts:262"],
   },
   CONTRADICTION_PAIR_BUDGET_EXCEEDED: {
     headline: "Some possible conflicts were left unchecked.",
-    meaning: "This compile used its automatic checks on other topics first.",
+    meaning: "This compile had already used its automatic checks on other topics.",
     next: SEE_EVIDENCE,
+    source: ["nextjs/lib/workspace-failure-copy.ts:264"],
   },
 };
 
-/** Result checks the package validator raises. Each is a consistency problem in the built result. */
-const INTEGRITY: Record<string, string> = {
-  MODEL_EMPTY: "The built result is empty.",
-  SOURCE_UNBOUND: "A statement is not tied to its document.",
-  SOURCE_VERSION_INVALID: "A document version in the result is not valid.",
-  SOURCE_DIGEST_INVALID: "A document's fingerprint in the result is not valid.",
-  EVIDENCE_DANGLING: "A statement points at a page region that is not in the result.",
-  CLAIM_DANGLING: "An item refers to a statement that is not in the result.",
-  ENTITY_DANGLING: "An item refers to a name that is not in the result.",
-  RELATION_DANGLING: "A link refers to something that is not in the result.",
-  COORDINATE_MALFORMED: "A page region has a position that cannot be read.",
-  COORDINATE_OUT_OF_RANGE: "A page region lies outside its page.",
-  COORDINATE_DEGENERATE: "A page region has no size.",
-  PAGE_OUT_OF_RANGE: "A page region points past the last page of its document.",
-  GRAPH_DISAGREEMENT: "The exported files disagree with each other.",
-  GRAPH_CSV_HEADER_WRONG: "An exported file is laid out wrongly.",
-  FILE_NOT_PARSEABLE: "An exported file could not be read back.",
-  COUNTS_DISAGREE: "The totals in the result do not add up.",
-  ID_DUPLICATE: "Two items in the result share one identifier.",
-  ID_NOT_STABLE: "An item's identifier would change between runs.",
-  OBJECT_KIND_UNKNOWN: "The result holds an item of a kind TAVONEL does not know.",
-  OBJECT_LABEL_MISSING: "An item in the result has no label.",
-  PREDICATE_UNDECLARED: "A link in the result uses a relation that was never declared.",
-  PACKAGE_FILE_MISSING: "A file that belongs in the package is missing.",
-  PACKAGE_ROOT_UNKNOWN: "The package holds a folder it should not.",
-  PATH_UNSAFE: "The package holds a file path that is not allowed.",
-  SCHEMA_UNSUPPORTED: "The result uses a format version TAVONEL does not read.",
-  LIFECYCLE_UNKNOWN: "The result is in a state TAVONEL does not recognise.",
-  COLLECTION_ID_NOT_STABLE: "The result's identifier would change between runs.",
-  BLUEPRINT_UNSUPPORTED: "The result uses a layout TAVONEL does not support.",
-  SIGNATURE_ABSENT: "The package is missing its signature.",
+/** Result checks the package validator raises: each sentence restates what the cited validator line tests. */
+const INTEGRITY: Record<string, { meaning: string; line: number }> = {
+  MODEL_EMPTY: { meaning: "The built result describes no objects.", line: 319 },
+  SOURCE_UNBOUND: { meaning: "A statement cites a document that is not in the result's list of inputs.", line: 353 },
+  SOURCE_VERSION_INVALID: { meaning: "A document's version key in the result is not in the expected form.", line: 326 },
+  SOURCE_DIGEST_INVALID: { meaning: "A document's input digest in the result is not in the expected form.", line: 329 },
+  EVIDENCE_DANGLING: { meaning: "A statement points at evidence that is not in the result.", line: 359 },
+  CLAIM_DANGLING: { meaning: "An item refers to a statement that is not in the result.", line: 399 },
+  ENTITY_DANGLING: { meaning: "An item refers to a name that is not in the result.", line: 402 },
+  RELATION_DANGLING: { meaning: "A link refers to something that is not in the result.", line: 367 },
+  COORDINATE_MALFORMED: { meaning: "A page region's position is not four whole numbers.", line: 380 },
+  COORDINATE_OUT_OF_RANGE: { meaning: "A page region leaves the 0 to 1000 page frame.", line: 384 },
+  COORDINATE_DEGENERATE: { meaning: "A page region encloses no area.", line: 386 },
+  PAGE_OUT_OF_RANGE: { meaning: "A page region has a page number that is not valid.", line: 390 },
+  GRAPH_DISAGREEMENT: { meaning: "The exported graph files do not match the model.", line: 416 },
+  GRAPH_CSV_HEADER_WRONG: { meaning: "An exported graph file has an unexpected header.", line: 490 },
+  FILE_NOT_PARSEABLE: { meaning: "An exported file is not valid JSON.", line: 233 },
+  COUNTS_DISAGREE: { meaning: "The counts in the validation report differ from what the package holds.", line: 457 },
+  ID_DUPLICATE: { meaning: "Two items in the result share one identifier.", line: 336 },
+  ID_NOT_STABLE: { meaning: "An item has an identifier that is not in the expected form.", line: 346 },
+  OBJECT_KIND_UNKNOWN: { meaning: "The result holds an item of a kind that is not recognised.", line: 340 },
+  OBJECT_LABEL_MISSING: { meaning: "An item in the result has no label.", line: 350 },
+  PREDICATE_UNDECLARED: { meaning: "A link in the result uses a relation type that was never declared.", line: 370 },
+  PACKAGE_FILE_MISSING: { meaning: "A file that belongs in the package is missing.", line: 296 },
+  PACKAGE_ROOT_UNKNOWN: { meaning: "The package holds a top-level folder that is not a package root.", line: 292 },
+  PATH_UNSAFE: { meaning: "The package holds a file path that is not allowed.", line: 290 },
+  SCHEMA_UNSUPPORTED: { meaning: "The result uses a schema version this validator does not accept.", line: 306 },
+  LIFECYCLE_UNKNOWN: { meaning: "The result is in a lifecycle state this validator does not recognise.", line: 474 },
+  COLLECTION_ID_NOT_STABLE: { meaning: "The result's collection identifier is not in the expected form.", line: 313 },
+  BLUEPRINT_UNSUPPORTED: { meaning: "The result uses a blueprint this validator does not support.", line: 310 },
+  SIGNATURE_ABSENT: { meaning: "The package is missing its signature files.", line: 469 },
 };
+
+/** Code -> the file:line entries that state the sentence. The test holds each cited file to containing the code. */
+export const SENTENCE_SOURCES: Readonly<Record<string, readonly string[]>> = {
+  ...Object.fromEntries(Object.entries(REASONS).map(([code, row]) => [code, row.source])),
+  ...Object.fromEntries(Object.entries(INTEGRITY).map(([code, row]) => [code, [`${VALIDATOR}:${row.line}`]])),
+};
+
+/** Codes deliberately left without a row: no source in this repo states what they mean, so they get the neutral sentence. */
+export const NEUTRAL_BY_POLICY: readonly string[] = ["SEMANTIC_CLAIMS_EMPTY", "OCR_LOW_TEXT_YIELD"];
 
 /** Every code this module has a sentence for, so a test can hold the review screen's codes to it. */
 export const PLAIN_REASON_CODES: readonly string[] = [...Object.keys(REASONS), ...Object.keys(INTEGRITY)];
@@ -177,7 +208,7 @@ export function isReasonCode(value: string): boolean {
 /**
  * The plain account of one recorded review reason.
  *
- * An unknown code gets the generic sentence and `known: false`; it is never given a guessed meaning.
+ * A code with no sourced row gets the neutral sentence and `known: false`; it is never given a guessed meaning.
  */
 export function describeReviewReason(value: string): PlainReason {
   const code = codeOf(value);
@@ -189,23 +220,18 @@ export function describeReviewReason(value: string): PlainReason {
   if (integrity) {
     return {
       headline: "A check on the built result failed.",
-      meaning: integrity,
+      meaning: integrity.meaning,
       didWhat: HELD_BACK,
-      next: "Compile again. If it stops the same way, send us the reference.",
+      next: `${SEND_REFERENCE}`,
       technical: value,
       known: true,
     };
   }
-  const family = /^SECURITY/i.test(code)
-    ? "A safety check stopped this document."
-    : /^OCR_|^READING_/.test(code)
-      ? "A reading check flagged this document."
-      : "A check flagged this result for a person to look at.";
   return {
-    headline: family,
-    meaning: "TAVONEL has no plain description for this particular check yet, so it does not guess what it found.",
+    headline: NEUTRAL_HEADLINE,
+    meaning: NEUTRAL_MEANING,
     didWhat: HELD_BACK,
-    next: `${SEE_EVIDENCE} If it is not clear, send us the reference.`,
+    next: `${SEE_EVIDENCE} ${SEND_REFERENCE}`,
     technical: value,
     known: false,
   };

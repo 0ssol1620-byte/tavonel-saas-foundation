@@ -347,10 +347,10 @@ describe("the rendered queue", () => {
     }));
     // Not excluded (blocked is empty), so not a "Safety stop": the status line would count it as not excluded.
     // UI-D: a sentence leads; the recorded code sits behind "Technical details" and stays verbatim.
-    expect(markup).toContain(`<span>Security reason</span><em>A safety check stopped this document.</em>`);
+    expect(markup).toContain(`<span>Security reason</span><em>One of the checks on this result did not pass.</em>`);
     expect(markup).toContain(`<summary>Technical details</summary>Reference <code>SECURITY_STOP:doc-x</code>`);
     expect(markup).not.toContain("Safety stop");
-    expect(markup).toContain(`<span>Reading check</span><em>Very little text could be read from this document.</em>`);
+    expect(markup).toContain(`<span>Reading check</span><em>One of the checks on this result did not pass.</em>`);
     expect(markup).toContain(`Reference <code>OCR_LOW_TEXT_YIELD doc-y</code>`);
     expect(markup.split("No review decision recorded yet").length - 1).toBe(1);
     expect(markup).toContain("No review decision recorded yet for any document below.");
@@ -380,7 +380,7 @@ describe("the rendered queue", () => {
     }));
     // A select sizes itself to its widest option, which is how a 360px screen overflows.
     // B3: a code-shaped reason is labelled by its plain headline, never by the raw string.
-    expect(markup).toContain("<option value=\"" + long + "\" title=\"Reference " + long + "\">A check flagged this result for a person to look at.</option>");
+    expect(markup).toContain("<option value=\"" + long + "\" title=\"Reference " + long + "\">One of the checks on this result did not pass.</option>");
     expect(markup).not.toContain(`>${long}</option>`);
     expect(markup).not.toMatch(/<option[^>]*>[^<]*AUTHORITY_CONFLICT/);
     // A reason someone already wrote as a sentence is still elided, as before.
@@ -860,8 +860,8 @@ describe("review reason chip", () => {
 
   it("says only that an unknown reason was flagged, and keeps its code verbatim under Technical details", () => {
     const markup = renderToStaticMarkup(createElement(ReviewQueue, { input: { ...input, reviewReasons: ["GLOBAL_REASON_WITH_NO_DOCUMENT"] } }));
-    expect(markup).toContain("<span>Review reason</span><em>A check flagged this result for a person to look at.</em>");
-    expect(markup).toContain("does not guess what it found");
+    expect(markup).toContain("<span>Review reason</span><em>One of the checks on this result did not pass.</em>");
+    expect(markup).toContain("The exact check is shown under Technical details.");
     expect(markup).toContain("<summary>Technical details</summary>Reference <code>GLOBAL_REASON_WITH_NO_DOCUMENT</code>");
     // The code is never the headline.
     expect(markup).not.toContain("<em>GLOBAL_REASON_WITH_NO_DOCUMENT");

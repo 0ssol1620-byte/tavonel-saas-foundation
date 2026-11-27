@@ -111,6 +111,18 @@ export function reasonOptionLabel(value: string): string {
   return value.length > 40 ? `${value.slice(0, 39)}…` : value;
 }
 
+/* Plain headlines are shared (every unsourced code reads the same), so equal labels are numbered: the options stay distinguishable and the code stays out of the label. */
+export function reasonOptionLabels(values: string[]): string[] {
+  const labels = values.map(reasonOptionLabel);
+  const seen = new Map<string, number>();
+  return labels.map((label) => {
+    if (labels.filter((other) => other === label).length < 2) return label;
+    const n = (seen.get(label) ?? 0) + 1;
+    seen.set(label, n);
+    return `${label} (${n})`;
+  });
+}
+
 function ReasonChip({ value, family, locale }: { value: string; family: string; locale: PageLocale }) {
   const copy = reviewReasonCopy(value, locale);
   /* UI-D (D-02): the headline is a sentence a first-time customer reads; the recorded code is support's, behind a disclosure. */
@@ -251,9 +263,10 @@ export default function ReviewQueue({
             onChange={(event) => setReason(event.target.value)}
           >
             <option value="">All {countNoun(queue.total, "source")}</option>
-            {reasons.map((value) => (
-              <option key={value} value={value} title={isReasonCode(value) ? `Reference ${value}` : undefined}>{reasonOptionLabel(value)}</option>
-            ))}
+            {reasonOptionLabels(reasons).map((label, index) => {
+              const value = reasons[index]!;
+              return <option key={value} value={value} title={isReasonCode(value) ? `Reference ${value}` : undefined}>{label}</option>;
+            })}
           </select>
           <p className="fine">
             {rows.length} of {queue.total} shown · ordered by safety stops, then review state, then
