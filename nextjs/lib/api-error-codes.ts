@@ -212,6 +212,12 @@ export const API_ERROR_GROUPS: readonly ApiErrorGroup[] = [
         whatToDo: "Revoke a pending invitation or remove a member to free a seat, or see /pricing for a plan with more seats.",
       },
       {
+        code: "WORKSPACE_HAS_MEMBERS",
+        status: 409,
+        meaning: "A checkout for a one-person plan (Personal or Developer) was refused because the workspace has more than one active member or at least one open invitation. Nothing was opened or charged.",
+        whatToDo: "Revoke the other members and any open invitations in Members & invitations, then start the checkout again.",
+      },
+      {
         code: "MEMBER_SOURCE_SCOPE_DENIED",
         status: 403,
         meaning: "The caller is a member of this workspace and at least one source behind the requested World, document or job is outside the sources an owner or admin chose for them. A member reads a World only when every source behind it is in their scope.",

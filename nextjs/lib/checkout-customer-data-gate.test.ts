@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { gate, intent, commercial, binding, billingAccount, seam, quote } = vi.hoisted(() => ({
+const { gate, intent, commercial, binding, billingAccount, seam, quote, members, invites } = vi.hoisted(() => ({
   billingAccount: vi.fn(),
+  // The workspace's people: one active owner and nothing pending unless a test says otherwise.
+  members: vi.fn(),
+  invites: vi.fn(),
   // The real quote by default (set in beforeEach); a test makes it fail to pin the order of quote and intent.
   quote: vi.fn(),
   gate: vi.fn(),
@@ -9,11 +12,11 @@ const { gate, intent, commercial, binding, billingAccount, seam, quote } = vi.ho
   commercial: vi.fn(),
   binding: vi.fn(),
   // The catalog v2 test seam: what the deployment delivers and holds. Everything below is the live gate with a plan on sale.
-  seam: { delivered: true, configured: true, paddle: true },
+  seam: { delivered: true, configured: true, paddle: true, grant: null as null | { billingExempt: boolean } },
 }));
 
 vi.mock("@/lib/account-grants", () => ({
-  getFoundationAccountGrant: async () => ({ ok: true, grant: null }),
+  getFoundationAccountGrant: async () => ({ ok: true, grant: seam.grant }),
 }));
 vi.mock("@/lib/billing-binding", () => ({ createCheckoutBinding: binding }));
 /*
@@ -39,6 +42,7 @@ vi.mock("@/lib/billing-store", () => ({
   issueFoundationCheckoutIntent: intent,
   getFoundationBillingAccount: billingAccount,
 }));
+vi.mock("@/lib/workspace-membership", () => ({ listWorkspaceMembers: members, listWorkspaceInvites: invites }));
 vi.mock("@/lib/commercial-state", () => ({ readCommercialState: commercial }));
 vi.mock("@/lib/checkout-quote", () => ({ quoteCheckout: quote }));
 vi.mock("@/lib/customer-data-admission", async () => ({
@@ -73,12 +77,14 @@ function request(offerCode = "developer") {
 describe("live checkout requires the buyer's document-processing receipt", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.assign(seam, { delivered: true, configured: true, paddle: true });
+    Object.assign(seam, { delivered: true, configured: true, paddle: true, grant: null });
     vi.stubEnv("FOUNDATION_BILLING_HMAC", "h".repeat(32));
     commercial.mockReturnValue({ provider: "production", checkoutEnabled: true, liveChargesEnabled: true });
     binding.mockReturnValue({ tavonel_nonce: "nonce" });
     intent.mockResolvedValue({ ok: true });
     quote.mockImplementation(realQuote);
+    members.mockResolvedValue({ ok: true, members: [{ user_id: "u1", role: "owner", state: "active" }] });
+    invites.mockResolvedValue({ ok: true, invites: [] });
     billingAccount.mockResolvedValue({ ok: true, account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null } });
   });
 
@@ -234,6 +240,91 @@ describe("live checkout requires the buyer's document-processing receipt", () =>
       const response = await POST(request());
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({ code: "BILLING_OFFER_CONTACT_REQUIRED" });
+    });
+  });
+
+  /*
+    WO-SINGLE-USER-2 (fix B). Personal and Developer are one-person plans: the seat function caps new invitations,
+    never the people already in, so the checkout counts them. Every refusal leaves no binding and no intent.
+  */
+  describe("a one-person plan is bought only by a workspace of one", () => {
+    const owner = { user_id: "u1", role: "owner", state: "active" };
+    const soon = new Date(Date.now() + 86_400_000).toISOString();
+    const past = new Date(Date.now() - 86_400_000).toISOString();
+
+    for (const offer of ["personal", "developer"]) {
+      it(`${offer}: a second active member is 409 WORKSPACE_HAS_MEMBERS`, async () => {
+        gate.mockResolvedValue(approved());
+        members.mockResolvedValue({ ok: true, members: [owner, { user_id: "u2", role: "member", state: "active" }] });
+        const response = await POST(request(offer));
+        expect(response.status).toBe(409);
+        await expect(response.json()).resolves.toEqual({ code: "WORKSPACE_HAS_MEMBERS" });
+        expect(members).toHaveBeenCalledWith("pilot-11111111");
+        expect(invites).toHaveBeenCalledWith("pilot-11111111");
+        expect(binding).not.toHaveBeenCalled();
+        expect(intent).not.toHaveBeenCalled();
+      });
+    }
+
+    it("a live pending invitation alone is refused", async () => {
+      gate.mockResolvedValue(approved());
+      invites.mockResolvedValue({ ok: true, invites: [{ invite_id: "i1", state: "pending", expires_at: soon }] });
+      const response = await POST(request("personal"));
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({ code: "WORKSPACE_HAS_MEMBERS" });
+      expect(intent).not.toHaveBeenCalled();
+    });
+
+    it("a single owner with no invitations opens the checkout", async () => {
+      gate.mockResolvedValue(approved());
+      const response = await POST(request("personal"));
+      expect(response.status).toBe(200);
+      expect(intent).toHaveBeenCalledOnce();
+    });
+
+    it("revoked members and expired, revoked or accepted invitations do not count", async () => {
+      gate.mockResolvedValue(approved());
+      members.mockResolvedValue({ ok: true, members: [owner, { user_id: "u2", role: "member", state: "revoked" }] });
+      invites.mockResolvedValue({ ok: true, invites: [
+        { invite_id: "i1", state: "pending", expires_at: past },
+        { invite_id: "i2", state: "revoked", expires_at: soon },
+        { invite_id: "i3", state: "accepted", expires_at: soon },
+        { invite_id: "i4", state: "expired", expires_at: soon },
+      ] });
+      expect((await POST(request("developer"))).status).toBe(200);
+    });
+
+    it("a count that cannot be read refuses and is never read as one member", async () => {
+      gate.mockResolvedValue(approved());
+      members.mockResolvedValue({ ok: false, code: "WORKSPACE_MEMBERSHIP_READ_FAILED", status: 503 });
+      let response = await POST(request("personal"));
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code: "WORKSPACE_MEMBERSHIP_READ_FAILED" });
+      members.mockResolvedValue({ ok: true, members: [owner] });
+      invites.mockResolvedValue({ ok: false, code: "WORKSPACE_INVITE_READ_FAILED", status: 503 });
+      response = await POST(request("personal"));
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ code: "WORKSPACE_INVITE_READ_FAILED" });
+      expect(binding).not.toHaveBeenCalled();
+      expect(intent).not.toHaveBeenCalled();
+    });
+
+    it("an operator grant keeps its own answer and never reaches the count", async () => {
+      seam.grant = { billingExempt: true };
+      members.mockResolvedValue({ ok: true, members: [owner, { user_id: "u2", role: "member", state: "active" }] });
+      const response = await POST(request("developer"));
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({ code: "OWNER_ACCESS_ACTIVE" });
+      expect(members).not.toHaveBeenCalled();
+      expect(invites).not.toHaveBeenCalled();
+    });
+
+    it("a plan that is not sold online is refused by the offer policy before any count", async () => {
+      members.mockResolvedValue({ ok: true, members: [owner, { user_id: "u2", role: "member", state: "active" }] });
+      const response = await POST(request("team"));
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ code: "BILLING_OFFER_CONTACT_REQUIRED" });
+      expect(members).not.toHaveBeenCalled();
     });
   });
 });

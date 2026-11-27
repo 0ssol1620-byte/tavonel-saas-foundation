@@ -28,6 +28,11 @@ vi.mock("@/lib/billing-store", () => ({
     account: { accessPlan: null, planCode: null, subscriptionStatus: "inactive", subscriptionCancelAt: null, paddleSubscriptionId: null },
   }),
 }));
+// A one-person workspace: the one-seat refusal (checkout-customer-data-gate.test.ts) does not apply.
+vi.mock("@/lib/workspace-membership", () => ({
+  listWorkspaceMembers: async () => ({ ok: true, members: [{ user_id: "u1", role: "owner", state: "active" }] }),
+  listWorkspaceInvites: async () => ({ ok: true, invites: [] }),
+}));
 vi.mock("@/lib/commercial-state", () => ({
   readCommercialState: () => ({ provider: "sandbox", checkoutEnabled: true, liveChargesEnabled: false }),
 }));

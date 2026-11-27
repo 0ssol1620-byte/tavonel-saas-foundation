@@ -258,6 +258,7 @@ describe("checkout refusals", () => {
     ["BILLING_OFFER_CONTACT_REQUIRED", 403],
     ["PILOT_ACCESS_REQUIRED", 403],
     ["BILLING_NOT_CONFIGURED", 503],
+    ["WORKSPACE_HAS_MEMBERS", 409],
   ] as const;
 
   for (const [code, status] of REFUSALS) {
@@ -314,6 +315,16 @@ describe("checkout refusals", () => {
 
     expect(owed).toEqual([]);
     expect(notices).toEqual([`Checkout is unavailable. ${failureSentence("BILLING_HOLD", 403)}`]);
+  });
+
+  it("sends a one-person-plan refusal to Members & invitations, where the extra people are removed", async () => {
+    respondWith({ code: "WORKSPACE_HAS_MEMBERS" }, false, 409);
+    const notices = await runCheckout("personal");
+
+    expect(paddle.opened).toHaveLength(0);
+    expect(notices[0]).toContain("Revoke the other members and any open invitations");
+    expect(notices[0]).toContain("nothing was opened or charged");
+    expect(links).toEqual([{ href: "/workspace/admin", label: "Open Members & invitations" }]);
   });
 
   it("links nothing on a refusal the terms cannot change", async () => {

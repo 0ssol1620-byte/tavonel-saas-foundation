@@ -129,6 +129,14 @@ describe("workspace failure copy", () => {
     ]) {
       expect(failureSentence(code, 503), code).toContain("nothing was charged");
     }
+    // The one-person-plan refusal says it in the form the other "opened or charged" refusals use.
+    const sentence = failureSentence("WORKSPACE_HAS_MEMBERS", 409);
+    expect(sentence).toContain("nothing was opened or charged");
+    expect(sentence).not.toContain("Reference");
+    for (const code of ["WORKSPACE_MEMBERSHIP_READ_FAILED", "WORKSPACE_INVITE_READ_FAILED"]) {
+      expect(failureSentence(code, 503), code).toContain("nothing was opened or charged");
+      expect(failureSentence(code, 503), code).not.toContain("Reference");
+    }
   });
 });
 
