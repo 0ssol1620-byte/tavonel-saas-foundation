@@ -1211,7 +1211,8 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     // Train 2026-11-26 (WO-TRAIN-5): nine owners for the paths the train's later lanes added (WO-ASK-0, WO-WS-1/2/4, WO-KS-2/3, WO-BIG-2, WO-RTR-1/2,
     // WO-C-T2, WO-AN-9, the compile stage line); WO-WS-1's spec is a Product QA claim at 1440, the U37 DB-clock suite a registered Node suite.
     // WO-PROJ-K2: member-source-scope 18 -> 24 paths, 11 -> 16 suites; ask-verbatim-windows 6 -> 8 paths, 11 -> 13 suites.
-    ['ask-verbatim-windows', 8, 13, 0, 0],
+    // WO-PROJ-K2-E2 review r1: ask-verbatim-windows 8 -> 9 paths (model-attempt-receipt.test.ts).
+    ['ask-verbatim-windows', 9, 13, 0, 0],
     ['workspace-active-world', 3, 2, 0, 1],
     ['workspace-product-frame', 5, 2, 2, 0],
     ['compile-source-stages', 3, 1, 0, 0],

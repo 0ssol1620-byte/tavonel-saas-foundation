@@ -3537,8 +3537,9 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
   // ask-verbatim-windows (WO-ASK-0): Ask answers with verbatim windows of the matching regions. ask-evidence-window.test.ts runs the window
   // module; retrieval-pipeline.test.ts and ask-synthetic.test.ts import the pipeline and the synthetic statement World fixture; the other
   // suites import retrieval-pipeline.ts itself (a suite that only mocks it is not listed).
+  // WO-PROJ-K2-E2 review r1: model-attempt-receipt.test.ts (pre-model failure codes) is owned as a path too; it already ran here.
   'ask-verbatim-windows': Object.freeze({
-    paths: Object.freeze(['lib/__fixtures__/ask-synthetic/statement-world.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-evidence-window.ts', 'lib/ask-synthetic.test.ts', 'lib/model-attempt-receipt.ts', 'lib/retrieval-pipeline.test.ts', 'lib/retrieval-pipeline.ts', 'lib/retrieval-store.ts']),
+    paths: Object.freeze(['lib/__fixtures__/ask-synthetic/statement-world.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-evidence-window.ts', 'lib/ask-synthetic.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/model-attempt-receipt.ts', 'lib/retrieval-pipeline.test.ts', 'lib/retrieval-pipeline.ts', 'lib/retrieval-store.ts']),
     unitFiles: Object.freeze(['lib/answer-receipt-signing.test.ts', 'lib/answerability.test.ts', 'lib/ask-evidence-window.test.ts', 'lib/ask-route-limits.test.ts', 'lib/ask-synthetic.test.ts', 'lib/derived-data-admission.test.ts', 'lib/explore-sample.test.ts', 'lib/member-projection.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/retrieval-pipeline.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),

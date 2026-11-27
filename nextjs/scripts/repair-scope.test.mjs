@@ -8634,7 +8634,8 @@ const V34_OWNER_PINS = Object.freeze([
   // WO-TRAIN-5: nine owners for the paths the train's later lanes added; the active-World Ask spec is Product QA's claim at 1440.
   // WO-PROJ-K2: retrieval-store.ts (the projected unit-to-document read), member-projection.test.ts runs the pipeline (6 -> 7, 11 -> 12).
   // WO-PROJ-K2 review r1: 7 -> 8 paths, 12 -> 13 suites.
-  ['ask-verbatim-windows', 8, '19effffc7593a443', 13, 'd520be24f780d216', [], {}],
+  // WO-PROJ-K2-E2 review r1: model-attempt-receipt.test.ts joins the paths (8 -> 9); suites unchanged.
+  ['ask-verbatim-windows', 9, 'b4fd0703fee36ded', 13, 'd520be24f780d216', [], {}],
   ['workspace-active-world', 3, '0100582fc90a9d9e', 2, '8175b5631f96fff8', [], { 'e2e/workspace-ask-active-world.spec.ts': v34ProductQa('1440') }],
   ['workspace-product-frame', 5, 'cc0483ce4041a85a', 2, '7c71ecdbeea3234a', ['e2e/workspace-intake-layout.spec.ts', 'e2e/world-lifecycle.spec.ts'], {}],
   ['compile-source-stages', 3, 'bc386d90f7452d1b', 1, '55811b7cc38fcba2', [], {}],
