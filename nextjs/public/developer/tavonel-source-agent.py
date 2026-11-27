@@ -33,8 +33,11 @@ makes mounted sync apply PLAN_POLICY and a root .tavonelignore before anything i
 or sent, inventories supported types only, skips empty and oversize files locally, re-hashes only
 on changed (file id, size, mtime) or once a day, commits more than 128 changed files in per-cycle
 subsets, refuses volume, home and system roots, and records a policy fingerprint so a narrowed
-inventory is never sent as deletions. S3 sync shares only the per-cycle subsets; its inventory is
-not filtered by the name policy. This file is of mixed authorship.
+inventory is never sent as deletions. A Claude Opus 5.5 revision (WO-LF-1B) applies the same policy
+to S3/R2/MinIO sync (scan_s3, s3_out_of_scope): an excluded, unsupported or unsafe key is dropped by
+name before it reaches an event, the state or a read, empty and oversize objects are skipped with a
+count, the policy fingerprint guards narrowing the same way, and a replayed pending journal is
+filtered by the same filter_replayed_journal as mounted sync. This file is of mixed authorship.
 """
 
 from __future__ import annotations
@@ -1902,7 +1905,21 @@ def s3_client(args: argparse.Namespace) -> Any:
     )
 
 
-def scan_s3(client: Any, args: argparse.Namespace) -> dict[str, dict[str, object]]:
+def s3_out_of_scope(key: str) -> str | None:
+    """out_of_scope for an object key, every '/' segment a path segment; a key that is no safe relative path is out too."""
+    if any(_unsafe_key_segment(name) for name in key.split("/")):
+        return "key_not_a_safe_relative_name"
+    return out_of_scope(key)
+
+
+def scan_s3(client: Any, args: argparse.Namespace, report: dict[str, Any] | None = None) -> dict[str, dict[str, object]]:
+    """The S3 inventory, by the same policy as scan_mount: supported, non-excluded, non-empty keys at or under the ceiling.
+
+    An excluded or unsupported key is dropped by its name alone, so it never reaches an event, the
+    state or a read. Empty and oversize objects are named only in `report["skipped"]`.
+    """
+    limit = min(args.max_file_bytes, FOUNDATION_MAX_SOURCE_BYTES)
+    skipped: dict[str, str] = {}
     files: dict[str, dict[str, object]] = {}
     token: str | None = None
     seen_tokens: set[str] = set()
@@ -1929,9 +1946,10 @@ def scan_s3(client: Any, args: argparse.Namespace) -> dict[str, dict[str, object
             size = item["Size"]
             if not key.startswith(args.s3_prefix):
                 raise AgentError("S3 inventory exceeded configured prefix")
-            if not key or size > args.max_file_bytes:
-                if size > args.max_file_bytes:
-                    raise AgentError(f"{key!r} exceeds --max-file-bytes")
+            if s3_out_of_scope(key):
+                continue
+            if size < 1 or size > limit:
+                skipped[key] = "empty" if size < 1 else "oversize"
                 continue
             etag = str(item.get("ETag") or "").strip('"')
             if not etag:
@@ -1940,7 +1958,7 @@ def scan_s3(client: Any, args: argparse.Namespace) -> dict[str, dict[str, object
                 "revision": f"etag:{etag}",
                 "sizeBytes": size,
                 "contentSha256": None,
-                "mimeType": MIME_BY_SUFFIX.get(Path(key).suffix.lower()),
+                "mimeType": MIME_BY_SUFFIX[Path(key).suffix.lower()],
             }
         if response["IsTruncated"] is False:
             break
@@ -1951,6 +1969,8 @@ def scan_s3(client: Any, args: argparse.Namespace) -> dict[str, dict[str, object
             raise AgentError("S3 listing repeated its continuation token")
         seen_tokens.add(next_token)
         token = next_token
+    if report is not None:
+        report.update(skipped=skipped)
     return files
 
 
@@ -2415,16 +2435,17 @@ def _root_ignore(root: _HeldRoot) -> tuple[str, ...]:
     return _read_ignore_file(root.backend, root.handle)
 
 
-def filter_replayed_journal(pending_path: Path, pending: dict[str, Any], root: _HeldRoot) -> dict[str, object]:
+def filter_replayed_journal(pending_path: Path, pending: dict[str, Any], root: _HeldRoot | None) -> dict[str, object]:
     """Apply the current policy to a pending journal before any of it is replayed (WO-LF-1 r2).
 
     A journal saved by an older agent (or under an older .tavonelignore) can name files the
     policy now excludes. They are dropped before any request, open or hash; everything else
     replays with its saved batch, attempt, file keys and document identities, and the cursor is
     recomputed over what is kept. An excluded file already in a posted or saved approval can't be
-    dropped from that approval, so that set is refused for review and nothing is read or sent.
+    dropped from that approval, so that set is refused for review and nothing is read or sent. Mounted and S3 sync
+    share it; S3 has no ignore file and judges keys with s3_out_of_scope (WO-LF-1B).
     """
-    ignore = _root_ignore(root)
+    ignore = _root_ignore(root) if root is not None else ()
     fingerprint = scope_policy_fingerprint(ignore)
     files = pending["files"]
     body = pending.get("body")
@@ -2432,7 +2453,9 @@ def filter_replayed_journal(pending_path: Path, pending: dict[str, Any], root: _
     batch = body if isinstance(body, dict) else intake
 
     def excluded(native_id: object) -> bool:
-        return isinstance(native_id, str) and out_of_scope(native_id, ignore) is not None
+        if not isinstance(native_id, str):
+            return False
+        return (out_of_scope(native_id, ignore) if root is not None else s3_out_of_scope(native_id)) is not None
 
     dropped_files = {native_id for native_id in files if excluded(native_id)}
     kept_events = [event for event in batch["events"] if not (isinstance(event, dict) and excluded(event.get("nativeId")))]
@@ -2455,7 +2478,7 @@ def filter_replayed_journal(pending_path: Path, pending: dict[str, Any], root: _
     pending["files"] = kept_files
     pending["policyFingerprint"] = fingerprint
     batch["events"] = kept_events
-    batch["nextCursorSha256"] = cursor_sha256(kept_files, "file_server")
+    batch["nextCursorSha256"] = cursor_sha256(kept_files, "file_server" if root is not None else "s3")
     if body is not None:
         body["manifestSha256"] = "sha256:" + sha256(canonical(kept_events))
     elif dropped_members:
@@ -2517,11 +2540,10 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
                     "the mounted root is not the object this pending upload set was quoted from; nothing was "
                     f"read, quoted or uploaded. Restore the original root, or {DISCARD_HINT}"
                 )
-            if root is not None:
-                replay_notes = filter_replayed_journal(pending_path, pending, root)
-                if pending.get("body") is not None:
-                    # Every upload member was excluded: what is left is a batch without uploads.
-                    return {**commit_pending(args, client, pending_path, pending), **replay_notes}
+            replay_notes = filter_replayed_journal(pending_path, pending, root)
+            if pending.get("body") is not None:
+                # Every upload member was excluded: what is left is a batch without uploads.
+                return {**commit_pending(args, client, pending_path, pending), **replay_notes}
             return {**approve_and_upload(args, client, pending_path, pending, resumed=True, root=root), **replay_notes}
         if not isinstance(body, dict) or not isinstance(files, dict) or not isinstance(body.get("events"), list):
             raise AgentError("pending journal contract is invalid")
@@ -2532,8 +2554,7 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
         elif state["serverCursorSha256"] != body.get("previousCursorSha256"):
             raise AgentError("pending journal cursor is not the current state")
         else:
-            if root is not None:
-                replay_notes = filter_replayed_journal(pending_path, pending, root)
+            replay_notes = filter_replayed_journal(pending_path, pending, root)
             return {**commit_pending(args, client, pending_path, pending), **replay_notes}
     cloud = None if root else s3_client(args)
     now = int(time.time())
@@ -2544,27 +2565,29 @@ def _sync(args: argparse.Namespace, root: _HeldRoot | None) -> dict[str, object]
     if root:
         current = scan_mount(root, args.max_file_bytes, previous, trust_metadata=not full_rehash, report=report)
     else:
-        current = scan_s3(cloud, args)
-    policy_fingerprint = scope_policy_fingerprint(report["ignore"]) if root else None
+        current = scan_s3(cloud, args, report)
+    policy_fingerprint = scope_policy_fingerprint(report["ignore"])
     notes: dict[str, object] = {}
-    if root:
-        # A path the policy now excludes by name was not deleted by the customer: it leaves the local
-        # state and the cursor without a deleted event. Only a changed policy fingerprint (state
-        # written before WO-LF-1 has none) explains such a path; under the same policy it is a broken
-        # state and nothing is sent.
-        descoped = [native_id for native_id in previous if out_of_scope(native_id, report["ignore"])]
-        if descoped:
-            if state.get("policyFingerprint") == policy_fingerprint:
-                raise AgentError("state lists paths its own exclusion policy excludes; cursor was not advanced")
-            previous = {native_id: item for native_id, item in previous.items() if native_id not in descoped}
-            notes["policyChange"] = {"descopedWithoutDeletion": len(descoped)}
-        # Empty or oversize now, but synced before: keep the synced entry rather than read it as deleted.
-        for native_id in report["skipped"]:
-            if isinstance(previous.get(native_id), dict):
-                current[native_id] = previous[native_id]
-        reasons = list(report["skipped"].values())
-        if reasons:
-            notes["skippedLocally"] = {"empty": reasons.count("empty"), "oversize": reasons.count("oversize")}
+    # A path the policy now excludes by name was not deleted by the customer: it leaves the local
+    # state and the cursor without a deleted event. Only a changed policy fingerprint (state
+    # written before WO-LF-1, or WO-LF-1B for S3, has none) explains such a path; under the same
+    # policy it is a broken state and nothing is sent.
+    descoped = [
+        native_id for native_id in previous
+        if (out_of_scope(native_id, report["ignore"]) if root else s3_out_of_scope(native_id))
+    ]
+    if descoped:
+        if state.get("policyFingerprint") == policy_fingerprint:
+            raise AgentError("state lists paths its own exclusion policy excludes; cursor was not advanced")
+        previous = {native_id: item for native_id, item in previous.items() if native_id not in descoped}
+        notes["policyChange"] = {"descopedWithoutDeletion": len(descoped)}
+    # Empty or oversize now, but synced before: keep the synced entry rather than read it as deleted.
+    for native_id in report["skipped"]:
+        if isinstance(previous.get(native_id), dict):
+            current[native_id] = previous[native_id]
+    reasons = list(report["skipped"].values())
+    if reasons:
+        notes["skippedLocally"] = {"empty": reasons.count("empty"), "oversize": reasons.count("oversize")}
     if previous and not current and not args.allow_empty_snapshot:
         raise AgentError("empty inventory requires --allow-empty-snapshot after source verification")
     for native_id, item in current.items():
