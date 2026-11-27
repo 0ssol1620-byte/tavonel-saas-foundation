@@ -768,7 +768,7 @@ describe("public trust disclosures and the enterprise procurement summary", () =
       expect(source, "the disclosures come from one module").toContain("@/components/trust-disclosures");
       expect(source).toContain("<TrustDisclosures");
       // The wording may not be retyped on the page: a second copy is a copy that goes stale.
-      expect(withoutComments(source)).not.toContain("planned after the first paying customer");
+      expect(withoutComments(source)).not.toContain("Our automated checks include CodeQL static analysis");
     },
   );
 

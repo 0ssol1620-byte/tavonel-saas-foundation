@@ -754,11 +754,11 @@ for (const binding of [
     browsers: [],
     rows: [],
     neighbors: ['nextjs/next.config.ts', 'nextjs/scripts/gate-surface.test.mjs', 'nextjs/scripts/gate-surface-rules.yaml', 'shared/scopedCustomerDataGate.test.ts', 'shared/customerDataAuthorization.ts', 'nextjs/lib/scoped-customer-data-gate.ts', 'scopedCustomerDataGate.ts', 'nextjs/.gitignore'] },
-  // G1-COPY (phase 4, codex/p4-copy-20261019): six exact paths, seventeen direct suites, two browser suites on existing rows.
+  // G1-COPY (phase 4, codex/p4-copy-20261019): seven exact paths (WO-RELEASE-CONTRACT-1 added the forbidden-public-claims suite), eighteen direct suites, two browser suites on existing rows.
   { group: 'g1-copy-truth', prefix: 'nextjs/', exportedPaths: G1_COPY_TRUTH_AFFECTED_PATHS, exportedSuites: G1_COPY_TRUTH_AFFECTED_UNIT_FILES,
     exportedBrowsers: G1_COPY_TRUTH_AFFECTED_BROWSER_FILES,
-    paths: ['lib/billing-catalog.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'],
-    suites: ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'],
+    paths: ['lib/billing-catalog.ts', 'lib/forbidden-public-claims.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'],
+    suites: ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'],
     browsers: ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'],
     rows: ["['e2e/docs-reading-layout.spec.ts', ['1440', '390', 'reduced-motion']],", "['e2e/pricing-plan-overview.spec.ts', ['1440', '390']],"],
     neighbors: ['nextjs/lib/billing-catalog.test.tsx', 'nextjs/lib/operations-v2.ts', 'nextjs/lib/mcp-tools.tsx', 'nextjs/lib/g1-copy-truth.ts', 'nextjs/public/developer/tavonel-mcp-2.mjs', 'nextjs/public/developer/tavonel-cli.mjs'] },
@@ -943,8 +943,8 @@ for (const binding of [
     neighbors: ['nextjs/lib/operational-sli-store.ts', 'nextjs/lib/operational-sli.tsx', 'nextjs/lib/operational-job-liveness.ts', 'lib/operational-sli.ts'] },
   { group: 'legal-semicolons-20261109', prefix: 'nextjs/', exportedPaths: LEGAL_SEMICOLONS_AFFECTED_PATHS, exportedSuites: LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES,
     exportedBrowsers: [],
-    paths: ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'],
-    suites: ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'],
+    paths: ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts', 'public/policy/TAVONEL_DPA_v1_2026-09-11.md', 'public/policy/TAVONEL_DPA_v2_2026-09-23.md'],
+    suites: ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-page-answers.test.ts', 'lib/trust-provisions.test.ts'],
     browsers: [],
     rows: [],
     neighbors: ['nextjs/app/refunds/page.ts', 'nextjs/components/processing-consent-panel.css', 'nextjs/content/trust/provisions.json', 'nextjs/lib/status-probe-store.ts', 'lib/status-probe.ts'] },
@@ -1184,7 +1184,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
   const pins = [['v34-shell', 47, 23, 3, 0], ['v34-route-registry', 6, 55, 2, 0], ['v34-world', 18, 22, 2, 0], ['v34-route-bodies', 258, 60, 3, 0],
     ['v34-guard-suites', 15, 16, 1, 0], ['korean-surface-removal', 7, 7, 1, 0], ['proposals-library', 18, 11, 0, 1],
     ['workspace-journey', 8, 3, 0, 1], ['compile-pipeline', 15, 12, 0, 2], ['world-temporal-lens', 13, 6, 0, 2], ['control-plane', 5, 3, 0, 0],
-    ['developer-surface', 10, 8, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
+    ['developer-surface', 12, 9, 0, 0], ['tenant-isolation', 6, 5, 0, 0], ['billing-reconciliation', 12, 7, 0, 1],
     ['v34-home', 2, 1, 2, 0], ['v34-changes-contract', 1, 1, 1, 0], ['v34-catalog', 6, 12, 1, 0], ['v34-repointed-specs', 2, 0, 2, 0],
     // WO-MIG-GUARD-1: db-harness takes the migration redefinition guard, allowlist and suite (19 -> 22 paths, 9 -> 10 Node suites).
     // WO-TRAIN-2: db-harness takes the member-scope race script and its suite (17 -> 19 paths, 8 -> 9 Node suites).

@@ -83,7 +83,8 @@ for (const [source, sentence] of [
     await page.goto("/workspace/connections");
     const gate = page.locator(".workspace-access-gate");
     await expect(gate.getByRole("heading", { name: "Available on a paid plan." })).toBeVisible();
-    await expect(gate).toContainText("Local-folder connections are included in every paid plan.");
+    await expect(gate).toContainText("Every paid plan includes the local-folder upload agent: a command-line tool you run on Windows or Linux that uploads the documents in one folder you choose, then the new and changed ones each time it runs.");
+    await expect(gate).not.toContainText("Local-folder connections");
     await expect(gate).toContainText(sentence);
     await expect(gate).not.toContainText(/Dropbox|OneDrive/);
     await expect(gate.getByRole("link", { name: "See plans" })).toHaveAttribute("href", "/pricing");

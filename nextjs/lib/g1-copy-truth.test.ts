@@ -269,3 +269,82 @@ describe("FOLLOW-UPS NB-7: the developer README's MCP args", () => {
     expect(Object.values(channel.assets).map((asset) => asset.url)).not.toContain("https://tavonel.com/developer/README.md");
   });
 });
+
+/*
+  WO-LF-0 (WO-LOCAL-FOLDER-1 report, sections 3 and 6). What the local-folder agent does today: a
+  paid workspace runs a command-line agent on Windows (local NTFS/ReFS) or Linux, it uploads the
+  documents of one chosen folder and on each run the new and changed ones. A deleted file is
+  recorded and nothing consumes it; an edit becomes a new document; macOS is refused. The public
+  sentences below say that and no more. Each binds to the code fact that makes it true, so the
+  day LF-2/LF-3 give local sources a logical identity (deletions honoured, one current version),
+  this suite fails and the copy is rewritten with them.
+*/
+const OVERCLAIM = /\bwatch(es)? (your|the|a) folder|\bin sync\b|\bsyncs? (your|the)\b|kept current|keeps? (it|them|your [a-z]+) current|deletions? (are |is )?(honou?red|reflected)|\bmac(os)?\b|local-folder connections|assisted setup|configure the first route with you/i;
+
+describe("WO-LF-0: local-folder copy says what the agent does today", () => {
+  it("the overclaim check catches the wording that went (failure path)", () => {
+    for (const old of [
+      "Local-folder connections",
+      "Every paid plan includes local-folder connections.",
+      "Assisted setup",
+      "We configure the first route with you.",
+      "The agent watches your folder.",
+      "Local-folder sync keeps your folder in sync.",
+      "New, changed and deleted files are kept current.",
+      "Deletions are honored.",
+      "Connect a folder from your Mac.",
+    ]) expect(old, old).toMatch(OVERCLAIM);
+  });
+
+  it("names the agent and its two platforms on every paid plan's bullet, and the platforms are the agent's own", async () => {
+    const { LOCAL_FOLDER_AGENT_SENTENCE } = await import("./billing-catalog");
+    const bullets = Object.values(BILLING_OFFERS).flatMap((offer) => (offer.features as readonly string[]).filter((feature) => /folder/i.test(feature)));
+    expect(bullets.length).toBeGreaterThan(0);
+    for (const bullet of bullets) expect(bullet).toBe("Local-folder upload agent (Windows, Linux)");
+    for (const text of [...bullets, LOCAL_FOLDER_AGENT_SENTENCE]) expect(text).not.toMatch(OVERCLAIM);
+    // Windows and Linux are the only traversal backends; every other platform is refused.
+    expect(agent).toMatch(/if os\.name == "nt":\s+return _WindowsTraversal\(\)\s+if sys\.platform\.startswith\("linux"\):\s+return _LinuxTraversal\(\)\s+raise UnsupportedSafeTraversal\("platform_not_supported"\)/);
+  });
+
+  it("renders the one sentence on the pricing row and the workspace gate, and the old one nowhere", () => {
+    expect(copy("components/pricing-page-client.tsx")).toContain("${LOCAL_FOLDER_AGENT_SENTENCE}");
+    expect(copy("app/workspace/page.tsx").split("${LOCAL_FOLDER_AGENT_SENTENCE}")).toHaveLength(3);
+    for (const path of ["lib/billing-catalog.ts", "app/pricing/page.tsx", "components/pricing-page-client.tsx", "app/workspace/page.tsx", "components/workspace/source-choices.tsx", "app/integrations/page.tsx"]) {
+      expect(copy(path), path).not.toMatch(/local-folder connections|assisted setup|configure the first route with you/i);
+    }
+  });
+
+  it("tells a customer they run the agent themselves", () => {
+    expect(integrations()).toContain("You run it yourself: create the connection in Workspace, then point the agent at one folder or bucket.");
+    expect(copy("components/workspace/source-choices.tsx")).toContain('{ name: "Local folder", availability: "Command-line agent", provider: null }');
+  });
+
+  it("says in both runbooks that a deleted file is not removed or suspended yet, and an edit is a new document", () => {
+    for (const path of ["public/developer/source-agent-operations.md", "../docs/runbooks/source-agent-operations.md"]) {
+      const runbook = read(path);
+      expect(runbook, path).toContain("A file deleted from the folder, or an object removed from the bucket, is recorded as deleted, but the document already uploaded is not removed or suspended yet");
+      expect(runbook, path).toContain("An edited file is uploaded as a new document, and the earlier one stays until it is deleted the same way.");
+      expect(runbook, path).not.toContain("The server decides how deleted sources are suspended");
+      expect(runbook, path).not.toContain("deletion/suspension batch");
+    }
+    // The code fact: a source identity (and so a suspension) exists only for the OAuth providers.
+    expect(read("lib/connector-source-identity.ts")).toContain('const PROVIDERS: readonly string[] = ["google_drive", "dropbox", "microsoft_graph"];');
+  });
+
+  it("/privacy suspends on removal only for connected cloud accounts, and says what a local-folder deletion does", () => {
+    const privacy = copy("app/privacy/page.tsx");
+    expect(privacy).toContain("Removing a source from a connected Google Drive, Dropbox or OneDrive/SharePoint account, or losing access to it, suspends it");
+    expect(privacy).toContain("With the local-folder upload agent, a file deleted from the folder is not removed or suspended on its own: its uploaded document stays until a workspace owner or administrator requests its deletion, as described next.");
+    expect(privacy).not.toContain("Removing a connected source, or losing access to it, suspends it");
+    expect(privacy).toContain("A workspace owner or administrator can request deletion of an uploaded source through the service.");
+  });
+
+  it("says a revoke stops sync batches and the API key stops uploads, in the docs and the OpenAPI description", () => {
+    const docs = docsText("connections");
+    expect(docs).toContain("Revoking stops sync batches; revoke the agent's API key to stop uploads, and documents already uploaded stay in the workspace until a workspace owner or administrator requests their deletion.");
+    expect(docs).not.toContain("a revoke stops future reads");
+    const openapi = copy("app/api/openapi/route.ts");
+    expect(openapi).toContain("Revoking stops sync batches; revoke the agent's API key to stop uploads.");
+    expect(openapi).not.toContain("a revoke stops future reads");
+  });
+});

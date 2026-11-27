@@ -27,8 +27,12 @@ export const LEGAL_EFFECTIVE_DATE = "2026-08-30";
 
   2026-11-09 (GX-03, founder): /privacy and /subprocessors say that cookieless Vercel page views run
   unless a visitor declines, rather than only after a yes.
+
+  2026-11-27 (WO-LF-0, orchestrator under the founder's 2026-11-09 delegation): /privacy narrows
+  suspension on removal to the connected cloud accounts and says that a file deleted from a
+  local-folder agent's folder is not removed or suspended on its own.
 */
-export const LEGAL_LAST_UPDATED = "2026-11-09";
+export const LEGAL_LAST_UPDATED = "2026-11-27";
 
 /*
   SD-07. One draft label, on every legal document, until counsel signs it off.

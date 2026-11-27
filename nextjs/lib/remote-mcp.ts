@@ -59,6 +59,18 @@ export const REMOTE_MCP_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = 
 export const REMOTE_MCP_CANONICAL_TOOL_SCOPES: Readonly<Record<string, DeveloperScope>> = { search: "ask:read", fetch: "worlds:read" };
 export const remoteMcpCanonicalToolsEnabled = (env: Env = process.env): boolean => env.TAVONEL_REMOTE_MCP_CANONICAL_TOOLS === "true";
 
+/** The scope a listed tool needs, or undefined for a name in neither table (a canonical name counts only while canonical tools are on). */
+export const remoteMcpToolScope = (name: string, canonical: boolean): DeveloperScope | undefined =>
+  REMOTE_MCP_TOOL_SCOPES[name] ?? (canonical && Object.hasOwn(REMOTE_MCP_CANONICAL_TOOL_SCOPES, name) ? REMOTE_MCP_CANONICAL_TOOL_SCOPES[name] : undefined);
+
+/**
+ * WO-MCP-LIST-AUTH: while exactly "true", tools/list with no bearer is a 401 with the RFC 9728
+ * challenge instead of the static definitions. Off by default: the unauthenticated list carries no
+ * customer data (see receipts/WO-MCP-LIST-AUTH/NOTES.md) and one host's behaviour on a 401 at
+ * tools/list is not yet receipted. Any other value is off.
+ */
+export const remoteMcpListAuthRequired = (env: Env = process.env): boolean => env.TAVONEL_REMOTE_MCP_LIST_AUTH === "true";
+
 /** The only scopes a remote MCP token may hold. A key holding anything else is refused. */
 export const REMOTE_MCP_SCOPES: readonly DeveloperScope[] = [...new Set(Object.values(REMOTE_MCP_TOOL_SCOPES))].sort();
 

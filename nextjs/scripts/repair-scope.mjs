@@ -2364,8 +2364,11 @@ export const GATE_RELEASE_CONTINUITY_AFFECTED_UNIT_FILES = Object.freeze([
 // docs-reading-layout (1440, 390, reduced-motion) browser suites, each through its existing reviewed project row. Every
 // other path this lane changed keeps its existing owner. Product copy and a published asset, so never nativeReuse.
 // lib/operations.ts is also a consent-poster path (PR #163): a change to it selects both owners, the union of their suites.
+// WO-RELEASE-CONTRACT-1 (2026-11-27): the forbidden-public-claims suite, the same kind of public-copy truth guard, joins this owner
+// and selects itself: seven paths, eighteen direct suites. No pin moves.
 export const G1_COPY_TRUTH_AFFECTED_PATHS = Object.freeze([
   'lib/billing-catalog.ts',
+  'lib/forbidden-public-claims.test.ts',
   'lib/g1-copy-truth.test.ts',
   'lib/mcp-server.test.ts',
   'lib/mcp-tools.ts',
@@ -2378,6 +2381,7 @@ export const G1_COPY_TRUTH_AFFECTED_UNIT_FILES = Object.freeze([
   'lib/copy-trust-guard.test.ts',
   'lib/developer-distribution.test.ts',
   'lib/docs-content.test.ts',
+  'lib/forbidden-public-claims.test.ts',
   'lib/g1-copy-truth.test.ts',
   'lib/guide-content.test.ts',
   'lib/legal-terms-consistency.test.ts',
@@ -3058,7 +3062,9 @@ export const CDR_NATIVE_READER_AFFECTED_PATHS = Object.freeze(['quarantine-sidec
 export const OPS_BACKLOG_SLI_AFFECTED_PATHS = Object.freeze(['lib/operational-sli.test.ts', 'lib/operational-sli.ts']);
 export const OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES = Object.freeze(['lib/operational-sli-alert-route.test.ts', 'lib/operational-sli-read-route.test.ts', 'lib/operational-sli.test.ts']);
 // legal-semicolons-20261109: the legal, consent, trust and /status copy whose semicolons were removed without a change in meaning.
-export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts']);
+// WO-RELEASE-CONTRACT-1 r2 (2026-11-27): the two archived DPA drafts, whose pen-test promise was removed with /trust's, join it,
+// with the two suites that read them and the /trust row (forbidden-public-claims, trust-page-answers): 7 paths, 12 suites.
+export const LEGAL_SEMICOLONS_AFFECTED_PATHS = Object.freeze(['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts', 'public/policy/TAVONEL_DPA_v1_2026-09-11.md', 'public/policy/TAVONEL_DPA_v2_2026-09-23.md']);
 // processing-ga-20261109 (ADR 0008): the processing authorization that reads TAVONEL_PROCESSING_ROLLOUT. The rollout function and
 // its grant caller live in lib/processing-workspace-grant.ts, which keeps its ux-billing-checkout owner.
 export const PROCESSING_GA_AFFECTED_PATHS = Object.freeze(['lib/customer-data-admission.ts']);
@@ -3068,7 +3074,7 @@ export const PROCESSING_GA_AFFECTED_UNIT_FILES = Object.freeze(['lib/customer-da
 export const TRIAL_TO_PAID_AFFECTED_PATHS = Object.freeze(['app/api/collections/[id]/promote/route.ts', 'components/processing-consent-panel.module.css', 'lib/activation-cohorts.ts', 'lib/cookbook-content.ts', 'lib/keyword-map.ts', 'e2e/billing-lifecycle.spec.ts', 'app/api/collections/[id]/search/route.ts']);
 export const TRIAL_TO_PAID_AFFECTED_BROWSER_FILES = Object.freeze(['e2e/billing-lifecycle.spec.ts']);
 export const TRIAL_TO_PAID_AFFECTED_UNIT_FILES = Object.freeze(['lib/activation-cohorts.test.ts', 'lib/activation-rate-limit.test.ts', 'lib/brand-copy.test.ts', 'lib/client-route-weight.test.ts', 'lib/consumer-context/consumer-context-parity.test.ts', 'lib/cookbook-content.test.ts', 'lib/docs-content.test.ts', 'lib/docs-navigation.test.ts', 'lib/funnel-events.test.ts', 'lib/keyword-map.test.ts', 'lib/marketing-analytics.test.ts', 'lib/model-attempt-receipt.test.ts', 'lib/openapi-response-shape.switch-off.test.ts', 'lib/openapi-response-shape.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/public-copy-purge.test.ts', 'lib/recipe-intent.test.ts', 'lib/remote-mcp.test.ts', 'lib/resources-hub.test.ts', 'lib/retrieval-compile-wiring.test.ts', 'lib/retrieval-search-authorization.test.ts', 'lib/seo-surface.test.ts', 'lib/synthetic-customer-journey.test.ts', 'lib/trial-ai-access.test.ts', 'lib/world-activation-plan-gate.test.ts', 'lib/world-promotion-current-source.test.ts']);
-export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts']);
+export const LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES = Object.freeze(['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-page-answers.test.ts', 'lib/trust-provisions.test.ts']);
 // trust-copy-20261110: the two direct suites whose sample-disclaimer assertions moved to the positive label; each selects itself.
 export const TRUST_COPY_AFFECTED_PATHS = Object.freeze(['lib/explore-frame.test.ts', 'lib/public-package-proof.test.ts']);
 export const TRUST_COPY_AFFECTED_UNIT_FILES = Object.freeze(['lib/explore-frame.test.ts', 'lib/public-package-proof.test.ts']);
@@ -3224,9 +3230,10 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     externalChecks: Object.freeze({}),
   }),
   // developer-surface: D18-3 and D19: the remote MCP facade, readiness, refresh and its matrices, and the signed answer receipt parity suite.
+  // WO-MCP-LISTING-2: the OpenAI domain-verification route and its suite join (10 -> 12 paths, 8 -> 9 Node suites).
   'developer-surface': Object.freeze({
-    paths: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-facade.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-readiness.ts', 'lib/remote-mcp-refresh.test.ts']),
-    unitFiles: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-refresh.test.ts']),
+    paths: Object.freeze(['app/.well-known/openai-apps-challenge/route.ts', 'lib/d18-receipt-parity.test.ts', 'lib/openai-apps-challenge.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-facade.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-readiness.ts', 'lib/remote-mcp-refresh.test.ts']),
+    unitFiles: Object.freeze(['lib/d18-receipt-parity.test.ts', 'lib/openai-apps-challenge.test.ts', 'lib/remote-mcp-auth-matrix.test.ts', 'lib/remote-mcp-facade.test.ts', 'lib/remote-mcp-injection.test.ts', 'lib/remote-mcp-output-limit.test.ts', 'lib/remote-mcp-protocol.test.ts', 'lib/remote-mcp-readiness.test.ts', 'lib/remote-mcp-refresh.test.ts']),
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
@@ -3879,6 +3886,10 @@ export const AFFECTED_GROUPS = Object.freeze([
       'lib/connector-page-integrity.test.ts', 'lib/connector-sync-page.test.ts', 'lib/connector-provider-isolation.test.ts', 'lib/connector-source-identity.test.ts',
       'lib/source-version-guard.test.ts', 'lib/connector-replay-world-currency-migration.test.ts'], database: true, databaseTests: ['supabase/tests/dropbox_source_reconciliation.sql'],
       databaseDependencies: DROPBOX_DATABASE_DEPENDENCIES }),
+  // WO-LF-2: the connection batch contract and the local-folder upload gate select their route suites.
+  affectedGroup('local-folder-lf2', /^nextjs\/lib\/(?:developer-contracts|local-folder-connection-gate)(?:\.test)?\.ts$/,
+    { unitFiles: ['lib/local-folder-connection-gate.test.ts', 'lib/developer-contracts.test.ts', 'lib/intake-approval-rollout-off.test.ts',
+      'lib/connection-source-inventory.test.ts'] }),
   // ops-backlog-sli-20261110: 2 exact paths select 3 direct suites and no browser suite.
   affectedGroup('ops-backlog-sli-20261110', new RegExp(`^nextjs/(?:${exactPathAlternation(OPS_BACKLOG_SLI_AFFECTED_PATHS)})$`),
     { unitFiles: OPS_BACKLOG_SLI_AFFECTED_UNIT_FILES }),

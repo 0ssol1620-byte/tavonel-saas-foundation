@@ -21,7 +21,8 @@ const BYTES_PER_GB = 1_000_000_000;
  * Every v2 offer's storage allowance in bytes, sent with each admission. The database picks the
  * workspace's entry by its `plan_code` under the intake lock (20261117150100). A retired offer has
  * no entry: legacy, owner and trial admissions are never capped, and a v2 code with no entry is
- * refused by the database rather than admitted uncapped.
+ * refused by the database rather than admitted uncapped. An account no plan was ever projected into
+ * is held to Free's 1 GB in SQL (20261127070000); this map has no Free entry.
  */
 export const STORAGE_LIMIT_BYTES: Readonly<Record<string, number>> = Object.fromEntries(
   Object.entries(BILLING_OFFERS).flatMap(([code, offer]) =>
@@ -89,6 +90,34 @@ export async function reserveFoundationIntake(value: IntakeAdmission) {
     typeof result.confirmed !== "boolean"
   ) return { ok: false as const, code: "INTAKE_ADMISSION_RECEIPT_INVALID" };
   return { ok: true as const, result };
+}
+
+/**
+ * Releases an admission whose upload the server then refused (a compute refusal), so it stops holding
+ * a slot of the trial's file allowance (migration 20261127060000). The database closes the window of an
+ * unconfirmed admission only; a confirmed one is never released. Not ok leaves the slot held until the
+ * admission's own window ends, which is the safe direction: the caller still answers its refusal.
+ */
+export async function releaseFoundationIntake(value: { workspaceKey: string; documentId: string; reasonCode: string }) {
+  if (!WORKSPACE_ID_PATTERN.test(value.workspaceKey) || !DOCUMENT_ID_PATTERN.test(value.documentId)) {
+    return { ok: false as const, code: "INTAKE_RELEASE_INVALID" };
+  }
+  const config = readSupabaseAdminConfig();
+  if (!config) return { ok: false as const, code: "INTAKE_RELEASE_NOT_CONFIGURED" };
+  try {
+    const response = await supabaseAdminRequest(config, "/rest/v1/rpc/refuse_foundation_intake_admission", {
+      method: "POST",
+      body: JSON.stringify({
+        p_workspace_key: value.workspaceKey,
+        p_document_id: value.documentId,
+        // The database's own pattern; any other code is sent as the generic one rather than refused.
+        p_reason_code: /^[A-Z][A-Z0-9_]{2,79}$/.test(value.reasonCode) ? value.reasonCode : "COMPUTE_REFUSED",
+      }),
+    });
+    return response.ok ? { ok: true as const } : { ok: false as const, code: "INTAKE_RELEASE_FAILED" };
+  } catch {
+    return { ok: false as const, code: "INTAKE_RELEASE_FAILED" };
+  }
 }
 
 export async function confirmFoundationIntake(value: IntakeConfirmation) {

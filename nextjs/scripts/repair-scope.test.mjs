@@ -7537,10 +7537,10 @@ test('affected remote-mcp owner: 12 exact paths select 16 direct suites and 1 br
     assert.throws(() => affectedAskPlan(unknown), /clean fail-closed map/, adjacent);
   }
 });
-test('affected g1-copy-truth owner: 6 exact paths select 17 direct suites and 2 browser suites; neighbours stay unmapped', () => {
-  const suites = ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'];
+test('affected g1-copy-truth owner: 7 exact paths select 18 direct suites and 2 browser suites; neighbours stay unmapped', () => {
+  const suites = ['lib/billing-catalog.test.ts', 'lib/compiler-contract.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/developer-distribution.test.ts', 'lib/docs-content.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/mcp-server.test.ts', 'lib/operations.test.ts', 'lib/plan-entitlement.test.ts', 'lib/pricing-plan-overview.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-posture.test.ts', 'lib/prompt-injection.test.ts', 'lib/synthetic-probe.test.ts', 'lib/tenant-isolation-negative.test.ts'];
   const browsers = ['e2e/docs-reading-layout.spec.ts', 'e2e/pricing-plan-overview.spec.ts'];
-  assert.deepEqual([[...G1_COPY_TRUTH_AFFECTED_PATHS], [...G1_COPY_TRUTH_AFFECTED_UNIT_FILES], [...G1_COPY_TRUTH_AFFECTED_BROWSER_FILES]], [['lib/billing-catalog.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'], suites, browsers]);
+  assert.deepEqual([[...G1_COPY_TRUTH_AFFECTED_PATHS], [...G1_COPY_TRUTH_AFFECTED_UNIT_FILES], [...G1_COPY_TRUTH_AFFECTED_BROWSER_FILES]], [['lib/billing-catalog.ts', 'lib/forbidden-public-claims.test.ts', 'lib/g1-copy-truth.test.ts', 'lib/mcp-server.test.ts', 'lib/mcp-tools.ts', 'lib/operations.ts', 'public/developer/tavonel-mcp.mjs'], suites, browsers]);
   // lib/operations.ts is also a consent-poster path (main, PR #163): both owners select it, with the union of their suites.
   const shared = path => path === 'lib/operations.ts';
   for (const path of G1_COPY_TRUTH_AFFECTED_PATHS) {
@@ -8235,9 +8235,9 @@ test('affected trial-to-paid-20261109 owner: 7 exact paths select 27 direct suit
 });
 // legal-semicolons-20261109: one finite owner, restated independently of the exported constants.
 import { LEGAL_SEMICOLONS_AFFECTED_PATHS, LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES } from './repair-scope.mjs';
-test('affected legal-semicolons-20261109 owner: 5 exact paths select 10 direct suites and no browser suite; neighbours stay unmapped', () => {
-  const paths = ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts'];
-  const suites = ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-provisions.test.ts'];
+test('affected legal-semicolons-20261109 owner: 7 exact paths select 12 direct suites and no browser suite; neighbours stay unmapped', () => {
+  const paths = ['app/refunds/page.tsx', 'components/processing-consent-panel.tsx', 'content/trust/provisions.ts', 'lib/status-probe.test.ts', 'lib/status-probe.ts', 'public/policy/TAVONEL_DPA_v1_2026-09-11.md', 'public/policy/TAVONEL_DPA_v2_2026-09-23.md'];
+  const suites = ['lib/brand-copy.test.ts', 'lib/copy-trust-guard.test.ts', 'lib/forbidden-public-claims.test.ts', 'lib/guide-content.test.ts', 'lib/legal-terms-consistency.test.ts', 'lib/processing-consent-panel.test.ts', 'lib/product-claims-sync.test.ts', 'lib/production-hardening.test.ts', 'lib/seo-surface.test.ts', 'lib/status-probe.test.ts', 'lib/trust-page-answers.test.ts', 'lib/trust-provisions.test.ts'];
   assert.deepEqual([[...LEGAL_SEMICOLONS_AFFECTED_PATHS], [...LEGAL_SEMICOLONS_AFFECTED_UNIT_FILES]], [paths, suites]);
   for (const path of paths.map(p => `nextjs/${p}`)) {
     assert.deepEqual(AFFECTED_GROUPS.filter(o => o.match.test(path)).map(o => o.group), ['legal-semicolons-20261109'], path);
@@ -8581,7 +8581,8 @@ const V34_OWNER_PINS = Object.freeze([
   ['compile-pipeline', 15, 'c0dcca37df08a4b6', 12, 'd73d2c163da39980', [], { 'e2e/compile-job-states-mobile.spec.ts': v34ProductQa('390'), 'e2e/compile-resume.spec.ts': v34ProductQa('audit') }],
   ['world-temporal-lens', 13, 'fdef27c6e8765cd3', 6, '2c6da671f58ed78b', [], { 'e2e/world-graph-scale.spec.ts': v34ProductQa('1440'), 'e2e/world-lens.spec.ts': v34ProductQa('1440') }],
   ['control-plane', 5, '69fb7d773a115e09', 3, '0252f55e061df2fc', [], {}],
-  ['developer-surface', 10, '3e2063aec635d535', 8, '0c3198c499d7bbb0', [], {}],
+  // WO-MCP-LISTING-2: the OpenAI domain-verification route and its suite join developer-surface (10 -> 12 paths, 8 -> 9 Node suites).
+  ['developer-surface', 12, 'c601bfc1d28ecda0', 9, 'd88396fa5a66c2e3', [], {}],
   ['tenant-isolation', 6, 'd41829069c62cb31', 5, '26b862fea9f1ef7b', [], {}],
   ['billing-reconciliation', 12, 'd98a2e522659cc4b', 7, '00d0f2f362aa3ea7', [], { 'scripts/billing/paddle-reconcile.test.mjs': V34_CI_VITEST }],
   ['v34-home', 2, '15569343b96c4a82', 1, '70918323898e7ed4', ['e2e/home-v34.spec.ts', 'e2e/upload-entry.spec.ts'], {}],

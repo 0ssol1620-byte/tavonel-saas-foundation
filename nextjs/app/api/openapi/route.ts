@@ -1308,7 +1308,7 @@ export async function GET(request: Request) {
           tags: ["Connections"],
           "x-tavonel-scope": "connections:write",
           parameters: [{ $ref: "#/components/parameters/ConnectionId" }],
-          description: "Revokes the connection. Access removal takes effect on the next request rather than waiting for a background reindex. Immutable outputs already compiled are retained: a revoke stops future reads, it does not rewrite history.",
+          description: "Revokes the connection: the agent's next sync batch for it is refused, rather than waiting for a background reindex. Revoking stops sync batches; revoke the agent's API key to stop uploads. Documents already uploaded and outputs already compiled are retained: a revoke does not rewrite history.",
           responses: {
             "204": { description: "Connection revoked; immutable outputs retained. No body." },
             "400": err("CONNECTION_ID_INVALID"),

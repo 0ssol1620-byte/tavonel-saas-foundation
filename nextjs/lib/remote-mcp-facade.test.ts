@@ -29,6 +29,7 @@ const world = vi.hoisted(() => ({
   items: [] as Array<Record<string, unknown>>,
   calls: [] as Array<{ kind: string; url: string; body?: unknown; auth: string | null }>,
   searchStatus: 200,
+  held: [] as Array<Record<string, unknown>>,
 }));
 const mocks = vi.hoisted(() => ({
   authenticateKey: vi.fn(),
@@ -67,7 +68,7 @@ vi.mock("../app/api/v1/collections/[id]/search/route", () => ({
       degradations: [],
       activeWorld: { manifestDigest: world.digest, revision: 1, worldStateId: "ws-1" },
       ...(body.known_at ? { temporal: { knownAt: body.known_at, resolution: "world_activation_log", manifestDigest: OLD_DIGEST, activatedAt: "2026-01-01T00:00:00.000Z", current: false } } : {}),
-      contextPacket: { worldId: id, worldVersion: "v1", retrievalProfile: "profile", question: "q", items: world.items, heldConflicts: [], abstentionReasons: world.items.length > 0 ? [] : ["NO_GROUNDED_REGION"] },
+      contextPacket: { worldId: id, worldVersion: "v1", retrievalProfile: "profile", question: "q", items: world.items, heldConflicts: world.held, abstentionReasons: world.items.length > 0 ? [] : ["NO_GROUNDED_REGION"] },
     });
   },
 }));
@@ -101,7 +102,8 @@ import { parseChunks } from "./grounded-ask";
 import { compileSectionViewUnits } from "./retrieval-units";
 import { sealClaims, unsealClaims } from "./sealed-claims";
 import { buildWorldReadModel } from "./world-read-model";
-import { TOOLS } from "../public/developer/tavonel-mcp.mjs";
+import { TOOLS, createServer } from "../public/developer/tavonel-mcp.mjs";
+import { CANONICAL_TOOL_DEFINITIONS } from "./remote-mcp-facade";
 import { REMOTE_MCP_CANONICAL_TOOL_SCOPES, REMOTE_MCP_TOOL_SCOPES, remoteMcpCanonicalToolsEnabled, remoteMcpSealingKey, remoteMcpToolLabel } from "./remote-mcp";
 
 const principals: Record<string, { workspaceKey: string; scopes: string[]; authorizationRevision: number }> = {};
@@ -149,6 +151,7 @@ beforeEach(() => {
   world.rows = null;
   world.calls = [];
   world.searchStatus = 200;
+  world.held = [];
   principals["tvnl_live_a"] = { workspaceKey: A, scopes: READ_SCOPES, authorizationRevision: 4 };
   principals["tvnl_live_b"] = { workspaceKey: B, scopes: READ_SCOPES, authorizationRevision: 4 };
   mocks.authenticateKey.mockImplementation(async (token: string) => {
@@ -166,13 +169,24 @@ describe("flag off (production default)", () => {
   it("is exactly the nine bridge tools and search is not a tool", async () => {
     vi.stubEnv("TAVONEL_REMOTE_MCP_CANONICAL_TOOLS", "");
     const listed = await (await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).json() as { result: { tools: unknown[] } };
-    expect(listed.result.tools).toEqual(TOOLS.map(({ name, description, inputSchema }: { name: string; description: string; inputSchema: unknown }) => ({
-      name, description, inputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    expect(listed.result.tools).toEqual(TOOLS.map(({ name, title, description, inputSchema }: { name: string; title: string; description: string; inputSchema: unknown }) => ({
+      name, title, description, inputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     })));
     const outcome = await search();
     expect(outcome.result.isError).toBe(true);
     expect(errorText(outcome)).toMatch(/^TOOL_NOT_FOUND/);
     expect(world.calls).toEqual([]);
+  });
+
+  it("absent, blank or mistyped, the list is the stdio bridge's own tools/list, byte for byte", async () => {
+    const bridge = createServer({ call: async () => { throw new Error("no call"); } });
+    const own = JSON.stringify((await bridge({ jsonrpc: "2.0", id: 1, method: "tools/list" }) as { result: unknown }).result);
+    for (const value of [undefined, "", "TRUE", "1", " true", "true "]) {
+      vi.stubEnv("TAVONEL_REMOTE_MCP_CANONICAL_TOOLS", value);
+      const text = await (await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).text();
+      expect(JSON.stringify((JSON.parse(text) as { result: unknown }).result), String(value)).toBe(own);
+      expect(text, String(value)).not.toMatch(/"name":"(search|fetch)"|outputSchema/);
+    }
   });
 
   it("stays off for any value other than the exact string true", () => {
@@ -185,14 +199,27 @@ describe("flag on: the tool list", () => {
   it("is the nine bridge tools byte for byte, then search and fetch, read-only", async () => {
     const listed = await (await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).json() as { result: { tools: Array<{ name: string; annotations: unknown; inputSchema: { additionalProperties: unknown } }> } };
     const { tools } = listed.result;
-    expect(tools.slice(0, 9)).toEqual(TOOLS.map(({ name, description, inputSchema }: { name: string; description: string; inputSchema: unknown }) => ({
-      name, description, inputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    expect(tools.slice(0, 9)).toEqual(TOOLS.map(({ name, title, description, inputSchema }: { name: string; title: string; description: string; inputSchema: unknown }) => ({
+      name, title, description, inputSchema, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     })));
     expect(tools.slice(9).map((entry) => entry.name)).toEqual(["search", "fetch"]);
     for (const entry of tools.slice(9)) {
-      expect(entry.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, openWorldHint: true });
+      expect(entry.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
       expect(entry.inputSchema.additionalProperties).toBe(false);
     }
+    expect(tools.slice(9)).toEqual(JSON.parse(JSON.stringify(CANONICAL_TOOL_DEFINITIONS)));
+  });
+
+  it("gives every tool, bridge and canonical, a plain title and the same read-only annotations", async () => {
+    const listed = await (await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).json() as { result: { tools: Array<{ name: string; title: unknown; description: unknown; annotations: unknown }> } };
+    const titles = listed.result.tools.map((entry) => entry.title);
+    expect(titles.length).toBe(11);
+    for (const entry of listed.result.tools) {
+      expect(typeof entry.title === "string" && /^[A-Z][A-Za-z ]{2,40}$/.test(entry.title), entry.name).toBe(true);
+      expect(entry.description, entry.name).toMatch(/Read-only/);
+      expect(entry.annotations, entry.name).toEqual({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
+    }
+    expect(new Set(titles).size).toBe(titles.length);
   });
 
   it("keeps the bridge scope table equal to the bridge and adds the two canonical scopes apart", () => {
@@ -681,5 +708,110 @@ describe("scope, key and what leaves", () => {
     expect(outcome.result.structuredContent!.metadata.untrusted_content).toBe(true);
     expect(world.calls.map((entry) => entry.kind).sort()).toEqual(["lens", "list", "search"]);
     expect(network).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  WO-MCP-LISTING-2: outputSchema. A host may validate structuredContent against it, so it has to be
+  exactly what the facade returns. The checker is the JSON Schema subset the two schemas use; a
+  keyword outside that subset fails the descriptor test, so nothing in the schema goes unchecked.
+*/
+type Schema = Record<string, unknown>;
+const KEYWORDS = new Set(["type", "properties", "required", "additionalProperties", "items", "pattern", "enum", "const", "minimum", "minItems", "maxItems", "format", "description"]);
+const typeOf = (value: unknown) => (value === null ? "null" : Array.isArray(value) ? "array" : Number.isInteger(value) ? "integer" : typeof value);
+function schemaViolations(schema: Schema, value: unknown, at = "$"): string[] {
+  const types = schema.type === undefined ? null : ([] as string[]).concat(schema.type as string | string[]);
+  const actual = typeOf(value);
+  if (types && !types.some((type) => type === actual || (type === "number" && typeof value === "number"))) return [`${at}: ${actual} is not ${types.join("|")}`];
+  const out: string[] = [];
+  if ("const" in schema && value !== schema.const) out.push(`${at}: not ${String(schema.const)}`);
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) out.push(`${at}: not in enum`);
+  if (typeof value === "string" && typeof schema.pattern === "string" && !new RegExp(schema.pattern).test(value)) out.push(`${at}: pattern`);
+  if (typeof value === "string" && schema.format === "uri" && !URL.canParse(value)) out.push(`${at}: not a uri`);
+  if (typeof value === "number" && typeof schema.minimum === "number" && value < schema.minimum) out.push(`${at}: below minimum`);
+  if (Array.isArray(value)) {
+    if (typeof schema.minItems === "number" && value.length < schema.minItems) out.push(`${at}: too few items`);
+    if (typeof schema.maxItems === "number" && value.length > schema.maxItems) out.push(`${at}: too many items`);
+    if (schema.items) value.forEach((entry, index) => out.push(...schemaViolations(schema.items as Schema, entry, `${at}[${index}]`)));
+  }
+  if (actual === "object") {
+    const record = value as Record<string, unknown>;
+    const properties = (schema.properties ?? {}) as Record<string, Schema>;
+    for (const key of (schema.required ?? []) as string[]) if (!Object.hasOwn(record, key)) out.push(`${at}.${key}: required`);
+    for (const [key, entry] of Object.entries(record)) {
+      if (properties[key]) out.push(...schemaViolations(properties[key]!, entry, `${at}.${key}`));
+      else if (schema.additionalProperties === false) out.push(`${at}.${key}: not allowed`);
+    }
+  }
+  return out;
+}
+function descriptorFaults(schema: Schema, at = "$"): string[] {
+  const out = Object.keys(schema).filter((key) => !KEYWORDS.has(key)).map((key) => `${at}: unchecked keyword ${key}`);
+  const properties = schema.properties as Record<string, Schema> | undefined;
+  if (properties) {
+    if (schema.additionalProperties !== false) out.push(`${at}: open object`);
+    for (const key of (schema.required ?? []) as string[]) if (!Object.hasOwn(properties, key)) out.push(`${at}: required ${key} has no property`);
+    for (const [key, entry] of Object.entries(properties)) out.push(...descriptorFaults(entry, `${at}.${key}`));
+  }
+  if (schema.items) out.push(...descriptorFaults(schema.items as Schema, `${at}[]`));
+  if (typeof schema.pattern === "string") new RegExp(schema.pattern);
+  return out;
+}
+const outputSchemaOf = (name: "search" | "fetch") => CANONICAL_TOOL_DEFINITIONS.find((entry) => entry.name === name)!.outputSchema as unknown as Schema;
+
+describe("outputSchema: search and fetch declare exactly what they return", () => {
+  it("is a closed object schema whose every keyword the checker reads, served in tools/list", async () => {
+    for (const name of ["search", "fetch"] as const) {
+      const schema = outputSchemaOf(name);
+      expect(schema.type, name).toBe("object");
+      expect(descriptorFaults(schema), name).toEqual([]);
+    }
+    const resultItem = (outputSchemaOf("search").properties as Record<string, Schema>).results!.items as Schema;
+    expect(resultItem.required).toEqual(["id", "title", "url", "text"]);
+    expect(outputSchemaOf("fetch").required).toEqual(["id", "title", "text", "url", "metadata"]);
+    const listed = await (await rpc({ jsonrpc: "2.0", id: 1, method: "tools/list" })).json() as { result: { tools: Array<{ name: string; outputSchema?: unknown }> } };
+    expect(listed.result.tools.filter((entry) => entry.outputSchema).map((entry) => entry.name)).toEqual(["search", "fetch"]);
+  });
+
+  it("every search success shape validates: results, held conflicts, an empty packet, no active World", async () => {
+    world.held = [{ claimIds: ["claim-1", "claim-2"], reason: "two sources disagree" }];
+    const full = await search();
+    expect((full.result.structuredContent as Record<string, unknown>).held_conflicts).toEqual([{ claim_ids: ["claim-1", "claim-2"], reason: "two sources disagree" }]);
+    world.held = [];
+    world.items = [];
+    const empty = await search();
+    world.active = [];
+    const none = await search();
+    for (const outcome of [full, empty, none]) {
+      expect(outcome.result.isError).toBe(false);
+      expect(schemaViolations(outputSchemaOf("search"), outcome.result.structuredContent)).toEqual([]);
+    }
+  });
+
+  it("a fetch success validates, the sealed id and the url included, with and without known_at", async () => {
+    for (const args of [{}, { known_at: "2026-11-01T09:30:00Z" }]) {
+      const found = resultsOf(await search(args))[0]!;
+      const fetched = await tool("fetch", { id: found.id });
+      expect(fetched.result.isError).toBe(false);
+      expect(fetched.result.structuredContent).toMatchObject({ id: found.id, url: found.url });
+      expect(schemaViolations(outputSchemaOf("fetch"), fetched.result.structuredContent)).toEqual([]);
+    }
+  });
+
+  it("the checker is not vacuous: a dropped url, an unsealed id, an extra key and a null page each fail", async () => {
+    const found = resultsOf(await search())[0]!;
+    const body = (await tool("fetch", { id: found.id })).result.structuredContent as unknown as Record<string, unknown> & { metadata: Record<string, unknown> };
+    const noUrl = Object.fromEntries(Object.entries(body).filter(([key]) => key !== "url"));
+    expect(schemaViolations(outputSchemaOf("fetch"), noUrl)).toEqual(["$.url: required"]);
+    expect(schemaViolations(outputSchemaOf("fetch"), { ...body, id: "collection-x" })).toEqual(["$.id: pattern"]);
+    expect(schemaViolations(outputSchemaOf("fetch"), { ...body, rank: 1 })).toEqual(["$.rank: not allowed"]);
+    expect(schemaViolations(outputSchemaOf("fetch"), { ...body, metadata: { ...body.metadata, pages: [null] } })).toEqual(["$.metadata.pages[0]: null is not integer"]);
+    expect(schemaViolations(outputSchemaOf("search"), { results: [{ ...found, url: "" }] })).toEqual(["$.results[0].url: not a uri"]);
+  });
+
+  it("an error result carries no structuredContent, so no schema is claimed for it", async () => {
+    const outcome = await tool("fetch", { id: "tvr_not-a-real-id" });
+    expect(outcome.result.isError).toBe(true);
+    expect(outcome.result.structuredContent).toBeUndefined();
   });
 });

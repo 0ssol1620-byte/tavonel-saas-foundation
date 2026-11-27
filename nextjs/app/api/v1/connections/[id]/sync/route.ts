@@ -11,6 +11,11 @@ export const runtime = "nodejs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NO_STORE = { "Cache-Control": "no-store" };
+// The batch was understood and refused against stored state; retrying it unchanged cannot succeed.
+const CONFLICT_CODES = new Set([
+  "CONNECTION_CURSOR_CONFLICT", "CONNECTION_BATCH_CONFLICT", "CONNECTION_SOURCE_NOT_ADMITTED",
+  "CONNECTION_SOURCE_MISMATCH", "CONNECTION_SOURCE_CONFLICT",
+]);
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await authorizeFoundationRequest(request, "connections:sync", "connections");
@@ -57,7 +62,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     keyId: auth.principal.keyId,
   }, batch);
   if (!result.ok) {
-    const status = result.code === "CONNECTION_CURSOR_CONFLICT" || result.code === "CONNECTION_BATCH_CONFLICT" ? 409 : result.code === "CONNECTION_NOT_SYNCABLE" ? 423 : 503;
+    const status = CONFLICT_CODES.has(result.code) ? 409
+      : result.code === "CONNECTION_NOT_SYNCABLE" ? 423 : result.code === "CONNECTION_BATCH_INVALID" ? 400 : 503;
     return NextResponse.json({ code: result.code }, { status, headers: NO_STORE });
   }
   return NextResponse.json({ code: "OK", ...result.result }, { headers: NO_STORE });

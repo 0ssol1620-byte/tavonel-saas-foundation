@@ -860,6 +860,126 @@ add("deny: Deny then a token request has nothing to redeem and mints nothing", a
   noWorkspaceTouched();
 });
 
+/* 11. tools/list (WO-MCP-LIST-AUTH) */
+type Listed = { result: { tools: Array<{ name: string }> } };
+const listText = async (headers: Record<string, string> = {}) => {
+  const response = await rpc(LIST, headers);
+  expect(response.status).toBe(200);
+  return response.text();
+};
+const listedNames = async (bearer: string) => ((JSON.parse(await listText({ authorization: `Bearer ${bearer}` })) as Listed).result.tools.map((tool) => tool.name));
+const BRIDGE_NINE = Object.keys(REMOTE_MCP_TOOL_SCOPES);
+const anonymousChallenge = async () => {
+  const response = await rpc(LIST);
+  expect([response.status, (await response.json()).error.message]).toEqual([401, "AUTH_REQUIRED"]);
+  expect(response.headers.get("www-authenticate")).toBe(`Bearer resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/api/mcp"`);
+};
+add("list: no token is the static definitions only: the nine tools, read without any token or store", async () => {
+  const text = await listText();
+  expect((JSON.parse(text) as Listed).result.tools.map((tool) => tool.name)).toEqual(BRIDGE_NINE);
+  expect(text).not.toMatch(/collection-[a-f0-9]{32}|pilot-|evidence-[a-f0-9]{32}/);
+  expect(text).not.toContain(USER);
+  for (const mock of [mocks.authenticateKey, mocks.authorize, mocks.listWorlds, mocks.activeWorld, mocks.readModel]) expect(mock).not.toHaveBeenCalled();
+});
+add("list: no token is the same bytes for every caller, whatever host addressed it", async () => {
+  expect(await listText({ host: "preview.tavonel.test", "x-forwarded-proto": "https" })).toBe(await listText());
+});
+add("list: no token, with canonical tools on, is the static eleven and still reads no store", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_CANONICAL_TOOLS", "true");
+  const text = await listText();
+  expect((JSON.parse(text) as Listed).result.tools.map((tool) => tool.name)).toEqual([...BRIDGE_NINE, "search", "fetch"]);
+  expect(text).not.toMatch(/collection-[a-f0-9]{32}|pilot-/);
+  expect(mocks.authenticateKey).not.toHaveBeenCalled();
+});
+add("list: no token can list but never execute: tools/call of every listed tool is 401 and runs no route", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_CANONICAL_TOOLS", "true");
+  for (const tool of [...BRIDGE_NINE, "search", "fetch"]) {
+    const response = await call(tool, {});
+    expect([tool, response.status, (await response.json()).error.message]).toEqual([tool, 401, "AUTH_REQUIRED"]);
+  }
+  for (const mock of [mocks.authorize, mocks.listWorlds, mocks.activeWorld, mocks.readModel, mocks.loadCandidate]) expect(mock).not.toHaveBeenCalled();
+});
+add("list: a token holding every read scope sees exactly the anonymous list, byte for byte (every listed name has a scope)", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_CANONICAL_TOOLS", "true");
+  expect(await listText({ authorization: "Bearer tvnl_mcp_mine" })).toBe(await listText());
+});
+add("list: a token short of ask:read does not see the tools ask:read gates", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_CANONICAL_TOOLS", "true");
+  mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal(READ_SCOPES.filter((scope) => scope !== "ask:read")));
+  expect(await listedNames("tvnl_mcp_narrow")).toEqual(["list_sources", "list_worlds", "get_world", "get_object", "get_relation", "get_evidence", "download_package", "fetch"]);
+});
+add("list: a token holding only documents:read sees list_sources alone; the hidden tools still answer 403 when called", async () => {
+  mocks.authenticateKey.mockResolvedValue(keyPrincipal(["documents:read"]));
+  expect(await listedNames("tvnl_mcp_narrow")).toEqual(["list_sources"]);
+  expect((await call("list_worlds", {}, "tvnl_mcp_narrow")).status).toBe(403);
+});
+add("list: a token holding no scope sees an empty list", async () => {
+  mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal([]));
+  expect(await listedNames("tvnl_mcp_empty")).toEqual([]);
+});
+add("list: two workspaces' tokens with the same scopes get the same bytes (the list names no tenant)", async () => {
+  mocks.authenticateKey.mockResolvedValueOnce(keyPrincipal(READ_SCOPES));
+  const mine = await listText({ authorization: "Bearer tvnl_mcp_mine" });
+  mocks.authenticateKey.mockResolvedValueOnce({ ok: true, principal: { ...keyPrincipal(READ_SCOPES).principal, workspaceKey: "pilot-beta" } });
+  expect(await listText({ authorization: "Bearer tvnl_mcp_theirs" })).toBe(mine);
+});
+add("list: a token whose workspace is outside the cohort is 403 on tools/list too", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_COHORT", "pilot-beta");
+  const response = await rpc(LIST, { authorization: "Bearer tvnl_mcp_mine" });
+  expect([response.status, (await response.json()).error.message]).toEqual([403, "REMOTE_MCP_COHORT_EXCLUDED"]);
+});
+const listRefused = (name: string, authorization: string, setup: () => void = () => {}) => add(`list: ${name} is 401 invalid_token on tools/list`, async () => {
+  setup();
+  const response = await rpc(LIST, { authorization });
+  expect(response.status).toBe(401);
+  expect(response.headers.get("www-authenticate")).toContain('error="invalid_token"');
+  expect(response.headers.get("www-authenticate")).toContain("resource_metadata=");
+});
+listRefused("a revoked token", "Bearer tvnl_mcp_revoked", () => mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_INVALID" }));
+listRefused("an expired token", "Bearer tvnl_mcp_expired", () => mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_EXPIRED" }));
+listRefused("an agent-resource token (wrong audience)", "Bearer tvnl_agt_abcdefghijkl_secret");
+listRefused("a foreign JWT", "Bearer eyJhbGciOiJIUzI1NiJ9.e30.x");
+add("list-auth flag: exactly 'true' makes tools/list with no token 401 AUTH_REQUIRED with the resource_metadata challenge", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_LIST_AUTH", "true");
+  await anonymousChallenge();
+  expect(mocks.authenticateKey).not.toHaveBeenCalled();
+});
+add("list-auth flag on: initialize and ping with no token still answer 200 (capability discovery stays public)", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_LIST_AUTH", "true");
+  expect((await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } })).status).toBe(200);
+  expect((await rpc({ jsonrpc: "2.0", id: 2, method: "ping" })).status).toBe(200);
+});
+add("list-auth flag on: a valid token lists exactly what it lists with the flag off", async () => {
+  const off = await listText({ authorization: "Bearer tvnl_mcp_mine" });
+  vi.stubEnv("TAVONEL_REMOTE_MCP_LIST_AUTH", "true");
+  expect(await listText({ authorization: "Bearer tvnl_mcp_mine" })).toBe(off);
+});
+add("list-auth flag on: a revoked token is still 401 invalid_token, not AUTH_REQUIRED", async () => {
+  vi.stubEnv("TAVONEL_REMOTE_MCP_LIST_AUTH", "true");
+  mocks.authenticateKey.mockResolvedValueOnce({ ok: false, code: "API_KEY_INVALID" });
+  const response = await rpc(LIST, { authorization: "Bearer tvnl_mcp_revoked" });
+  expect([response.status, (await response.json()).error.message]).toEqual([401, "AUTH_INVALID"]);
+});
+add("list-auth flag: any value but exactly 'true' is off, byte-identical to unset", async () => {
+  const unset = await listText();
+  for (const value of ["", "TRUE", "1", " true", "true ", "yes", "on"]) {
+    vi.stubEnv("TAVONEL_REMOTE_MCP_LIST_AUTH", value);
+    expect([value, await listText()]).toEqual([value, unset]);
+  }
+});
+add("list-auth flag: T01/T06 issuer and resource metadata are byte-identical with it on, and no agent resource is advertised", async () => {
+  const read = async () => [
+    await (await authorizationServer(new Request(`${ORIGIN}/.well-known/oauth-authorization-server`))).text(),
+    await (await wellKnown({ host: "tavonel.test", "x-forwarded-proto": "https" })).text(),
+  ];
+  const off = await read();
+  vi.stubEnv("TAVONEL_REMOTE_MCP_LIST_AUTH", "true");
+  expect(await read()).toEqual(off);
+  expect(off.join("")).not.toContain("agent-mcp");
+  const agent = await protectedResource(new Request(`${ORIGIN}/.well-known/oauth-protected-resource/api/agent-mcp`), { params: Promise.resolve({ resource: ["api", "agent-mcp"] }) });
+  expect(await agent.text()).not.toContain("agent-mcp");
+});
+
 /* ------------------------------------------------------------------- the run */
 
 describe("remote MCP auth / expiry / revoke / origin / error matrix (WO-D19-4)", () => {

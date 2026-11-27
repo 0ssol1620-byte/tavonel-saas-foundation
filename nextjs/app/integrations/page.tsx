@@ -274,7 +274,7 @@ export default function IntegrationsPage() {
         <div className="body">
           <div className="stack"><h2 id={sections[2].id}>File and object storage.</h2></div>
           <div className="stack">
-            <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for repositories that stay inside your network. We configure the first route with you.</p>
+            <p className="lede">Use a <a href="/developer/tavonel-source-agent.py" download>local source agent</a> for folders and buckets that stay inside your network. You run it yourself: create the connection in Workspace, then point the agent at one folder or bucket.</p>
             <div className="chain">{INFRA.map(([name, level, description]) => <article className="link" key={name}><span className="st">{level}</span><h3>{name}</h3><p>{description}</p></article>)}</div>
             <details className="integration-technical">
               <summary>Operating the agent</summary>

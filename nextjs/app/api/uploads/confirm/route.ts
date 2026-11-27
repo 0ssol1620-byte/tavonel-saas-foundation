@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeFoundationRequest } from "@/lib/developer-auth";
+import { uploadConnectionRefusal } from "@/lib/developer-store";
 import { canAdmitCustomerSource } from "@/lib/customer-data-admission";
 import { readBoundedJson } from "@/lib/enterprise-http";
 import { authorizeFoundationSessionProduct } from "@/lib/self-service-trial";
@@ -159,6 +160,7 @@ export async function POST(request: Request) {
   );
   const body = parsed.value as {
     documentId?: unknown; sourceSha256?: unknown; attemptKey?: unknown; scopeDigest?: unknown; fileKey?: unknown;
+    connectionId?: unknown;
   };
   const documentId = typeof body.documentId === "string" ? body.documentId : "";
   if (!DOCUMENT_ID_PATTERN.test(documentId)) {
@@ -171,6 +173,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ code: "INVALID_SOURCE_DIGEST" }, { status: 400, headers });
   }
   const sourceSha256 = typeof body.sourceSha256 === "string" ? body.sourceSha256 : null;
+  // Same rule as the capability: a revoked or paused connection confirms nothing more.
+  const connection = await uploadConnectionRefusal(auth.principal.workspaceKey, body.connectionId);
+  if (connection) return NextResponse.json({ code: connection.code }, { status: connection.status, headers });
   if (!INTAKE_APPROVAL_ROLLOUT_ENABLED) return confirmLegacy(auth.principal, documentId, sourceSha256);
   const attemptKey = typeof body.attemptKey === "string" ? body.attemptKey : "";
   const scopeDigest = typeof body.scopeDigest === "string" ? body.scopeDigest : "";

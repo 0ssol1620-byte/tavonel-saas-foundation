@@ -104,6 +104,15 @@ insert into public.foundation_intake_approval_files (
   'declared', 1, 1, 1, 'cancelled', 'a0000000-0000-4000-8000-00000000aa22', now(), now(), now(), 'TEST_CANCELLED', now()
 );
 
+-- 20261127110000 binds every file_server document to its logical source and requires it to be a
+-- confirmed upload of the workspace, as the capability/confirm routes leave it before any batch.
+insert into public.foundation_intake_admissions (
+  workspace_key, document_id, user_id, object_key, requested_bytes, declared_mime_type,
+  created_at, updated_at, expires_at, confirmed_at
+) values ('pilot-syncA', '11111111-1111-4111-8111-111111111111', 'a0000000-0000-4000-8000-0000000000a1',
+  'quarantine/pilot-syncA/11111111-1111-4111-8111-111111111111/source', 1024, 'application/pdf',
+  now(), now(), now() + interval '10 minutes', now());
+
 -- The initial approved UUIDv4 batch applies once; an exact replay is a no-op.
 select is(pg_temp.batch(
   'a0000000-0000-4000-8000-00000000ab01', null, 'sha256:' || repeat('1',64),
@@ -247,6 +256,13 @@ begin
   return (pg_catalog.substring(v_hex,1,8)||'-'||pg_catalog.substring(v_hex,9,4)||'-'||pg_catalog.substring(v_hex,13,4)||'-'||pg_catalog.substring(v_hex,17,4)||'-'||pg_catalog.substring(v_hex,21,12))::uuid;
 end
 $fn$;
+
+insert into public.foundation_intake_admissions (
+  workspace_key, document_id, user_id, object_key, requested_bytes, declared_mime_type,
+  created_at, updated_at, expires_at, confirmed_at
+) values ('pilot-syncA', pg_temp.legacy_document_id('pilot-syncA',repeat('9',64)), 'a0000000-0000-4000-8000-0000000000a1',
+  'quarantine/pilot-syncA/' || pg_temp.legacy_document_id('pilot-syncA',repeat('9',64))::text || '/source', 100,
+  'application/pdf', now(), now(), now() + interval '10 minutes', now());
 
 select is(pg_temp.batch(
   'a0000000-0000-4000-8000-00000000ab07', 'sha256:' || repeat('1',64), 'sha256:' || repeat('9',64),

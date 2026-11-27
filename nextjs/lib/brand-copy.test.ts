@@ -906,8 +906,10 @@ describe("public copy", () => {
       '{ name: "Google Drive", availability: "Read-only", provider: "google_drive" }'
     );
     expect(workspace).toContain(
-      '{ name: "Local folder", availability: "Assisted setup", provider: null }'
+      '{ name: "Local folder", availability: "Command-line agent", provider: null }'
     );
+    // WO-LF-0: the agent is something the customer runs; nobody sets it up with them.
+    expect(workspace).not.toContain("Assisted setup");
   });
 
   it("keeps internal qualification vocabulary out of the integration buying path", () => {

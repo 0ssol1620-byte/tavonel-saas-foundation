@@ -25,7 +25,8 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   Whose plan governs is the workspace's, decided in the database by the same rule as the storage and
   seat meters (foundation_workspace_capped_plan, 20261117160000): the plan_code of the workspace's
   billing account, uncapped for a legacy plan, no account, or an operator grant on that account's user.
-  Every caller of one workspace therefore meets one limit. The numbers come from the catalog: this
+  An account no plan was ever projected into (Paddle's transaction landed before its subscription event)
+  is held to Free's 100 a month in SQL (20261127070000); this map has no Free entry. Every caller of one workspace therefore meets one limit. The numbers come from the catalog: this
   module sends `included.kqu` of every v2 offer (CAT-D10), and the database picks the workspace's.
 
   Durable only where the workspace cost guard is (lib/workspace-operation-guard.ts, the same switch):

@@ -103,13 +103,16 @@ describe("the Provided / Roadmap / Not provided table", () => {
 
       The 2026-09-22 copy cleanup dropped the "stated plainly, because a buyer will ask" preamble
       and collapsed three negatives into one. All four facts it carried are still asserted here,
-      individually: the three absent reports, the planned penetration test, and the audit right
-      being a right to inspect rather than a report that exists.
+      individually: the three absent reports, the audit right being a right to inspect rather than
+      a report that exists, and -- since the release-contract change of 2026-11-27, when the
+      external penetration test was not scheduled -- the automated checks that do run, with no
+      promise of a future test.
     */
     expect(assurance?.line).toContain("No SOC 2 report");
     expect(assurance?.line).toContain("ISO 27001 certificate");
     expect(assurance?.line).toContain("independent penetration-test report");
-    expect(assurance?.line).toContain("penetration test is planned after the first paying customer");
+    expect(assurance?.line).toContain("Our automated checks include CodeQL static analysis, database tenant-isolation tests and a malware-scanner check against a pinned ClamAV image.");
+    expect(assurance?.line).not.toMatch(/\bplanned\b|after the first paying customer/);
     expect(assurance?.line).toContain("audit right is a real right to inspect controls");
   });
 
