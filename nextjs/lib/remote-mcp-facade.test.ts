@@ -24,6 +24,8 @@ const world = vi.hoisted(() => ({
   active: [] as string[],
   digest: "",
   evidence: new Map<string, Record<string, unknown>>(),
+  // The real lens shape: rows keyed `<evidenceId>:<chunkId>`, served in order. null = the id-keyed `evidence` map above.
+  rows: null as Array<Record<string, unknown>> | null,
   items: [] as Array<Record<string, unknown>>,
   calls: [] as Array<{ kind: string; url: string; body?: unknown; auth: string | null }>,
   searchStatus: 200,
@@ -77,6 +79,12 @@ vi.mock("../app/api/v1/world/[id]/[lens]/route", () => ({
     if (!world.active.includes(id)) return Response.json({ code: "WORLD_NOT_FOUND" }, { status: 404 });
     const ids = (url.searchParams.get("ids") ?? "").split(",");
     const known = url.searchParams.get("known_at");
+    if (world.rows !== null) {
+      // The route's own semantics: `ids` selects rows whose id is exactly one of them, no `ids` is the whole lens.
+      const wanted = url.searchParams.get("ids");
+      const rows = wanted === null ? world.rows : world.rows.filter((row) => wanted.split(",").includes(row.id as string));
+      return Response.json({ code: "OK", world: { manifestDigest: known ? OLD_DIGEST : world.digest }, evidence: rows });
+    }
     return Response.json({
       code: "OK",
       world: { manifestDigest: known ? OLD_DIGEST : world.digest },
@@ -132,6 +140,7 @@ beforeEach(() => {
   world.digest = DIGEST;
   world.evidence = new Map([["ev_1", evidence("ev_1")], ["ev_2", evidence("ev_2", "Late fees accrue at 2% a month.", 4)]]);
   world.items = [item("u1", ["ev_1"]), item("u2", ["ev_2"], "Late fees accrue at 2% a month.")];
+  world.rows = null;
   world.calls = [];
   world.searchStatus = 200;
   principals["tvnl_live_a"] = { workspaceKey: A, scopes: READ_SCOPES, authorizationRevision: 4 };
@@ -351,6 +360,61 @@ describe("fetch", () => {
     const id = resultsOf(await search())[0]!.id;
     world.evidence.delete("ev_2");
     expect(errorText(await tool("fetch", { id }))).toMatch(/^NOT_FOUND: no result /);
+  });
+
+  describe("search cites the bare evidence id, the World serves `<evidenceId>:<chunkId>` rows", () => {
+    // The id namespaces of the real route (lib/world-read-model.ts parseEvidence). A ChatGPT client hit NOT_FOUND here.
+    const row = (id: string, excerpt: string, page = 3) => evidence(id, excerpt, page);
+
+    it("returns every chunk of the cited evidence, in the lens's order, and nothing of another evidence", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one."), row("ev_2:chunk_1", "Other evidence."), row("ev_1:chunk_2", "Second chunk of one.", 4)];
+      world.items = [item("u1", ["ev_1"])];
+      const outcome = await tool("fetch", { id: resultsOf(await search())[0]!.id });
+      expect(outcome.result.isError).toBe(false);
+      const body = outcome.result.structuredContent!;
+      expect(body.text.indexOf("First chunk of one.")).toBeGreaterThan(-1);
+      expect(body.text.indexOf("Second chunk of one.")).toBeGreaterThan(body.text.indexOf("First chunk of one."));
+      expect(body.text).not.toContain("Other evidence.");
+      expect(body.metadata).toMatchObject({ evidence_ids: ["ev_1"], pages: [3, 4], untrusted_content: true });
+      expect(calls("lens").map((entry) => new URL(entry.url).searchParams.get("ids"))).toEqual(["ev_1", null]);
+    });
+
+    it("keeps the all-or-nothing rule: one cited evidence with no row is NOT_FOUND, not a partial answer", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one.")];
+      world.items = [item("u1", ["ev_1", "ev_2"])];
+      expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^NOT_FOUND: no result /);
+    });
+
+    it("is NOT_FOUND for a bare id with no matching row", async () => {
+      world.rows = [row("ev_9:chunk_1", "Unrelated.")];
+      world.items = [item("u1", ["ev_1"])];
+      expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^NOT_FOUND: no result /);
+    });
+
+    it("matches on the colon boundary only: ev_1 never takes ev_10 rows", async () => {
+      world.rows = [row("ev_10:chunk_1", "Ten."), row("ev_1chunk:x", "No colon after id."), row("ev_1:chunk_1", "One.")];
+      world.items = [item("u1", ["ev_1"])];
+      const body = (await tool("fetch", { id: resultsOf(await search())[0]!.id })).result.structuredContent!;
+      expect(body.text).toContain("One.");
+      expect(body.text).not.toContain("Ten.");
+      expect(body.text).not.toContain("No colon after id.");
+      world.rows = [row("ev_10:chunk_1", "Ten.")];
+      expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^NOT_FOUND: no result /);
+    });
+
+    it("still refuses, never cuts, when the chunks together do not fit one tool result", async () => {
+      const words = Array.from({ length: 15_000 }, () => "abc").join(" ");
+      world.rows = [row("ev_1:chunk_1", words), row("ev_1:chunk_2", words)];
+      world.items = [item("u1", ["ev_1"])];
+      expect(errorText(await tool("fetch", { id: resultsOf(await search())[0]!.id }))).toMatch(/^FETCH_OVER_BUDGET/);
+    });
+
+    it("still answers RESULT_ID_STALE when the World moved, before any row is read", async () => {
+      world.rows = [row("ev_1:chunk_1", "First chunk of one.")];
+      const id = resultsOf(await search())[0]!.id;
+      world.digest = NEWER_DIGEST;
+      expect(errorText(await tool("fetch", { id }))).toBe("RESULT_ID_STALE: search again");
+    });
   });
 
   it("refuses an id longer than any this server issues, and an extra argument", async () => {
