@@ -18,8 +18,21 @@ permissions:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+# WO-CI-PAR-1: one round must show every independent failure. The old `root` and `nextjs` jobs ran
+# check, test and build as serial steps, so the first red step hid the rest. Each independent gate is
+# now its own job, all started together, each with its own frozen install (the pnpm store is restored
+# from one cache key, so the installs are cache hits, not downloads).
+#
+# The two required status names are unchanged and now stand for the whole of what they stood for
+# before. `root` and `nextjs` below are the final aggregate jobs: they run `if: always()`, need every
+# gate of their tree, and fail unless each one is `success` (a skipped or cancelled gate fails too).
+# The job that runs `pnpm test` for nextjs keeps the id `nextjs`, which the Repair selector's external
+# check claim reads (repair-scope.mjs, CI_NEXTJS_VITEST_CLAIM: job `nextjs`, step `pnpm test`), and
+# takes the display name `nextjs-tests`; the aggregate takes the id `nextjs-gate` and the display
+# name `nextjs`, because a required check is matched by display name. Do not give either job a
+# `needs`, `if` or `continue-on-error` that hides a failure, and do not retry a gate until it is green.
 jobs:
-  root:
+  root-types:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,19 +42,101 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+  root-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      # No `pnpm build` here. The root tree stopped being a runtime on 2026-09-22: the express
+      # entrypoint (`server/_core/index.ts`), the template SPA (`client/`) and the vite build were
+      # deleted, so both halves of the old `vite build && esbuild server/_core/index.ts` now have
+      # nothing to compile. `server/legacyRootRuntime.test.ts`, which `pnpm test` above runs, fails
+      # if either comes back. The deployed product is built by the `nextjs-build` job below.
+  root-cdr-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
       - name: CDR Worker tests and types
         working-directory: quarantine-sidecar/foundation-cdr-worker
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
           node node_modules/typescript/bin/tsc --noEmit
-      # No `pnpm build` here. The root tree stopped being a runtime on 2026-09-22: the express
-      # entrypoint (`server/_core/index.ts`), the template SPA (`client/`) and the vite build were
-      # deleted, so both halves of the old `vite build && esbuild server/_core/index.ts` now have
-      # nothing to compile. `server/legacyRootRuntime.test.ts`, which `pnpm test` above runs, fails
-      # if either comes back. The deployed product is built by the `nextjs` job below.
+  root:
+    if: always()
+    needs: [root-types, root-tests, root-cdr-worker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every root gate
+        run: |
+          test "${{ needs.root-types.result }}" = "success"
+          test "${{ needs.root-tests.result }}" = "success"
+          test "${{ needs.root-cdr-worker.result }}" = "success"
+  # Blueprint §43, P-13: the secret scan scans the whole checkout rather than nextjs/ alone -- a key
+  # pasted into a workflow file or a migration is the same incident as one pasted into a route. It
+  # needs no dependencies of its own, so it installs nothing and is the first gate to report; it is a
+  # gate of the required `nextjs` check below, and it no longer waits for an install to run.
+  nextjs-secrets:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm scan:secrets
+  # The first three steps of `pnpm check` (nextjs/package.json "check"), one step each so the first
+  # red one is named. `nextjs-lint` is its last part (`pnpm lint` is the same `eslint app components lib`).
+  # verify-repair-workflows.mjs pins that these four commands together are exactly `pnpm check`.
+  nextjs-types:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm brand:verify
+      - run: node scripts/check-type-floor.mjs
+      - run: pnpm exec tsc --noEmit
+  nextjs-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
   nextjs:
+    name: nextjs-tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,13 +150,38 @@ jobs:
       - uses: pnpm/action-setup@v4
         with: { version: 10.34.4 }
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      # Blueprint §43, P-13: the secret scan runs before anything is built, and it scans the whole
-      # checkout rather than nextjs/ alone -- a key pasted into a workflow file or a migration is
-      # the same incident as one pasted into a route. It needs no dependencies of its own, so it
-      # is the cheapest step that can stop a merge, and `nextjs` is a required check on main.
-      - run: pnpm scan:secrets
-      - run: pnpm check
       - run: pnpm test
+  nextjs-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.34.4 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: nextjs/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - run: pnpm exec next build
+  nextjs-gate:
+    name: nextjs
+    if: always()
+    needs: [nextjs-secrets, nextjs-types, nextjs-lint, nextjs, nextjs-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every nextjs gate
+        run: |
+          test "${{ needs.nextjs-secrets.result }}" = "success"
+          test "${{ needs.nextjs-types.result }}" = "success"
+          test "${{ needs.nextjs-lint.result }}" = "success"
+          test "${{ needs.nextjs.result }}" = "success"
+          test "${{ needs.nextjs-build.result }}" = "success"

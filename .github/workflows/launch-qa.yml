@@ -22,6 +22,11 @@ concurrency:
   group: launch-qa-${{ github.ref }}
   cancel-in-progress: true
 
+# WO-CI-PAR-1: `preflight` (frozen install, secret scan, pnpm check) no longer gates the four jobs below. They used
+# `needs: preflight`, so one lint or type error left every browser, product, Lighthouse and V34 result unreported for
+# the round. All five now start together and `launch-gate` still needs every one of them to be `success`, so a red
+# preflight still fails the workflow; it just stops hiding the other four. Each job has its own install and its own
+# `next build`, so none reads anything preflight produced.
 jobs:
   preflight:
     name: Frozen install, secret scan and pnpm check
@@ -46,7 +51,6 @@ jobs:
         run: pnpm check
 
   browser-qa:
-    needs: preflight
     name: Browser QA (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -121,7 +125,6 @@ jobs:
           retention-days: 14
 
   product-qa:
-    needs: preflight
     name: Product QA (widths + reduced motion + audit)
     runs-on: ubuntu-latest
     # 45, not 30. The three audit projects added below are 90 tests that walk every public route
@@ -239,7 +242,6 @@ jobs:
           retention-days: 14
 
   lighthouse:
-    needs: preflight
     name: Lighthouse budgets
     runs-on: ubuntu-latest
     # Three production-build measurements per route plus the build exceed 20 minutes
@@ -336,7 +338,6 @@ jobs:
   # About 21 minutes of work plus install; 50 is that doubled for a slower runner and a cold build, rounded
   # up. It is not a budget to grow into: a run past it is a regression to find, not a number to raise.
   v34-matrix:
-    needs: preflight
     name: V34 matrix (chromium, drawer pass)
     runs-on: ubuntu-latest
     timeout-minutes: 50

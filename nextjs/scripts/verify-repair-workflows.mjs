@@ -96,6 +96,37 @@ const assertFullEvents = (workflow, name) => {
 assertFullEvents(ci, 'CI');
 assertFullEvents(launch, 'Launch QA');
 for (const job of ['  root:', '  nextjs:']) assert(ci.includes(job), `CI full job context changed: ${job.trim()}`);
+// WO-CI-PAR-1: CI's independent gates run as parallel jobs, and the two required status names `root` and `nextjs` are the final
+// aggregate jobs, so a failure anywhere still fails them. Reviewed shape: no job may hide a failure, and the split commands together
+// must remain exactly `pnpm check`.
+{
+  const jobsAt = ci.indexOf('\njobs:\n'), jobsText = ci.slice(jobsAt);
+  assert(jobsAt > 0, 'CI has no jobs key');
+  const jobIds = [...jobsText.matchAll(/^  ([a-z][a-z0-9-]*):\n/gm)].map(match => match[1]);
+  const block = id => { const at = jobsText.indexOf(`\n  ${id}:\n`); assert(at >= 0, `CI job ${id} is missing`); const next = jobsText.slice(at + 1).search(/\n  [a-z][a-z0-9-]*:\n/); return jobsText.slice(at, next < 0 ? undefined : at + 2 + next); };
+  assert(jobIds.join() === 'root-types,root-tests,root-cdr-worker,root,nextjs-secrets,nextjs-types,nextjs-lint,nextjs,nextjs-build,nextjs-gate', `CI job set changed: ${jobIds.join()}`);
+  assert(!/continue-on-error/.test(ci.replace(/^\s*#.*$/gm, '')), 'CI must never use continue-on-error');
+  // The aggregates: `root` keeps its id and name, `nextjs-gate` takes the display name `nextjs`; each needs every gate of its tree and requires `success`.
+  const gateDefinitions = [['root', null, ['root-types', 'root-tests', 'root-cdr-worker']], ['nextjs-gate', 'nextjs', ['nextjs-secrets', 'nextjs-types', 'nextjs-lint', 'nextjs', 'nextjs-build']]];
+  for (const [id, name, needs] of gateDefinitions) {
+    const gate = block(id);
+    assert(gate.includes(`\n    if: always()\n    needs: [${needs.join(', ')}]\n`), `CI aggregate ${id} must run always and need exactly ${needs.join(', ')}`);
+    assert(name === null ? !gate.includes('\n    name:') : gate.includes(`\n    name: ${name}\n`), `CI aggregate ${id} changed its required status name`);
+    for (const need of needs) assert(gate.includes(`\n          test "\${{ needs.${need}.result }}" = "success"\n`), `CI aggregate ${id} no longer requires ${need} to be success`);
+    assert((gate.match(/test "/g) ?? []).length === needs.length, `CI aggregate ${id} checks a job it does not need`);
+  }
+  // Only the two aggregates are named root or nextjs; the test job that holds `pnpm test` keeps the id `nextjs` the Repair claim reads.
+  assert(block('nextjs').includes('\n    name: nextjs-tests\n') && /\n      - run: pnpm test\n/.test(block('nextjs')), 'the nextjs-tests job (id nextjs) must run pnpm test');
+  for (const id of jobIds.filter(id => !['root', 'nextjs-gate'].includes(id))) assert(!/\n    (?:if|needs):/.test(block(id)), `CI job ${id} must start immediately and unconditionally`);
+  assert(/\n      - run: pnpm check\n/.test(block('root-types')) && /\n      - run: pnpm test\n/.test(block('root-tests')) && block('root-cdr-worker').includes('npm test\n          node node_modules/typescript/bin/tsc --noEmit'), 'root gates changed');
+  // The nextjs commands together are exactly `pnpm check`: package.json's script is the sum of the split steps.
+  const nextPackage = JSON.parse(readFileSync(resolve(repo, 'nextjs/package.json'), 'utf8'));
+  assert(nextPackage.scripts.check === 'pnpm brand:verify && node scripts/check-type-floor.mjs && tsc --noEmit && eslint app components lib' && nextPackage.scripts.lint === 'eslint app components lib',
+    'nextjs `pnpm check` changed: update the split CI jobs (nextjs-types, nextjs-lint) in the same change');
+  assert(/\n      - run: pnpm brand:verify\n      - run: node scripts\/check-type-floor\.mjs\n      - run: pnpm exec tsc --noEmit\n/.test(block('nextjs-types')) && /\n      - run: pnpm lint\n/.test(block('nextjs-lint')) && /\n      - run: pnpm scan:secrets\n/.test(block('nextjs-secrets')) && /\n      - run: pnpm exec next build\n/.test(block('nextjs-build')), 'nextjs split gates changed');
+  // Launch QA: the install and check job no longer gates the browser, product, Lighthouse and V34 jobs, and the Launch gate still needs all five.
+  assert(!/\n    needs: preflight\n/.test(launch), 'Launch QA jobs must not wait for preflight: a red check would hide every later result');
+}
 for (const full of [
   'Browser QA (${{ matrix.browser }})', 'Product QA (widths + reduced motion + audit)',
   'Lighthouse budgets', 'V34 matrix (chromium, drawer pass)', 'Launch gate',
