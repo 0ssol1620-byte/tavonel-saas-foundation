@@ -1,9 +1,10 @@
 -- Workspace seat allowance (20261117150200, WO-CAT-6): active members plus live pending invites
--- stay at or under the plan's seat limit; legacy, no-plan and operator-granted workspaces are
--- uncapped as before. The limits map is what nextjs/lib/workspace-membership.ts sends, built from
--- the catalog's included.seats (lib/workspace-membership.test.ts pins that the two agree).
+-- stay at or under the plan's seat limit; legacy and operator-granted workspaces are uncapped as
+-- before. A Free workspace (no billing account and no operator grant on its owner) has one seat
+-- (20261127100000, WO-SINGLE-USER-2). The limits map is what nextjs/lib/workspace-membership.ts sends,
+-- built from the catalog's included.seats (lib/workspace-membership.test.ts pins that the two agree).
 begin;
-select plan(52);
+select plan(57);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -108,7 +109,8 @@ select is((select count(*)::integer from generate_series(25, 43) i where (pg_tem
   'business: nineteen invites are admitted next to the owner');
 select throws_ok($$select pg_temp.invite(24, 44)$$, 'P0001', 'workspace_seat_limit_reached', 'business: the twenty-first seat is refused');
 
--- 6. Legacy (plan_code null), no plan, and an operator-granted owner: uncapped, as before.
+-- 6. Legacy (plan_code null) and an operator-granted owner: uncapped, as before. No plan at all (a Free
+-- workspace) is one seat, the owner (20261127100000).
 select pg_temp.plan(45, 'studio_access', null);
 select is((select count(*)::integer from generate_series(46, 52) i where (pg_temp.invite(45, i)->>'state') = 'pending'), 7,
   'legacy: seven invites past any v2 limit are admitted');
@@ -119,8 +121,18 @@ select is(public.create_foundation_workspace_invite(pg_temp.ws(45), pg_temp.uid(
   'pending', 'legacy: the eight-argument call of the earlier signature still resolves and behaves as today');
 select is(public.accept_foundation_workspace_invite(pg_temp.uid(53), pg_temp.hash(53), 'seat-accept-53')->>'state',
   'accepted', 'legacy: so does the three-argument accept');
-select is((select count(*)::integer from generate_series(55, 61) i where (pg_temp.invite(54, i)->>'state') = 'pending'), 7,
-  'no plan (no billing account): uncapped, as today');
+select throws_ok($$select pg_temp.invite(54, 55)$$, 'P0001', 'workspace_seat_limit_reached',
+  'free (no billing account, no grant): the owner is the one seat, so no invite can be created');
+select is((select count(*)::integer from public.foundation_workspace_invitations where workspace_key = pg_temp.ws(54)), 0,
+  'free: the refused invite wrote no row');
+-- A Free workspace whose owner holds an operator grant (the founder's) is still uncapped.
+insert into public.foundation_account_access_grants (user_id, grant_kind, access_plan, active)
+values (pg_temp.uid(90), 'owner', 'studio_access', true);
+select is((select count(*)::integer from generate_series(91, 97) i where (pg_temp.invite(90, i)->>'state') = 'pending'), 7,
+  'no billing account, operator-granted owner: uncapped, as before');
+update public.foundation_account_access_grants set active = false where user_id = pg_temp.uid(90);
+select throws_ok($$select pg_temp.invite(90, 98)$$, 'P0001', 'workspace_seat_limit_reached',
+  'no billing account: an inactive grant does not exempt, the workspace is Free again');
 select pg_temp.plan(62, 'studio_access', 'team');
 insert into public.foundation_account_access_grants (user_id, grant_kind, access_plan, active)
 values (pg_temp.uid(62), 'owner', 'studio_access', true);
@@ -176,11 +188,19 @@ select throws_ok($$select pg_temp.accept(86)$$, 'P0001', 'workspace_seat_limit_r
 
 -- 10. Both functions take the workspace's seat lock (the two-session run is in the WO-CAT-6 receipt).
 select ok(pg_temp.seat_lock_held(1), 'create takes the workspace seat lock');
+select pg_temp.plan(87, 'studio_access', null);
 insert into public.foundation_workspace_invitations (workspace_key, invitee_email, role, token_hash, idempotency_key, invited_by, expires_at)
 values (pg_temp.ws(87), 'seat-88@example.invalid', 'member', pg_temp.hash(88), 'seat_idempotency_0088', pg_temp.uid(87), now() + interval '1 hour');
 select ok(not pg_temp.seat_lock_held(87), 'no seat lock is held on a workspace before its accept');
-select is(pg_temp.accept(88)->>'state', 'accepted', 'an accept on a workspace without a plan code is admitted');
+select is(pg_temp.accept(88)->>'state', 'accepted', 'an accept on a legacy workspace (no plan code) is admitted');
 select ok(pg_temp.seat_lock_held(87), 'accept takes the workspace seat lock');
+-- A Free workspace refuses the accept of an invite that was pending before the one-seat rule.
+insert into public.foundation_workspace_invitations (workspace_key, invitee_email, role, token_hash, idempotency_key, invited_by, expires_at)
+values (pg_temp.ws(89), 'seat-99@example.invalid', 'member', pg_temp.hash(99), 'seat_idempotency_0099', pg_temp.uid(89), now() + interval '1 hour');
+select throws_ok($$select pg_temp.accept(99)$$, 'P0001', 'workspace_seat_limit_reached',
+  'free: accepting an earlier-pending invite would be a second active member, so it is refused');
+select is((select state from public.foundation_workspace_invitations where invite_id = pg_temp.invite_id(99)), 'pending',
+  'free: the refused accept left the invite pending');
 
 -- 11. Grants are as before: service_role only; the limit helper is internal.
 select ok(
