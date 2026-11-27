@@ -3620,6 +3620,15 @@ export const V34_PROGRAM_AFFECTED_OWNERS = Object.freeze({
     browserFiles: Object.freeze([]),
     externalChecks: Object.freeze({}),
   }),
+  // WO-AN-RUM-1: product measurement and field vitals (the two routes, the store, the browser reporter, the workspace choice).
+  // product-measurement.test.ts drives the routes and the reporter; legal-terms-consistency reads the choice component's first-touch
+  // use; route-classification reads both route files. Its pgTAP file runs in the full DB rehearsal (supabase test db discovers it).
+  'product-measurement': Object.freeze({
+    paths: Object.freeze(['app/api/field-vitals/route.ts', 'app/api/product-measurement/route.ts', 'components/workspace/product-measurement.tsx', 'lib/field-vitals.ts', 'lib/product-measurement.test.ts', 'lib/product-measurement.ts']),
+    unitFiles: Object.freeze(['lib/legal-terms-consistency.test.ts', 'lib/product-measurement.test.ts', 'lib/route-classification.test.ts']),
+    browserFiles: Object.freeze([]),
+    externalChecks: Object.freeze({}),
+  }),
 });
 // Owners for paths lanes still in flight add, fixed by their work orders: each its own group, selected only by a change to its own paths,
 // so a suite it names that is absent today can only be selected by the change that adds it.

@@ -1221,7 +1221,9 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     ['workspace-payer-entitlement', 1, 1, 0, 0],
     ['agent-u37-matrix', 3, 2, 0, 0],
     // WO-WS-5: the workspace draws its active World (one owner, one suite).
-    ['workspace-world-picture', 4, 1, 0, 0]];
+    ['workspace-world-picture', 4, 1, 0, 0],
+    // WO-AN-RUM-1: product measurement and field vitals (six paths, three suites).
+    ['product-measurement', 6, 3, 0, 0]];
   // Train 2026-11-24 (WO-TRAIN-1): codex/v34-an-8's two routes were pending; WO-TRAIN-2: that lane merged, so none is pending.
   const pendingPins = [];
   // Paths another owner keeps that also select a program owner's suite (round 5: WO-CI-6B's shell suite for the /explore page and stage).
@@ -1231,7 +1233,7 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
   // Repair runs only part of the file: every planned run of it carries a grep or a grep-invert.
   const repairRunsPart = file => { const runs = planBrowserRuns([file], false); return runs.length > 0 && runs.every(run => run.grep || run.grepInvert); };
   assert(JSON.stringify(Object.keys(V34_PROGRAM_AFFECTED_OWNERS)) === JSON.stringify(pins.map(([group]) => group))
-    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the fifty-five reviewed groups and no pending group');
+    && JSON.stringify(Object.keys(V34_PROGRAM_PENDING_OWNERS)) === JSON.stringify(pendingPins.map(([group]) => group)), 'V34 program owners must be exactly the fifty-six reviewed groups and no pending group');
   for (const [pending, [group, pathCount, unitCount, browserCount, externalCount]] of [...pins.map(pin => [false, pin]), ...pendingPins.map(pin => [true, pin])]) {
     const declared = (pending ? V34_PROGRAM_PENDING_OWNERS : V34_PROGRAM_AFFECTED_OWNERS)[group], owners = AFFECTED_GROUPS.filter(owner => owner.group === group), [owner] = owners;
     const external = Object.keys(owner?.externalChecks ?? {});
@@ -1283,4 +1285,4 @@ assert(collectorVerifier.includes("Symbol('native race final-gate generated plan
     && planner.includes('name different runners for one external check: ') && planner.includes('externalCheckClaimFailures(file, externalChecks.get(file).claim, readClaimSource)'),
     'page-meter must own the ledger replay without an unrun claim, database-contract must select the five program pgTAP files, and the map must refuse an absent or unheld external check, two runners for one file and an owner that executes nothing');
 }
-console.log('V34 program owners: fifty-five exact owners (one binding the /explore paths to its checks, the /explore key spec, the one-path spec, the acting-workspace spec and the active-World Ask spec verified Product QA claims) and none pending (codex/v34-an-8\'s two routes merged and moved), every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
+console.log('V34 program owners: fifty-six exact owners (one binding the /explore paths to its checks, the /explore key spec, the one-path spec, the acting-workspace spec and the active-World Ask spec verified Product QA claims) and none pending (codex/v34-an-8\'s two routes merged and moved), every external claim read at head (the V34 matrix job included), no program path unexecuted, every Repair browser row runs something, the V34 harness and the database harness run by the Repair job, page-meter and database-contract additions verified.');
