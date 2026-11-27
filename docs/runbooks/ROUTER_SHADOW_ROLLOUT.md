@@ -205,9 +205,9 @@ pnpm router:seed:shadow -- --workspace <workspaceKey> --collection <collectionId
 pnpm router:seed:shadow -- --workspace <workspaceKey> --collection <collectionId> \
   --endpoint both --execute
 
-# 3. Read the evidence back (after real traffic).
-pnpm router:shadow:report -- --hours 24
-pnpm router:shadow:report -- --hours 168 --markdown > shadow-evidence.md
+# 3. Read the evidence back (after real traffic): the SQL below.
+#    (`pnpm router:shadow:report` read these tables until 2026-11-27; it now reports the PAGE router
+#    shadow, foundation_router_shadow_traces -- WO-RTR-GAPS-1.)
 ```
 
 Inspecting the same thing in SQL, for a reviewer who will not run the script:

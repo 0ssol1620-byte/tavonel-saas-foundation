@@ -4,11 +4,13 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
-  WO-RTR-2. The router shadow hook in the real `runCollectionCompile`: only R2, Core and the stores
-  around it are stubbed. What it proves: off writes nothing and the compile is the compile; on, the
-  trace is sent beside the compile without changing its answer or Core's request, Core is dispatched
-  while the write is still in flight, a failing write fails nothing, a redelivered job sends the same
-  keys, and no public surface imports the trace.
+  WO-RTR-2 and WO-RTR-GAPS-1. The router shadow hook in the real `runCollectionCompile`: only R2, Core
+  and the stores around it are stubbed. What it proves: off writes nothing and the compile is the
+  compile; on, the trace is sent once the compile has its answer without changing that answer or
+  Core's request, Core never waits on it, a hung store releases the answer after its 2 s timeout, a
+  failing write or a throwing compile fails nothing more, a redelivered job sends the same keys,
+  operational and semantic failures land in their own rows (gap 1), the run's outcome rides on every
+  row (gap 4), and no public surface imports the trace or its report.
 */
 
 const listed = vi.fn();
@@ -181,16 +183,41 @@ describe("router shadow hook in runCollectionCompile", () => {
     expect(error).toHaveBeenCalledWith(JSON.stringify({ event: "router_shadow_failed", code: "ROUTER_SHADOW_STORE_UNREACHABLE", pages: 2 }));
   });
 
-  it("Core is dispatched while the write is still in flight", async () => {
+  it("the write starts once the compile has its answer: Core and the stored candidate never wait on it", async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
     let release!: () => void;
     storeAnswer = () => new Promise<Response>((resolveWrite) => { release = () => resolveWrite(new Response("2", { status: 200 })); });
     for (const [name, value] of Object.entries(SHADOW_ON)) vi.stubEnv(name, value);
     const pending = runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
-    await vi.waitFor(() => expect(put).toHaveBeenCalled());
+    await vi.waitFor(() => expect(storeCalls).toHaveLength(1));
     expect(dispatched).toHaveBeenCalledTimes(1);
+    expect(put).toHaveBeenCalledTimes(1);
     release();
     expect(await pending).toMatchObject({ ok: true });
+  });
+
+  it("a hung store releases the same answer after its 2 s timeout", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const off = await compileWith({ TAVONEL_ROUTER_SHADOW_ENABLED: "" });
+    vi.stubGlobal("fetch", vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+    })));
+    const started = performance.now();
+    const on = await compileWith(SHADOW_ON);
+    const waited = performance.now() - started;
+    expect(on.run).toBe(off.run);
+    expect(waited).toBeGreaterThanOrEqual(1_900);
+    expect(waited).toBeLessThan(6_000);
+    expect(error).toHaveBeenCalledWith(JSON.stringify({ event: "router_shadow_failed", code: "ROUTER_SHADOW_STORE_UNREACHABLE", pages: 2 }));
+  }, 10_000);
+
+  it("a throwing compile is traced as COMPILE_THREW and still throws its own error", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    for (const [name, value] of Object.entries(SHADOW_ON)) vi.stubEnv(name, value);
+    dispatched.mockRejectedValue(new Error("core exploded"));
+    await expect(runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).rejects.toThrow("core exploded");
+    expect(storeCalls[0]!.body.p_rows.map((row) => [row.page_index0, row.outcome_class, row.run_outcome_class, row.run_reason_code]))
+      .toEqual([[0, "ok", "operational", "COMPILE_THREW"], [1, "semantic", "operational", "COMPILE_THREW"]]);
   });
 
   it("a redelivered job sends the same run, document, version and page: the database key makes the second a no-op", async () => {
@@ -200,6 +227,60 @@ describe("router shadow hook in runCollectionCompile", () => {
     const key = (row: Record<string, unknown>) => [row.run_ref, row.document_id, row.version_key, row.page_index0, row.table_sha256].join("|");
     expect(storeCalls).toHaveLength(2);
     expect(storeCalls[1]!.body.p_rows.map(key)).toEqual(storeCalls[0]!.body.p_rows.map(key));
+  });
+});
+
+describe("trace v2 through the real path (WO-RTR-GAPS-1)", () => {
+  const OTHER = "0c0c0c0c-0000-4000-8000-00000000000b";
+  const OTHER_PREFIX = `immutable/${WS}/${WS}/${OTHER}/${VERSION}`;
+  const rowsOf = (call = storeCalls.at(-1)!) => call.body.p_rows.map((row) => [row.document_id, row.page_index0, row.outcome_class,
+    row.reason_code, row.run_outcome_class, row.run_reason_code]);
+  const withOther = (file: string) => listed.mockResolvedValue({ ok: true, objects: [
+    { key: `${PREFIX}/sanitized.pdf`, size: 1024 }, { key: `${PREFIX}/ocr.json`, size: 512 },
+    { key: `${OTHER_PREFIX}/sanitized.pdf`, size: 2048 }, ...(file ? [{ key: `${OTHER_PREFIX}/${file}`, size: 64 }] : []),
+  ] });
+  beforeEach(() => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    for (const [name, value] of Object.entries(SHADOW_ON)) vi.stubEnv(name, value);
+  });
+
+  it("gap 1: a review receipt instead of a result is a semantic document row; the compile's own refusal is unchanged", async () => {
+    withOther("ocr-review.json");
+    const run = await runCollectionCompile(WS, [DOCUMENT, OTHER], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, code: "OCR_NOT_READY" });
+    expect(rowsOf()).toEqual([[OTHER, null, "semantic", "OCR_REVIEW_RECEIPT", "unattributed", "COMPILE_STOPPED"]]);
+    expect(storeCalls.at(-1)!.body.p_rows[0]).toMatchObject({ pre_source_bytes: 2048, pre_page_count: null, candidate_route: null });
+  });
+
+  it("gap 1: a job's document the reader never finished is an operational OCR_READ_TIMEOUT row beside the pages it did read", async () => {
+    withOther("");
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID, undefined, undefined,
+      [{ documentId: OTHER, kind: "input", reason: "READING_DID_NOT_FINISH" }, { documentId: "0c0c0c0c-0000-4000-8000-0000000000ff", kind: "input", reason: "DOCUMENT_NEVER_ARRIVED" }]);
+    expect(run).toMatchObject({ ok: true });
+    expect(rowsOf()).toEqual([[DOCUMENT, 0, "ok", null, "ok", null], [DOCUMENT, 1, "semantic", "UNCLASSIFIABLE_PAGE", "ok", null],
+      [OTHER, null, "operational", "OCR_READ_TIMEOUT", "ok", null]]);
+  });
+
+  it("gap 1: a result that could not be fetched is OCR_RESULT_UNREADABLE (operational), not a binding failure", async () => {
+    fetched.mockResolvedValue({ ok: false, code: "GET_FAILED" });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, code: "OCR_BINDING_INVALID" });
+    expect(rowsOf()).toEqual([[DOCUMENT, null, "operational", "OCR_RESULT_UNREADABLE", "operational", "INPUT_UNREADABLE"]]);
+  });
+
+  it("gap 4: a Core timeout is the run's operational outcome, and the pages read fine keep their own", async () => {
+    dispatched.mockResolvedValue({ ok: false, code: "CORE_V2_TIMEOUT" });
+    const run = await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID);
+    expect(run).toMatchObject({ ok: false, code: "CORE_V2_TIMEOUT" });
+    expect(rowsOf()).toEqual([[DOCUMENT, 0, "ok", null, "operational", "CORE_TIMEOUT"],
+      [DOCUMENT, 1, "semantic", "UNCLASSIFIABLE_PAGE", "operational", "CORE_TIMEOUT"]]);
+    expect(storeCalls.at(-1)!.body.p_rows[0]).toMatchObject({ candidate_route: "native_text", pre_page_count: 2, pre_source_bytes: 1024 });
+  });
+
+  it("a compile that stops before it lists anything traces nothing", async () => {
+    listed.mockResolvedValue({ ok: false, code: "LIST_FAILED" });
+    expect(await runCollectionCompile(WS, [DOCUMENT], undefined, JOB_ID)).toMatchObject({ ok: false });
+    expect(storeCalls).toHaveLength(0);
   });
 });
 
@@ -213,6 +294,11 @@ describe("no public surface carries the trace", () => {
       "*.ts", "*.tsx", "*.mts", "*.js", "*.mjs", ":!*.test.*", ":!*.spec.*", ":!scripts/repair-scope.mjs"], { cwd: ROOT, encoding: "utf8" })
       .split(/\r?\n/).filter(Boolean).sort();
     expect(importers).toEqual(["lib/collection-compile-run.ts", "lib/router-shadow-store.ts", "lib/router-shadow-trace.ts"]);
+    // The RTR-4 report (internal and public types) is reached only by the operator CLI.
+    const reportImporters = execFileSync("git", ["grep", "-l", "--untracked", "-F", "router-shadow-report", "--",
+      "*.ts", "*.tsx", "*.mts", "*.js", "*.mjs", ":!*.test.*", ":!*.spec.*", ":!scripts/repair-scope.mjs"], { cwd: ROOT, encoding: "utf8" })
+      .split(/\r?\n/).filter(Boolean).sort();
+    expect(reportImporters).toEqual(["scripts/router/shadow-report.mjs"]);
   });
 
   it("the compile's answer, the stored candidate and Core's request name no trace field", async () => {
@@ -220,7 +306,7 @@ describe("no public surface carries the trace", () => {
     const { run, core } = await compileWith(SHADOW_ON);
     const stored = String(put.mock.calls.at(-1)?.[3]);
     for (const text of [run, core, stored]) {
-      expect(text).not.toMatch(/page_class|pageClass|evidence_row|evidenceRow|incumbent|router|RT-1|RT-3|unclassifiable/i);
+      expect(text).not.toMatch(/page_class|pageClass|evidence_row|evidenceRow|incumbent|router|RT-1|RT-3|unclassifiable|reason_code|outcome_class|table_sha256|cost_reason|candidate_route|pre_page_count|pre_source_bytes|run_outcome|EMPTY_PAGE/i);
     }
   });
 });

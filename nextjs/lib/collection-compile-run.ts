@@ -37,7 +37,8 @@ import { readR2SignerEnv } from "./r2-synthetic-canary";
 import { getFoundationActiveWorld } from "./world-store";
 import { detectExactDuplicatesAtIntake, type ExactDuplicateNote } from "./source-dedup";
 import { organizeLibraryAtIntake } from "./library-shadow";
-import { recordRouterShadowTrace, routerShadowRun, type RouterShadowDocument } from "./router-shadow-store";
+import { recordRouterShadowTrace, routerShadowRun, routerShadowRunOutcome, type RouterShadowDocument } from "./router-shadow-store";
+import type { CompileBlocker } from "./compile-job-store";
 import type { DocumentListItem } from "./immutable-keys";
 
 /** A size refusal keeps its detail on the failure, so the job event can name what was too large. */
@@ -153,9 +154,24 @@ function ocrCandidate(document: DocumentListItem, json: Record<string, unknown>)
   };
 }
 
+/** What the router shadow saw of this compile; filled as the compile goes, read only by the shadow after it. */
+type RouterShadowObservation = {
+  runId: string | null;
+  listed: readonly DocumentListItem[] | null;
+  read: { selected: readonly DocumentListItem[]; fetched: readonly Awaited<ReturnType<typeof getWorkspaceOcrJson>>[] } | null;
+};
+
+const shadowRef = (document: DocumentListItem) => ({ documentId: document.documentId, versionKey: document.versionKey,
+  sourceBytes: document.sanitizedSize });
+
 /** What the router shadow may know of one document: the compile's own checks, applied to it alone. */
-function routerShadowDocument(document: DocumentListItem, body: unknown): RouterShadowDocument {
-  const ref = { documentId: document.documentId, versionKey: document.versionKey };
+function routerShadowDocument(document: DocumentListItem, fetched: Awaited<ReturnType<typeof getWorkspaceOcrJson>>): RouterShadowDocument {
+  const ref = shadowRef(document);
+  // A result that could not be fetched is a transport failure; one fetched but not JSON (or not an OCR body) is unbound.
+  if (!fetched.ok && "code" in fetched && (fetched.code === "GET_FAILED" || fetched.code === "NOT_FOUND")) {
+    return { ...ref, failure: "OCR_RESULT_UNREADABLE" };
+  }
+  const body = fetched.ok ? fetched.json : null;
   if (body === null || typeof body !== "object" || ocrSchemaUnbound(body as Record<string, unknown>)) {
     return { ...ref, failure: "OCR_BINDING_INVALID" };
   }
@@ -163,6 +179,32 @@ function routerShadowDocument(document: DocumentListItem, body: unknown): Router
   if (documentsWithoutRegions([candidate]).length > 0) return { ...ref, failure: OCR_REGIONS_REQUIRED };
   const input = validateCollectionOcrInput(candidate);
   return input ? { ...ref, input } : { ...ref, failure: "OCR_BINDING_INVALID" };
+}
+
+/**
+ * Every document whose reading this compile knows: the ones it read, then the ones the reader never answered
+ * for (a review receipt instead of a result, or a job blocker). A document still being read has no row.
+ */
+function routerShadowDocuments(documentIds: readonly string[], readingBlocked: readonly CompileBlocker[],
+  shadow: RouterShadowObservation): RouterShadowDocument[] {
+  const listed = shadow.listed;
+  if (!listed) return [];
+  const rows = new Map<string, RouterShadowDocument>();
+  shadow.read?.selected.forEach((document, index) => rows.set(document.documentId, routerShadowDocument(document, shadow.read!.fetched[index]!)));
+  const unanswered = [
+    ...documentIds.map((documentId) => ({ documentId, reason: "" })),
+    ...readingBlocked,
+  ];
+  for (const { documentId, reason } of unanswered) {
+    const document = listed.find((item) => item.documentId === documentId);
+    if (!document || rows.has(documentId)) continue;
+    if (document.processingState === "operator_review" || reason === "READING_NEEDS_OPERATOR_REVIEW") {
+      rows.set(documentId, { ...shadowRef(document), failure: "OCR_REVIEW_RECEIPT" });
+    } else if (reason === "READING_DID_NOT_FINISH") {
+      rows.set(documentId, { ...shadowRef(document), failure: "OCR_READ_TIMEOUT" });
+    }
+  }
+  return [...rows.values()];
 }
 
 export async function runCollectionCompile(
@@ -173,18 +215,23 @@ export async function runCollectionCompile(
   observationPrincipal?: CompileObservationPrincipal,
   /** The invocation's wall clock, when a scheduler tick owns it: Core is given what is left of it minus the settlement reserve. */
   deadlineAt?: number,
+  /** The job's documents the reader never answered for (router shadow only; the compile does not read it). */
+  readingBlocked: readonly CompileBlocker[] = [],
 ): Promise<CollectionCompileRun> {
   /*
-    The router shadow (ADR-012 section 5) writes beside the compile, never in its way: its write
-    starts once the OCR bodies are read, Core is dispatched without waiting for it, and it is
-    settled here, after the compile has its answer. It never rejects, and the answer is not read
-    from it. Off (the default) it resolves at once without a store call.
+    The router shadow (ADR-012 section 5, trace v2) records once the compile has its answer, so each
+    row carries the run's outcome. It never rejects, the answer is never read from it, and Core never
+    waits on it; the answer waits for the write at most its 2 s store timeout (cohort only). Off (the
+    default) it resolves at once with no computation and no store call.
   */
-  const shadowWrites: Promise<void>[] = [];
+  const shadow: RouterShadowObservation = { runId: null, listed: null, read: null };
+  let result: CollectionCompileRun | undefined;
   try {
-    return await compileOnce(workspaceId, documentIds, logicalCollectionKey, compileJobId, observationPrincipal, deadlineAt, shadowWrites);
+    result = await compileOnce(workspaceId, documentIds, logicalCollectionKey, compileJobId, observationPrincipal, deadlineAt, shadow);
+    return result;
   } finally {
-    await Promise.all(shadowWrites);
+    await recordRouterShadowTrace(workspaceId, routerShadowRun(compileJobId ?? null, shadow.runId ?? ""),
+      () => ({ documents: routerShadowDocuments(documentIds, readingBlocked, shadow), outcome: routerShadowRunOutcome(result) }));
   }
 }
 
@@ -195,12 +242,13 @@ async function compileOnce(
   compileJobId: string | undefined,
   observationPrincipal: CompileObservationPrincipal | undefined,
   deadlineAt: number | undefined,
-  shadowWrites: Promise<void>[],
+  shadow: RouterShadowObservation,
 ): Promise<CollectionCompileRun> {
   const startedAt = Date.now();
   // An invocation identity, distinct from a durable job (which can have several attempts).
   // Copy and hash the server caller's principal now; no customer text or raw identity is logged.
   const observationRunId = randomUUID();
+  shadow.runId = observationRunId;
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const observationJobId = /^cjob-[a-f0-9]{32}$/.test(compileJobId ?? "") ? compileJobId! : null;
   const principalProvenance = observationPrincipal?.provenance;
@@ -267,6 +315,7 @@ async function compileOnce(
       payload: { documentIds: current.ambiguousDocumentIds.filter((id) => documentIds.includes(id)) } };
   }
   const documents = current.documents;
+  shadow.listed = documents;
   const selected = documentIds.map((id) => documents.find((item) => item.documentId === id && item.hasOcrJson));
   if (selected.some((item) => !item?.sanitizedKey || !item.ocrJsonKey)) {
     return { ok: false, status: 409, code: "OCR_NOT_READY", payload: {}, retryAfterSeconds: 5 };
@@ -320,8 +369,7 @@ async function compileOnce(
   }
   // An OCR result that could not be read at all is a binding failure, not a missing-region one.
   const bodies = fetched.map((result) => (result.ok ? result.json : null));
-  shadowWrites.push(recordRouterShadowTrace(workspaceId, routerShadowRun(compileJobId ?? null, observationRunId),
-    () => selected.map((item, index) => routerShadowDocument(item!, bodies[index]))));
+  shadow.read = { selected: selected as DocumentListItem[], fetched };
   if (bodies.some((body) => body === null || typeof body !== "object")) {
     return { ok: false, status: 422, code: "OCR_BINDING_INVALID", payload: {} };
   }

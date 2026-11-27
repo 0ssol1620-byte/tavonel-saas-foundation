@@ -58,7 +58,10 @@ select is((select string_agg(attname::text, ',' order by attnum) from pg_attribu
   'trace_key,workspace_key,run_kind,run_ref,document_id,version_key,page_index0,input_sha256,'
   || 'ocr_schema_version,reader_revision,reader_binding_sha256,page_class,incumbent_route,evidence_row_id,'
   || 'table_version,table_sha256,agrees_with_incumbent,cost_usd,cost_reason,outcome_class,reason_code,'
-  || 'recognition_conflict_count,created_at', 'ids, digests, class and outcome only: no text, bbox or region column');
+  || 'recognition_conflict_count,created_at,'
+  -- 20261127060000 (trace v2): route, counts and outcome codes, still no content column.
+  || 'trace_version,candidate_route,pre_page_count,pre_source_bytes,run_outcome_class,run_reason_code',
+  'ids, digests, class and outcome only: no text, bbox or region column');
 
 -- 3. Writes and redelivery.
 select is(pg_temp.rt_call(jsonb_build_array(

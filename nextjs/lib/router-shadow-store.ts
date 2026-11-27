@@ -10,11 +10,23 @@ import { readSupabaseAdminConfig, supabaseAdminRequest } from "./supabase-admin"
   Anything else is off, and off means no computation and no store call -- not a degraded trace.
   A cohort that is unset, empty, malformed or holds `*` (or any non-key) is off for every workspace.
 
-  Rows go to foundation_router_shadow_traces through record_router_shadow_traces (migration
-  20261123130000, provisional slot). They carry ids, digests, the page class and the evidence row:
+  Rows go to foundation_router_shadow_traces through record_router_shadow_traces (migrations
+  20261124000200 and 20261127060000). They carry ids, digests, the page class and the evidence row:
   no text, no bbox, no region content. The key is computed by the database from (run, document
   version, page, table digest), so a redelivered compile writes nothing twice. INTERNAL ONLY: no
   public DTO, route or client bundle imports this module (router-shadow-hook.test.ts checks it).
+
+  Trace v2 (WO-RTR-GAPS-1, the four ROUTER-AUDIT-1 gaps):
+  1. Operational failures are traced apart from semantic ones, including a reader that never
+     answered (OCR_READ_TIMEOUT) and a stored result that could not be fetched (OCR_RESULT_UNREADABLE).
+  2. A page with no region is EMPTY_PAGE: in a durable OCR result every page was read (the CDR
+     worker refuses an incomplete set, OCR_PAGES_INCOMPLETE, and the worker raises on a page it
+     cannot render), so a failed read is never a page row; it is a document row. Whether an empty
+     page is blank or holds text the reader missed is NOT measured here.
+  3. Pre-read features (`pre_*`: known before any reader runs, the same for every reader) are
+     separate columns from post-read ones (page class, conflicts, reasons: the incumbent's output).
+  4. Each row names the candidate route its evidence row supports, and the run's outcome
+     (`run_*`), which is never attributed to a page route.
 */
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -24,12 +36,49 @@ const COMPILE_JOB = /^cjob-[a-f0-9]{32}$/;
 const INVOCATION = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** One RPC call's row bound; the database refuses above it too. A compile above it is skipped and says so. */
 export const ROUTER_SHADOW_MAX_ROWS = 20_000;
-// ponytail: the result waits at most this long for a write still in flight when the compile finishes; Core never waits on it.
+// ponytail: the write starts once the compile has its answer, so the answer waits at most this long for it (cohort only); Core never waits on it.
 const STORE_TIMEOUT_MS = 2_000;
 
+/** Why a document has no page rows. The first three are ours (operational); the last two are the reader's (semantic). */
+export type RouterShadowFailure =
+  | "OCR_BINDING_INVALID" // read, but the body could not be bound
+  | "OCR_RESULT_UNREADABLE" // the stored result could not be fetched
+  | "OCR_READ_TIMEOUT" // the reader never answered inside the compile job's bound (READING_DID_NOT_FINISH)
+  | "OCR_REGIONS_REQUIRED" // a v1 read without regions
+  | "OCR_REVIEW_RECEIPT"; // the reader ran and its answer did not hold, or the source is the problem (CDR ocr.ts: only `semantic` codes write a receipt)
+
+const OPERATIONAL_FAILURES: ReadonlySet<RouterShadowFailure> = new Set(["OCR_BINDING_INVALID", "OCR_RESULT_UNREADABLE", "OCR_READ_TIMEOUT"]);
+
+/** `sourceBytes`: the sanitized source's stored size from the listing, a pre-read feature; null when the listing has none. */
 export type RouterShadowDocument =
-  | { documentId: string; versionKey: string; failure: "OCR_BINDING_INVALID" | "OCR_REGIONS_REQUIRED" }
-  | { documentId: string; versionKey: string; input: CollectionOcrInput };
+  | { documentId: string; versionKey: string; sourceBytes: number | null; failure: RouterShadowFailure }
+  | { documentId: string; versionKey: string; sourceBytes: number | null; input: CollectionOcrInput };
+
+/**
+ * The run's outcome, recorded on every row of the run and never attributed to a page route.
+ * operational: a component failed (timeout, unavailable, unreadable, threw). semantic: a reader or Core answered and
+ * refused. unattributed: the compile stopped at a gate that is not reading (authority, version, budget, size, not ready).
+ */
+export type RouterShadowRunOutcome =
+  | { outcome_class: "ok"; reason_code: null }
+  | { outcome_class: "operational"; reason_code: "CORE_TIMEOUT" | "CORE_FAILED" | "INPUT_UNREADABLE" | "COMPILE_THREW" }
+  | { outcome_class: "semantic"; reason_code: "CORE_REJECTED" | "INPUT_REFUSED" }
+  | { outcome_class: "unattributed"; reason_code: "COMPILE_STOPPED" };
+
+/** Pure. `undefined` is a compile that threw. Unknown codes are COMPILE_STOPPED: never guessed into a reader or Core outcome. */
+export function routerShadowRunOutcome(result: { ok: boolean; code?: string } | undefined): RouterShadowRunOutcome {
+  if (!result) return { outcome_class: "operational", reason_code: "COMPILE_THREW" };
+  if (result.ok) return { outcome_class: "ok", reason_code: null };
+  const code = result.code ?? "";
+  if (code === "CORE_V2_REJECTED") return { outcome_class: "semantic", reason_code: "CORE_REJECTED" };
+  if (code === "OCR_REGIONS_REQUIRED" || code === "OCR_V3_READER_REQUIRED") return { outcome_class: "semantic", reason_code: "INPUT_REFUSED" };
+  if (code === "CORE_V2_TIMEOUT") return { outcome_class: "operational", reason_code: "CORE_TIMEOUT" };
+  if (code === "CORE_V2_UNAVAILABLE" || code === "CORE_V2_RECEIPT_INVALID" || code === "CORE_V2_PROJECTION_INVALID" || /^CORE_V2_HTTP_\d{3}$/.test(code)) {
+    return { outcome_class: "operational", reason_code: "CORE_FAILED" };
+  }
+  if (code === "OCR_BINDING_INVALID") return { outcome_class: "operational", reason_code: "INPUT_UNREADABLE" };
+  return { outcome_class: "unattributed", reason_code: "COMPILE_STOPPED" };
+}
 
 export type RouterShadowRun = { kind: "compile_job" | "invocation"; ref: string };
 
@@ -46,6 +95,7 @@ export type RouterShadowRow = {
   page_class: string | null;
   incumbent_route: string | null;
   evidence_row_id: string | null;
+  candidate_route: string | null;
   table_version: number;
   table_sha256: string;
   agrees_with_incumbent: boolean | null;
@@ -54,6 +104,10 @@ export type RouterShadowRow = {
   outcome_class: "ok" | "operational" | "semantic";
   reason_code: string | null;
   recognition_conflict_count: number | null;
+  pre_page_count: number | null;
+  pre_source_bytes: number | null;
+  run_outcome_class: RouterShadowRunOutcome["outcome_class"];
+  run_reason_code: RouterShadowRunOutcome["reason_code"];
 };
 
 function log(level: "info" | "error", line: Record<string, string | number>) {
@@ -84,21 +138,22 @@ export function routerShadowRun(compileJobId: string | null, invocationId: strin
  * that far. null when the compile has more than ROUTER_SHADOW_MAX_ROWS rows: counted before any is built.
  */
 export function buildRouterShadowRows(run: RouterShadowRun, documents: readonly RouterShadowDocument[],
-  table: EvidenceTable = EVIDENCE_TABLE): RouterShadowRow[] | null {
+  outcome: RouterShadowRunOutcome, table: EvidenceTable = EVIDENCE_TABLE): RouterShadowRow[] | null {
   const total = documents.reduce((sum, document) => sum + ("failure" in document ? 1 : document.input.pageCount), 0);
   if (!(total <= ROUTER_SHADOW_MAX_ROWS)) return null;
   const rows: RouterShadowRow[] = [];
-  const tableFields = { table_version: table.tableVersion, table_sha256: tableSha256(table) };
+  const tableFields = { table_version: table.tableVersion, table_sha256: tableSha256(table),
+    run_outcome_class: outcome.outcome_class, run_reason_code: outcome.reason_code };
   for (const document of documents) {
+    const sourceBytes = Number.isSafeInteger(document.sourceBytes) && document.sourceBytes! >= 0 ? document.sourceBytes : null;
     const base = { run_kind: run.kind, run_ref: run.ref, document_id: document.documentId.toLowerCase(),
-      version_key: document.versionKey.toLowerCase() };
+      version_key: document.versionKey.toLowerCase(), pre_source_bytes: sourceBytes };
     const empty = { page_index0: null, input_sha256: null, ocr_schema_version: null, reader_revision: null,
-      reader_binding_sha256: null, page_class: null, incumbent_route: null, evidence_row_id: null,
-      agrees_with_incumbent: null, cost_usd: null, cost_reason: null, recognition_conflict_count: null };
+      reader_binding_sha256: null, page_class: null, incumbent_route: null, evidence_row_id: null, candidate_route: null,
+      agrees_with_incumbent: null, cost_usd: null, cost_reason: null, recognition_conflict_count: null, pre_page_count: null };
     if ("failure" in document) {
-      // An OCR body that cannot be read or bound is ours (operational); a v1 read without regions is the reader's (semantic).
       rows.push({ ...base, ...empty, ...tableFields,
-        outcome_class: document.failure === "OCR_BINDING_INVALID" ? "operational" : "semantic", reason_code: document.failure });
+        outcome_class: OPERATIONAL_FAILURES.has(document.failure) ? "operational" : "semantic", reason_code: document.failure });
       continue;
     }
     const { input } = document;
@@ -115,14 +170,15 @@ export function buildRouterShadowRows(run: RouterShadowRun, documents: readonly 
     for (const page of classified.pages) {
       const conflictCount = conflicts.get(page.pageIndex0) ?? 0;
       const reason = page.pageClass === "unclassifiable" ? "UNCLASSIFIABLE_PAGE"
-        : page.pageClass === "no_text" ? "NO_TEXT_PAGE"
+        : page.pageClass === "no_text" ? "EMPTY_PAGE"
           : conflictCount > 0 ? "RECOGNITION_CONFLICT" : null;
       rows.push({ ...base, page_index0: page.pageIndex0, input_sha256: input.inputSha256.toLowerCase(),
         ocr_schema_version: input.ocrSchemaVersion ?? null, reader_revision: input.readerRevision ?? null,
         reader_binding_sha256: input.readerBindingSha256 ?? null, page_class: page.pageClass,
-        incumbent_route: page.incumbentRoute, evidence_row_id: page.evidenceRowId, ...tableFields,
+        incumbent_route: page.incumbentRoute, evidence_row_id: page.evidenceRowId, candidate_route: page.evidenceRoute, ...tableFields,
         agrees_with_incumbent: page.agreesWithIncumbent, cost_usd: page.costUsd, cost_reason: page.costReason,
-        outcome_class: reason === null ? "ok" : "semantic", reason_code: reason, recognition_conflict_count: conflictCount });
+        outcome_class: reason === null ? "ok" : "semantic", reason_code: reason, recognition_conflict_count: conflictCount,
+        pre_page_count: input.pageCount });
     }
   }
   return rows;
@@ -130,10 +186,11 @@ export function buildRouterShadowRows(run: RouterShadowRun, documents: readonly 
 
 /**
  * Records this compile's trace. Never throws and never rejects: every failure is a logged reason code.
- * `documents` is a thunk so a workspace outside the cohort pays for nothing.
+ * `trace` is a thunk so a workspace outside the cohort pays for nothing. A compile that stopped before it
+ * knew any document's reading has no row and makes no store call.
  */
 export async function recordRouterShadowTrace(workspaceKey: string, run: RouterShadowRun | null,
-  documents: () => readonly RouterShadowDocument[], env: Env = process.env): Promise<void> {
+  trace: () => { documents: readonly RouterShadowDocument[]; outcome: RouterShadowRunOutcome }, env: Env = process.env): Promise<void> {
   try {
     if (!routerShadowEnabled(workspaceKey, env)) return;
     // Yield first, so the rows are built while the compile awaits its own I/O, not before it goes on.
@@ -142,7 +199,9 @@ export async function recordRouterShadowTrace(workspaceKey: string, run: RouterS
     if (!run) return fail("ROUTER_SHADOW_RUN_INVALID");
     const config = readSupabaseAdminConfig(env);
     if (!config) return fail("ROUTER_SHADOW_STORE_NOT_CONFIGURED");
-    const rows = buildRouterShadowRows(run, documents());
+    const { documents, outcome } = trace();
+    if (documents.length === 0) return;
+    const rows = buildRouterShadowRows(run, documents, outcome);
     if (!rows) return fail("ROUTER_SHADOW_SKIPPED_BUDGET");
     let response: Response;
     try {
