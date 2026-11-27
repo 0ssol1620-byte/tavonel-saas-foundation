@@ -3,10 +3,10 @@ name: Launch QA
 on:
   # Every PR event main runs on (opened, synchronize, reopened): the full suite runs on each push
   # to a PR, not only when it leaves draft.
-  # No push trigger for agent/** or codex/** lane branches: their pull_request run is the one release evidence
-  # cites, and a push run on the same head was a duplicate of every job (WO-CI-PARALLEL-1).
   pull_request:
   push:
+    # No push trigger for agent/** or codex/** lane branches: their pull_request run is the one release evidence
+    # cites, and a push run on the same head was a duplicate of every job (WO-CI-PARALLEL-1).
     branches:
       - main
       - codex/gate-acl-integration-20260927
