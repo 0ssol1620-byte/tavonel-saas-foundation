@@ -13,7 +13,7 @@
  *    the member accepts and selects the shared workspace, lists its documents, the owner revokes,
  *    and the member's next request acts in their own workspace again. It needs a real database,
  *    and the documents read needs the workspace's plan to apply to members (WO-C-T2). The owner's workspace
- *    must also have a second seat: a Free workspace has one (20261127100000), so the consented owner needs a
+ *    must also have a second seat: a Free workspace has one (20261127020000), so the consented owner needs a
  *    Team plan, a legacy plan or an operator grant, or the invite is refused 402 WORKSPACE_SEAT_LIMIT_REACHED.
  */
 

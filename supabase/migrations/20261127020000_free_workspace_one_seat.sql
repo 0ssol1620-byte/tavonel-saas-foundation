@@ -1,7 +1,7 @@
 -- WO-SINGLE-USER-2 (fix A of receipts/WO-SINGLE-USER-1/REPORT.md): a Free workspace has one seat.
 --
 -- DRAFT. Not applied by its author; the lead dispatches the hosted DB rehearsal (supabase/tests/workspace_seat_allowance.sql
--- is the proof) before this reaches any project. Ordering: 20261127100000, after 20261124000200.
+-- is the proof) before this reaches any project. Ordering: 20261127020000, after 20261124000200.
 --
 -- Until now foundation_workspace_seat_limit returned null (uncapped) for every workspace the plan lookup did not cap:
 -- a Free workspace (no billing account), a legacy plan holder (plan_code null) and an operator-granted account.

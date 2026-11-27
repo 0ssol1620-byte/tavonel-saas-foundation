@@ -56,7 +56,7 @@ create function pg_temp.admit(i integer, d integer) returns void language sql as
     1024, 'application/pdf', now() + interval '10 minutes')
 $$;
 
--- ws(1) is a legacy-plan workspace (plan_code null, uncapped): a Free workspace has one seat (20261127100000), so a
+-- ws(1) is a legacy-plan workspace (plan_code null, uncapped): a Free workspace has one seat (20261127020000), so a
 -- workspace with several members needs a plan row first. Not a statement, so the plan count is unchanged.
 insert into public.foundation_billing_accounts (workspace_key, user_id, access_plan, plan_code, subscription_status)
 values (pg_temp.ws(1), pg_temp.uid(1), 'studio_access', null, 'active');

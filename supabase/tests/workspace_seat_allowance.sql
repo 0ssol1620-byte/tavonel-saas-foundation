@@ -1,7 +1,7 @@
 -- Workspace seat allowance (20261117150200, WO-CAT-6): active members plus live pending invites
 -- stay at or under the plan's seat limit; legacy and operator-granted workspaces are uncapped as
 -- before. A Free workspace (no billing account and no operator grant on its owner) has one seat
--- (20261127100000, WO-SINGLE-USER-2). The limits map is what nextjs/lib/workspace-membership.ts sends,
+-- (20261127020000, WO-SINGLE-USER-2). The limits map is what nextjs/lib/workspace-membership.ts sends,
 -- built from the catalog's included.seats (lib/workspace-membership.test.ts pins that the two agree).
 begin;
 select plan(57);
@@ -110,7 +110,7 @@ select is((select count(*)::integer from generate_series(25, 43) i where (pg_tem
 select throws_ok($$select pg_temp.invite(24, 44)$$, 'P0001', 'workspace_seat_limit_reached', 'business: the twenty-first seat is refused');
 
 -- 6. Legacy (plan_code null) and an operator-granted owner: uncapped, as before. No plan at all (a Free
--- workspace) is one seat, the owner (20261127100000).
+-- workspace) is one seat, the owner (20261127020000).
 select pg_temp.plan(45, 'studio_access', null);
 select is((select count(*)::integer from generate_series(46, 52) i where (pg_temp.invite(45, i)->>'state') = 'pending'), 7,
   'legacy: seven invites past any v2 limit are admitted');

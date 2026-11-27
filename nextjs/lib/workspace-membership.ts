@@ -34,7 +34,7 @@ export type WorkspaceMembershipPrincipal = {
  * for the workspace's `plan_code` under one lock (20261117150200); a workspace with a billing account
  * but no plan code (a legacy plan) or whose owner holds an operator grant is uncapped, a workspace
  * with no billing account and no granted owner (Free) has one seat, held in SQL and not in this map
- * (20261127100000), and a plan code with no entry is refused. Retired offers are absent on purpose.
+ * (20261127020000), and a plan code with no entry is refused. Retired offers are absent on purpose.
  */
 export const WORKSPACE_SEAT_LIMITS: Readonly<Record<string, number>> = Object.fromEntries(
   Object.entries(BILLING_OFFERS).flatMap(([code, offer]) => (offer.included ? [[code, offer.included.seats]] : [])),
